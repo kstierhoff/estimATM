@@ -1,0 +1,991 @@
+---
+title: "CTD and UCTD casts"
+author: "Kevin L. Stierhoff"
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
+output: html_document
+---
+
+```{r setup,echo=FALSE,warning=FALSE,message=FALSE,include=FALSE}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,cowplot,devtools,knitr,shadowtext,plotly,sf,fs,
+               DBI,stringr,gdata,forecast,lubridate,here,rnaturalearth,viridis,
+               DT,mapview,bookdown,ggspatial)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# Control script behavior
+copy.files      <- F # copy data files from data to plotCTD directory
+overwrite.files <- F # overwrite existing files
+get.nav         <- F # download nav data from ERDDAP
+process.files   <- T # process CTD/UCTD files
+save.figs       <- T # create new figures
+get.map         <- T # download map from rnaturalearth
+
+# determines method of table generation for best formatting
+doc.type <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+if (is.null(doc.type)) {
+  doc.type <- "html"
+}
+
+# global knitr chunk options
+knitr::opts_chunk$set(
+  echo = F, warning = F, message = F, 
+  fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
+)
+```  
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r copy-files, include=F}
+if (copy.files) {
+  # Copy UCTD data ------------------------------------
+  # Location of header files on survey directory
+  uctd.hdr <- list.files(file.path(data.dir, "UCTD"), 
+                         pattern = paste(uctd.prefix, ".asc", sep = ""), 
+                         full.names = T)
+  
+  # Copy files to plotCTD directory
+  file.copy(uctd.hdr, here("Data/UCTD"), overwrite = overwrite.files)
+  
+  # Location of processed UCTD files on survey directory
+  uctd.proc <- list.files(file.path(data.dir, "UCTD"), 
+                          pattern = paste(uctd.prefix,"_processed.asc", sep = ""),
+                          full.names = T)
+  
+  # Copy files to plotCTD directory
+  file.copy(uctd.proc, here("Data/UCTD"), overwrite = overwrite.files)
+  
+  # Copy CTD data -------------------------------------
+  # List raw CTD ASCII files
+  ctd.hdr <- list.files(file.path(data.dir, "CTD"),
+                        pattern = paste(ctd.prefix,".hdr", sep = ""),
+                        full.names = T)
+  
+  # Copy files to plotCTD directory
+  file.copy(ctd.hdr, here("Data/CTD"), overwrite = overwrite.files)
+  
+  # Location of processed CTD files on survey directory
+  ctd.proc <- list.files(file.path(data.dir, "CTD"),
+                        pattern = paste(ctd.prefix,"_processed.asc", sep = ""),
+                        full.names = T)
+  
+  # Copy files to plotCTD directory
+  file.copy(ctd.proc, here("Data/CTD"),
+            overwrite = overwrite.files)
+}
+```
+
+```{r process-nav}
+if (get.nav) {
+  # Generate ERDDAP URL
+  dataURL <- URLencode(paste("http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+                             survey.vessel.erddap, ".csv0?", erddap.vars,
+                             "&time>=", survey.start, "&time<=", survey.end,
+                             sep = ""))
+  
+  # Download and parse ERDDAP nav data
+  nav <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                             row.names = NULL, skip = 0))
+  names(nav) <- erddap.headers
+  
+  # Filter to remove bad SST values
+  nav <- nav %>% 
+    mutate(long = long - 360,
+           SOG = SOG * 1.94384,
+           datetime = ymd_hms(time),
+           leg = paste("Leg", cut(as.numeric(date(datetime)), 
+                                  leg.breaks, labels = F))) %>%
+    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+           between(lat, min(survey.lat), max(survey.lat)), 
+           between(long, min(survey.long), max(survey.long)))
+  
+  # Convert nav to spatial
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  # Cast nav to transects
+  transects <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, transects, file = here("Data/nav_data.Rdata"))
+} else {
+  load(here("Data/nav_data.Rdata"))
+}
+```
+
+```{r process-uctd}
+# Process UCTD header files #####
+# List raw UCTD ASCII files
+uctd.hdr <- list.files(here("Data/UCTD"), 
+                       pattern = paste(uctd.prefix, ".asc", sep = ""), 
+                       full.names = T)
+
+# Plot UCTD casts
+if (length(uctd.hdr) == 0) {
+  # Create empty figure if no UCTD casts present
+  df <- data.frame()
+  
+  uctd.empty <- ggplot(df) + geom_point() + 
+    xlim(0,10) + ylim(0,10) + 
+    annotate('text', 5, 5, label = 'No UCTD Casts', size = 6, fontface = 'bold') +
+    theme_bw()  
+  
+  # Save blank figure
+  ggsave(ctd.empty, filename = here("Figs/uctd_missing.png"))
+  
+} else {
+  if (process.files) {
+    # Create a data frame for header info  
+    all.uctd.hdr <- data.frame()
+    
+    for (i in uctd.hdr) {
+      # Extract header information
+      all.uctd.hdr <- bind_rows(all.uctd.hdr,
+                                extract_ctd_header(i, type = "UCTD"))
+    }
+    
+    # Process UCTD cast files --------------------------------------------------
+    # List processed UCTD cast files
+    uctd.proc <- list.files(here("Data/UCTD"), 
+                            pattern = paste(uctd.prefix,"_processed.asc", sep = ""),
+                            full.names = T)
+    
+    # create a data frame for storing results
+    all.uctd.casts <- data.frame()
+    
+    # Process all UCTD casts
+    for (i in uctd.proc) {
+      all.uctd.casts <- bind_rows(all.uctd.casts, 
+                                  extract_ctd_cast(i, type = "UCTD"))
+    }
+    
+    # Arrange and filter results
+    all.uctd.casts <- arrange(all.uctd.casts, cast, scan) %>% 
+      filter(S < max.S, S > min.S) # Remove bad salinity data
+    
+    # Save results
+    save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc,
+         file = here("Data/uctd_data.Rdata"))
+  } else {
+    # Load results
+    load(here("Data/uctd_data.Rdata"))
+  }
+  
+  # Match UCTD headers to nav data
+  nav.match.uctd <- data.frame()
+  
+  for (i in 1:nrow(all.uctd.hdr)) {
+    min.diff <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], nav$datetime)))
+    nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
+  }
+  
+  # Combine header and nav data
+  all.uctd.hdr <- all.uctd.hdr %>% 
+    bind_cols(nav.match.uctd) %>% 
+    mutate(lag = difftime(cast.date, datetime)) %>% 
+    arrange(cast.date)
+  
+  # Summarize UCTD cast results
+  uctd.summ <- all.uctd.casts %>% 
+    group_by(cast) %>% 
+    summarise(
+      time = round(sum(dt),0),
+      max.depth = round(min(Z),0))
+  
+  # Summarize UCTD cast results
+  uctd.summ <- uctd.summ %>%
+    left_join(select(all.uctd.hdr, cast, cast.date, lat, long, SOG)) %>%
+    arrange(cast.date) %>%
+    mutate(cast.num = seq(1, n()),
+           leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = F)))
+  
+  # Write table to CSV
+  write.csv(uctd.summ, file = here("Output/cast_summary_uctd.csv"), quote = F, row.names = F)
+  
+  # Add SOG to all.uctd
+  all.uctd.casts <- all.uctd.casts %>% 
+    left_join(select(uctd.summ, cast, SOG)) %>% 
+    mutate(survey = as.factor(survey.name))
+  
+  # Summarize uctd casts for water classification
+  uctd.class <- 
+    group_by(all.uctd.casts, cast) %>% 
+    summarise(
+      min.T = min(T),
+      min.S = min(S),
+      max.T = max(T),
+      max.S = max(S)
+    ) %>% 
+    # Assign classes based on salinity
+    mutate(class = case_when(
+      min.S <= 31.4 ~ "Type 1",
+      min.S >= 33.4 ~ "Type 2",
+      TRUE ~ "Type 3"))
+
+  # Add water mass to the summary table and cast data for plotting
+  all.uctd.casts <- all.uctd.casts %>% 
+    left_join(uctd.class[ ,c("cast","class")]) %>% 
+    left_join(select(uctd.summ, cast, leg))
+  
+  uctd.summ <- uctd.summ %>% 
+    left_join(uctd.class[ , c("cast","class")]) %>% 
+    select(cast.num, cast, cast.date, lat, long, SOG, 
+           time, max.depth, class, leg)
+  
+  # Remove unprocessed casts from the summary
+  uctd.missing <- all.uctd.hdr %>% 
+    filter(!cast %in% all.uctd.casts$cast)
+  
+  # Exclude bad casts
+  all.uctd.casts <- all.uctd.casts %>%
+    filter(!cast %in% exclude.ctd)
+  
+  # Write table to CSV
+  write.csv(uctd.missing, file = here("Output/unprocessed_uctd.csv"), 
+            quote = F, row.names = F)
+}
+```
+
+```{r process-ctd}
+# List raw UCTD ASCII files
+ctd.hdr <- list.files(here("Data/CTD"),
+                      pattern = paste(ctd.prefix,".hdr", sep = ""),
+                      full.names = T)
+
+# Create empty figure if no CTD casts present
+if (length(ctd.hdr) == 0) {
+  df <- data.frame()
+  
+  ctd.empty <- ggplot(df) + geom_point() + 
+    xlim(0,10) + ylim(0,10) + 
+    annotate('text', 5, 5, label = 'No CTD Casts', size = 6, fontface = 'bold') +
+    theme_bw()  
+  
+  ggsave(ctd.empty, filename = here("Figs/ctd_missing.png"))
+  
+} else {
+  if (process.files) {
+    # Extract header info
+    all.ctd.hdr <- data.frame()
+    
+    for (i in ctd.hdr) {
+      all.ctd.hdr <- bind_rows(all.ctd.hdr,
+                               extract_ctd_header(i, type = "CTD"))
+    }
+    
+    # Process CTD cast files --------------------------------------------------
+    # List processed CTD cast files
+    ctd.proc <- list.files(here("Data/CTD"),
+                           pattern = paste(ctd.prefix,"_processed.asc", sep = ""),
+                           full.names = T)
+    
+    # create a data frame for storing results
+    all.ctd.casts <- data.frame()
+    
+    for (i in ctd.proc) {
+      all.ctd.casts <- bind_rows(all.ctd.casts, 
+                           extract_ctd_cast(i, type = "CTD"))
+    }
+    
+    # Save results
+    save(all.ctd.casts, all.ctd.hdr, ctd.hdr, ctd.proc, 
+         file = here("Data/ctd_data.Rdata"))
+    
+  } else {
+    load(here("Data/ctd_data.Rdata"))
+  }
+  
+  # Match UCTD headers to nav data
+  nav.match.ctd <- data.frame()
+  
+  for (i in 1:nrow(all.ctd.hdr)) {
+    min.diff <- which.min(abs(difftime(all.ctd.hdr$cast.date[i], nav$datetime)))
+    nav.match.ctd <- bind_rows(nav.match.ctd, nav[min.diff, ])
+  }
+  
+  # combine header and nav data
+  all.ctd.hdr <- all.ctd.hdr %>% 
+    bind_cols(nav.match.ctd) %>% 
+    mutate(
+      cast.num = seq(1, n()),
+      lag = difftime(cast.date, datetime))
+  
+  # reorder all.ctd by cast and depth
+  all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>% 
+  # filter all.ctd to remove bad temperature and salinity 
+    filter(T > min.T, T < max.T) %>% 
+    filter(S > min.S, S < max.S) 
+  
+  # calculate max depth of each cast
+  ctd.depth <- all.ctd.casts %>% 
+    group_by(cast) %>% 
+    summarise(max.depth = min(Z))
+  
+  # extract cast number from filename
+  all.ctd.hdr <- all.ctd.hdr %>% 
+    left_join(ctd.depth)
+  
+  # summarize uctd casts for water classification
+  ctd.class <- all.ctd.casts %>% 
+    group_by(cast) %>% 
+    summarise(
+      min.T = min(T),
+      min.S = min(S),
+      max.T = max(T),
+      max.S = max(S)) %>% 
+    # assign classes based on salinity
+    mutate(class = case_when(
+      min.S <= 31.4 ~ "Type 1",
+      min.S >= 33.4 ~ "Type 2",
+      TRUE ~ "Type 3"))
+  
+  all.ctd.hdr <- all.ctd.hdr %>% 
+    left_join(select(ctd.class, cast, class)) %>% 
+    mutate(leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = F))) %>% 
+    select(cast.num, cast, cast.date, lat, long, max.depth, class, leg)
+  
+  # add water mass to the summary table and cast data for plotting
+  all.ctd.casts <- all.ctd.casts %>% 
+    left_join(select(ctd.class, cast, class)) %>% 
+    left_join(select(all.ctd.hdr, cast, leg))  
+  
+  # write table to CSV
+  write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
+            quote = F, row.names = F)
+  
+  # Remove unprocessed casts from the summary
+  ctd.missing <- all.ctd.hdr %>% 
+    filter(!cast %in% all.ctd.casts$cast)
+  
+  # Exclude bad casts
+  all.ctd.casts <- all.ctd.casts %>%
+    filter(!cast %in% exclude.ctd)
+  
+  # write table to CSV
+  write.csv(ctd.missing, file = here("Output/unprocessed_ctd.csv"), 
+            quote = F, row.names = F)
+}
+```
+
+```{r create-basemap}
+# Get map data
+if (get.map) {
+  # Import landmarks ---------------------------
+  locations <- read.csv(here("Data/Map/locations.csv")) %>% 
+    filter(name %in% label.list) %>% 
+    st_as_sf(coords = c("lon","lat"), crs = crs.geog)
+  
+  locations <- project_sf(locations, crs.proj) %>% 
+    arrange(Y)
+  
+  # Get land features --------------------------
+  # Get states
+  states <- ne_states(country = 'United States of America', returnclass = 'sf')
+  
+  # Get countries
+  countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+    filter(subregion %in% c("Northern America","Central America"))
+  
+  # Read bathy contours shapefile ----------------
+  bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+    st_transform(crs.geog) %>% 
+    rename(Depth = Contour)
+  
+  save(locations, states, countries, bathy, file = here("Data/Map/land_sf.Rdata"))
+} else {
+  load(here("Data/Map/land_sf.Rdata"))
+}
+
+# Get map boundaries from nav data
+map.bounds <- nav.sf %>%
+  st_transform(crs = crs.proj) %>%
+  st_bbox()
+
+# Create base map
+base.map <- get_basemap(nav.sf, states, countries, locations, bathy, crs = crs.proj) + 
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+
+# Save plot
+ggsave(base.map, filename = here("Figs/basemap.png"), 
+       width = map.width, height = map.height)
+```
+
+# Underway CTD (UCTD) Results
+## Cast summary  
+Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
+
+```{r uctd-summary, include=TRUE}
+if (length(uctd.hdr) > 0) {
+  # make a copy of uctd.summ
+  uctd.table <- uctd.summ %>% 
+    arrange(cast.date) %>% 
+    mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S"))
+  
+  # rename columns
+  names(uctd.table) <- c("Cast","Filename","Date/time","Lat","Lon",
+                         "SOG (kt)","Time (s)","Depth (m)","Class","Leg")
+  # print table
+  datatable(uctd.table)  
+} else {
+  cat("No UCTD casts processed.")
+}
+```  
+
+## Unprocessed UCTD casts  
+List of UCTD casts not yet processed. 
+
+```{r uctd-missing, include=TRUE}
+if (nrow(uctd.missing) > 0) {
+  # make a copy of uctd.summ
+  uctd.tbl.missing <- uctd.missing %>%
+    arrange(cast.date) %>%
+    mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S")) %>% 
+    select(Cast = cast, Date = cast.date, Leg = leg)
+  
+  # print table
+  datatable(uctd.tbl.missing)  
+} else {
+  cat("All UCTD casts have been processed.")
+}
+```  
+
+## Cast locations
+Location of underway UCTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. UCTD cast numbers correspond to those in the previous table.  
+
+```{r create-map-data}
+# Convert casts to spatial
+uctd.sf <- st_as_sf(uctd.summ, coords = c("long","lat"), crs = crs.geog) %>%
+  st_transform(crs = crs.proj) %>% 
+  mutate(
+    X = as.data.frame(st_coordinates(.))$X,
+    Y = as.data.frame(st_coordinates(.))$Y) 
+  
+ctd.sf  <- st_as_sf(all.ctd.hdr, coords = c("long","lat"), crs = crs.geog) %>%
+  st_transform(crs = crs.proj) %>% 
+  mutate(
+    X = as.data.frame(st_coordinates(.))$X,
+    Y = as.data.frame(st_coordinates(.))$Y)  
+```
+
+```{r uctd-map-all}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    if (length(uctd.table) > 0) {
+      # Create main map using ggmap
+      map.uctd <- base.map + 
+        geom_sf(data = transects) + 
+        geom_shadowtext(data = uctd.sf, aes(X, Y, label = cast.num, colour = leg),
+                        size = 3, bg.color = "white", fontface = "bold") +
+        coord_sf(crs = crs.proj,
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    } else {
+      # Create main map using ggmap
+      map.uctd <- base.map + 
+        geom_sf(data = transects) + 
+        geom_shadowtext(aes(mean(c(map.bounds["xmin"], map.bounds["xmax"])), 
+                            mean(mean(c(map.bounds["ymin"], map.bounds["ymax"]))), 
+                            label = "No UCTD casts"), 
+                        colour = "black", bg.color = "red", size = 6, fontface = "bold") +
+        coord_sf(crs = crs.proj,
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    }
+    # Save map
+    ggsave(here("Figs/map_uctd.png"), map.uctd, 
+           width = map.width, height = map.height)
+  }
+}
+
+# Map casts
+mapview(transects, alpha = 0.5, layer.name = "Vessel track") +
+  mapview(uctd.sf, zcol = c("leg"), cex = 4, layer.name = "UCTD Casts", legend = T)
+```  
+
+## Descent rate v. Depth plot
+Descent rate of the UCTD by depth and vessel speed.  
+
+```{r uctd-dZt-plot,out.width="90%",out.height="90%"}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    # plot descent rate v depth
+    uctd.dZt <- ggplot(data = all.uctd.casts, aes(dZt, Z, group = cast, colour = SOG)) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nDescent rate (m/s)") + ylab("Depth (m)\n") + 
+      scale_x_continuous(limits = c(0,ceiling(max(all.uctd.casts$dZt,na.rm = T))),
+                         breaks = seq(0, ceiling(max(all.uctd.casts$dZt,na.rm = T)), 0.5), 
+                         expand = c(0,0)) + 
+      scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1),0),
+                         breaks = seq(round(min(all.uctd.casts$Z),digits = -1), 0, 25), 
+                         expand = c(0, 0)) + 
+      scale_colour_viridis("Vessel\nspeed (kt)\n", option = "plasma") +
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() + 
+      theme(panel.grid.major     = element_line(size = 0.75),
+            legend.position      =  c(0,1),
+            legend.justification = c(0,1),
+            legend.background    = element_blank(),
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(uctd.dZt, file = here("Figs/uctd_dZt_v_Z.png"))
+  }
+  ggplotly(uctd.dZt)
+  # include_graphics(here("Figs/uctd_dZt_v_Z.png")) 
+} else {
+  include_graphics(here("Figs/uctd_missing.png"))
+}
+```
+
+## Depth v. Time plot
+The dashed line represent the Loess-smoothed depth profiles.  
+
+```{r uctd-depth-time-plot,out.width="90%",out.height="90%"}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    # plot depth v time
+    uctd.Z <- ggplot(data = all.uctd.casts, aes(s, Z, group = factor(cast), colour = SOG)) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nTime (s)") + ylab("Depth (m)\n") + 
+      scale_x_continuous(limits = c(0,max(all.uctd.casts$s) + 10),
+                         breaks = seq(0, max(all.uctd.casts$s) + 10, 25),
+                         expand = c(0,0)) + 
+      scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                         breaks = seq(round(min(all.uctd.casts$Z),digits = -1), 0, 25),
+                         expand = c(0,0)) + 
+      scale_colour_viridis("Vessel\nspeed (kt)\n", option = "plasma") +
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() + 
+      theme(panel.grid.major     = element_line(size = 0.75),
+            legend.position      = c(1,1),
+            legend.justification = c(1,1),
+            legend.background    = element_blank(),
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold")) +
+      geom_smooth(data = all.uctd.casts, se = F, aes(s, Z, group = survey), 
+                  colour = 'black', linetype = 2)
+    # save plot
+    ggsave(uctd.Z, file = here("Figs/uctd_Z_v_time.png"))
+  }
+  ggplotly(uctd.Z)
+  # include_graphics(here("Figs/uctd_Z_v_time.png")) 
+} else {
+  include_graphics(here("Figs/uctd_Z_v_time.png"))
+}
+```  
+
+## Temperature v. Depth plot
+
+```{r uctd-temp-depth-plot,out.width="90%",out.height="90%"}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    # plot temperature v depth
+    uctd.T <- ggplot(data = all.uctd.casts, aes(T, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nTemperature (C)") + ylab("Depth (m)\n") + 
+      scale_x_continuous(limits = c(round(min(all.uctd.casts$T),0) - 1, round(max(all.uctd.casts$T),0) + 1),
+                         breaks = seq(round(min(all.uctd.casts$T),0) - 1, round(max(all.uctd.casts$T), 0) + 1, 2),
+                         expand = c(0,0)) + 
+      scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1),0),
+                         breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25), 
+                         expand = c(0,0)) +
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75), 
+            legend.position = "none",
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(uctd.T, file = here("Figs/uctd_T_v_Z.png"))
+  }
+  ggplotly(uctd.T)
+  # include_graphics(here("Figs/uctd_T_v_Z.png"))
+} else {
+  include_graphics(here("Figs/uctd_missing.png"))
+}
+```
+
+## Salinity v. Depth plot
+
+```{r uctd-sal-depth-plot,out.width="90%",out.height="90%"}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    # plot salinity v depth
+    uctd.S <- ggplot(data = all.uctd.casts, aes(S, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nSalinity") + ylab("Depth (m)\n") +
+      scale_x_continuous(limits = c(round(min(all.uctd.casts$S), 2) - 0.1, 
+                                    round(max(all.uctd.casts$S), 2) + 0.1),
+                         breaks = seq(round(min(all.uctd.casts$S),2) - 0.1, 
+                                      round(max(all.uctd.casts$S), 2) + 0.1, 1),
+                         expand = c(0,0)) +  
+      scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
+                         breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25), 
+                         expand = c(0,0)) + 
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75), 
+            legend.position = "none",
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(uctd.S,file = here("Figs/uctd_S_v_Z.png"))
+  }
+  ggplotly(uctd.S)
+  # include_graphics(here("Figs/uctd_S_v_Z.png")) 
+
+} else {
+  include_graphics(here("Figs/uctd_missing.png"))
+}
+```
+
+## Sound speed v. Depth plot
+
+```{r uctd-sv-depth-plot,out.width="90%",out.height="90%"}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    # plot sound speed v depth
+    uctd.Sv <- ggplot(data = all.uctd.casts, aes(Sv, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nSound speed (m/s)") + ylab("Depth (m)\n") +
+      scale_x_continuous(limits = c(round(min(all.uctd.casts$Sv), 0) - 1, 
+                                    round(max(all.uctd.casts$Sv), 0) + 1),
+                         breaks = seq(round(min(all.uctd.casts$Sv),0) - 1, 
+                                      round(max(all.uctd.casts$Sv),0) + 1, 10),
+                         expand = c(0,0)) +  
+      scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
+                         breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
+                         expand = c(0,0)) + 
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75), 
+            legend.position = "none",
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(uctd.Sv, file = here("Figs/uctd_sV_v_Z.png"))
+  }
+  ggplotly(uctd.Sv)
+  # include_graphics(here("Figs/uctd_sV_v_Z.png"))
+} else {
+  include_graphics(here("Figs/uctd_missing.png"))
+}
+```
+
+## Temperature-Salinity plot
+Temperature-salinity plot for all UCTD casts (left) and the location of UCTD casts (right), symbolized by water mass.
+
+```{r uctd-temp-sal-plot}
+if (length(uctd.hdr) > 0) {
+  if (save.figs) {
+    # plot salinity v depth
+    uctd.TS <- ggplot(data = all.uctd.casts, aes(S, T, group = cast, colour = factor(class))) + 
+      geom_point(alpha = 0.5, size = 2) +
+      xlab("\nSalinity") + ylab("Temperature (C)\n") +
+      scale_x_continuous(limits = c(29,35),
+                         breaks = seq(29,35,1),expand = c(0,0)) +  
+      scale_y_continuous(limits = c(floor(min(all.uctd.casts$T)), 
+                                    ceiling(max(all.uctd.casts$T))),
+                         breaks = seq(floor(min(all.uctd.casts$T)), 
+                                      ceiling(max(all.uctd.casts$T)),2), 
+                         expand = c(0,0)) + 
+      scale_colour_hue("Water\nmass") +
+      theme_bw() +
+      theme(panel.grid.major     = element_line(size = 0.75),
+            legend.position      = c(0,0),
+            legend.justification = c(0,0),
+            legend.background    = element_blank(),
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(uctd.TS,file = here("Figs/uctd_S_v_T.png"))
+    
+    # create main map using ggmap
+    map.uctd.TS <- base.map + 
+      geom_sf(data = transects) + 
+      geom_point(data = uctd.sf, aes(X, Y, colour = class), 
+                 size = 2, alpha = 0.75) +
+      scale_colour_hue(name = "Water\nmass") +
+      theme(panel.grid.major = element_line(size = 0.75),
+            legend.position =  c(0,0),
+            legend.justification = c(0,0),
+            legend.background = element_blank()) +
+      coord_sf(crs = crs.proj,
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    
+    # combine plots
+    uctd.TS.map <- plot_grid(uctd.TS, map.uctd.TS, align = "h") 
+    
+    # save plot
+    ggsave(here("Figs/map_T-S_uctd.png"), uctd.TS.map, 
+           width = map.width*2, height = map.height)
+  }
+  include_graphics(here("Figs/map_T-S_uctd.png"))
+} else {
+  include_graphics(here("Figs/uctd_missing.png"))
+}
+```
+
+# Traditional CTD Results
+## Cast summary 
+Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
+
+```{r ctd-summary,include=T}
+if (length(ctd.hdr) > 0) {
+  # make a copy of uctd.summ
+  ctd.table <- all.ctd.hdr %>% 
+    mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S"))
+  # rename columns
+  names(ctd.table) <- c("Order Occupied", "Filename", "Date/time", 
+                        "Lat", "Lon", "Depth (m)", "Class", "Leg")
+  # print table
+  datatable(ctd.table)  
+} else {
+  cat("No CTD casts processed.")
+}
+```  
+
+## Cast locations
+Location of underway CTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. CTD cast numbers correspond to those in the previous table.  
+
+```{r ctd-map-all}
+if (save.figs) {
+  if (length(ctd.hdr) > 0) {
+    map.ctd <- base.map + 
+        geom_sf(data = transects) + 
+        geom_shadowtext(data = ctd.sf, aes(X, Y, label = cast.num, colour = leg),
+                        size = 3, bg.color = "white", fontface = "bold") +
+        coord_sf(crs = crs.proj,
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  } else {
+    # Create main map using ggmap
+      map.ctd <- base.map + 
+        geom_sf(data = transects) + 
+        geom_shadowtext(aes(mean(c(map.bounds["xmin"], map.bounds["xmax"])), 
+                            mean(mean(c(map.bounds["ymin"], map.bounds["ymax"]))), 
+                            label = "No CTD casts"), 
+                        colour = "black", bg.color = "red", size = 6, fontface = "bold") +
+        coord_sf(crs = crs.proj,
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  }
+  # save map
+  ggsave(here("Figs/map_ctd.png"), map.ctd, 
+         width = map.width, height = map.height)
+}
+
+# Map casts
+mapview(transects, alpha = 0.5, layer.name = "Vessel track") +
+  mapview(ctd.sf, zcol = c("leg"), cex = 4, layer.name = "CTD Casts", legend = T)
+```  
+
+## Unprocessed CTD casts  
+List of CTD casts not yet processed. 
+
+```{r ctd-missing, include=TRUE}
+if (nrow(ctd.missing) > 0) {
+  # make a copy of uctd.summ
+  ctd.tbl.missing <- ctd.missing %>%
+    arrange(cast.date) %>%
+    mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S")) %>% 
+    select(Cast = cast, Date = cast.date, Leg = leg)
+  
+  # print table
+  datatable(ctd.tbl.missing)  
+} else {
+  cat("All UCTD casts have been processed.")
+}
+```
+
+```{r uctd-ctd-combo-map}
+if (save.figs) {
+  # Combine maps
+  both.maps <- plot_grid(map.uctd, map.ctd, align = "h", labels = c("UCTD", "CTD"))
+  # save plot
+  ggsave(here("Figs/map_all_ctds.png"), both.maps, 
+         width = map.width*2, height = map.height)
+}
+```
+
+## Temperature v. Depth plot
+
+```{r ctd-temp-depth-plot,out.width="90%",out.height="90%"}
+if (length(ctd.hdr) > 0) {
+  if (save.figs) {
+    # plot temperature v depth
+    ctd.T <- ggplot(data = all.ctd.casts, aes(T, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nTemperature (C)") + ylab("Depth (m)\n") + 
+      scale_x_continuous(limits = c(round(min(all.ctd.casts$T), 0) - 1, 
+                                    round(max(all.ctd.casts$T), 0) + 1),
+                         breaks = seq(round(min(all.ctd.casts$T), 0) - 1, 
+                                      round(max(all.ctd.casts$T), 0) + 1, 2),
+                         expand = c(0,0)) +
+      scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                         breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
+                         expand = c(0,0)) +
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75), 
+            legend.position = "none",
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    
+    # save plot
+    ggsave(ctd.T, file = here("Figs/ctd_T_v_Z.png"))
+  }
+  # include_graphics(here("Figs/ctd_T_v_Z.png"))
+  ggplotly(ctd.T)
+} else {
+  include_graphics(here("Figs/ctd_missing.png"))
+}
+```
+
+## Salinity v. Depth plot
+
+```{r ctd-sal-depth-plot,out.width="90%",out.height="90%"}
+if (length(ctd.hdr) > 0) {
+  if (save.figs) {
+    # plot salinity v depth
+    ctd.S <- ggplot(data = all.ctd.casts, aes(S, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nSalinity") + ylab("Depth (m)\n") +
+      scale_x_continuous(limits = c(round(min(all.ctd.casts$S),2) - 0.1,
+                                    round(max(all.ctd.casts$S), 2) + 0.1),
+                         breaks = seq(round(min(all.ctd.casts$S),2) - 0.1, 
+                                      round(max(all.ctd.casts$S), 2) + 0.1, 1),
+                         expand = c(0,0)) +  
+      scale_y_continuous(limits = c(round(min(all.ctd.casts$Z), digits = -1), 0),
+                         breaks = seq(round(min(all.ctd.casts$Z), digits = -1), 0, 25), 
+                         expand = c(0,0)) + 
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75), 
+            legend.position = "none",
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(ctd.S,file = here("Figs/ctd_S_v_Z.png"))
+  }
+  ggplotly(ctd.S)
+  # include_graphics(here("Figs/ctd_S_v_Z.png"))
+} else {
+  include_graphics(here("Figs/ctd_missing.png"))
+}
+```
+
+## Sound speed v. Depth plot
+
+```{r ctd-sv-depth-plot,out.width="90%",out.height="90%"}
+if (length(ctd.hdr) > 0) {
+  if (save.figs) {
+    # plot sound speed v depth
+    ctd.Sv <- ggplot(data = all.ctd.casts, aes(Sv, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nSound speed (m/s)") + ylab("Depth (m)\n") +
+      scale_x_continuous(
+        limits = c(round(min(all.ctd.casts$Sv), 0) - 1, 
+                   round(max(all.ctd.casts$Sv), 0) + 1),
+        breaks = seq(round(min(all.ctd.casts$Sv), 0) - 1, 
+                     round(max(all.ctd.casts$Sv), 0) + 1, 10),
+        expand = c(0,0)) +  
+      scale_y_continuous(
+        limits = c(round(min(all.ctd.casts$Z), digits = -1), 0),
+        breaks = seq(round(min(all.ctd.casts$Z), digits = -1), 0, 25),
+        expand = c(0,0)) + 
+      facet_wrap(~leg, ncol = 2) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75), 
+            legend.position = "none",
+            strip.background.x = element_blank(),
+            strip.text.x = element_text(face = "bold"))
+    # save plot
+    ggsave(ctd.Sv, file = here("Figs/ctd_sV_v_T.png"))
+  }
+  ggplotly(ctd.Sv)
+  # include_graphics(here("Figs/ctd_sV_v_T.png"))
+} else {
+  include_graphics(here("Figs/ctd_missing.png"))
+}
+```
+
+## Temperature-Salinity plot
+Temperature-salinity plot for all CTD casts (left) and the location of CTD casts (right), symbolized by water mass.
+
+```{r ctd-temp-sal-plot}
+if (length(ctd.hdr) > 0) {
+  if (save.figs) {
+    # plot salinity v depth
+    ctd.TS <- ggplot(all.ctd.casts, aes(S, T, group = cast, colour = factor(class))) + 
+      geom_point(alpha = 0.5, size = 2) +
+      xlab("\nSalinity") + ylab("Temperature (C)\n") +
+      scale_x_continuous(
+        limits = c(29, 35),
+        breaks = seq(29, 35, 1), 
+        expand = c(0,0)) +  
+      scale_y_continuous(
+        limits = c(floor(min(all.ctd.casts$T)), 
+                   ceiling(max(all.ctd.casts$T))),
+        breaks = seq(floor(min(all.ctd.casts$T)), 
+                     ceiling(max(all.ctd.casts$T)), 2), 
+        expand = c(0,0)) + 
+      scale_colour_hue("Water\nmass") +
+      theme_bw() +
+      theme(panel.grid.major     = element_line(size = 0.75),
+            legend.position      = c(0,0),
+            legend.justification = c(0,0),
+            legend.background    = element_blank())
+    # save plot
+    ggsave(ctd.TS, file = here("Figs/ctd_S_v_T.png"))
+    
+    # create main map using ggmap
+    map.ctd.TS <- base.map + 
+      geom_sf(data = transects) + 
+      geom_point(data = ctd.sf, aes(X, Y, colour = class), 
+                 size = 2, alpha = 0.75) +
+      scale_colour_hue(name = "Water\nmass") +
+      theme(panel.grid.major = element_line(size = 0.75),
+            legend.position =  c(0,0),
+            legend.justification = c(0,0),
+            legend.background = element_blank()) +
+      coord_sf(crs = crs.proj,
+               xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+               ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    
+    # combine plots
+    ctd.TS.map <- plot_grid(ctd.TS, map.ctd.TS, align = "h")
+    
+    # save plot
+    ggsave(ctd.TS.map, file = here("Figs/map_T-S_ctd.png"), 
+           width = map.width*2, height = map.height)
+  }
+  include_graphics(here("Figs/map_T-S_ctd.png"))
+} else {
+  include_graphics(here("Figs/ctd_missing.png"))
+}
+```

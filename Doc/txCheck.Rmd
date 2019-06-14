@@ -1,0 +1,138 @@
+---
+title: "Check Rose Point Transects"
+author: "Kevin L. Stierhoff"
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = TRUE)`'
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+# Install and Load packages
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,sf,mapview,here,knitr,DT,bookdown)
+
+pacman::p_load_gh("rstudio/distill")
+
+# Configure knitr chunk options
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      out.width = "100%")
+```
+
+```{r read-tables, include = FALSE}
+wpts <- read_csv(here::here("Output/tables", "waypoints_all.csv")) %>% 
+    st_as_sf(coords = c("Longitude","Latitude"), crs = 4326)
+
+uctds <- read_csv(here::here("Output/tables", "waypoints_uctd.csv")) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = 4326)
+
+bathy <- st_read(here("Data/GIS/bathy_contours.shp"))
+
+ca_mpas <- st_read(here("Data/GIS/MPA_CA_Existing.shp"))
+
+ca_state_waters <- st_read(here("Data/GIS/MAN_CA_StateWater.shp"))
+
+or_mpas <- st_read(here("Data/GIS/or_mpas.shp"))
+
+or_state_waters <- st_read(here("Data/GIS/or_state_waters.shp"))
+
+nms_bounds <- st_read(here("Data/GIS/national_marine_sanctuaries.shp"))
+
+transects <- wpts %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1))
+```
+
+# Static map
+A static map as prepared for the cruise instructions.
+
+```{r map-survey-play}
+include_graphics(here("Figs/survey_map.png"))
+```
+
+
+# Interactive maps
+Interactive maps to closely scrutinize the transect placement
+
+## Map transects by transect type
+
+```{r map-objects-type, out.height = "9in",out.width="100%"}
+mapview(bathy, color = "white", map.types = c("Esri.OceanBasemap"), legend = FALSE) + 
+  mapview(nms_bounds) +
+  mapview(ca_mpas, zcol = "Type", alpha = 0.75) +
+  mapview(or_mpas, zcol = "Label", alpha = 0.75) +
+  mapview(transects, zcol = "Type") + 
+  mapview(wpts, zcol = "Type", cex = 3, alpha = 0, legend = FALSE) + 
+  mapview(uctds, col.regions = "white", cex = 2, legend = FALSE)
+```
+
+## Map transects by region
+
+```{r map-objects-region, out.height = "9in",out.width="100%"}
+mapview(bathy, color = "white", map.types = c("Esri.OceanBasemap"), legend = FALSE) + 
+  mapview(nms_bounds) +
+  mapview(ca_mpas, zcol = "Type", alpha = 0.75) +
+  mapview(or_mpas, zcol = "Label", alpha = 0.75) +
+  mapview(transects, zcol = "Region") + 
+  mapview(wpts, zcol = "Region", cex = 3, alpha = 0, legend = FALSE) + 
+  mapview(uctds, col.regions = "white", cex = 2, legend = FALSE)
+```
+
+# Data tables
+## Compulsory and Adaptive Transects
+
+```{r acoustic-wpts-table}
+wpts %>% 
+  filter(Type %in% c("Adaptive","Compulsory")) %>% 
+  arrange(Waypoint) %>%
+  mutate(
+    Long = as.data.frame(st_coordinates(.))$X,
+    Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Offshore Transects
+
+```{r offshore-wpts-table}
+wpts %>% 
+  filter(Type %in% c("Offshore")) %>% 
+  arrange(Waypoint) %>%
+  mutate(
+    Long = as.data.frame(st_coordinates(.))$X,
+    Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Nearshore Transects
+
+```{r nearshore-wpts-table}
+wpts %>% 
+  filter(Type %in% c("Nearshore")) %>% 
+  arrange(Waypoint) %>%
+  mutate(
+    Long = as.data.frame(st_coordinates(.))$X,
+    Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL) %>% 
+  datatable(rownames = FALSE)
+```
+
+## UCTD Stations
+
+```{r uctd-wpts-table}
+uctds %>% 
+  arrange(Name) %>%
+  mutate(
+    Long = as.data.frame(st_coordinates(.))$X,
+    Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL) %>% 
+  datatable(rownames = FALSE)
+```
