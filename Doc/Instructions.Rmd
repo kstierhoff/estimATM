@@ -1,0 +1,144 @@
+---
+title: 'EstimateCPS'
+subtitle: 'An automated tool for estimating the abundance and biomass of CPS species during acoustic-trawl surveys'
+author: "Kevin Stierhoff"
+date: 'Last updated: `r format(Sys.time(), format = "%F %T")`'
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+css: css/ast.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', dev = "png", dpi = 150,
+                        dev.args = list(type = "cairo"))
+```  
+
+```{r load-packages}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(knitr,bookdown,here)
+```
+
+
+# Overview
+The Rstudio project EstimateCPS is an analysis framework used to compute biomass estimates of coastal pelagic fish species (CPS) using the following inputs:  
+
+* Putative backscatter from CPS from Echoview processing of multi-frequency echosounder data,
+* Lengths, weights, abundance, and species composition from trawl sampling, and
+* Environmental conditions from conductivity-temperature-depth (CTD) casts.
+
+Additional data, for example the density of CPS eggs collected in the continuous underway fish egg sampler (CUFES) are processed and used to aid the interpretation of results.
+The overarching goal of this tool is to create a transparent, standardized tool that may be used by users with little or no programming experience and a minimal amount of additional software.  
+
+# Set-up
+To use this tool, the user will require, at minimum:  
+
+* R (version  ≥ 3.4.1 recommended; available here)
+* ODBC permissions to connect to the following databases on the SQL Server (Thanh Vu can assist with the connection. You’ll need to request “data reader” permissions from Yuhong Gu and Ed Weber for the Trawl and CUFES data, respectively.):
+  + Trawl
+  + CUFES  
+
+The following additional tools and software are highly recommended:  
+
+* Rstudio Desktop (A free GUI interface for R; available [here](https://www.rstudio.com/products/rstudio/download/)),
+* Git (a version control tool; available [here](https://git-scm.com/download/win))
+* A Tex engine for PDF/LaTeX output ([tinytex](https://yihui.name/tinytex/), for example).
+
+All instructions are written assuming that the user is performing analyses using Rstudio. More advanced users may use these tools with other user interfaces (e.g., Emacs), but it has not been tested nor will support be provided if not using Rstudio.  
+
+On first run, an internet connection is required to install the required R packages. Afterward, the code may be executed without any external connections, but would need to be connected if source data changes.
+
+# Installation
+The latest version of EstimateCPS is available via Github. An example of downloading the latest version using Rstudio is described below. 
+
+## GitHub via Rstudio
+In a new instance of Rstudio, press `File/New project...` (Or the icon above the red arrow) and select the Version Control option (Git installation _IS_ required):  
+
+```{r rstudio-config,out.width="50%"}
+include_graphics(here("Images/img_rstudio_project.png"))
+```  
+
+Next, choose the Git option, enter the URL for the GitHub repository (https://github.com/kstierhoff/EstimateCPS) in the next window, and specify the location where the project is to be created:  
+
+```{r github-config,out.width="50%"}
+include_graphics(here("Images/img_github_repo.png"))
+```  
+
+## GitHub via web browser
+Alternatively, download the project as a .zip file from https://github.com/kstierhoff/EstimateCPS.  
+
+```{r github-config-alt,out.width="100%"}
+include_graphics(here("Images/img_github_zip.png"))
+```  
+
+After unzipping the downloaded file, double-click the `EstimateCPS.Rproj` file to launch Rstudio. **NOTE:** The GitHub repository is private; to request access, contact Kevin Stierhoff (Kevin.Stierhoff@noaa.gov).  
+
+# Execution
+## Main document
+The main document, `Analysis.Rmd`, is stored in the `Doc/_Analysis` subdirectory. Double-click to open.
+
+```{r rproject-dirs,out.width="50%"}
+include_graphics(here("Images/img_rproj_dirs.png"))
+```
+
+## Survey settings files
+Survey-specific information files (e.g., `settings_*.R`) reside in the `Doc/settings` subdirectory and have been configured for several surveys already. Either modify an existing file (if needed) or create a new file if analyzing data from a new survey. Use an existing file as a template, as all of the variables in this document are used somewhere in the main Rmarkdown file. The Analysis.Rmd file will automatically select the appropriate survey file if the project directory (e.g., `1807RL`) and settings file (e.g., `settings_1807RL.R`) are named appropriately.
+
+```{r rproject-doc,out.width="50%"}
+include_graphics(here("Images/img_doc_dir.png"))
+```  
+
+## Document controls
+The various processing steps are controlled by a collection of TRUE/FALSE statements at the beginning of the document:  
+
+```{r loop-controls,out.width="80%"}
+include_graphics(here("Images/img_loop_controls.png"))
+``` 
+ 
+The first time the document is run, you may set `do.all <- T` to easily execute all of the code. Subsequent runs may be accelerated by setting `do.all <- F` and specifying only certain loops to run in the code above. Setting all individual controls to `F` will generate a new output file without copying any new files, importing new data, performing any new analyses, or saving new figures.  
+
+## Knitting the document
+After modifying the survey settings file and configuring the document controls, the analysis is executed by “knitting” the `Analysis.Rmd` file. With the `Analysis.Rmd` file active, press the `Knit` button, or use the pull-down menu next to the Knit button to select the output type (HTML, PDF, or Word; HTML is the default for now), or press `Ctrl+Shift+k` (keyboard shortcut to knit with the last used option). You can monitor the progress of the knit procedure in the R Markdown window:
+
+```{r knitr-progress,out.width="80%"}
+include_graphics(here("Images/img_knitr_window.png"))
+``` 
+ 
+# Viewing the results
+After the knitting completes, the resulting HTML file will open in a new window.
+Voila, you’ve just analyzed all of the data from the survey! Go get a beer (or three). 
+
+```{r knitr-output,out.width="100%"}
+include_graphics(here("Images/img_html_output.png"))
+``` 
+
+# Writing the Biomass Report
+After running `Analysis.Rmd`, a report may be generated to present the biomass estimates for all species and relevant methodological details, figures, and tables. A new report is used for each survey; the most recent biomass report may be used as a template for subsequent reports to capture the most recent methods, etc. 
+
+```{r report-directory,out.width="100%"}
+include_graphics(here("Images/img_report_dir.png"))
+``` 
+
+# Creating a Slide Presentation
+After running `Analysis.Rmd`, slides may also be generated in PowerPoint (using `bookdown`) or HTML (using `xaringan`). Other methods are possible but these are the two most widely used. 
+
+```{r slides-directory,out.width="100%"}
+include_graphics(here("Images/img_slides_dir.png"))
+``` 
+
+## PowerPoint (.pptx)
+Open the `Slides_*_PowerPoint.Rmd` and knit as you would any other `.Rmd` file. A NOAA template is included in the `Doc/_Slides/template` directory that may be modified as desired.
+
+```{r slides-example,out.width="100%"}
+include_graphics(here("Images/img_PowerPoint_example.png"))
+``` 
+
+## Xaringan (.HTML)
+**These slides are currently under development. Please, check back later.**
+
+Open the `Slides_*_Xaringan.Rmd` and knit as you would any other `.Rmd` file. Slide style is controlled in the `.Rmd` file itself.
