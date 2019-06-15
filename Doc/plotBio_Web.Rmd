@@ -37,6 +37,9 @@ knitr::opts_chunk$set(
   echo = F, warning = F, message = F, 
   fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
 )
+
+# Create project directories
+dir_create(here(c("Data", "Doc","Figs","Images","Output","References")))
 ```
 
 ```{r user-input}
@@ -175,7 +178,7 @@ if (get.nav) {
            datetime = ymd_hms(time),
            SST      = na_if(SST, NaN),
            leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                  leg.breaks, labels = F))) %>%
+                                  leg.breaks, labels = F, include.lowest = T))) %>%
     filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
            between(long, min(survey.long), max(survey.long)))
@@ -197,7 +200,8 @@ if (get.nav) {
 }
 
 # Read planned waypoints
-wpts <- vroom(here("Data/Nav", paste0("waypoints_", prj.name, ".csv")))
+wpts <- vroom(here("Data/Nav", paste0("waypoints_", prj.name, ".csv"))) %>% 
+  mutate(Group = paste(Type, Transect))
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -515,7 +519,6 @@ cufes.neg <- filter(cufes.raw, AllEggs == 0) %>%
 ```{r process-csv-cps}
 # RESUME HERE
 # Incorporate CSV processing code from biomassEstimate (fread; but consider vroom)
-
 if (process.csv) {
   if (length(dir_ls(here("Output"), regexp = "processed_cps.Rdata")) > 0) {
     # Load already processed CSV files
@@ -889,17 +892,12 @@ nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>%
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
 
-# Read waypoint file
-wpt.all <- read.csv(here("Data/NAV/waypoints_all.csv")) %>% 
-  mutate(type = tolower(type),
-         group = paste(type, line))
-
 # Create transects sf
-tx_sf <- st_as_sf(wpt.all, coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(type, line) %>% 
+tx_sf <- st_as_sf(wpts, coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  group_by(Group) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
-  filter(type != "extra")
+  filter(!str_detect(Group, "Extra"))
 
 # Set padding around data  
 if (resize.map) {
@@ -908,7 +906,7 @@ if (resize.map) {
     st_transform(crs = crs.proj) %>%
     st_bbox()  
 } else {
-  # Use nav data to resize map to survey progress
+  # Use planned waypoints to set map extent
   map.bounds <- tx_sf %>%
     st_transform(crs = crs.proj) %>%
     st_bbox()  
@@ -919,9 +917,9 @@ map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$
 map.height <- 10
 map.width  <- map.height*map.aspect
 
-# Set annotation location (for panel letters)
-annotation.lon <- min(range(nasc.cps$long))
-annotation.lat <- max(range(nasc.cps$lat))
+# # Set annotation location (for panel letters)
+# annotation.lon <- min(range(nasc.cps$long))
+# annotation.lat <- max(range(nasc.cps$lat))
 
 # Create base map
 base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
@@ -929,7 +927,7 @@ base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds,
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
 # Save the basemap
-ggsave(base.map,file = here("Figs/fig_base_map.png"), 
+ggsave(base.map, file = here("Figs/fig_base_map.png"), 
        height = map.height, width = map.width)
 
 save(base.map, file = here("Data/Map/basemap.Rdata"))
@@ -941,14 +939,6 @@ if (save.figs) {
   source(here("Code/plot_sA_trawl_cufes.R"))
   
   if (add.mammal.data) {
-    
-    # # Project nasc data
-    # nasc.cps.proj <- st_as_sf(nasc.plot.cps, coords = c("long","lat"), crs = crs.geog)
-    # nasc.cps.proj <- project_sf(nasc.cps.proj, crs.proj)
-    # 
-    # nasc.krill.proj <- st_as_sf(nasc.plot.krill, coords = c("long","lat"), crs = crs.geog)
-    # nasc.krill.proj <- project_sf(nasc.krill.proj, crs.proj)
-    
     # Map CPS backscatter and PWS dolphin group size
     pws.map <- base.map +
       # plot ship track data
@@ -1006,14 +996,14 @@ if (save.figs) {
 ```{r get-spatial-files,include=F}
 # Import shapefiles ------------------------------------------------
 # Read CA State Waters shapefile
-ca_waters <- st_read(here("Data/GIS/MAN_CA_StateWater.shp")) %>% 
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
   st_transform(crs.geog)
 
 or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>% 
   st_transform(crs.geog)
 
 # Read CA MPAs shapefile
-ca_mpas <- st_read(here("Data/GIS/MPA_CA_Existing.shp")) %>% 
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
   st_transform(crs.geog) %>% 
   mutate(MPA = paste(NAME, Type))
 
