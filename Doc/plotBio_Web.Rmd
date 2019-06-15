@@ -13,7 +13,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,
-               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,
+               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,vroom,
                shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
                leaflet.minicharts,maptools,htmltools,mapview,DT,rworldmap,rworldxtra)
 
@@ -56,8 +56,8 @@ source(here("Doc/settings", prj.settings))
 save.figs       <- T # Resave figures
 get.nav         <- T # Download nav data from ERDDAP
 get.nav.sd      <- F # Download nav data from ERDDAP
-copy.files      <- F # Copy data files from data to plotBio directory
-overwrite.files <- F # Overwrite existing files when copying (not CSV, see below)
+copy.files      <- T # Copy data files from data to plotBio directory
+overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
 process.csv     <- F # Process acoustic backscatter files
 
 # Control script behavior (often F)
@@ -121,8 +121,6 @@ nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00",
 nasc.summ.interval <- 20
 
 # Catch map
-scale.pies         <- FALSE # Scale pie charts (TRUE/FALSE)
-pie.scale          <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 catch.breaks       <- c(0,10,100,500,1000) # breaks for legend
 catch.labels       <- c("0-10","10-100", "100-500", "500-1000") # labels for legend
 catch.pie.sizes    <- c(1,2,3,4,5,6) # sizes for legend
@@ -130,30 +128,29 @@ catch.pie.sizes    <- c(1,2,3,4,5,6) # sizes for legend
 
 ```{r copy-files, include=F}
 if (copy.files) {
-  # Copy <- report files (.xlsx)
-  haul.report <- list.files(file.path(survey.dir, "DATA/BIOLOGICAL/HAUL"), 
-                            pattern = "HaulReport*.*xlsx", full.names = T)
-  file.copy(haul.report, here("Data/HAUL"), overwrite = overwrite.files)
+  # Create data directories
+  dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
   
   # Copy trawl Access database (.accdb)
-  haul.db <- list.files(file.path(survey.dir, "DATA/BIOLOGICAL/HAUL"), 
-                            pattern = "TrawlDataEntry*.*accdb", full.names = T)
-  file.copy(haul.db, here("Data/HAUL"), overwrite = overwrite.files)
+  haul.db <- list.files(file.path(survey.dir[survey.vessel.primary], 
+                                  "DATA/BIOLOGICAL/HAUL"),
+                        pattern = "TrawlDataEntry*.*accdb", full.names = T)
+  file.copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
   
   # Copy CUFES files
-  cufes.file <- list.files(file.path(survey.dir, "DATA/BIOLOGICAL/CUFES"), 
+  cufes.file <- list.files(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
                            pattern = "*.sqlite", full.names = T)
   file.copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
   
   # Copy CSV files
-  csv.files.cps <- list.files(file.path(survey.dir, "PROCESSED/EV/CSV"), 
+  csv.files.cps <- list.files(file.path(survey.dir[survey.vessel.primary], "PROCESSED/EV/CSV"), 
                           pattern = "*Final 38 kHz CPS.csv", full.names = T)
-  file.copy(csv.files.cps, here("Data/NASC"), overwrite = overwrite.csv)
+  file.copy(csv.files.cps, here("Data/Backscatter"), overwrite = overwrite.csv)
   
   # Copy CSV files
-  csv.files.krill <- list.files(file.path(survey.dir, "PROCESSED/EV/CSV"), 
+  csv.files.krill <- list.files(file.path(survey.dir[survey.vessel.primary], "PROCESSED/EV/CSV"), 
                           pattern = "*Z Final Krill 120.csv", full.names = T)
-  file.copy(csv.files.krill, here("Data/NASC"), overwrite = overwrite.csv)
+  file.copy(csv.files.krill, here("Data/Backscatter"), overwrite = overwrite.csv)
 }
 ```
 
@@ -162,8 +159,8 @@ if (get.nav) {
   # Generate ERDDAP URL
   dataURL <- URLencode(paste(
     "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-    survey.vessel.erddap, ".csv0?", erddap.vars,
-    "&time>=", survey.start, "&time<=", survey.end,
+    erddap.vessel, ".csv0?", erddap.vars,
+    "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
     sep = ""))
   
   # Download and parse ERDDAP nav data
@@ -193,13 +190,14 @@ if (get.nav) {
     st_cast("LINESTRING")
   
   # Save results
-  save(nav, nav.sf, nav.legs, file = here("Data/nav_data.Rdata"))
+  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
-  load(here("Data/nav_data.Rdata"))
+  load(here("Data/Nav/nav_data.Rdata"))
 }
 
-wpts <- read_csv(here("Data/NAV/waypoints_all.csv"))
+# Read planned waypoints
+wpts <- vroom(here("Data/Nav", paste0("waypoints_", prj.name, ".csv")))
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -267,7 +265,7 @@ if (trawl.source == "SQL") {
 } else if (trawl.source == "Access") {
   trawl.channel  <- dbConnect(odbc::odbc(), 
                     Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                    DBQ = file.path(here("Data/HAUL"),trawl.db.access))
+                    DBQ = file.path(here("Data/Trawl"),trawl.db.access))
 }
 
 # Import trawl database tables
@@ -281,7 +279,7 @@ spp.codes      <- tbl(trawl.channel,"SpeciesCodes") %>% collect()
 dbDisconnect(trawl.channel)
 
 # Save imported database data to .Rdata file
-save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, file = here("Data/HAUL/trawl_data.Rdata"))
+save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, file = here("Data/Trawl/trawl_data.Rdata"))
 ```  
 
 ```{r process-haul-data}
@@ -300,25 +298,25 @@ if (trawl.source == "Access") {
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
       TRUE ~ haulBackTime))
-
+  
   # Filter haul data for current survey
   haul <- haul.all %>% 
-    dplyr::select(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection,
-                  startLatDecimal, startLongDecimal, stopLatDecimal,
-                  stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes = Notes)
+    select(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection,
+           startLatDecimal, startLongDecimal, stopLatDecimal,
+           stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes = Notes)
   
 } else if (trawl.source == "SQL") {
   # Filter haul data for current survey
   haul <- haul.all %>% 
     mutate(equilibriumTime = ymd_hms(equilibriumTime),
            haulBackTime    = ymd_hms(haulBackTime)) %>% 
-    dplyr::select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
-                  stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
+    select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
+           stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
     filter(cruise %in% cruise.name & ship %in% cruise.ship) 
-
+  
 } else if (trawl.source == "Excel") {
   # Format haul data
-   haul.all <- haul.all %>% 
+  haul.all <- haul.all %>% 
     mutate(
       startLatDecimal  =   DecLatitude,
       startLongDecimal =   DecLongitude,
@@ -328,12 +326,12 @@ if (trawl.source == "Access") {
                                          format(haul.all$EquilibriumTime, 
                                                 format = "%H:%M:%S"))),
       haulBackTime     =   equilibriumTime + minutes(`Duration(dec)`*60))
-
+  
   # Filter haul data for current survey
   haul <- haul.all %>% 
-    dplyr::select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
-                  startLatDecimal,startLongDecimal,stopLatDecimal,
-                  stopLongDecimal,equilibriumTime,haulBackTime)
+    select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
+           startLatDecimal,startLongDecimal,stopLatDecimal,
+           stopLongDecimal,equilibriumTime,haulBackTime)
 }
 
 haul <- haul %>% 
@@ -373,15 +371,15 @@ save(haul, file = here("Output/haul_info.Rdata"))
 ```{r process-catch-data, message=FALSE}
 # Filter catch data
 catch <- catch.all %>% 
-  left_join(dplyr::select(spp.codes, species, scientificName, commonName)) %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-  left_join(dplyr::select(haul, haul, cluster)) %>% 
+  left_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg)
 
 # Summarize trawl catch by species
-catch.summ.wt <- dcast(dplyr::select(catch, haul, cluster, scientificName, totalWeight),
+catch.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
                        haul + cluster ~ scientificName, sum)
 
 # Add species with zero total weight
@@ -423,14 +421,6 @@ catch.plot <- left_join(haul, catch.summ.wt) %>%
          "JackMack"   = "Trachurus symmetricus")
 
 # Prepare catch data for plotting ----------------------------------------------
-# Select and rename trawl data for pie charts
-# catch.pie <- catch.plot %>% 
-#   select(Haul = haul, long = startLongDecimal, lat = startLatDecimal,
-#          Anchovy, JackMack, Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
-#   replace(is.na(.), 0) %>% 
-#   mutate(bin = cut(AllCPS, catch.breaks, include.lowest = T, labels = F)) %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
 catch.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
@@ -446,30 +436,6 @@ cluster.pos <- filter(catch.pie, AllCPS > 0) %>%
 # Filter for empty trawls
 cluster.zero <- filter(catch.pie, AllCPS == 0)
 ```
-
-```{r leaflet-minichart,eval=F}
-tilesURL <- "http://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-
-basemap <- leaflet(width = "100%", height = "1000px") %>%
-  addTiles(tilesURL)
-
-colors <- c(anchovy.color, jack.mack.color, jacksmelt.color,
-            pac.herring.color, pac.mack.color, sardine.color)
-
-basemap %>%
-  addMinicharts(
-    catch.pie$long, catch.pie$lat,
-    type = "pie",
-    chartdata = catch.pie[, c("Anchovy", "JackMack", "Jacksmelt","PacHerring",
-                             "PacMack","Sardine")], 
-    colorPalette = colors, 
-    width = 60 * sqrt(catch.pie$AllCPS) / sqrt(max(catch.pie$AllCPS)), transitionTime = 0,
-    group = "Trawl Species Composition"
-  )
-
-
-```
-
 
 ```{r process-cufes}
 # Read CUFES data
@@ -500,7 +466,7 @@ cufes <- cufes.raw %>%
          -StartLatitude, -StartLongitude, -Duration) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
-         bin = cut(Density,cufes.breaks,include.lowest = T),
+         bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
   left_join(select(cufes.raw, SampleNumber, Start, Stop))
 
@@ -547,6 +513,9 @@ cufes.neg <- filter(cufes.raw, AllEggs == 0) %>%
 ```  
 
 ```{r process-csv-cps}
+# RESUME HERE
+# Incorporate CSV processing code from biomassEstimate (fread; but consider vroom)
+
 if (process.csv) {
   if (length(dir_ls(here("Output"), regexp = "processed_cps.Rdata")) > 0) {
     # Load already processed CSV files
@@ -793,7 +762,7 @@ nasc.summ.krill <- nasc.krill %>%
 # Average krill.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.plot.krill <- nasc.krill %>%
-  dplyr::select(filename, transect, int, lat, long, krill.nasc = NASC.350) %>% 
+  select(filename, transect, int, lat, long, krill.nasc = NASC.350) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat  = lat[1],

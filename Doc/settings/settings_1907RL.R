@@ -5,9 +5,6 @@ survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shim
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "1907RL"        # SWFSC/AST survey name
-survey.start.erddap    <- "2019-06-13"    # Start of survey for ERDDAP vessel data query
-survey.end.erddap      <- "2019-09-09"    # End of survey for ERDDAP vessel data query
-survey.vessel.erddap   <- "WTEGnrt"          # Lasker == WTEG; Shimada == WTED
 survey.start           <- "13 June"       # Survey start date
 survey.end             <- "9 September"  # Survey end date
 survey.year            <- "2019"          # Survey year, for report
@@ -20,6 +17,21 @@ survey.twilight.offset <- 30              # Twilight offset; minutes before sunr
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
+# Inport dates for classifying data by cruise leg (if desired) -----------------
+leg.breaks <- as.numeric(lubridate::ymd(c("2019-06-13", "2019-07-06", 
+                                          "2019-07-29", "2019-08-20",
+                                          "2019-09-10")))
+
+# Define ERDDAP data variables
+erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.survey.start  <- "2019-06-13" # Start of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2019-09-09" # End of survey for ERDDAP vessel data query
+erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
+erddap.classes       <- c("factor", "numeric", "numeric", "numeric","numeric")
+erddap.headers       <- c("time", "lat", "long", "SST", "SOG")
+survey.lat           <- c(32,51)
+survey.long          <- c(-130,-117)
+
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
 sd.numbers <- c("1024")
@@ -31,36 +43,36 @@ sd.filter.method <- "manual" # Options are c("buffer","manual")
 sd.nasc.name     <- "cps_nasc_SD.csv"
 
 # Define Saildrone sampling dates
-survey.start.sd        <- "2019-06-13"    # Start of Saildrone survey
-survey.end.sd          <- "2019-09-09"    # End of Saildrone survey
+survey.start.sd        <- "2019-06-13" # Start of Saildrone survey
+survey.end.sd          <- "2019-09-09" # End of Saildrone survey
 
 # Set date range
-survey.start.erddap.sd <- "2019-06-13T00%3A00%3A00Z"
-survey.end.erddap.sd   <- "2019-09-09T19%3A59%3A00Z"
+erddap.survey.start.sd <- "2019-06-13T00%3A00%3A00Z"
+erddap.survey.end.sd   <- "2019-09-09T19%3A59%3A00Z"
 
 # Configure columns and classes
-erddap.headers.sd    <- c("saildrone", "lat", "long", "COG","HDG","time")
+erddap.vars.sd       <- c("trajectory,Clatitude,Clongitude")
+erddap.headers.sd    <- c("saildrone", "lat", "long", "time")
+# erddap.headers.sd    <- c("saildrone","lat","long","COG","HDG","time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
-
-# Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(as.POSIXct(c("2019-06-13", "2019-07-06", 
-                                      "2019-07-29", "2019-08-20",
-                                      "2019-09-10"),
-                                    format = "%F"))
+erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
 cruise.name            <- 201907 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
 cruise.ship            <- "RL"   # May be a character or character vector (e.g., c("RL","SH",...))
 
 # Growth model parameters ------------------------------------------------------
-model.season           <- "summer"        # spring or summer; for selecting growth model parameters
-model.type             <- "glm"            # lm, nlm, or glm; for selecting growth model
+model.season           <- "summer" # spring or summer; for selecting growth model parameters
+model.type             <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
-# Define map height and width (inches) for saved images
-# map.height             <-  10      # e.g., 8 for spring surveys, 10 for summer surveys
-# map.width              <-  6      # e.g., 8 for spring surveys, 6 for summer surveys
-pie.scale              <-  0.0125   # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
+# Coordinate reference systems for geographic and projected data
+crs.geog <- 4326 # WGS84
+crs.proj <- 3310 # Califoria Albers Equal Area
+
+# Trawl proportion plots
+scale.pies             <- FALSE   # Scale pie charts (TRUE/FALSE)
+pie.scale              <-  0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
