@@ -74,6 +74,12 @@ crs.proj <- 3310 # Califoria Albers Equal Area
 scale.pies             <- FALSE   # Scale pie charts (TRUE/FALSE)
 pie.scale              <-  0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
+# Map landmarks
+label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
+                "Newport","Point Conception","Cape Mendocino","Columbia River",
+                "Cape Blanco","Bodega Bay","Westport","Fort Bragg",
+                "Morro Bay","Long Beach","Cape Scott","San Diego")
+
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
