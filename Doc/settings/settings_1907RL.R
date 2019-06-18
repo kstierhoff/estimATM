@@ -72,7 +72,8 @@ crs.proj <- 3310 # Califoria Albers Equal Area
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
-pie.scale  <-  0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
+
+pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
 label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
@@ -111,9 +112,12 @@ if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
 nasc.dir               <- c(RL = "PROCESSED/EV/CSV",
                             LM = "PROCESSED/EV/CSV/LISA_MARIE",
                             SD = "PROCESSED/EV/CSV/SAILDRONE") # Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.file.pattern      <- c(RL = "*Final 38 kHz CPS.csv",
+nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
                             LM = "*Final 38 kHz CPS.csv",
                             SD = "*CPS-Final CPS.csv")
+nasc.pattern.krill     <- c(RL = "*Z Final Krill 120.csv",
+                            LM = "*Z Final Krill 120.csv",
+                            SD = "*Z Final Krill 120.csv")
 source.cps.nasc        <- c(RL = F,
                             LM = F,
                             SD = F) # If T, read cps.nasc from file; else use NASC.50 
@@ -168,7 +172,7 @@ ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 # UCTD data   
 uctd.dir               <- unique(file.path(survey.dir,"DATA/UCTD"))
-uctd.hdr.pattern       <- "\\d{3}.asc"
+uctd.hdr.pattern       <- ".*UCTD\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
 # Biomass estimation settings ------------------------------------------
@@ -437,3 +441,16 @@ if (survey.vessel.primary == "SH") {
 cb.retracted    <- 5
 cb.intermediate <- 7
 cb.extended     <- 9
+
+# Set min and max values for temperature, salinity, etc.
+# Temperature limits
+min.T <- 0
+max.T <- 25
+
+# Salinity limits
+min.S <- 30
+max.S <- 35
+
+# Files to manually exclude
+exclude.uctd <- c(NA)
+exclude.ctd  <- c(NA)
