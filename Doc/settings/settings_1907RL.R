@@ -43,8 +43,8 @@ sd.filter.method <- "manual" # Options are c("buffer","manual")
 sd.nasc.name     <- "cps_nasc_SD.csv"
 
 # Define Saildrone sampling dates
-survey.start.sd        <- "2019-06-13" # Start of Saildrone survey
-survey.end.sd          <- "2019-09-09" # End of Saildrone survey
+survey.start.sd  <- "2019-06-13" # Start of Saildrone survey
+survey.end.sd    <- "2019-09-09" # End of Saildrone survey
 
 # Set date range
 erddap.survey.start.sd <- "2019-06-13T00%3A00%3A00Z"
@@ -58,12 +58,12 @@ erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor"
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
-cruise.name            <- 201907 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
-cruise.ship            <- "RL"   # May be a character or character vector (e.g., c("RL","SH",...))
+cruise.name <- 201907 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL","SH",...))
 
 # Growth model parameters ------------------------------------------------------
-model.season           <- "summer" # spring or summer; for selecting growth model parameters
-model.type             <- "glm"    # lm, nlm, or glm; for selecting growth model
+model.season  <- "summer" # spring or summer; for selecting growth model parameters
+model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
 # Coordinate reference systems for geographic and projected data
@@ -72,6 +72,7 @@ crs.proj <- 3310 # Califoria Albers Equal Area
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
+
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
@@ -87,7 +88,7 @@ stock.ns      <- "Northern"
 strata.ns     <- 4
 
 # Figure preferences ------------------------------------------------------
-annotation.size        <-  2.5    # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
+annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
@@ -151,7 +152,7 @@ use.tx.number          <- c(RL = F,
                             LM = F,
                             SD = F) # Use transect names for transect numbers
 tx.rm                  <- c(RL = NA,
-                            SD = NA) # Data frame of transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
+                            SD = NA) # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 min.tx.length          <- c(RL = 3,
                             LM = 1,
                             SD = 1)  # Minimum acoustic transect length (nmi)
