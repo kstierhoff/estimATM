@@ -101,23 +101,23 @@ sounder.type           <- c(RL = "EK60",
                             SD = "EK80") # Echosounder type; e.g., EK60, EK80, other
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
-  survey.dir           <- c(RL = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS",
-                            LM = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS",
-                            SD = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS")   
+  survey.dir           <- c(RL = "C:/SURVEY/1907RL",
+                            LM = "C:/SURVEY/1907RL",
+                            SD = "C:/SURVEY/1907RL")   
 } else {
-  survey.dir           <- c(RL = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS",
-                            LM = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS",
-                            SD = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS")
+  survey.dir           <- c(RL = "C:/SURVEY/1907RL",
+                            LM = "C:/SURVEY/1907RL",
+                            SD = "C:/SURVEY/1907RL")
 }
-nasc.dir               <- c(RL = "PROCESSED/EV/CSV",
+nasc.dir               <- c(RL = "PROCESSED/EV/CSV/LASKER",
                             LM = "PROCESSED/EV/CSV/LISA_MARIE",
                             SD = "PROCESSED/EV/CSV/SAILDRONE") # Backscatter data (within survey.dir, typically; a vector of file paths)
 nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
                             LM = "*Final 38 kHz CPS.csv",
                             SD = "*CPS-Final CPS.csv")
-nasc.pattern.krill     <- c(RL = "*Z Final Krill 120.csv",
-                            LM = "*Z Final Krill 120.csv",
-                            SD = "*Z Final Krill 120.csv")
+nasc.pattern.krill     <- c(RL = "*Juan Krill Final 120.csv",
+                            LM = "*Juan Krill Final 120.csv",
+                            SD = "*Juan Krill Final 120.csv")
 source.cps.nasc        <- c(RL = F,
                             LM = F,
                             SD = F) # If T, read cps.nasc from file; else use NASC.50 
@@ -158,8 +158,8 @@ min.tx.length          <- c(RL = 3,
                             SD = 1)  # Minimum acoustic transect length (nmi)
 # CUFES database
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
-cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary],"DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- dir(cufes.dir.sqlite,pattern = "*.sqlite") # CUFES SQLite database
+cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
+cufes.db.sqlite        <- "cufes201907RL.sqlite" # CUFES SQLite database
 # Trawl database
 trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL" # System DSN for Trawl database on SQL server

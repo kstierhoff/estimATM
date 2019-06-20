@@ -64,11 +64,9 @@ overwrite.files <- T # Overwrite existing files when copying (not CSV, see below
 process.csv     <- F # Process acoustic backscatter files
 
 # Control script behavior (often F)
-get.map         <- F # Import land simple features
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
-overwrite.csv   <- F # Overwrite existing Echoview CSV files when copying
+overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
 process.csv.all <- F # Process all CSV files (F = new files only)
-add.mammal.data <- F # Add marine mammal observations
 save.imap       <- T # Save interactive map using mapshot
 
 # Do all steps
@@ -102,17 +100,24 @@ pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                        "Scomber japonicus","Trachurus symmetricus")
+
 # CUFES
 cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 500, 10000) # for legend breaks
 cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", "50-500", ">500") # for legend labels
 cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6) # for legend sizes
-cufes.colors       <- c(anchovy.color, jack.mack.color, sardine.color)
 cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
-cufes.spp.labels   <- c("Anchovy","J. mackerel","Sardine")
+cufes.colors       <- c("AnchovyEggs"      = anchovy.color, 
+                        "JackMackerelEggs" = jack.mack.color, 
+                        "SardineEggs"      = sardine.color)
+cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
+                        "JackMackerelEggs" = "J. mackerel",
+                        "SardineEggs"      = "Sardine")
+
 # Trawl
 trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) # for legend breaks
 trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") # for legend labels
 trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) # for legend sizes
+
 # NASC
 nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000) # for legend breaks
 nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
@@ -135,25 +140,26 @@ if (copy.files) {
   dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
   
   # Copy trawl Access database (.accdb)
-  haul.db <- list.files(file.path(survey.dir[survey.vessel.primary], 
-                                  "DATA/BIOLOGICAL/HAUL"),
-                        pattern = "TrawlDataEntry*.*accdb", full.names = T)
-  file.copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
+  haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                        regexp = trawl.db.access)
+  file_copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
   
   # Copy CUFES files
-  cufes.file <- list.files(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
-                           pattern = "*.sqlite", full.names = T)
-  file.copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
+  cufes.file <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
+                           regex = cufes.db.sqlite)
+  file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
   
-  # Copy CSV files
-  csv.files.cps <- list.files(file.path(survey.dir[survey.vessel.primary], "PROCESSED/EV/CSV"), 
-                          pattern = "*Final 38 kHz CPS.csv", full.names = T)
-  file.copy(csv.files.cps, here("Data/Backscatter"), overwrite = overwrite.csv)
+  # Copy CSV files for CPS
+  csv.files.cps <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
+                                    nasc.dir[survey.vessel.primary]), 
+                          regex = nasc.pattern.cps[survey.vessel.primary])
+  file_copy(csv.files.cps, here("Data/Backscatter"), overwrite = overwrite.csv)
   
-  # Copy CSV files
-  csv.files.krill <- list.files(file.path(survey.dir[survey.vessel.primary], "PROCESSED/EV/CSV"), 
-                          pattern = "*Z Final Krill 120.csv", full.names = T)
-  file.copy(csv.files.krill, here("Data/Backscatter"), overwrite = overwrite.csv)
+  # Copy CSV files for Krill
+  csv.files.krill <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
+                                    nasc.dir[survey.vessel.primary]), 
+                          regex = nasc.pattern.krill[survey.vessel.primary])
+  file_copy(csv.files.krill, here("Data/Backscatter"), overwrite = overwrite.csv)
 }
 ```
 
