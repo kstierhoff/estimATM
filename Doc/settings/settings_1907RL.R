@@ -66,6 +66,8 @@ model.season  <- "summer" # spring or summer; for selecting growth model paramet
 model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
+mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
+
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # Califoria Albers Equal Area
