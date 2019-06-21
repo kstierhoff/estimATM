@@ -6,7 +6,7 @@ survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "1907RL"        # SWFSC/AST survey name
 survey.start           <- "13 June"       # Survey start date
-survey.end             <- "9 September"  # Survey end date
+survey.end             <- "9 September"   # Survey end date
 survey.year            <- "2019"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 77              # Days at sea allocated
@@ -18,19 +18,24 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2019-06-13", "2019-07-06", 
+leg.breaks <- as.numeric(lubridate::ymd(c("2019-06-12", "2019-07-06", 
                                           "2019-07-29", "2019-08-20",
                                           "2019-09-10")))
 
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2019-06-13" # Start of survey for ERDDAP vessel data query
-erddap.survey.end    <- "2019-09-09" # End of survey for ERDDAP vessel data query
+erddap.survey.start  <- "2019-06-12" # Start of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2019-09-10" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
 erddap.classes       <- c("factor", "numeric", "numeric", "numeric","numeric")
 erddap.headers       <- c("time", "lat", "long", "SST", "SOG")
 survey.lat           <- c(32,51)
 survey.long          <- c(-130,-117)
+
+# Survey plan info --------------------------------------------------------
+wpt.filename         <- "waypoints_1907RL.csv"
+wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
+wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500") 
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
@@ -74,7 +79,6 @@ crs.proj <- 3310 # Califoria Albers Equal Area
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
-
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
@@ -162,6 +166,7 @@ min.tx.length          <- c(RL = 3,
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
 cufes.db.sqlite        <- "cufes201907RL.sqlite" # CUFES SQLite database
+cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl database
 trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL" # System DSN for Trawl database on SQL server

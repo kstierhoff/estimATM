@@ -13,9 +13,9 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,
-               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,vroom,
+               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
                shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
-               leaflet.minicharts,maptools,htmltools,mapview,DT,rworldmap,rworldxtra)
+               leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -34,12 +34,9 @@ if (is.null(doc.type)) {
 
 # global knitr chunk options
 knitr::opts_chunk$set(
-  echo = F, warning = F, message = F, 
+  echo = FALSE, warning = FALSE, message = FALSE, 
   fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
 )
-
-# Create project directories
-dir_create(here(c("Data", "Doc","Figs","Images","Output","References")))
 ```
 
 ```{r user-input}
@@ -61,7 +58,7 @@ get.nav         <- T # Download nav data from ERDDAP
 get.nav.sd      <- F # Download nav data from ERDDAP
 copy.files      <- T # Copy data files from data to plotBio directory
 overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
-process.csv     <- F # Process acoustic backscatter files
+process.csv     <- T # Process acoustic backscatter files
 
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -81,7 +78,6 @@ if (do.all) {
   overwrite.files <- T 
   process.csv     <- T 
   # Control script behavior (often F)
-  get.map         <- T 
   resize.map      <- T
   overwrite.csv   <- T 
   process.csv.all <- T 
@@ -100,7 +96,6 @@ pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                        "Scomber japonicus","Trachurus symmetricus")
-
 # CUFES
 cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 500, 10000) # for legend breaks
 cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", "50-500", ">500") # for legend labels
@@ -112,12 +107,10 @@ cufes.colors       <- c("AnchovyEggs"      = anchovy.color,
 cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
                         "JackMackerelEggs" = "J. mackerel",
                         "SardineEggs"      = "Sardine")
-
 # Trawl
 trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) # for legend breaks
 trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") # for legend labels
 trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) # for legend sizes
-
 # NASC
 nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000) # for legend breaks
 nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
@@ -126,7 +119,6 @@ nasc.scale         <- 0.7 # Scale nasc.sizes by this percentage (smaller for lar
 nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale # for legend sizes
 nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
                         "#FF0000", "#FFC0CB", "#FFFFFF")# for legend colors
-nasc.summ.interval <- 20
 
 # Catch map
 catch.breaks       <- c(0,10,100,500,1000) # breaks for legend
@@ -139,7 +131,7 @@ if (copy.files) {
   # Create data directories
   dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
   
-  # Copy trawl Access database (.accdb)
+   # Copy trawl Access database (.accdb)
   haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
                         regexp = trawl.db.access)
   file_copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
@@ -165,6 +157,14 @@ if (copy.files) {
 
 ```{r process-nav}
 if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Get max date
+    erddap.survey.start <- max(date(nav$time))
+  }
+  
   # Generate ERDDAP URL
   dataURL <- URLencode(paste(
     "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
@@ -173,21 +173,29 @@ if (get.nav) {
     sep = ""))
   
   # Download and parse ERDDAP nav data
-  nav <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+  nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
                              row.names = NULL, skip = 0))
-  names(nav) <- erddap.headers
+  names(nav.temp) <- erddap.headers
   
   # Filter to remove bad SST values
-  nav <- nav %>% 
+  nav.temp <- nav.temp %>% 
     mutate(long     = long - 360,
            SOG      = SOG * 1.94384,
            datetime = ymd_hms(time),
            SST      = na_if(SST, NaN),
            leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                  leg.breaks, labels = F, include.lowest = T))) %>%
+                                  leg.breaks, labels = F))) %>%
     filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
            between(long, min(survey.long), max(survey.long)))
+  
+  # Append new nav data
+  if (exists("nav")) {
+    nav <- bind_rows(nav, nav.temp) %>% 
+      distinct()
+  } else {
+    nav <- nav.temp
+  }
   
   # Convert nav to spatial
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
@@ -202,12 +210,21 @@ if (get.nav) {
   save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
-  load(here("Data/Nav/nav_data.Rdata"))
+  load(here("Data/NAV/nav_data.Rdata"))
 }
 
-# Read planned waypoints
-wpts <- vroom(here("Data/Nav", paste0("waypoints_", prj.name, ".csv"))) %>% 
-  mutate(Group = paste(Type, Transect))
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -262,7 +279,7 @@ if (get.nav.sd) {
   } else {
     # Load nav data
     load(here("Data/NAV/nav_data_saildrone.Rdata"))
-  }  
+  }
 }
 ```
 
@@ -310,25 +327,25 @@ if (trawl.source == "Access") {
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
       TRUE ~ haulBackTime))
-  
+
   # Filter haul data for current survey
   haul <- haul.all %>% 
-    select(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection,
-           startLatDecimal, startLongDecimal, stopLatDecimal,
-           stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes = Notes)
+    dplyr::select(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection,
+                  startLatDecimal, startLongDecimal, stopLatDecimal,
+                  stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes = Notes)
   
 } else if (trawl.source == "SQL") {
   # Filter haul data for current survey
   haul <- haul.all %>% 
     mutate(equilibriumTime = ymd_hms(equilibriumTime),
            haulBackTime    = ymd_hms(haulBackTime)) %>% 
-    select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
-           stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
+    dplyr::select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
+                  stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
     filter(cruise %in% cruise.name & ship %in% cruise.ship) 
-  
+
 } else if (trawl.source == "Excel") {
   # Format haul data
-  haul.all <- haul.all %>% 
+   haul.all <- haul.all %>% 
     mutate(
       startLatDecimal  =   DecLatitude,
       startLongDecimal =   DecLongitude,
@@ -338,15 +355,16 @@ if (trawl.source == "Access") {
                                          format(haul.all$EquilibriumTime, 
                                                 format = "%H:%M:%S"))),
       haulBackTime     =   equilibriumTime + minutes(`Duration(dec)`*60))
-  
+
   # Filter haul data for current survey
   haul <- haul.all %>% 
-    select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
-           startLatDecimal,startLongDecimal,stopLatDecimal,
-           stopLongDecimal,equilibriumTime,haulBackTime)
+    dplyr::select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
+                  startLatDecimal,startLongDecimal,stopLatDecimal,
+                  stopLongDecimal,equilibriumTime,haulBackTime)
 }
 
 haul <- haul %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
   filter(trawlPerformance != "Aborted") %>% # Remove aborted hauls
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
          cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
@@ -366,15 +384,15 @@ haul.paths <- arrange(bind_rows(haul.starts, haul.ends), haul)
 haul.mid <- haul %>% 
   group_by(cluster,haul) %>% 
   summarise(
-    mid.lat  = mean(c(startLatDecimal, stopLatDecimal)),
-    mid.long = mean(c(startLongDecimal, stopLongDecimal))) 
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
 
 # Find midpoint of each haul cluster as the average of haul midpoints
 cluster.mid <- haul.mid %>% 
   group_by(cluster) %>% 
   summarise(
-    lat  = mean(mid.lat),
-    long = mean(mid.long))
+    lat  = mean(lat),
+    long = mean(long))
 
 # Save haul data
 save(haul, file = here("Output/haul_info.Rdata"))
@@ -383,56 +401,80 @@ save(haul, file = here("Output/haul_info.Rdata"))
 ```{r process-catch-data, message=FALSE}
 # Filter catch data
 catch <- catch.all %>% 
-  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  left_join(dplyr::select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-  left_join(select(haul, haul, cluster)) %>% 
+  left_join(dplyr::select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg)
 
-# Summarize trawl catch by species
-catch.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
-                       haul + cluster ~ scientificName, sum)
-
-# Add species with zero total weight
-if (is.null(catch.summ.wt$`Engraulis mordax`))      {catch.summ.wt$`Engraulis mordax`      <- 0}
-if (is.null(catch.summ.wt$`Sardinops sagax`))       {catch.summ.wt$`Sardinops sagax`       <- 0}
-if (is.null(catch.summ.wt$`Scomber japonicus`))     {catch.summ.wt$`Scomber japonicus`     <- 0}
-if (is.null(catch.summ.wt$`Trachurus symmetricus`)) {catch.summ.wt$`Trachurus symmetricus` <- 0}
-if (is.null(catch.summ.wt$`Clupea pallasii`))       {catch.summ.wt$`Clupea pallasii`       <- 0}
-if (is.null(catch.summ.wt$`Atherinopsis californiensis`)) {catch.summ.wt$`Atherinopsis californiensis` <- 0}
-
-# Calculate total weight of all CPS species
-catch.summ.wt <- catch.summ.wt %>% 
-  mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
-
-# Summarise catch by cluster
-cluster.summ.wt <- catch.summ.wt %>% 
-  select(-haul, -AllCPS) %>% 
-  group_by(cluster) %>% 
-  summarise_all(funs(sum)) %>% 
-  mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
-  left_join(cluster.mid) %>% 
-  rename("Jacksmelt"  = "Atherinopsis californiensis",
-         "PacHerring" = "Clupea pallasii",
-         "Anchovy"    = "Engraulis mordax",
-         "Sardine"    = "Sardinops sagax",
-         "PacMack"    = "Scomber japonicus",
-         "JackMack"   = "Trachurus symmetricus")
-
-# Select positive clusters
-super.clusters <- filter(cluster.mid, cluster %in% catch.summ.wt$cluster)
-
-# Combine haul and catch data for plotting
-catch.plot <- left_join(haul, catch.summ.wt) %>% 
-  rename("Jacksmelt"  = "Atherinopsis californiensis",
-         "PacHerring" = "Clupea pallasii",
-         "Anchovy"    = "Engraulis mordax",
-         "Sardine"    = "Sardinops sagax",
-         "PacMack"    = "Scomber japonicus",
-         "JackMack"   = "Trachurus symmetricus")
+if (nrow(catch) > 0) {
+  # Summarize trawl catch by species
+  haul.summ.wt <- dcast(dplyr::select(catch, haul, cluster, scientificName, totalWeight),
+                         haul + cluster ~ scientificName, sum)
+  
+  # Add species with zero total weight
+  if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (is.null(haul.summ.wt$`Scomber japonicus`))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  
+  # Calculate total weight of all CPS species
+  haul.summ.wt <- haul.summ.wt %>% 
+    mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
+  
+  # Summarise catch by cluster
+  cluster.summ.wt <- haul.summ.wt %>% 
+    select(-haul, -AllCPS) %>% 
+    group_by(cluster) %>% 
+    summarise_all(list(sum)) %>% 
+    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+    right_join(cluster.mid) %>% 
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") %>% 
+    replace(is.na(.), 0)
+  
+  # Add lat/long to haul summary for plotting
+  haul.summ.wt <- haul.summ.wt %>% 
+    right_join(haul.mid) %>% 
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") %>% 
+    replace(is.na(.), 0)
+  
+} else {
+  # Summarize trawl catch by species
+  haul.summ.wt <- bind_cols(select(haul, haul, cluster),
+                             data.frame(
+                               "Jacksmelt"  = rep(0, nrow(haul)),
+                               "PacHerring" = rep(0, nrow(haul)),
+                               "Anchovy"    = rep(0, nrow(haul)),
+                               "Sardine"    = rep(0, nrow(haul)),
+                               "PacMack"    = rep(0, nrow(haul)),
+                               "JackMack"   = rep(0, nrow(haul)),
+                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
+    right_join(haul.mid)
+                             
+  # Summarise catch by cluster
+  cluster.summ.wt <- haul.summ.wt %>% 
+    select(-haul, -AllCPS) %>% 
+    group_by(cluster) %>% 
+    summarise_all(funs(sum)) %>% 
+    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+    right_join(cluster.mid) 
+}
 
 # Prepare catch data for plotting ----------------------------------------------
+# Select and rename trawl data for pie charts
 catch.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
@@ -442,25 +484,40 @@ catch.pie <- cluster.summ.wt %>%
 catch.pie <- project_sf(catch.pie, crs.proj) 
 
 # Filter for positive trawls
-cluster.pos <- filter(catch.pie, AllCPS > 0) %>% 
-  replace(. == 0, 0.0000001) # Substitute very small value for species with zero catch, just for pie charts
+cluster.pos <- filter(catch.pie, AllCPS > 0)
+
+if (nrow(cluster.pos) > 0) {
+   cluster.pos <- cluster.pos %>% 
+    replace(. == 0, 0.0000001) # Substitute very small value for species with zero catch, just for pie charts
+}
 
 # Filter for empty trawls
 cluster.zero <- filter(catch.pie, AllCPS == 0)
+
+# Convert haul data for plotting
+haul.catch <- haul.summ.wt %>% 
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) 
+
+haul.catch <- project_sf(haul.catch, crs = crs.proj)
 ```
 
 ```{r process-cufes}
 # Read CUFES data
 cufes.filename <- list.files(here("Data/CUFES"), pattern = "*.sqlite")
-cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
+cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
 cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
   collect() %>% 
   mutate(
-    Start = ymd_hms(Start), #"1996-03-15 15:43:00 -08:00"
-    Stop  = ymd_hms(Stop), #"1996-03-15 15:43:00 -08:00"
+    Start = case_when(
+      cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+      cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+    Stop = case_when(
+      cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+      cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
     Duration = as.numeric(difftime(Stop, Start, units = "mins")),
     Year = year(Start),
     AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs)
+
 # Close connection
 dbDisconnect(cufes.con)
 
@@ -478,9 +535,18 @@ cufes <- cufes.raw %>%
          -StartLatitude, -StartLongitude, -Duration) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
-         bin = cut(Density, cufes.breaks, include.lowest = T),
+         bin = cut(Density,cufes.breaks,include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
+  left_join(select(cufes.raw, SampleNumber, Start, Stop))
+
+# Save processed cufes to CSV
+write.csv(cufes, file = here("Output/cufes_proc.csv"), 
+          quote = F, row.names = F)
+
+# Prepare CUFES data for plotting ----------------------------------------------
+# Select CUFES sample with zero density for plotting
+cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
+  mutate(bin.level = 1)
 
 # Identify bad CUFES samples
 cufes.bad <- filter(cufes.raw, Duration <= 0)
@@ -490,54 +556,28 @@ save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
 cufes <- cufes %>% 
   filter(!SampleNumber %in% cufes.bad$SampleNumber)
 
-# Save processed cufes to CSV
-write.csv(cufes, file = here("Output/cufes_proc.csv"), 
-          quote = F, row.names = F)
+# Write CUFES data from current survey to CSV
+write.csv(cufes, file = here("Output/cufes_data.csv"), quote = F)
 
-# Convert CUFES to spatial
+# Create bins for defining point size in NASC plots
 cufes <- cufes %>% 
-  st_as_sf(coords = c("StartLongitude", "StartLatitude"), crs = crs.geog)
+  mutate(bin = cut(Density, cufes.breaks, include.lowest = T),
+         bin.level = as.numeric(bin))
 
-# Project CUFES data
-cufes.proj <- project_sf(cufes, crs = crs.proj)
+# Project cufes data
+cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_transform(crs = crs.proj) %>% 
+  filter(Density > 0, Species %in% cufes.plot.spp)
 
-# Prepare CUFES data for plotting ----------------------------------------------
+cufes.plot <- project_sf(cufes.plot, crs.proj)
+
 # Select CUFES sample with zero density for plotting
-cufes.neg <- filter(cufes.raw, AllEggs == 0, !is.na(Duration)) %>% 
-  mutate(bin.level = 1) %>% 
-  st_as_sf(coords = c("StartLongitude", "StartLatitude"), crs = crs.geog)
-
-# Project negative CUFES samples
-cufes.neg.proj <- project_sf(cufes.neg, crs = crs.proj) 
-
-# Define plot levels for all species
-cufes.levels.all <- cufes.proj %>% distinct(bin.level) %>% arrange()
-cufes.labels.all <- cufes.labels[cufes.levels.all$bin.level]
-cufes.sizes.all  <- cufes.sizes[cufes.levels.all$bin.level]
-
-# # Write CUFES data from current survey to CSV
-# write.csv(cufes, file = here("Output/cufes_data.csv"), quote = F)
-# # 
-# # Create bins for defining point size in NASC plots
-# cufes <- cufes %>% 
-#   mutate(bin = cut(Density, cufes.breaks, include.lowest = T),
-#          bin.level = as.numeric(bin))
-# 
-# # Project cufes data
-# cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-#   st_transform(crs = crs.proj) 
-# 
-# cufes.plot <- project_sf(cufes.plot, crs.proj)
-# 
-# # Select CUFES sample with zero density for plotting
-# cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
-#   st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-#   select(SampleNumber)
+cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
+  st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  select(SampleNumber)
 ```  
 
 ```{r process-csv-cps}
-# RESUME HERE
-# Incorporate CSV processing code from biomassEstimate (fread; but consider vroom)
 if (process.csv) {
   if (length(dir_ls(here("Output"), regexp = "processed_cps.Rdata")) > 0) {
     # Load already processed CSV files
@@ -546,17 +586,15 @@ if (process.csv) {
   
   # List local CSV files
   csv.files.cps <- dir_ls(here("Data/Backscatter"), 
-                              glob = nasc.pattern.cps[survey.vessel.primary])
+                          regex = nasc.pattern.cps[survey.vessel.primary])
   
   if (process.csv.all) {
     # Create final data frame
     nasc.cps <- data.frame()
-    
   } else {
     # Load already processed files
     load(here("Output/nasc_cps.Rdata")) 
-  
-      # List only new CSV files
+    # List only new CSV files
     csv.files.cps <- csv.files.cps[!csv.files.cps %in% processed.cps]
   }
   
@@ -566,22 +604,66 @@ if (process.csv) {
                          label = "0% done", min = 0, max = 100, initial = 0)
     
     # Process all .CSV files
-    for (i in seq_along(csv.files.cps)) {
-      # Extract backscatter from i-th file and combine results
-      nasc.cps <- bind_rows(nasc.cps, extract_csv(csv.files.cps[i]))
+    for (i in 1:length(csv.files.cps)) {
+      # Read i-th file
+      nasc.csv <- read_csv(csv.files.cps[i])
+      # Extract file name from path
+      file.name <- csv.files.cps[i]
+      # Extract transect name from the file name
+      transect <- unlist(strsplit(file.name, split = "_"))[2]
+      # Summarize NASC by interval
+      nasc.temp <- nasc.csv %>% 
+        group_by(Interval) %>% 
+        summarise(
+          long     = Lon_M[1],
+          lat      = Lat_M[1],
+          date     = Date_M[1],
+          time     = as.character(Time_M[1]),
+          dist_m   = Dist_M[1],
+          NASC.5   = sum(NASC[Layer_depth_max <=   5]),
+          NASC.10  = sum(NASC[Layer_depth_max <=  10]),
+          NASC.15  = sum(NASC[Layer_depth_max <=  15]),
+          NASC.20  = sum(NASC[Layer_depth_max <=  20]),
+          NASC.25  = sum(NASC[Layer_depth_max <=  25]),
+          NASC.30  = sum(NASC[Layer_depth_max <=  30]),
+          NASC.35  = sum(NASC[Layer_depth_max <=  35]),
+          NASC.40  = sum(NASC[Layer_depth_max <=  40]),
+          NASC.45  = sum(NASC[Layer_depth_max <=  45]),
+          NASC.50  = sum(NASC[Layer_depth_max <=  50]),
+          NASC.55  = sum(NASC[Layer_depth_max <=  55]),
+          NASC.60  = sum(NASC[Layer_depth_max <=  60]),
+          NASC.65  = sum(NASC[Layer_depth_max <=  65]),
+          NASC.70  = sum(NASC[Layer_depth_max <=  70]),
+          NASC.75  = sum(NASC[Layer_depth_max <=  75]),
+          NASC.80  = sum(NASC[Layer_depth_max <=  80]),
+          NASC.85  = sum(NASC[Layer_depth_max <=  85]),
+          NASC.90  = sum(NASC[Layer_depth_max <=  90]),
+          NASC.95  = sum(NASC[Layer_depth_max <=  95]),
+          NASC.100 = sum(NASC[Layer_depth_max <= 100]),
+          NASC.150 = sum(NASC[Layer_depth_max <= 150]),
+          NASC.250 = sum(NASC[Layer_depth_max <= 250]),
+          NASC.350 = sum(NASC[Layer_depth_max <= 350]),
+          NASC     = NASC.250,
+          depth    = max(Layer_depth_max) + 3,
+          CPS      = 1,
+          filename = file.name,
+          transect = transect,
+          type     = "CPS",
+          datetime = ymd_hms(paste(date, time)))
       
-      # Update the progress bar
+      # Combine results
+      nasc.cps <- bind_rows(nasc.cps, nasc.temp)
+      
+      # update the progress bar
       info <- sprintf("%d%% done", round((i / length(csv.files.cps)) * 100))
       setWinProgressBar(pb, round((i / length(csv.files.cps)) * 100), label = info)
     }
-    # Close progress bar
     close(pb)
     
     # Calculate summary interval
     nasc.cps <- nasc.cps %>%
       mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
                        labels = F, include.lowest = T))
-    
     # Save results
     save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
     write.csv(nasc.cps, file = here("Output/nasc_cps.csv"), row.names = F, quote = F)
@@ -590,7 +672,7 @@ if (process.csv) {
   load(here("Output/nasc_cps.Rdata"))
 }
 
-# Average NASC.50 data over new intervals or number of intervals in a 2 km radius
+# average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ.cps <- nasc.cps %>%
   group_by(transect, int) %>%
   summarise(
@@ -598,13 +680,13 @@ nasc.summ.cps <- nasc.cps %>%
     bin.mid = as.integer(round(bins / 2)),
     lat = lat[1],
     long = long[1],
-    NASC = mean(NASC.50)
+    NASC = mean(NASC.70)
   )
 
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.plot.cps <- nasc.cps %>%
-  select(filename, transect, int, lat, long, cps.nasc = NASC.50) %>% 
+  select(filename, transect, int, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat  = lat[1],
@@ -643,16 +725,14 @@ if (process.csv) {
   
   # List local CSV files
   csv.files.krill <- dir_ls(here("Data/Backscatter"), 
-                          glob = nasc.pattern.krill[survey.vessel.primary])
+                          regex = nasc.pattern.krill[survey.vessel.primary])
   
   if (process.csv.all) {
     # Create final data frame
     nasc.krill <- data.frame()
-    
   } else {
     # Load already processed files
     load(here("Output/nasc_krill.Rdata")) 
-    
     # List only new CSV files
     csv.files.krill <- csv.files.krill[!csv.files.krill %in% processed.krill]
   }
@@ -663,15 +743,60 @@ if (process.csv) {
                          label = "0% done", min = 0, max = 100, initial = 0)
     
     # Process all .CSV files
-    for (i in seq_along(csv.files.krill)) {
-      # Extract backscatter from i-th file and combine results
-      nasc.krill <- bind_rows(nasc.krill, extract_csv(csv.files.krill[i]))
+    for (i in 1:length(csv.files.krill)) {
+      # Read i-th file
+      nasc.csv <- read_csv(csv.files.krill[i])
+      # Extract file name from path
+      file.name <- csv.files.krill[i]
+      # Extract transect name from the file name
+      transect <- unlist(strsplit(file.name, split = "_"))[2]
+      # Summarize NASC by interval
+      nasc.temp <- nasc.csv %>% 
+        group_by(Interval) %>% 
+        summarise(
+          long     = Lon_M[1],
+          lat      = Lat_M[1],
+          date     = Date_M[1],
+          time     = as.character(Time_M[1]),
+          dist_m   = Dist_M[1],
+          NASC.5   = sum(NASC[Layer_depth_max <=   5]),
+          NASC.10  = sum(NASC[Layer_depth_max <=  10]),
+          NASC.15  = sum(NASC[Layer_depth_max <=  15]),
+          NASC.20  = sum(NASC[Layer_depth_max <=  20]),
+          NASC.25  = sum(NASC[Layer_depth_max <=  25]),
+          NASC.30  = sum(NASC[Layer_depth_max <=  30]),
+          NASC.35  = sum(NASC[Layer_depth_max <=  35]),
+          NASC.40  = sum(NASC[Layer_depth_max <=  40]),
+          NASC.45  = sum(NASC[Layer_depth_max <=  45]),
+          NASC.50  = sum(NASC[Layer_depth_max <=  50]),
+          NASC.55  = sum(NASC[Layer_depth_max <=  55]),
+          NASC.60  = sum(NASC[Layer_depth_max <=  60]),
+          NASC.65  = sum(NASC[Layer_depth_max <=  65]),
+          NASC.70  = sum(NASC[Layer_depth_max <=  70]),
+          NASC.75  = sum(NASC[Layer_depth_max <=  75]),
+          NASC.80  = sum(NASC[Layer_depth_max <=  80]),
+          NASC.85  = sum(NASC[Layer_depth_max <=  85]),
+          NASC.90  = sum(NASC[Layer_depth_max <=  90]),
+          NASC.95  = sum(NASC[Layer_depth_max <=  95]),
+          NASC.100 = sum(NASC[Layer_depth_max <= 100]),
+          NASC.150 = sum(NASC[Layer_depth_max <= 150]),
+          NASC.250 = sum(NASC[Layer_depth_max <= 250]),
+          NASC.350 = sum(NASC[Layer_depth_max <= 350]),
+          NASC     = NASC.250,
+          depth    = max(Layer_depth_max) + 3,
+          CPS      = 0,
+          filename = file.name,
+          transect = transect,
+          type     = "Krill",
+          datetime = ymd_hms(paste(date, time)))
       
-      # Update the progress bar
+      # Combine results
+      nasc.krill <- bind_rows(nasc.krill, nasc.temp)
+      
+      # update the progress bar
       info <- sprintf("%d%% done", round((i / length(csv.files.krill)) * 100))
       setWinProgressBar(pb, round((i / length(csv.files.krill)) * 100), label = info)
     }
-    # Close the progress bar
     close(pb)
     
     # Calculate summary interval
@@ -686,7 +811,7 @@ if (process.csv) {
   load(here("Output/nasc_krill.Rdata"))
 }
 
-# Average NASC.50 data over new intervals or number of intervals in a 2 km radius
+# average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ.krill <- nasc.krill %>%
   group_by(transect, int) %>%
   summarise(
@@ -700,7 +825,7 @@ nasc.summ.krill <- nasc.krill %>%
 # Average krill.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.plot.krill <- nasc.krill %>%
-  select(filename, transect, int, lat, long, krill.nasc = NASC.350) %>% 
+  dplyr::select(filename, transect, int, lat, long, krill.nasc = NASC.350) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat  = lat[1],
@@ -708,7 +833,9 @@ nasc.plot.krill <- nasc.krill %>%
     NASC = mean(krill.nasc)) %>% 
   # Create bins for defining point size in NASC plots%>% 
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin)) %>% 
+         bin.level =  as.numeric(bin)) 
+
+nasc.plot.krill <- nasc.plot.krill %>% 
   filter(!is.na(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
@@ -731,11 +858,6 @@ nasc.plot.all   <- bind_rows(nasc.plot.cps, nasc.plot.krill) %>%
   filter(NASC >= 200) %>% 
   ungroup()
 
-nasc.levels.all <- sort(unique(nasc.plot.all$bin.level))
-nasc.labels.all <- nasc.labels[nasc.levels.all]
-nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
-nasc.colors.all <- nasc.colors[nasc.levels.all]
-
 # Select top 200 nasc values and look for outliers
 big.nasc <- nasc.cps %>%
   bind_rows(nasc.krill) %>% 
@@ -744,29 +866,16 @@ big.nasc <- nasc.cps %>%
          rank = seq(n()),
          label = paste("Tx", transect, "-Int", Interval, "-", type, sep = "")) %>% 
   top_n(100, NASC) %>% 
-  select(rank, NASC, label, type, datetime, dist_m, lat, long) %>% 
-  filter(NASC > 15000)
+  select(rank, NASC, label, type, datetime, dist_m, lat, long) 
 
 # Save NASC outliers
 save(big.nasc, file = here("Output/nasc_big.Rdata"))
 ```
 
-```{r process-seeps, eval = FALSE}
-# Read seep regions
-seeps <- read_csv(here("Data/Seeps/seeps_acoustics.csv")) %>% 
-  mutate(
-    Type = case_when(
-      str_detect(Name, "Seep") ~ "Seep",
-      str_detect(Name, "Uncertain") ~ "Uncertain",
-      TRUE ~ "Missing")) %>% 
-  st_as_sf(coords = c("Lon","Lat"), crs = crs.geog) 
-```
-
 ```{r create-basemap,include=F}
 # Configure base map options -----------------
 # Import landmarks
-locations <- read.csv(here("Data/Map/locations.csv")) %>% 
-  filter(name %in% label.list) %>%
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
   st_as_sf(coords = c("lon","lat"), crs = crs.geog) 
 
 # Project sf
@@ -790,14 +899,6 @@ nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>%
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
 
-# Create transects sf
-tx_sf <- st_as_sf(wpts, coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
-  group_by(Group, Type, Transect) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING") %>% 
-  filter(!str_detect(Group, "Extra"),
-         !str_detect(Group, "Transit"))
-
 # Set padding around data  
 if (resize.map) {
   # Use nav data to resize map to survey progress
@@ -805,8 +906,8 @@ if (resize.map) {
     st_transform(crs = crs.proj) %>%
     st_bbox()  
 } else {
-  # Use planned waypoints to set map extent
-  map.bounds <- tx_sf %>%
+  # Use nav data to resize map to survey progress
+  map.bounds <- transects.sf %>%
     st_transform(crs = crs.proj) %>%
     st_bbox()  
 }
@@ -822,7 +923,7 @@ base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds,
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
 # Save the basemap
-ggsave(base.map, file = here("Figs/fig_basemap.png"), 
+ggsave(base.map,file = here("Figs/fig_base_map.png"), 
        height = map.height, width = map.width)
 
 save(base.map, file = here("Data/Map/basemap.Rdata"))
@@ -863,7 +964,7 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 # Create spatial objects -------------------------------------------
 # Convert NASC data to sf; CRS = crs.geog (WGS84)
 nasc.cps.sf <- nasc.cps %>%
-  select(filename, transect, int, lat, long, cps.nasc = NASC.50) %>% 
+  select(filename, transect, int, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat  = lat[1],
@@ -905,7 +1006,7 @@ big.nasc.sf <- big.nasc %>%
 
 # Convert NASC small nasc data to sf; CRS = crs.geog (WGS84)
 nasc.cps.sf.small <- nasc.cps %>%
-  select(filename, transect, int, lat, long, cps.nasc = NASC.50) %>% 
+  select(filename, transect, int, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat  = lat[1],
@@ -921,27 +1022,23 @@ nasc.cps.sf.small <- nasc.cps %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   filter(NASC < 200) 
 
-# Convert planned transects to sf; CRS = crs.geog
-wpts.sf <- wpts %>% 
-  filter(Type %in% c("Compulsory","Adaptive","Nearshore","Offshore")) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"),crs = crs.geog)
-
-# transects.sf <- wpts %>% 
-#   filter(type %in% c("Compulsory","Adaptive","Mammal","Saildrone")) %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-#   group_by(type, line) %>% 
-#   summarise(do_union = F) %>% 
-#   st_cast("LINESTRING")
-
 # Convert haul paths and midpoints to sf; CRS = crs.geog
 haul.paths.sf <- st_as_sf(haul.paths, coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+  st_cast("LINESTRING") %>% 
+  left_join(select(haul.catch, -X, -Y, -cluster)) %>% 
+  mutate(
+    label = paste("Haul", haul),
+    popup = paste('<b>Haul:', haul, '</b><br/>',
+                       'Anchovy:', Anchovy, 'kg<br/>',
+                       'Jack Mackerel:', JackMack, 'kg<br/>',
+                       'P. herring:', PacHerring, 'kg<br/>',
+                       'P. mackerel:', PacMack, 'kg<br/>',
+                       'Sardine:', Sardine, 'kg<br/>',
+                       'All CPS:', AllCPS, 'kg'))
 
 haul.locs.sf <- haul.mid %>% 
-  rename(long = mid.long, 
-         lat  = mid.lat) %>% 
   mutate(label = paste("Haul", haul)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
@@ -951,7 +1048,6 @@ cluster.locs.sf <- cluster.mid %>%
 
 # Convert haul catch to sf and create labels
 cluster.catch.sf <- catch.pie %>%
-  # left_join(select(haul.mid, Haul = haul, lat = mid.lat, long = mid.long)) %>% 
   st_as_sf(coords = c("X","Y"), crs = crs.proj) %>%
   st_transform(crs = crs.geog) %>% 
   mutate(
@@ -966,6 +1062,8 @@ cluster.catch.sf <- catch.pie %>%
 
 # Convert CUFES to sf; CRS - crs.geog
 cufes.sf <- cufes %>% 
+  rename(lat = StartLatitude,
+         long = StartLongitude) %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
   mutate(
     spp.label = case_when(
@@ -974,10 +1072,12 @@ cufes.sf <- cufes %>%
       Species == "JackMackerelEggs"~ "Jack mackerel",
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>"))
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 # Convert negative CUFES samples to sf; CRS - crs.geog
-cufes.neg.sf <- cufes.neg
+cufes.neg.sf <- cufes.neg %>% 
+  mutate(bin.level = 1)
 ```
 
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}
@@ -995,18 +1095,24 @@ all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)),
                    unique(as.character(or_mpas$Label))))
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
-# mpaPal  <- colorFactor(topo.colors(10), ca_mpas$Type)
-# Create color palette for NASC
-nascPal <- colorFactor(nasc.colors.all, nasc.levels.all)
+
 # Create color pallette for CUFES
 cufesPal <- colorFactor(cufes.colors, cufes.plot.spp)
 # Create color palette for seep types
 seepPal <- colorFactor(c("red","blue"), c("Seep","Uncertain"))
 # Create color pallette for planned transects
-txPal    <- colorFactor(c("red","blue","green","orange"), 
-                        c("Adaptive","Compulsory","Offshore","Nearshore"))
+txPal    <- colorFactor(wpt.colors, wpt.types)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
+
+# Select plot levels for backscatter data
+nasc.levels.all <- sort(unique(nasc.plot.all$bin.level))
+nasc.labels.all <- nasc.labels[sort(nasc.levels.all)]
+nasc.sizes.all  <- nasc.sizes[sort(nasc.levels.all)]
+nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
+
+# Create color palette for NASC
+nascPal <- colorFactor(nasc.colors.all, nasc.levels.all)
 
 # Plotting preferences -------------------------------------------------------
 # Leaflet tile options; set both to T if caching
@@ -1044,20 +1150,31 @@ i.map <- leaflet() %>%
   # Add OR MPAs
   addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
               fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
-  # Add planned transects
-  addPolylines(data = tx_sf, color = ~txPal(Type), weight = 3, 
-               label = ~htmlEscape(paste(Type, Transect)),
-               group = "Planned Transects") %>%
-  addCircleMarkers(data = wpts.sf,
+  # Add core planned transects
+  addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, 
+               label = ~htmlEscape(paste(Type, Transect)), 
+               group = "Planned Transects (Core)") %>%
+  addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
                    radius = 3, color = "#000414", stroke = F,
                    fillOpacity = 0.75, fillColor =  ~txPal(Type), 
                    label = ~htmlEscape(paste(Type, Waypoint)),
-                   group = "Planned Transects") %>%
+                   group = "Planned Transects (Core)") %>%
+  # Add ancillary planned transects 
+  addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, 
+               label = ~htmlEscape(paste(Type, Transect)), 
+               group = "Planned Transects (Ancillary)") %>%
+  addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F,
+                   fillOpacity = 0.75, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   group = "Planned Transects (Ancillary)") %>%
   # Add nav data
   addPolylines(data = nav_sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
-  addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3, 
-               label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>%
+  # addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3, 
+  #              label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>%
   # Add CUFES data
   addCircleMarkers(data = cufes.sf,
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
@@ -1078,7 +1195,8 @@ i.map <- leaflet() %>%
                    group = "Backscatter-CPS (Small)") %>%
   # Add trawl paths 
   addPolylines(data = haul.paths.sf, color = c("#000000"), weight = 5, opacity = 0.8, 
-               label = ~paste("Haul", haul), group = "Trawls") %>% 
+               popup = ~popup, label = ~label, 
+               group = "Trawls") %>% 
   # Add trawl catch
   addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
                    opacity = 0.8, fillOpacity = 1, fillColor =  "white",
@@ -1091,11 +1209,11 @@ i.map <- leaflet() %>%
   #               colorPalette = trawlPal,
   #               width = 30, transitionTime = 0) %>% 
   # Add backscatter outliers
-  addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup, 
+  addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
              group = "Backscatter (Large)") %>%
   # Add seep locations from acoustics
-  addMarkers(data = seeps, label = ~htmlEscape(Name),
-                   group = "Methane Seeps") %>% 
+  # addMarkers(data = seeps, label = ~htmlEscape(Name),
+  #                  group = "Methane Seeps") %>% 
   # Add legends
   addLegend("bottomleft", colors = nasc.colors.all, 
             values = sort(unique(nasc.cps.sf$bin.level)),
@@ -1123,42 +1241,19 @@ i.map <- leaflet() %>%
   # Add layer controls
   addLayersControl(
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
-                      "Bathymetry Contours","Planned Transects", "Vessel Track", 
-                      "Saildrone Tracks", "Trawls",
+                      "Bathymetry Contours",
+                      "Planned Transects (Core)", "Planned Transects (Ancillary)",
+                      "Vessel Track", "Trawls",
                       "Backscatter-CPS", "Backscatter-Krill", "Backscatter (Large)",
-                      "Backscatter-CPS (Small)","CUFES Egg Density", "CUFES (Negative)",
-                      "Methane Seeps"),
+                      "Backscatter-CPS (Small)","CUFES Egg Density", "CUFES (Negative)"),
     options = layersControlOptions(collapsed = F)) %>% 
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)",
-              "Methane Seeps", "Saildrone Tracks","Backscatter-CPS (Small)")) %>% 
+              "Saildrone Tracks", "Planned Transects (Ancillary)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
-if (add.mammal.data) {
-  i.map <- i.map %>% 
-    # Add marine mammal observations
-    addCircleMarkers(data = pws.data, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     opacity = 0.75, fillOpacity = 0.75, fillColor =  "white",
-                     popup = ~popup, label = ~label,
-                     group =  "PWS dolphins") %>%
-    addCircleMarkers(data = hb.data, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     opacity = 0.75, fillOpacity = 0.75, fillColor =  "#276ddd",
-                     popup = ~popup, label = ~label,
-                     group =  "Humpback whales") %>%
-    # Add layer controls
-    addLayersControl(
-      overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
-                        "Bathymetry Contours","Planned Transects", "Vessel Track", 
-                        "Saildrone Tracks", "Trawls",
-                        "Backscatter-CPS", "Backscatter-Krill", "Backscatter (Large)",
-                        "Backscatter-CPS (Small)","CUFES Egg Density", "CUFES (Negative)",
-                        "Methane Seeps","PWS dolphins", "Humpback whales"),
-      options = layersControlOptions(collapsed = F)) %>% 
-    hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)",
-                "Methane Seeps", "Saildrone Tracks","Backscatter-CPS (Small)","PWS dolphins", "Humpback whales")) 
-}
-
 # Save imap
+dir_create(here("Output/imap"))
 save(i.map, file = here("Output/imap/interactive_explorer.Rdata"))
 
 if (save.imap) {
@@ -1196,7 +1291,7 @@ if (save.figs) {
 }
 ```  
 
-```{r create-saidrone-map, eval = FALSE}
+```{r create-saidrone-map, eval=FALSE}
 if (save.figs) {
   # Create saildrone map
   saildrone.map <- base.map +
@@ -1229,13 +1324,13 @@ write_csv(nav.sd.summ, here("Output/saildrone_summary.csv"))
 ```
 
 
-### Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the 2018 California Current Ecosystem Survey (1807RL) 
+### Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the `r survey.name` 
 
 #### SWFSC Advanced Survey Technologies Group  
 
 _**Last updated:**_ `r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`
 
-An interactive map of the distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to 70-m deep) and krill (5 to 350-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; and proportions of CPS species in trawl clusters (white points) and some other miscellaneous surey data. Hover-over or click on map objects for more info.  
+An interactive map of the distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to 70-m deep) and krill (5 to 350-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; proportions by weight of CPS species in trawl clusters (white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.  
 
 ```{r plot-leaflet-map, echo=F, out.height="8in", out.width="100%"}
 # Display map

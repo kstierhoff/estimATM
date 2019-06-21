@@ -7,6 +7,8 @@ nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 
 # Map backscatter
 nasc.map.cps <- base.map +
+  # Plot transects data
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
   # plot ship track data
   geom_sf(data = nav_sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot NASC data
@@ -14,7 +16,7 @@ nasc.map.cps <- base.map +
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
-                    values = nasc.sizes.all, labels = nasc.labels.all) +
+                    values = nasc.sizes.all,labels = nasc.labels.all) +
   scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
                     values = nasc.colors.all,labels = nasc.labels.all) +
   # Configure legend guides
@@ -30,7 +32,7 @@ ggsave(nasc.map.cps,
        filename = here("Figs/fig_backscatter_cps.png"),
        width = map.width, height = map.height) 
 
-save(nasc.map.cps, file = here("Output/nasc_map_cps.Rdata"))
+save(nasc.map.cps, file = here("Output/nasc_plot_cps.Rdata"))
 
 # Create plot for Krill NASC
 # Select plot levels for backscatter data
@@ -41,6 +43,8 @@ nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 
 # Map backscatter
 nasc.map.krill <- base.map +
+  # Plot transects data
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
   # plot ship track data
   geom_sf(data = nav_sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot NASC data
@@ -64,43 +68,54 @@ ggsave(nasc.map.krill,
        filename = here("Figs/fig_backscatter_krill.png"),
        width = map.width, height = map.height) 
 
-save(nasc.map.krill, file = here("Output/nasc_map_krill.Rdata"))
+save(nasc.map.krill, file = here("Output/nasc_plot_krill.Rdata"))
 
 # CUFES Plots #####
 # Plot CUFES for sardine and anchovy -------------------------------------------------------  
+# Define plot levels for all species
+cufes.levels.all     <- cufes.plot %>% distinct(bin.level)
+cufes.labels.all     <- cufes.labels[sort(cufes.levels.all$bin.level)]
+cufes.sizes.all      <- cufes.sizes[sort(cufes.levels.all$bin.level)]
+cufes.colors.all     <- cufes.colors[which(names(cufes.colors) %in% unique(cufes.plot$Species))]
+cufes.spp.labels.all <- cufes.spp.labels[which(names(cufes.spp.labels) %in% unique(cufes.plot$Species))]
+
 cufes.density.all <- base.map +
+  # Plot transects data
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
   # Plot all cufes samples, including zeros
-  geom_point(data = cufes.neg.proj, aes(X, Y),
-             shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
+  geom_sf(data = cufes.neg,
+          shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
-  geom_point(data = filter(cufes.proj, Density > 0, Species %in% cufes.plot.spp),
+  geom_point(data = cufes.plot,
              aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
   # Configure size and colour scales
   scale_size_manual(name = bquote(atop('Density','(eggs' ~m^-3*')')),
                     values = cufes.sizes.all,labels = cufes.labels.all) +
-  scale_colour_manual(name = 'Species', values = cufes.colors, labels = cufes.spp.labels) +
+  scale_colour_manual(name = 'Species', values = cufes.colors.all, labels = cufes.spp.labels.all) +
   # Format axes and titles
   ggtitle("CUFES Egg Densities") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
 cufes.density.facet <- base.map +
+  # Plot transects data
+  geom_sf(data = transects.sf, size = 0.25, colour = "gray50", alpha = 0.75) +
   # Plot all cufes samples, including zeros
-  geom_point(data = cufes.neg.proj, aes(X, Y),
+  geom_sf(data = cufes.neg,
           shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
-  geom_point(data = filter(cufes.proj, Density > 0, Species %in% cufes.plot.spp),
+  geom_point(data = cufes.plot,
              aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
   # Configure size and colour scales
   scale_size_manual(name = bquote(atop('Density','(eggs' ~m^-3*')')),
-                    values = cufes.sizes.all, labels = cufes.labels.all) +
-  scale_colour_manual(name = 'Species', values = cufes.colors, labels = cufes.spp.labels) +
+                    values = cufes.sizes.all,labels = cufes.labels.all) +
+  scale_colour_manual(name = 'Species', values = cufes.colors.all, labels = cufes.spp.labels.all) +
   facet_wrap(~Species) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold")) +
   # Format axes and titles
   ggtitle("CUFES Egg Densities") +
-  theme(strip.background.x = element_blank(),
-        strip.text.x = element_text(face = "bold.italic")) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -117,43 +132,49 @@ ggsave(cufes.density.facet,
 
 # Map trawl species proportions -------------------------------------------------------
 # Calculate pie radius based on latitude range
-pie.radius <- abs(range(nasc.plot.cps$Y)[1] - range(nasc.plot.cps$Y)[2])*pie.scale
+# Use backscatter data to resize map to survey progress
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale) 
 
-# Calculate pie radius of each pie, based on All CPS landings
-if (scale.pies == T) {
-  catch.pie$radius <- pie.radius*catch.pie$bin
-} else{
-  catch.pie$radius <- pie.radius
+if (nrow(cluster.pos) > 0) {
+  # Create trawl figure
+  trawl.catch.plot <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+    # Plot trawl pies
+    geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
+                    cols = c("Anchovy","JackMack","Jacksmelt","PacHerring","PacMack","Sardine"),
+                    color = 'black', alpha = 0.8) +
+    # Configure trawl scale
+    scale_fill_manual(name = 'Species',
+                      labels = c("Anchovy","J. Mackerel","Jacksmelt","P. herring","P. mackerel","Sardine"),
+                      values = c(anchovy.color,jack.mack.color,jacksmelt.color,
+                                 pac.herring.color,pac.mack.color,sardine.color)) +
+    # Plot empty trawl locations
+    geom_point(data = cluster.zero, aes(X, Y),
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
+    # Plot panel label
+    ggtitle("CPS Species Proportions in Trawls") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+} else {
+  # Create trawl figure
+  trawl.catch.plot <- base.map +
+    # Plot nasc data
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+    # Plot empty trawl locations
+    geom_point(data = cluster.zero, aes(X, Y), 
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
+    # Plot panel label
+    ggtitle("CPS Species Proportions in Trawls") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 }
-
-# Create trawl figure
-trawl.catch.plot <- base.map +
-  # Plot nasc data
-  geom_sf(data = tx_sf, size = 0.5, colour = "gray50", alpha = 0.5) +
-  # Plot trawl pies
-  geom_scatterpie(data = cluster.pos, 
-                  aes(X, Y, group = cluster,r = pie.radius),
-                  cols = c("Anchovy","JackMack","Jacksmelt",
-                           "PacHerring","PacMack","Sardine"),
-                  color = 'black', alpha = 0.8) +
-  # Configure trawl scale
-  scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy","J. Mackerel","Jacksmelt",
-                               "P. herring","P. mackerel","Sardine"),
-                    values = c(anchovy.color,jack.mack.color,jacksmelt.color,
-                               pac.herring.color,pac.mack.color,sardine.color)) +
-  # Plot empty trawl locations
-  geom_point(data = cluster.zero, aes(X, Y), 
-             size = 3, shape = 21, fill = 'black', colour = 'white') +
-  # Plot panel label
-  ggtitle("CPS Species Proportions in Trawls") +
-  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
 # save trawl plot
 ggsave(trawl.catch.plot,
-       filename = here("Figs/fig_trawl_species_proportion.png"),
+       filename = here("Figs/fig_trawl_species_proportion_wt.png"),
        width = map.width, height = map.height)
 
 # Combine all plots #####
