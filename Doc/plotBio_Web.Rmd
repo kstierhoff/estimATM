@@ -571,6 +571,12 @@ cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs 
 
 cufes.plot <- project_sf(cufes.plot, crs.proj)
 
+cufes.plot.squid <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_transform(crs = crs.proj) %>% 
+  filter(Density > 0, Species == "SquidEggs")
+
+cufes.plot.squid <- project_sf(cufes.plot.squid, crs.proj)
+
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
   st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
@@ -1075,6 +1081,18 @@ cufes.sf <- cufes %>%
     popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
+cufes.squid.sf <- cufes %>% 
+  rename(lat = StartLatitude,
+         long = StartLongitude) %>% 
+  filter(Density > 0, Species == "SquidEggs") %>%
+  mutate(
+    spp.label = case_when(
+      Species == "SquidEggs" ~ "Squid",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
 # Convert negative CUFES samples to sf; CRS - crs.geog
 cufes.neg.sf <- cufes.neg %>% 
   mutate(bin.level = 1)
@@ -1176,10 +1194,14 @@ i.map <- leaflet() %>%
   # addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3, 
   #              label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>%
   # Add CUFES data
-  addCircleMarkers(data = cufes.sf,
+   addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
                    popup = ~popup, group = "CUFES Egg Density") %>%
+  addCircleMarkers(data = cufes.squid.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
   addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
                    fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                    group = "CUFES (Negative)") %>%
@@ -1245,8 +1267,9 @@ i.map <- leaflet() %>%
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
                       "Vessel Track", "Trawls",
                       "Backscatter-CPS", "Backscatter-Krill", "Backscatter (Large)",
-                      "Backscatter-CPS (Small)","CUFES Egg Density", "CUFES (Negative)"),
-    options = layersControlOptions(collapsed = F)) %>% 
+                      "Backscatter-CPS (Small)","CUFES Egg Density", 
+                      "CUFES Egg Density-Squid","CUFES (Negative)"),
+    options = layersControlOptions(collapsed = F)) %>%  
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)",
               "Saildrone Tracks", "Planned Transects (Ancillary)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
