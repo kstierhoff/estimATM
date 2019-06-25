@@ -174,7 +174,7 @@ trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry1907RL.accdb"
 # CTD data
 ctd.dir                <- unique(file.path(survey.dir,"DATA/CTD"))
-ctd.hdr.pattern        <- ".*hdr"
+ctd.hdr.pattern        <- "1907\\d{3}.hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 # UCTD data   
