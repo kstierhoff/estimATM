@@ -1,7 +1,7 @@
 ---
 title: "Trawl Specimen Explorer"
 author: "Kevin Stierhoff"
-date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = TRUE)`'
 output:
   bookdown::html_document2:
     toc: yes
@@ -11,7 +11,7 @@ output:
 
 ```{r set-up, echo=F, message=F, error=F, warning=F}
 # Knitr options
-knitr::opts_chunk$set(echo = F, message = F, warning = F,
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       out.width = "90%")
 
 # Install and load pacman (library management package)
@@ -164,7 +164,7 @@ lengths.expanded.all <- lengthFreq.all %>%
     mutate(
       flaggedData = "N",
       isRandomSample = "Y",
-      binned = T)
+      binned = TRUE)
 }
 
 lengths.all <- lengths.all  %>% 
@@ -181,7 +181,7 @@ lengths.all <- lengths.all  %>%
   mutate(individual_ID = as.numeric(individual_ID)) %>% 
   # Standardize sex values
   mutate(sex = tolower(trimws(sex)),
-         binned = F) %>% 
+         binned = FALSE) %>% 
   bind_rows(lengths.expanded.final) %>% 
   # Create unique key and replace unused sex categories
   mutate(key = paste(cruise, ship, haul, collection, species, specimenNumber),
@@ -209,7 +209,7 @@ lengths.all  <- lengths.all %>%
 # Get max TL for plotting L/W models
 L.max <- lengths.all %>% 
   group_by(scientificName) %>% 
-  summarise(max.TL = max(totalLength_mm, na.rm = T))
+  summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
 
 # Real length/weigth relationship models for each species
 lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
@@ -237,7 +237,7 @@ for (i in unique(L.max$scientificName)) {
 # Estiamate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
 lengths.all <- lengths.all %>% 
-  left_join(lw.models, by = 'scientificName') %>% 
+  left_join(select(lw.models, -commonName), by = 'scientificName') %>% 
   mutate(
     weightg = case_when(
       is.na(weightg) ~ a*totalLength_mm^b,
@@ -251,8 +251,7 @@ lengths.all <- lengths.all %>%
 lengths <- lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
-  droplevels()
+           scientificName %in% cps.spp & toupper(isRandomSample) == "Y")
 
 # Summarize Fulton's condition factor (K) for identifying outliers
 K.summ <- lengths %>%
@@ -264,8 +263,7 @@ K.summ <- lengths %>%
 # Filter binned lengths for the present survey
 lengths.binned <- lengths.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & binned == T) %>% 
-  droplevels()
+           scientificName %in% cps.spp & binned == TRUE) 
 
 # If binned lengths are present, plot their distribution
 if (nrow(lengths.binned) > 0) {
@@ -298,16 +296,15 @@ View the length (cm; total length, standard length, and fork length, as appropri
 lengths %>% 
   group_by(scientificName) %>% 
   summarise(
-    TL.min = round(min(totalLength_mm, na.rm = T)/10,0),
-    TL.max = round(max(totalLength_mm, na.rm = T)/10,0),
-    SL.min = round(min(standardLength_mm, na.rm = T)/10,0),
-    SL.max = round(max(standardLength_mm, na.rm = T)/10,0),
-    FL.min = round(min(forkLength_mm, na.rm = T)/10,0),
-    FL.max = round(max(forkLength_mm, na.rm = T)/10,0),
-    w.min  = round(min(weightg, na.rm = T),1),
-    w.max  = round(max(weightg, na.rm = T),1)) %>% 
-  datatable(rownames = F)
-
+    TL.min = round(min(totalLength_mm, na.rm = TRUE)/10,0),
+    TL.max = round(max(totalLength_mm, na.rm = TRUE)/10,0),
+    SL.min = round(min(standardLength_mm, na.rm = TRUE)/10,0),
+    SL.max = round(max(standardLength_mm, na.rm = TRUE)/10,0),
+    FL.min = round(min(forkLength_mm, na.rm = TRUE)/10,0),
+    FL.max = round(max(forkLength_mm, na.rm = TRUE)/10,0),
+    w.min  = round(min(weightg, na.rm = TRUE),1),
+    w.max  = round(max(weightg, na.rm = TRUE),1)) %>% 
+  datatable(rownames = FALSE)
 ```
 
 # Outliers
@@ -337,13 +334,12 @@ Other specimens may have been flagged by trawl personnel. The table below lists 
 # Select outliers
 lengths %>% 
   left_join(K.summ) %>% 
-  # filter(K <= K.lower | K >= K.upper) %>% 
-  filter(binned == F,
+  filter(binned == FALSE,
          flaggedData == "Y") %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
-  datatable(rownames = F)
+  datatable(rownames = FALSE)
 ```
 
 ## Outlier table-New  
@@ -356,12 +352,12 @@ Only show those specimens identified as outliers based on $K$ that have not yet 
 lengths %>% 
   left_join(K.summ) %>% 
   filter(K <= K.lower | K >= K.upper) %>% 
-  filter(binned == F) %>% 
+  filter(binned == FALSE) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   filter(flaggedData == "N") %>% 
-  datatable(rownames = F)
+  datatable(rownames = FALSE)
 ```
 
 # Interactive plots
@@ -399,19 +395,19 @@ if (nrow(lengths.sub) > 0) {
     scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
     scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
     # Plot individuals with missing lengths and weights
-    geom_point(data = filter(lengths.sub, missing.length == T), 
+    geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'red',  size = 2.5, colour = NA) +
-    geom_point(data = filter(lengths.sub, missing.weight == T), 
+    geom_point(data = filter(lengths.sub, missing.weight == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
     xlab("Total length (mm)") + ylab("Mass (g)") +
     theme_bw() 
   
-  ggplotly(lw.plot, dynamicTicks = T) 
+  ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
-  print("No speciments present.")
+  print("No specimens present.")
 }
 ```
 
@@ -447,19 +443,19 @@ if (nrow(lengths.sub) > 0) {
     scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
     scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
     # Plot individuals with missing lengths and weights
-    geom_point(data = filter(lengths.sub, missing.length == T), 
+    geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'red',  size = 2.5, colour = NA) +
-    geom_point(data = filter(lengths.sub, missing.weight == T), 
+    geom_point(data = filter(lengths.sub, missing.weight == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
     xlab("Total length (mm)") + ylab("Mass (g)") +
     theme_bw() 
   
-  ggplotly(lw.plot, dynamicTicks = T) 
+  ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
-  print("No speciments present.")
+  print("No specimens present.")
 }
 ```
 
@@ -495,19 +491,19 @@ if (nrow(lengths.sub) > 0) {
     scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
     scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
     # Plot individuals with missing lengths and weights
-    geom_point(data = filter(lengths.sub, missing.length == T), 
+    geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'red',  size = 2.5, colour = NA) +
-    geom_point(data = filter(lengths.sub, missing.weight == T), 
+    geom_point(data = filter(lengths.sub, missing.weight == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
     xlab("Total length (mm)") + ylab("Mass (g)") +
     theme_bw() 
   
-  ggplotly(lw.plot, dynamicTicks = T) 
+  ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
-  print("No speciments present.")
+  print("No specimens present.")
 }
 ```
 
@@ -543,19 +539,19 @@ if (nrow(lengths.sub) > 0) {
     scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
     scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
     # Plot individuals with missing lengths and weights
-    geom_point(data = filter(lengths.sub, missing.length == T), 
+    geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'red',  size = 2.5, colour = NA) +
-    geom_point(data = filter(lengths.sub, missing.weight == T), 
+    geom_point(data = filter(lengths.sub, missing.weight == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
     xlab("Total length (mm)") + ylab("Mass (g)") +
     theme_bw() 
   
-  ggplotly(lw.plot, dynamicTicks = T) 
+  ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
-  print("No speciments present.")
+  print("No specimens present.")
 }
 ```
 
@@ -591,18 +587,18 @@ if (nrow(lengths.sub) > 0) {
     scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
     scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
     # Plot individuals with missing lengths and weights
-    geom_point(data = filter(lengths.sub, missing.length == T), 
+    geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'red',  size = 2.5, colour = NA) +
-    geom_point(data = filter(lengths.sub, missing.weight == T), 
+    geom_point(data = filter(lengths.sub, missing.weight == TRUE), 
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
     xlab("Total length (mm)") + ylab("Mass (g)") +
     theme_bw() 
   
-  ggplotly(lw.plot, dynamicTicks = T) 
+  ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
-  print("No speciments present.")
+  print("No specimens present.")
 }
 ```
