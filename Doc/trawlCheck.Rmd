@@ -1,0 +1,608 @@
+---
+title: "Trawl Specimen Explorer"
+author: "Kevin Stierhoff"
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+    number_sections: no
+---
+
+```{r set-up, echo=F, message=F, error=F, warning=F}
+# Knitr options
+knitr::opts_chunk$set(echo = F, message = F, warning = F,
+                      out.width = "90%")
+
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,plotly,lubridate,mapview,
+               here,bookdown,odbc,DBI,knitr,DT)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r info}
+# Character vector of scientific names (e.g., c("Sardinops sagax","Engraulis mordax",...))
+cps.spp           <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+                      "Scomber japonicus","Trachurus symmetricus")
+```
+
+```{r get-data}
+if (trawl.source == "SQL") {
+  # Configure ODBC connection to TRAWL database
+  trawl.con  <- dbConnect(odbc(), 
+                          Driver = "SQL Server", 
+                          Server = "161.55.235.187", 
+                          Database = "Trawl", 
+                          Trusted_Connection = "True")
+} else if (trawl.source == "Access") {
+  trawl.con  <- dbConnect(odbc(), 
+                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                          DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+}
+
+# Import trawl database tables
+catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
+haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
+lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+
+# Close database channel
+dbDisconnect(trawl.con)
+```
+
+
+```{r modify-data}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  # Reformat haul data to match SQL
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)),
+      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$EquilibriumTime, 
+                                                format = "%H:%M:%S"))),
+      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$haulbackTime,
+                                                format = "%H:%M:%S")))) %>% 
+    mutate(haulBackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) %>%
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, notes = Notes)
+  
+  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+  
+  # Correct equilibriumTime or haulBackTime
+  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  
+  # Reformat length frequency data to match SQL
+  lengths.all <- lengths.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, species = Species)
+  
+  # Reformat length frequency data to match SQL
+  lengthFreq.all <- lengthFreq.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
+           species = Species, length = Length, lengthType = LengthType, 
+           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
+           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
+           subSampleNumber = SubSampleNumber)
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    mutate(
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime))
+}
+
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  mutate(season = case_when(
+    month(equilibriumTime) < 6 ~ "spring",
+    TRUE ~ "summer"))
+```
+
+```{r process-trawl-length-data}
+# Process trawl length data -------------------------------------------------------
+if (nrow(lengthFreq.all) > 0) {
+# Process binned length data from all surveys
+lengths.expanded.all <- lengthFreq.all %>%
+  left_join(select(spp.codes, species, scientificName, commonName)) %>%
+  # Remove samples from 4meshnet
+  filter(netSampleType == 'codend') %>%
+  select(cruise, ship, haul, collection, species, scientificName, length,
+         lengthType, sexUnknown, male, totalFemale) %>% 
+  gather(sex, count, -cruise, -ship, -haul, -collection, -species, 
+         -scientificName, -lengthType, -length) %>%
+  filter(count != 0) %>% 
+  droplevels() %>% 
+  # Expand data frame by counts
+  uncount(weights = count)
+
+  # Extract data by length type (SL, FL, and TL) and combine
+  lengths.expanded.final <- data.frame()
+  
+  for (i in unique(lengths.expanded.all$lengthType)) {
+    l.temp <- filter(lengths.expanded.all, lengthType == i)
+    names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
+    lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
+  }
+  
+  # Add missing length columns
+  if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
+  if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
+  if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
+  
+  # Remove unwanted columns and rename length columns  
+  lengths.expanded.final <- lengths.expanded.final %>% 
+    # select(-lengthType, -count) %>%
+    rename(forkLength_mm     = FL,
+           standardLength_mm = SL,
+           totalLength_mm    = TL) %>% 
+    mutate(
+      flaggedData = "N",
+      isRandomSample = "Y",
+      binned = T)
+}
+
+lengths.all <- lengths.all  %>% 
+  # Add scientific and common names
+  left_join(select(spp.codes, species, scientificName, commonName)) %>%
+  # Filter for CPS species
+  filter(scientificName %in% cps.spp) %>% 
+  # Select desired columns
+  select(cruise, ship, haul, collection, species, individual_ID, 
+         scientificName, commonName, specimenNumber, 
+         standardLength_mm, forkLength_mm, totalLength_mm, 
+         sex, weightg, isRandomSample, flaggedData) %>%
+  # Convert individual IDs to numeric
+  mutate(individual_ID = as.numeric(individual_ID)) %>% 
+  # Standardize sex values
+  mutate(sex = tolower(trimws(sex)),
+         binned = F) %>% 
+  bind_rows(lengths.expanded.final) %>% 
+  # Create unique key and replace unused sex categories
+  mutate(key = paste(cruise, ship, haul, collection, species, specimenNumber),
+         sex = str_replace(sex,"totalFemale","female"),
+         sex = str_replace(sex,"sexUnknown","unknown"),
+         label = paste("Haul: ", haul, ", Collection: ", collection, 
+                       ", Specimen: ", specimenNumber), sep = "") %>% 
+  # Add season from haul
+  left_join(select(haul.all, cruise, ship, haul, season)) %>% 
+  filter(scientificName %in% cps.spp)
+
+# Convert lengths to totalLength_mm for TS estimates ---------------------------
+lengths.all  <- lengths.all %>%
+  mutate(
+    totalLength_mm = case_when(
+      scientificName == "Clupea pallasii"       ~ -0.323 + 1.110*forkLength_mm,
+      scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
+      scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
+      scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
+      scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm),
+    missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ F),
+    missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ F)) %>% 
+  mutate(totalLength_mm = round(totalLength_mm))
+
+# Get max TL for plotting L/W models
+L.max <- lengths.all %>% 
+  group_by(scientificName) %>% 
+  summarise(max.TL = max(totalLength_mm, na.rm = T))
+
+# Real length/weigth relationship models for each species
+lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
+  filter(model_type == model.type, season == model.season) %>% 
+  select(-season)
+
+# Dataframe for storing results
+lw.df <- data.frame()
+
+# Generate length/weight curves
+for (i in unique(L.max$scientificName)) {
+  # Subset model
+  model.temp <- filter(lw.models, scientificName == i)
+  
+  # Create a length vector for each species
+  L <- seq(0, L.max$max.TL[L.max$scientificName == i])
+  
+  # Calculate weights from lenths
+  W <- model.temp$a*L^model.temp$b
+  
+  # Combine results
+  lw.df <- bind_rows(lw.df, data.frame(model.temp, L, W))
+}
+
+# Estiamate missing weights from lengths -------------------------------------------------------
+# Add a and b to length data frame and calculate missing lengths/weights
+lengths.all <- lengths.all %>% 
+  left_join(lw.models, by = 'scientificName') %>% 
+  mutate(
+    weightg = case_when(
+      is.na(weightg) ~ a*totalLength_mm^b,
+      TRUE  ~ weightg),
+    totalLength_mm = case_when(
+      is.na(totalLength_mm) ~ round((weightg/a)^(1/b)),
+      TRUE ~ totalLength_mm),
+    K = round((weightg/totalLength_mm*10^3)*100))
+
+# Filter length data for current cruise and vessel
+lengths <- lengths.all %>% 
+  # Filter for cruise specific data
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
+  droplevels()
+
+# Summarize Fulton's condition factor (K) for identifying outliers
+K.summ <- lengths %>%
+  group_by(scientificName) %>%
+  summarise(
+    K.lower = quantile(K, probs = 0.001),
+    K.upper = quantile(K, probs = 0.999))
+
+# Filter binned lengths for the present survey
+lengths.binned <- lengths.all %>%
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           scientificName %in% cps.spp & binned == T) %>% 
+  droplevels()
+
+# If binned lengths are present, plot their distribution
+if (nrow(lengths.binned) > 0) {
+  binned.length.plot <- ggplot(lengths.binned, aes(totalLength_mm)) +
+    geom_histogram() + 
+    facet_wrap(~scientificName, scales = "free") + 
+    xlab("Length (cm)") + ylab("Count") +
+    theme_bw() +
+    theme(strip.background.x = element_blank(),
+          strip.text.x = element_text(face = "italic"))
+  
+  # Save plot
+  ggsave(binned.length.plot,
+         file = here("Figs/fig_binned_length_histogram.png"),
+         height = 6, width = 6)
+}
+```  
+
+# Overview
+This is a tool used to visualize and conduct QA/QC of trawl specimen data collected during Acoustic-Trawl (AT) surveys of coastal pelagic fish species (CPS) in the California Current Ecosystem. 
+
+The data below was collected during the **`r survey.name.long` (`r survey.name`)**. 
+
+# Length-weight summary
+
+View the length (cm; total length, standard length, and fork length, as appropriate) and weight (g) range for each species.
+
+```{r length-summary}
+# Summarise lengths by species
+lengths %>% 
+  group_by(scientificName) %>% 
+  summarise(
+    TL.min = round(min(totalLength_mm, na.rm = T)/10,0),
+    TL.max = round(max(totalLength_mm, na.rm = T)/10,0),
+    SL.min = round(min(standardLength_mm, na.rm = T)/10,0),
+    SL.max = round(max(standardLength_mm, na.rm = T)/10,0),
+    FL.min = round(min(forkLength_mm, na.rm = T)/10,0),
+    FL.max = round(max(forkLength_mm, na.rm = T)/10,0),
+    w.min  = round(min(weightg, na.rm = T),1),
+    w.max  = round(max(weightg, na.rm = T),1)) %>% 
+  datatable(rownames = F)
+
+```
+
+# Outliers
+
+## Outlier plot  
+
+View the distribution of Fulton's Condition Factor ($K = (w/TL^3)*100$) for each species. Specimens that fall outside the 0.01 and 99.9 percentiles are identified as potential outliers (`flaggedData` = Y).  
+
+```{r, fig.pos="hold"}
+# Plot lengths and bounds of outliers
+ggplot(lengths, aes(K)) + geom_histogram() +
+  geom_vline(data = K.summ, aes(xintercept =  K.lower), linetype = "dashed") +
+  geom_vline(data = K.summ, aes(xintercept =  K.upper), linetype = "dashed") +
+  facet_wrap(~scientificName, scales = "free") +
+  xlab("Fulton's Condition Factor (K)") +
+  ylab("Frequency") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "italic"))
+```
+
+## Outlier table-All  
+
+Other specimens may have been flagged by trawl personnel. The table below lists all specimens identified as potential outliers, regardless of whether they've been flagged or reviewed (see `flaggedData`).   
+
+```{r outlier-table-all}
+# Select outliers
+lengths %>% 
+  left_join(K.summ) %>% 
+  # filter(K <= K.lower | K >= K.upper) %>% 
+  filter(binned == F,
+         flaggedData == "Y") %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
+  datatable(rownames = F)
+```
+
+## Outlier table-New  
+
+Only show those specimens identified as outliers based on $K$ that have not yet been flagged (`flaggedData` = N). 
+
+```{r outlier-table-new}
+# Select only outliers that have not yet been flagged
+# Select outliers
+lengths %>% 
+  left_join(K.summ) %>% 
+  filter(K <= K.lower | K >= K.upper) %>% 
+  filter(binned == F) %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
+  filter(flaggedData == "N") %>% 
+  datatable(rownames = F)
+```
+
+# Interactive plots
+The plots below provide information about trawl specimens (e.g., length, weigth, haul, collection, and specimen number) when you hover over points with the mouse. You may zoom, pan, toggle spike-lines, etc using the menu above each graph (available when the mouse is in the plot area). **<span style="color:red">Red</span>** and **<span style="color:blue">blue</span>** points are specimens that had missing length and weight measurements, respectively. Points with **bold black** outlines have already been "flagged" in the database but may or may not have been corrected.  
+
+## Sardine
+
+```{r sardine-data}
+# Select species
+scientificName.sub <- "Sardinops sagax"
+
+# Subset lengths and models
+lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
+lengths.all.sub <- filter(lengths.all, 
+                          scientificName == scientificName.sub,
+                          season ==  survey.season)
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+if (nrow(lengths.sub) > 0) {
+  # Plot L/W data from past and current survey -----------------------------------
+  lw.plot <- ggplot() + 
+    # Plot L/W data from all years/surveys
+    geom_point(data = lengths.all.sub, 
+               aes(totalLength_mm, weightg),
+               colour = "gray70", alpha = 0.3) +
+    # Plot seasonal length models for each species
+    geom_line(data = lw.df.sub, aes(L, W), linetype = 'dashed') +
+    # scale_colour_manual(name = "Season", values = c("forestgreen","blue")) +
+    # Plot L/W data for current survey
+    geom_point(data = lengths.sub,
+               aes(totalLength_mm, weightg, fill = sex, 
+                   colour = flaggedData, group = flaggedData,
+                   label = label), 
+               shape = 21, alpha = 0.9) + 
+    scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
+    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    # Plot individuals with missing lengths and weights
+    geom_point(data = filter(lengths.sub, missing.length == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'red',  size = 2.5, colour = NA) +
+    geom_point(data = filter(lengths.sub, missing.weight == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'blue', size = 2.5, colour = NA) +
+    # Format plot
+    xlab("Total length (mm)") + ylab("Mass (g)") +
+    theme_bw() 
+  
+  ggplotly(lw.plot, dynamicTicks = T) 
+} else {
+  print("No speciments present.")
+}
+```
+
+## Anchovy
+
+```{r anchovy-data}
+# Select species
+scientificName.sub <- "Engraulis mordax"
+
+# Subset lengths and models
+lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
+lengths.all.sub <- filter(lengths.all, 
+                          scientificName == scientificName.sub,
+                          season ==  survey.season)
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+if (nrow(lengths.sub) > 0) {
+  # Plot L/W data from past and current survey -----------------------------------
+  lw.plot <- ggplot() + 
+    # Plot L/W data from all years/surveys
+    geom_point(data = lengths.all.sub, 
+               aes(totalLength_mm, weightg),
+               colour = "gray70", alpha = 0.3) +
+    # Plot seasonal length models for each species
+    geom_line(data = lw.df.sub, aes(L, W), linetype = 'dashed') +
+    # scale_colour_manual(name = "Season", values = c("forestgreen","blue")) +
+    # Plot L/W data for current survey
+    geom_point(data = lengths.sub,
+               aes(totalLength_mm, weightg, fill = sex, 
+                   colour = flaggedData, group = flaggedData,
+                   label = label), 
+               shape = 21, alpha = 0.9) + 
+    scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
+    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    # Plot individuals with missing lengths and weights
+    geom_point(data = filter(lengths.sub, missing.length == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'red',  size = 2.5, colour = NA) +
+    geom_point(data = filter(lengths.sub, missing.weight == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'blue', size = 2.5, colour = NA) +
+    # Format plot
+    xlab("Total length (mm)") + ylab("Mass (g)") +
+    theme_bw() 
+  
+  ggplotly(lw.plot, dynamicTicks = T) 
+} else {
+  print("No speciments present.")
+}
+```
+
+## Pacific mackerel
+
+```{r mack-data}
+# Select species
+scientificName.sub <- "Scomber japonicus"
+
+# Subset lengths and models
+lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
+lengths.all.sub <- filter(lengths.all, 
+                          scientificName == scientificName.sub,
+                          season ==  survey.season)
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+if (nrow(lengths.sub) > 0) {
+  # Plot L/W data from past and current survey -----------------------------------
+  lw.plot <- ggplot() + 
+    # Plot L/W data from all years/surveys
+    geom_point(data = lengths.all.sub, 
+               aes(totalLength_mm, weightg),
+               colour = "gray70", alpha = 0.3) +
+    # Plot seasonal length models for each species
+    geom_line(data = lw.df.sub, aes(L, W), linetype = 'dashed') +
+    # scale_colour_manual(name = "Season", values = c("forestgreen","blue")) +
+    # Plot L/W data for current survey
+    geom_point(data = lengths.sub,
+               aes(totalLength_mm, weightg, fill = sex, 
+                   colour = flaggedData, group = flaggedData,
+                   label = label), 
+               shape = 21, alpha = 0.9) + 
+    scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
+    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    # Plot individuals with missing lengths and weights
+    geom_point(data = filter(lengths.sub, missing.length == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'red',  size = 2.5, colour = NA) +
+    geom_point(data = filter(lengths.sub, missing.weight == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'blue', size = 2.5, colour = NA) +
+    # Format plot
+    xlab("Total length (mm)") + ylab("Mass (g)") +
+    theme_bw() 
+  
+  ggplotly(lw.plot, dynamicTicks = T) 
+} else {
+  print("No speciments present.")
+}
+```
+
+## Jack mackerel
+
+```{r jack-data}
+# Select species
+scientificName.sub <- "Trachurus symmetricus"
+
+# Subset lengths and models
+lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
+lengths.all.sub <- filter(lengths.all, 
+                          scientificName == scientificName.sub,
+                          season ==  survey.season)
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+if (nrow(lengths.sub) > 0) {
+  # Plot L/W data from past and current survey -----------------------------------
+  lw.plot <- ggplot() + 
+    # Plot L/W data from all years/surveys
+    geom_point(data = lengths.all.sub, 
+               aes(totalLength_mm, weightg),
+               colour = "gray70", alpha = 0.3) +
+    # Plot seasonal length models for each species
+    geom_line(data = lw.df.sub, aes(L, W), linetype = 'dashed') +
+    # scale_colour_manual(name = "Season", values = c("forestgreen","blue")) +
+    # Plot L/W data for current survey
+    geom_point(data = lengths.sub,
+               aes(totalLength_mm, weightg, fill = sex, 
+                   colour = flaggedData, group = flaggedData,
+                   label = label), 
+               shape = 21, alpha = 0.9) + 
+    scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
+    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    # Plot individuals with missing lengths and weights
+    geom_point(data = filter(lengths.sub, missing.length == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'red',  size = 2.5, colour = NA) +
+    geom_point(data = filter(lengths.sub, missing.weight == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'blue', size = 2.5, colour = NA) +
+    # Format plot
+    xlab("Total length (mm)") + ylab("Mass (g)") +
+    theme_bw() 
+  
+  ggplotly(lw.plot, dynamicTicks = T) 
+} else {
+  print("No speciments present.")
+}
+```
+
+## Pacific herring
+
+```{r herring-data}
+# Select species
+scientificName.sub <- "Clupea pallasii"
+
+# Subset lengths and models
+lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
+lengths.all.sub <- filter(lengths.all, 
+                          scientificName == scientificName.sub,
+                          season ==  survey.season)
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+if (nrow(lengths.sub) > 0) {
+  # Plot L/W data from past and current survey -----------------------------------
+  lw.plot <- ggplot() + 
+    # Plot L/W data from all years/surveys
+    geom_point(data = lengths.all.sub, 
+               aes(totalLength_mm, weightg),
+               colour = "gray70", alpha = 0.3) +
+    # Plot seasonal length models for each species
+    geom_line(data = lw.df.sub, aes(L, W), linetype = 'dashed') +
+    # scale_colour_manual(name = "Season", values = c("forestgreen","blue")) +
+    # Plot L/W data for current survey
+    geom_point(data = lengths.sub,
+               aes(totalLength_mm, weightg, fill = sex, 
+                   colour = flaggedData, group = flaggedData,
+                   label = label), 
+               shape = 21, alpha = 0.9) + 
+    scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
+    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    # Plot individuals with missing lengths and weights
+    geom_point(data = filter(lengths.sub, missing.length == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'red',  size = 2.5, colour = NA) +
+    geom_point(data = filter(lengths.sub, missing.weight == T), 
+               aes(totalLength_mm, weightg, label = label),
+               shape = 21, fill = 'blue', size = 2.5, colour = NA) +
+    # Format plot
+    xlab("Total length (mm)") + ylab("Mass (g)") +
+    theme_bw() 
+  
+  ggplotly(lw.plot, dynamicTicks = T) 
+} else {
+  print("No speciments present.")
+}
+```
