@@ -283,7 +283,7 @@ if (length(uctd.hdr) == 0) {
 ```
 
 ```{r process-ctd}
-# List raw UCTD ASCII files
+# List raw CTD ASCII files
 ctd.hdr <- dir_ls(here("Data/CTD"), regexp = ctd.hdr.pattern) %>% 
     path_filter(regexp = "_processed", invert = TRUE)
 
@@ -316,12 +316,14 @@ if (length(ctd.hdr) == 0) {
     ctd.proc <- dir_ls(here("Data/CTD"), regexp = uctd.hdr.pattern) %>% 
       path_filter(regexp = "_processed")
     
-    # create a data frame for storing results
+    # Create a data frame for storing results
     all.ctd.casts <- data.frame()
     
-    for (i in ctd.proc) {
-      all.ctd.casts <- bind_rows(all.ctd.casts, 
-                           extract_ctd_cast(i, type = "CTD"))
+    if (length(ctd.proc) > 0) {
+      for (i in ctd.proc) {
+        all.ctd.casts <- bind_rows(all.ctd.casts, 
+                                   extract_ctd_cast(i, type = "CTD"))
+      }
     }
     
     # Save results
@@ -347,56 +349,60 @@ if (length(ctd.hdr) == 0) {
       cast.num = seq(1, n()),
       lag = difftime(cast.date, datetime))
   
-  # reorder all.ctd by cast and depth
-  all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>% 
-  # filter all.ctd to remove bad temperature and salinity 
-    filter(between(T, min.T, max.T)) %>% 
-    filter(between(S, min.S, max.S)) 
-  
-  # calculate max depth of each cast
-  ctd.depth <- all.ctd.casts %>% 
-    group_by(cast) %>% 
-    summarise(max.depth = min(Z))
-  
-  # extract cast number from filename
-  all.ctd.hdr <- all.ctd.hdr %>% 
-    left_join(ctd.depth)
-  
-  # summarize uctd casts for water classification
-  ctd.class <- all.ctd.casts %>% 
-    group_by(cast) %>% 
-    summarise(
-      min.T = min(T),
-      min.S = min(S),
-      max.T = max(T),
-      max.S = max(S)) %>% 
-    # assign classes based on salinity
-    mutate(class = case_when(
-      min.S <= 31.4 ~ "Type 1",
-      min.S >= 33.4 ~ "Type 2",
-      TRUE ~ "Type 3"))
-  
-  all.ctd.hdr <- all.ctd.hdr %>% 
-    left_join(select(ctd.class, cast, class)) %>% 
-    mutate(leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = F))) %>% 
-    select(cast.num, cast, cast.date, lat, long, max.depth, class, leg)
-  
-  # add water mass to the summary table and cast data for plotting
-  all.ctd.casts <- all.ctd.casts %>% 
-    left_join(select(ctd.class, cast, class)) %>% 
-    left_join(select(all.ctd.hdr, cast, leg))  
-  
-  # write table to CSV
-  write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
-            quote = F, row.names = F)
-  
-  # Remove unprocessed casts from the summary
-  ctd.missing <- all.ctd.hdr %>% 
-    filter(!cast %in% all.ctd.casts$cast)
-  
-  # Exclude bad casts
-  all.ctd.casts <- all.ctd.casts %>%
-    filter(!cast %in% exclude.ctd)
+  if (nrow(all.ctd.casts) > 0) {
+    # reorder all.ctd by cast and depth
+    all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>% 
+      # filter all.ctd to remove bad temperature and salinity 
+      filter(between(T, min.T, max.T)) %>% 
+      filter(between(S, min.S, max.S)) 
+    
+    # calculate max depth of each cast
+    ctd.depth <- all.ctd.casts %>% 
+      group_by(cast) %>% 
+      summarise(max.depth = min(Z))
+    
+    # extract cast number from filename
+    all.ctd.hdr <- all.ctd.hdr %>% 
+      left_join(ctd.depth)
+    
+    # summarize uctd casts for water classification
+    ctd.class <- all.ctd.casts %>% 
+      group_by(cast) %>% 
+      summarise(
+        min.T = min(T),
+        min.S = min(S),
+        max.T = max(T),
+        max.S = max(S)) %>% 
+      # assign classes based on salinity
+      mutate(class = case_when(
+        min.S <= 31.4 ~ "Type 1",
+        min.S >= 33.4 ~ "Type 2",
+        TRUE ~ "Type 3"))
+    
+    all.ctd.hdr <- all.ctd.hdr %>% 
+      left_join(select(ctd.class, cast, class)) %>% 
+      mutate(leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = F))) %>% 
+      select(cast.num, cast, cast.date, lat, long, max.depth, class, leg)
+    
+    # add water mass to the summary table and cast data for plotting
+    all.ctd.casts <- all.ctd.casts %>% 
+      left_join(select(ctd.class, cast, class)) %>% 
+      left_join(select(all.ctd.hdr, cast, leg))  
+    
+    # write table to CSV
+    write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
+              quote = F, row.names = F)
+    
+    # Remove unprocessed casts from the summary
+    ctd.missing <- all.ctd.hdr %>% 
+      filter(!cast %in% all.ctd.casts$cast)
+    
+    # Exclude bad casts
+    all.ctd.casts <- all.ctd.casts %>%
+      filter(!cast %in% exclude.ctd)
+  } else {
+    ctd.missing <- all.ctd.hdr
+  }
   
   # write table to CSV
   write.csv(ctd.missing, file = here("Output/unprocessed_ctd.csv"), 
@@ -531,7 +537,7 @@ if (exists("all.ctd.hdr")) {
 ```
 
 ```{r uctd-map-all}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     if (length(uctd.table) > 0) {
       # Create main map using ggmap
@@ -576,7 +582,7 @@ if (exists("uctd.sf")) {
 Descent rate of the UCTD by depth and vessel speed.  
 
 ```{r uctd-dZt-plot,out.width="90%",out.height="90%"}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     # plot descent rate v depth
     uctd.dZt <- ggplot(data = all.uctd.casts, aes(dZt, Z, group = cast, colour = SOG)) + 
@@ -612,7 +618,7 @@ if (length(uctd.hdr) > 0) {
 The dashed line represent the Loess-smoothed depth profiles.  
 
 ```{r uctd-depth-time-plot,out.width="90%",out.height="90%"}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     # plot depth v time
     uctd.Z <- ggplot(data = all.uctd.casts, aes(s, Z, group = factor(cast), colour = SOG)) + 
@@ -649,7 +655,7 @@ if (length(uctd.hdr) > 0) {
 ## Temperature v. Depth plot
 
 ```{r uctd-temp-depth-plot,out.width="90%",out.height="90%"}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     # plot temperature v depth
     uctd.T <- ggplot(data = all.uctd.casts, aes(T, Z, group = cast, colour = factor(cast))) + 
@@ -681,7 +687,7 @@ if (length(uctd.hdr) > 0) {
 ## Salinity v. Depth plot
 
 ```{r uctd-sal-depth-plot,out.width="90%",out.height="90%"}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     # plot salinity v depth
     uctd.S <- ggplot(data = all.uctd.casts, aes(S, Z, group = cast, colour = factor(cast))) + 
@@ -715,7 +721,7 @@ if (length(uctd.hdr) > 0) {
 ## Sound speed v. Depth plot
 
 ```{r uctd-sv-depth-plot,out.width="90%",out.height="90%"}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     # plot sound speed v depth
     uctd.Sv <- ggplot(data = all.uctd.casts, aes(Sv, Z, group = cast, colour = factor(cast))) + 
@@ -751,7 +757,7 @@ if (length(uctd.hdr) > 0) {
 Temperature-salinity plot for all UCTD casts (left) and the location of UCTD casts (right), symbolized by water mass.
 
 ```{r uctd-temp-sal-plot}
-if (length(uctd.hdr) > 0) {
+if (length(all.uctd.casts) > 0) {
   if (save.figs) {
     # plot salinity v depth
     uctd.TS <- ggplot(data = all.uctd.casts, aes(S, T, group = cast, colour = factor(class))) + 
@@ -807,7 +813,7 @@ if (length(uctd.hdr) > 0) {
 Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r ctd-summary,include=T}
-if (length(ctd.hdr) > 0) {
+if (length(all.ctd.casts) > 0) {
   # make a copy of uctd.summ
   ctd.table <- all.ctd.hdr %>% 
     mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S"))
@@ -894,7 +900,7 @@ if (save.figs) {
 ## Temperature v. Depth plot
 
 ```{r ctd-temp-depth-plot,out.width="90%",out.height="90%"}
-if (length(ctd.hdr) > 0) {
+if (length(all.ctd.casts) > 0) {
   if (save.figs) {
     # plot temperature v depth
     ctd.T <- ggplot(data = all.ctd.casts, aes(T, Z, group = cast, colour = factor(cast))) + 
@@ -930,7 +936,7 @@ if (length(ctd.hdr) > 0) {
 ## Salinity v. Depth plot
 
 ```{r ctd-sal-depth-plot,out.width="90%",out.height="90%"}
-if (length(ctd.hdr) > 0) {
+if (length(all.ctd.casts) > 0) {
   if (save.figs) {
     # plot salinity v depth
     ctd.S <- ggplot(data = all.ctd.casts, aes(S, Z, group = cast, colour = factor(cast))) + 
@@ -964,7 +970,7 @@ if (length(ctd.hdr) > 0) {
 ## Sound speed v. Depth plot
 
 ```{r ctd-sv-depth-plot,out.width="90%",out.height="90%"}
-if (length(ctd.hdr) > 0) {
+if (length(all.ctd.casts) > 0) {
   if (save.figs) {
     # plot sound speed v depth
     ctd.Sv <- ggplot(data = all.ctd.casts, aes(Sv, Z, group = cast, colour = factor(cast))) + 
@@ -1001,7 +1007,7 @@ if (length(ctd.hdr) > 0) {
 Temperature-salinity plot for all CTD casts (left) and the location of CTD casts (right), symbolized by water mass.
 
 ```{r ctd-temp-sal-plot,out.width="90%",out.height="90%"}
-if (length(ctd.hdr) > 0) {
+if (length(all.ctd.casts) > 0) {
   if (save.figs) {
     # plot salinity v depth
     ctd.TS <- ggplot(all.ctd.casts, aes(S, T, group = cast, colour = factor(class))) + 

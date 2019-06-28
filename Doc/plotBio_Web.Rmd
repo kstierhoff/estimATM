@@ -12,7 +12,7 @@ css: css/ast.css
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,
+pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,vroom,
                reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
                shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
                leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra)
@@ -593,7 +593,7 @@ cufes.neg <- filter(cufes.raw, AllEggs == 0) %>%
 
 ```{r process-csv-cps}
 if (process.csv) {
-  if (length(dir_ls(here("Output"), regexp = "processed_cps.Rdata")) > 0) {
+  if (file.exists(here("Output/processed_cps.Rdata"))) {
     # Load already processed CSV files
     load(here("Output/processed_cps.Rdata"))
   }
@@ -619,56 +619,10 @@ if (process.csv) {
     
     # Process all .CSV files
     for (i in 1:length(csv.files.cps)) {
-      # Read i-th file
-      nasc.csv <- read_csv(csv.files.cps[i])
-      # Extract file name from path
-      file.name <- csv.files.cps[i]
-      # Extract transect name from the file name
-      transect <- unlist(strsplit(file.name, split = "_"))[2]
-      # Summarize NASC by interval
-      nasc.temp <- nasc.csv %>% 
-        group_by(Interval) %>% 
-        summarise(
-          long     = Lon_M[1],
-          lat      = Lat_M[1],
-          date     = Date_M[1],
-          time     = as.character(Time_M[1]),
-          dist_m   = Dist_M[1],
-          NASC.5   = sum(NASC[Layer_depth_max <=   5]),
-          NASC.10  = sum(NASC[Layer_depth_max <=  10]),
-          NASC.15  = sum(NASC[Layer_depth_max <=  15]),
-          NASC.20  = sum(NASC[Layer_depth_max <=  20]),
-          NASC.25  = sum(NASC[Layer_depth_max <=  25]),
-          NASC.30  = sum(NASC[Layer_depth_max <=  30]),
-          NASC.35  = sum(NASC[Layer_depth_max <=  35]),
-          NASC.40  = sum(NASC[Layer_depth_max <=  40]),
-          NASC.45  = sum(NASC[Layer_depth_max <=  45]),
-          NASC.50  = sum(NASC[Layer_depth_max <=  50]),
-          NASC.55  = sum(NASC[Layer_depth_max <=  55]),
-          NASC.60  = sum(NASC[Layer_depth_max <=  60]),
-          NASC.65  = sum(NASC[Layer_depth_max <=  65]),
-          NASC.70  = sum(NASC[Layer_depth_max <=  70]),
-          NASC.75  = sum(NASC[Layer_depth_max <=  75]),
-          NASC.80  = sum(NASC[Layer_depth_max <=  80]),
-          NASC.85  = sum(NASC[Layer_depth_max <=  85]),
-          NASC.90  = sum(NASC[Layer_depth_max <=  90]),
-          NASC.95  = sum(NASC[Layer_depth_max <=  95]),
-          NASC.100 = sum(NASC[Layer_depth_max <= 100]),
-          NASC.150 = sum(NASC[Layer_depth_max <= 150]),
-          NASC.250 = sum(NASC[Layer_depth_max <= 250]),
-          NASC.350 = sum(NASC[Layer_depth_max <= 350]),
-          NASC     = NASC.250,
-          depth    = max(Layer_depth_max) + 3,
-          CPS      = 1,
-          filename = file.name,
-          transect = transect,
-          type     = "CPS",
-          datetime = ymd_hms(paste(date, time)))
+      # Process i-th file
+      nasc.cps <- bind_rows(nasc.cps, extract_csv(csv.files.cps[i]))
       
-      # Combine results
-      nasc.cps <- bind_rows(nasc.cps, nasc.temp)
-      
-      # update the progress bar
+      # Update the progress bar
       info <- sprintf("%d%% done", round((i / length(csv.files.cps)) * 100))
       setWinProgressBar(pb, round((i / length(csv.files.cps)) * 100), label = info)
     }
@@ -732,7 +686,7 @@ save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 
 ```{r process-csv-krill}
 if (process.csv) {
-  if (length(dir_ls(here("Output"), regexp = "processed_krill.Rdata")) > 0) {
+  if (file.exists(here("Output/processed_krill.Rdata"))) {
     # Load already processed CSV files
     load(here("Output/processed_krill.Rdata"))
   }
@@ -758,56 +712,10 @@ if (process.csv) {
     
     # Process all .CSV files
     for (i in 1:length(csv.files.krill)) {
-      # Read i-th file
-      nasc.csv <- read_csv(csv.files.krill[i])
-      # Extract file name from path
-      file.name <- csv.files.krill[i]
-      # Extract transect name from the file name
-      transect <- unlist(strsplit(file.name, split = "_"))[2]
-      # Summarize NASC by interval
-      nasc.temp <- nasc.csv %>% 
-        group_by(Interval) %>% 
-        summarise(
-          long     = Lon_M[1],
-          lat      = Lat_M[1],
-          date     = Date_M[1],
-          time     = as.character(Time_M[1]),
-          dist_m   = Dist_M[1],
-          NASC.5   = sum(NASC[Layer_depth_max <=   5]),
-          NASC.10  = sum(NASC[Layer_depth_max <=  10]),
-          NASC.15  = sum(NASC[Layer_depth_max <=  15]),
-          NASC.20  = sum(NASC[Layer_depth_max <=  20]),
-          NASC.25  = sum(NASC[Layer_depth_max <=  25]),
-          NASC.30  = sum(NASC[Layer_depth_max <=  30]),
-          NASC.35  = sum(NASC[Layer_depth_max <=  35]),
-          NASC.40  = sum(NASC[Layer_depth_max <=  40]),
-          NASC.45  = sum(NASC[Layer_depth_max <=  45]),
-          NASC.50  = sum(NASC[Layer_depth_max <=  50]),
-          NASC.55  = sum(NASC[Layer_depth_max <=  55]),
-          NASC.60  = sum(NASC[Layer_depth_max <=  60]),
-          NASC.65  = sum(NASC[Layer_depth_max <=  65]),
-          NASC.70  = sum(NASC[Layer_depth_max <=  70]),
-          NASC.75  = sum(NASC[Layer_depth_max <=  75]),
-          NASC.80  = sum(NASC[Layer_depth_max <=  80]),
-          NASC.85  = sum(NASC[Layer_depth_max <=  85]),
-          NASC.90  = sum(NASC[Layer_depth_max <=  90]),
-          NASC.95  = sum(NASC[Layer_depth_max <=  95]),
-          NASC.100 = sum(NASC[Layer_depth_max <= 100]),
-          NASC.150 = sum(NASC[Layer_depth_max <= 150]),
-          NASC.250 = sum(NASC[Layer_depth_max <= 250]),
-          NASC.350 = sum(NASC[Layer_depth_max <= 350]),
-          NASC     = NASC.250,
-          depth    = max(Layer_depth_max) + 3,
-          CPS      = 0,
-          filename = file.name,
-          transect = transect,
-          type     = "Krill",
-          datetime = ymd_hms(paste(date, time)))
+      # Process i-th file
+      nasc.krill <- bind_rows(nasc.krill, extract_csv(csv.files.krill[i]))
       
-      # Combine results
-      nasc.krill <- bind_rows(nasc.krill, nasc.temp)
-      
-      # update the progress bar
+      # Update the progress bar
       info <- sprintf("%d%% done", round((i / length(csv.files.krill)) * 100))
       setWinProgressBar(pb, round((i / length(csv.files.krill)) * 100), label = info)
     }
@@ -825,7 +733,7 @@ if (process.csv) {
   load(here("Output/nasc_krill.Rdata"))
 }
 
-# average NASC.70 data over new intervals or number of intervals in a 2 km radius
+# Average NASC.350 data over new intervals or number of intervals in a 2 km radius
 nasc.summ.krill <- nasc.krill %>%
   group_by(transect, int) %>%
   summarise(
