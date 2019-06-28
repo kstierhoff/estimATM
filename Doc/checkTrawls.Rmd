@@ -6,7 +6,7 @@ output:
   bookdown::html_document2:
     toc: yes
     toc_float: yes
-    number_sections: no
+    number_sections: yes
 ---
 
 ```{r set-up, echo=F, message=F, error=F, warning=F}
@@ -15,7 +15,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,mapview,
-               here,bookdown,odbc,DBI,knitr,DT)
+               here,bookdown,odbc,DBI,knitr,DT,fs)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -43,6 +43,11 @@ cps.spp           <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
 ```
 
 ```{r get-data}
+# Copy trawl Access database
+haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                  regexp = trawl.db.access)
+file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+
 if (trawl.source == "SQL") {
   # Configure ODBC connection to TRAWL database
   trawl.con  <- dbConnect(odbc(), 
@@ -335,8 +340,8 @@ Other specimens may have been flagged by trawl personnel. The table below lists 
 # Select outliers
 lengths %>% 
   left_join(K.summ) %>% 
-  filter(binned == FALSE,
-         flaggedData == "Y") %>% 
+  filter(K <= K.lower | K >= K.upper) %>% 
+  filter(binned == FALSE) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
@@ -353,11 +358,57 @@ Only show those specimens identified as outliers based on $K$ that have not yet 
 lengths %>% 
   left_join(K.summ) %>% 
   filter(K <= K.lower | K >= K.upper) %>% 
-  filter(binned == FALSE) %>% 
+  filter(binned == FALSE,
+         is.na(flaggedData)) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
-  filter(flaggedData == "N") %>% 
+  datatable(rownames = FALSE)
+```
+
+# Missing data
+## Length measurements
+
+Specimens with missing length measurements. It is expected that standard length is measured for Pacific Sardine and Northern Anchovy, and that fork length is measured for Pacific Herring, Pacific Mackerel, and Jack Mackerel. If missing, length is estimated from the measured weight.
+
+```{r missing-lengths}
+# Select only outliers that have not yet been flagged
+# Select outliers
+lengths %>% 
+  filter(missing.length == TRUE) %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Weight measurements
+
+Self explanatory; weight is missing and estimated from total length.
+
+```{r missing-weights}
+# Select only outliers that have not yet been flagged
+# Select outliers
+lengths %>% 
+  filter(missing.weight == TRUE) %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Sex classification
+
+Self explanatory; sex is not specified as either male, female, or unknown.
+
+```{r missing-sex}
+# Select only outliers that have not yet been flagged
+# Select outliers
+lengths %>% 
+  filter(sex == "missing") %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
 
