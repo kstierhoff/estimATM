@@ -34,6 +34,8 @@ settings.files <- dir(here("Doc/settings"))
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
 source(here("Doc/settings", prj.settings))
+
+theme_set(theme_bw())
 ```
 
 ```{r info}
@@ -288,6 +290,22 @@ if (nrow(lengths.binned) > 0) {
 }
 ```  
 
+```{r flag-outliers}
+# Select outliers
+outliers <- lengths %>% 
+  left_join(K.summ) %>% 
+  filter(K <= K.lower | K >= K.upper) %>% 
+  filter(binned == FALSE) %>% 
+  mutate(key = paste(collection, species, specimenNumber),
+         outlier = TRUE) %>% 
+  select(key, outlier)
+
+# Add outlier flag to length data
+lengths <- lengths %>% 
+  mutate(key = paste(collection, species, specimenNumber)) %>% 
+  left_join(outliers)
+```
+
 # Overview
 This is a tool used to visualize and conduct QA/QC of trawl specimen data collected during Acoustic-Trawl (AT) surveys of coastal pelagic fish species (CPS) in the California Current Ecosystem. 
 
@@ -440,11 +458,11 @@ if (nrow(lengths.sub) > 0) {
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
                aes(totalLength_mm, weightg, fill = sex, 
-                   colour = flaggedData, label = label), 
+                   colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "green", "missing" = "purple")) +
-    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -453,8 +471,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") +
-    theme_bw() 
+    xlab("Total length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -476,7 +493,7 @@ lengths.all.sub <- filter(lengths.all,
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
-  # Plot L/W data from past and current survey -----------------------------------
+    # Plot L/W data from past and current survey -----------------------------------
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
@@ -487,11 +504,11 @@ if (nrow(lengths.sub) > 0) {
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
                aes(totalLength_mm, weightg, fill = sex, 
-                   colour = flaggedData, label = label), 
+                   colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "green", "missing" = "purple")) +
-    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -500,8 +517,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") +
-    theme_bw() 
+    xlab("Total length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -523,7 +539,7 @@ lengths.all.sub <- filter(lengths.all,
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
-  # Plot L/W data from past and current survey -----------------------------------
+    # Plot L/W data from past and current survey -----------------------------------
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
@@ -534,11 +550,11 @@ if (nrow(lengths.sub) > 0) {
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
                aes(totalLength_mm, weightg, fill = sex, 
-                   colour = flaggedData, label = label), 
+                   colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "green", "missing" = "purple")) +
-    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -547,8 +563,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") +
-    theme_bw() 
+    xlab("Total length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -570,7 +585,7 @@ lengths.all.sub <- filter(lengths.all,
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
-  # Plot L/W data from past and current survey -----------------------------------
+    # Plot L/W data from past and current survey -----------------------------------
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
@@ -581,11 +596,11 @@ if (nrow(lengths.sub) > 0) {
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
                aes(totalLength_mm, weightg, fill = sex, 
-                   colour = flaggedData, label = label), 
+                   colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "green", "missing" = "purple")) +
-    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -594,8 +609,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") +
-    theme_bw() 
+    xlab("Total length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -617,7 +631,7 @@ lengths.all.sub <- filter(lengths.all,
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
-  # Plot L/W data from past and current survey -----------------------------------
+    # Plot L/W data from past and current survey -----------------------------------
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
@@ -628,11 +642,11 @@ if (nrow(lengths.sub) > 0) {
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
                aes(totalLength_mm, weightg, fill = sex, 
-                   colour = flaggedData, label = label), 
+                   colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "green", "missing" = "purple")) +
-    scale_colour_manual(name = "Flagged", values = c("N" = NA,"Y" = "black")) +
+    scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -641,8 +655,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") +
-    theme_bw() 
+    xlab("Total length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
