@@ -268,11 +268,19 @@ lengths.all <- lengths.all %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
+# Filter samples with missing length AND weight measurements
+bad.lengths <-  lengths.all %>% 
+  # Filter for cruise specific data
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
+  filter(is.na(totalLength_mm), is.na(weightg))
+
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & toupper(isRandomSample) == "Y")
+           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
+  filter(!is.na(K))
 
 # Summarize Fulton's condition factor (K) for identifying outliers
 K.summ <- lengths %>%
@@ -422,6 +430,20 @@ Self explanatory; weight is missing and estimated from total length.
 # Select outliers
 lengths %>% 
   filter(missing.weight == TRUE) %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Length and weight measurements
+
+Self explanatory; both length and weight measurements are missing, so K may not be calculated.
+
+```{r missing-lengths-weights}
+# Select only outliers that have not yet been flagged
+# Select outliers
+bad.lengths %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
