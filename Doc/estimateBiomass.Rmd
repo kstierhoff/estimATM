@@ -33,7 +33,7 @@ pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
           beepr,rnaturalearth,shadowtext,here,leaflet,htmltools,
           leaflet.extras,maptools,mapview,photobiology,fs,plotly,
           concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,
-          rworldmap,rworldxtra,data.table,xts,stplanr)
+          rworldmap,rworldxtra,data.table,xts,stplanr,ggspatial)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -334,6 +334,19 @@ if (get.nav) {
   load(here("Data/NAV/nav_data.Rdata"))
 }
 
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
 # # Get saildrone nav from erddap
 # if ("SD" %in% nasc.vessels) {
 #   if (get.nav) {
@@ -418,7 +431,6 @@ if (resize.map) {
 
 # Determine map aspect ratio and set height and width
 map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.height <- 10
 map.width  <- map.height*map.aspect
 
 # Create base map
@@ -434,28 +446,11 @@ save(base.map, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r map-survey-plan}
-# Read waypoint file
-wpt.file <- list.files(here("Data/Nav"), 
-                       pattern = paste("waypoints", survey.name, sep = "_"),
-                       full.names = TRUE)
-
-wpts.all <- read_csv(wpt.file) %>% 
-  mutate(type = tolower(type),
-         group = paste(line, type)) %>% 
-  filter(type %in% c("compulsory","adaptive","mammal","saildrone","lisa marie")) %>% 
-  mutate(type = str_replace(type, "lisa marie", "Lisa Marie"))
-
-# Convert planned waypoints and transects to sf; CRS = 4326
-wpts.sf <- wpts.all %>% 
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog)
-
 # Create transect lines from waypoint files and add line bearing
-transects.sf <- wpts.sf %>% 
-  group_by(type, line) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING") %>% 
+transects.sf <- transects.sf %>% 
   ungroup() %>% 
-  mutate(brg = 360 + stplanr::line_bearing(.))
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.))
 
 st_write(transects.sf, here("Output/planned_transects.shp"), delete_layer = TRUE)
 
@@ -466,15 +461,15 @@ wpts.proj <- project_sf(wpts.sf, crs = crs.proj)
 survey.plan <- base.map +    
   # plot adaptive transects
   geom_point(data = wpts.proj, 
-            aes(X, Y, colour = type), size = 1) +
-  geom_path(data = wpts.proj, 
-            aes(X, Y, group = group, colour = type, linetype = type)) +
-  scale_colour_manual("Type", values = c(adaptive = "red", compulsory = "black",
-                                         mammal = "green", saildrone = "orange",
-                                         "Lisa Marie" = "green")) +
-  scale_linetype_manual("Type", values = c(adaptive = "dashed", compulsory = "solid",
-                                           mammal = "solid", saildrone = "solid",
-                                           "Lisa Marie" = "solid")) +
+            aes(X, Y, colour = Type), size = 1) +
+  geom_sf(data = transects.sf, 
+            aes(colour = Type, linetype = Type)) +
+  scale_colour_manual(name = "Type", values = c("Adaptive" = "red","Compulsory" = "blue",
+                                                "Offshore" = "green", "Nearshore" = "#F08C09",
+                                                "Transit" = "cyan")) +
+  scale_linetype_manual("Type", values = c(Adaptive = "dashed", Compulsory = "solid",
+                                           Offshore = "solid", Nearshore = "solid",
+                                           Transit = "dashed")) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
@@ -532,14 +527,14 @@ if (process.csv) {
   if (process.csv.all) {
     nasc <- data.frame() 
   } else {
-    load(here("Data/Backscatter/cps_nasc.Rdata"))
+    load(here("Data/Backscatter/nasc_cps.Rdata"))
   }
   
   # Process CSV files for each vessel
   for (i in nasc.vessels) {
     # List all CSV files
-    nasc.files <- list.files(file.path(here("Data/Backscatter", i)),
-                             pattern = nasc.file.pattern[i])
+    nasc.files <- dir_ls(file.path(here("Data/Backscatter", i)),
+                             regex = nasc.pattern.cps[i])
     
     if (!process.csv.all) {
       # List only new CSV files
@@ -554,55 +549,13 @@ if (process.csv) {
       pb <- tkProgressBar("R Progress Bar", "CSV File Processing", 0, 100, 0)
       # Process all .CSV files
       for (ii in seq_along(nasc.files)) {
-        # Read i-th file
-        nasc.csv <- fread(file.path(here("Data/Backscatter"), i, nasc.files[ii]))
-        # Extract file name from path
-        file.temp <- unlist(strsplit(nasc.files[ii], split = "/"))
-        # Extract file name from path
-        file.name <- file.temp[length(file.temp)]
-        # Extract transect name from the file name
-        transect.name  <- unlist(strsplit(file.name, split = "_"))[2]
-        # Summarize NASC by interval
-        nasc.temp <- nasc.csv %>% 
-          group_by(Interval) %>% 
-          summarise(
-            long     = Lon_M[1],
-            lat      = Lat_M[1],
-            date     = Date_M[1],
-            time     = as.character(Time_M[1]),
-            dist_m   = Dist_M[1],
-            NASC.5   = sum(NASC[Layer_depth_max <=   5]),
-            NASC.10  = sum(NASC[Layer_depth_max <=  10]),
-            NASC.15  = sum(NASC[Layer_depth_max <=  15]),
-            NASC.20  = sum(NASC[Layer_depth_max <=  20]),
-            NASC.25  = sum(NASC[Layer_depth_max <=  25]),
-            NASC.30  = sum(NASC[Layer_depth_max <=  30]),
-            NASC.35  = sum(NASC[Layer_depth_max <=  35]),
-            NASC.40  = sum(NASC[Layer_depth_max <=  40]),
-            NASC.45  = sum(NASC[Layer_depth_max <=  45]),
-            NASC.50  = sum(NASC[Layer_depth_max <=  50]),
-            NASC.55  = sum(NASC[Layer_depth_max <=  55]),
-            NASC.60  = sum(NASC[Layer_depth_max <=  60]),
-            NASC.65  = sum(NASC[Layer_depth_max <=  65]),
-            NASC.70  = sum(NASC[Layer_depth_max <=  70]),
-            NASC.75  = sum(NASC[Layer_depth_max <=  75]),
-            NASC.80  = sum(NASC[Layer_depth_max <=  80]),
-            NASC.85  = sum(NASC[Layer_depth_max <=  85]),
-            NASC.90  = sum(NASC[Layer_depth_max <=  90]),
-            NASC.95  = sum(NASC[Layer_depth_max <=  95]),
-            NASC.100 = sum(NASC[Layer_depth_max <= 100]),
-            NASC.150 = sum(NASC[Layer_depth_max <= 150]),
-            NASC.250 = sum(NASC[Layer_depth_max <= 250]),
-            NASC     = NASC.250,
-            depth    = max(Layer_depth_max) + 3,
-            CPS      = 1,
-            transect.name = transect.name,
-            vessel.name   = i,
-            filename      = file.name,
-            sounder       = sounder.type[i])
+        # Extract vessel nasc
+        nasc.vessel.temp <- extract_csv(nasc.files[ii]) %>% 
+          mutate(vessel.name = i,
+                 sounder = sounder.type[i])
         
         # Combine results
-        nasc.vessel <- bind_rows(nasc.vessel, nasc.temp)
+        nasc.vessel <- bind_rows(nasc.vessel, nasc.vessel.temp)
         
         # Update the progress bar
         pb.prog <- round(ii/length(nasc.files)*100)
@@ -620,7 +573,7 @@ if (process.csv) {
       # Convert date and time to POSIXct
       nasc.vessel <- nasc.vessel %>% 
         mutate(datetime      = ymd_hms(paste(date, time), tz = "UTC"),
-               transect.orig = transect.name)
+               transect.orig = transect)
       
       if (i == "SD") {
         # Set Saildrone number as vessel name
@@ -719,14 +672,14 @@ if (process.csv) {
       
       # Indentify acoustic transects to include in processing, based on length
       tx.include <- nasc.vessel %>% 
-        group_by(transect.name) %>% 
+        group_by(transect) %>% 
         summarise(L = length(Interval)/10*0.539957) %>%
         arrange(L) %>% 
         filter(L > min.tx.length[i]) 
       
       # Remove backscatter data from short transects
       nasc.vessel <- nasc.vessel %>% 
-        filter(transect.name %in% tx.include$transect.name,
+        filter(transect %in% tx.include$transect,
                nasc.vessel$lat != 999,
                nasc.vessel$long != 999)
 
@@ -736,7 +689,7 @@ if (process.csv) {
         mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
                                        nasc.summ.interval),
                          labels = F, include.lowest = TRUE),
-               transect.name = paste(vessel.name, transect.name))
+               transect.name = paste(vessel.name, transect))
       
       # Filter NASC per vessel -------------------------------------------------
       # Manually remove individual transects
@@ -751,7 +704,7 @@ if (process.csv) {
           filter(!str_detect(transect.orig, "\\d\\.5")) # Remove inter-transects e.g., 102.5
       }
       
-      # Remove offthore transects data
+      # Remove offshore transects data
       if (rm.offshore[i]) {
         nasc.offshore <- nasc.vessel %>% 
           filter(str_detect(transect.orig, "\\d{3}M") | str_detect(tolower(filename), "offshore")) 
@@ -762,7 +715,7 @@ if (process.csv) {
         
         nasc.vessel <- nasc.vessel %>% 
           filter(!str_detect(tolower(filename), "offshore")) %>% 
-          filter(!str_detect(transect.orig, "\\d{3}M"))  
+          filter(!str_detect(transect.orig, "\\d{3}O"))  
       }
       
       # Remove nearshore transects data
@@ -805,9 +758,9 @@ if (process.csv) {
     }
   }  
   # Save raw NASC file import
-  save(nasc, file = here("Data/Backscatter/cps_nasc.Rdata"))
+  save(nasc, file = here("Data/Backscatter/nasc_cps.Rdata"))
 } else {
-  load(here("Data/Backscatter/cps_nasc.Rdata"))
+  load(here("Data/Backscatter/nasc_cps.Rdata"))
 }
 
 # List already processed CSV files and save
@@ -857,10 +810,10 @@ for (i in nasc.vessels) {
 }
 
 # Add transect numbers to NASC
-nasc <- left_join(nasc, select(tx.order, transect.name, transect))  
+nasc <- left_join(select(nasc, -transect), select(tx.order, transect.name, transect))  
 
 # Create survey strata polygons
-source(here("Code/draw_strata_survey.R"))
+source(here("Code/drawStrataSurvey.R"))
 
 # Remove saildrone overlap for 1807RL
 if (prj.name %in% c("1807RL")) {
@@ -956,6 +909,8 @@ ggplotly(nasc.outlier.plotly)
 (ref:plot-day-night) In the event that acoustic data were collected continuously (i.e., during day and night), each interval is characterized as being collected during day or night by estimating sunrise/sunset for each day based on the mean latitude and longitude of acoustic data from that day. If desired, data collected during either the day or night may be removed.
 
 ```{r plot-day-night,fig.cap='(ref:plot-day-night)'}
+# RESUME HERE #######################################
+# 
 # Summarize NASC by date and lat/long
 nasc.sun <- nasc %>% 
   mutate(date = ymd(date)) %>% 

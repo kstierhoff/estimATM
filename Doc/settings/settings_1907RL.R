@@ -77,6 +77,9 @@ mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Pos
 crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # Califoria Albers Equal Area
 
+# Default map height
+map.height <- 10
+
 # Configure mapview options
 mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
 
@@ -155,7 +158,7 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
-nasc.vessels           <- c("RL", "LM", "SD") # Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
+nasc.vessels           <- c("RL","LM", "SD") # Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
 nasc.interval          <-  100    # Interval length (m); from Echoview
 nasc.summ.interval     <- 2000/nasc.interval # number of intervals over which to summarize NASC
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
@@ -196,7 +199,7 @@ strip.tx.nums          <- c(RL = F,
 strip.tx.chars         <- c(RL = F,
                             LM = F,
                             SD = F) # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-rm.transit             <- c(RL = T,
+rm.transit             <- c(RL = F,
                             LM = F,
                             SD = F) # If T, removes transects with names including "transit"
 rm.offshore            <- c(RL = T,
@@ -215,6 +218,7 @@ use.tx.number          <- c(RL = F,
                             LM = F,
                             SD = F) # Use transect names for transect numbers
 tx.rm                  <- c(RL = NA,
+                            LM = NA,
                             SD = NA) # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 min.tx.length          <- c(RL = 3,
                             LM = 1,
