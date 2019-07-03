@@ -77,6 +77,13 @@ mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Pos
 crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # Califoria Albers Equal Area
 
+# Configure mapview options
+mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
+
+# Leaflet tile options; set both to T if caching
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
+
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
@@ -94,6 +101,56 @@ stock.ns      <- "Northern"
 strata.ns     <- 4
 
 # Figure preferences ------------------------------------------------------
+# Set species colors
+sardine.color      <- '#FF0000'
+anchovy.color      <- '#00CD66'
+jack.mack.color    <- '#0000FF'
+jacksmelt.color    <- '#A020F0'
+pac.mack.color     <- '#00FFFF'
+pac.herring.color  <- '#F5DEB3'
+
+# Load cmocean colormaps
+load(here("Code/cmocean.Rdata"))
+ocean.pal <- colors
+
+# Define species to be analysed
+cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+                        "Scomber japonicus","Trachurus symmetricus")
+# CUFES
+# For legend objects
+cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
+cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
+                        "50-250", "250-500", ">500")
+cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6, 7)
+cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
+cufes.colors       <- c("AnchovyEggs"      = anchovy.color, 
+                        "JackMackerelEggs" = jack.mack.color, 
+                        "SardineEggs"      = sardine.color)
+cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
+                        "JackMackerelEggs" = "J. mackerel",
+                        "SardineEggs"      = "Sardine")
+# Trawl
+# For legend objects
+trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) 
+trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
+trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
+
+# NASC
+# For legend objects
+nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000)
+nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
+                        "5000-20,000", "20,000-50,000", ">50,000")
+nasc.scale         <- 0.7 # Scale percentage (smaller for larger scale)
+nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
+nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
+                        "#FF0000", "#FFC0CB", "#FFFFFF")
+
+# Catch map
+# For legend objects
+catch.breaks       <- c(0,10,100,500,1000)
+catch.labels       <- c("0-10","10-100", "100-500", "500-1000")
+catch.pie.sizes    <- c(1,2,3,4,5,6)
+
 annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
 
 # Data sources ------------------------------------------------------------
@@ -457,6 +514,12 @@ max.T <- 25
 # Salinity limits
 min.S <- 30
 max.S <- 35
+
+# Set limits for latitude and longitude ----------------------------------------
+min.lat  <-   31
+max.lat  <-   52
+min.long <- -132
+max.long <- -117
 
 # Files to manually exclude
 exclude.uctd <- c(NA)

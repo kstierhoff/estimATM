@@ -38,6 +38,7 @@ pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
 # Install and load required packages from Github -------------------------------
 # surveyR
 pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
 # rnaturalearth data
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
@@ -84,11 +85,11 @@ source(here("Doc/settings", prj.settings))
 
 ```{r project-functions}
 # Get all functions files
-functions.files <- dir(here("Code/functions"))
+# functions.files <- dir(here("Code/functions"))
 
 # Source survey functions file
-prj.functions <- functions.files[str_detect(functions.files, paste(prj.name, ".R", sep = ""))]
-source(here("Code/functions", prj.functions))
+# prj.functions <- functions.files[str_detect(functions.files, paste(prj.name, ".R", sep = ""))]
+# source(here("Code/functions", prj.functions))
 ```
 
 ```{r at-methods-overview, child='Background/ATM_Methods.Rmd', eval=FALSE}
@@ -110,25 +111,24 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
-get.nav           <- F # Download nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-process.ctd       <- F # Process CTD and UCTD cast files
-save.figs         <- F # Draw new figures and maps
-save.imap         <- F # Save Leaflet maps
-do.bootstrap      <- F # Generate bootstrap estimates
+get.db            <- T # Download data from databases (fast; generally TRUE)
+get.nav           <- T # Download nav data from ERDDAP
+copy.files        <- T # Copy data files to local directory 
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
+save.imap         <- T # Save Leaflet maps
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
+resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 # Often or usually F
-copy.bib          <- F # Copy bibliography files (requires connection to AST2)
-overwrite.files   <- F # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
-overwrite.ctd     <- F # Overwrite CTD files (TRUE if files have changed)
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+copy.bib          <- T # Copy bibliography files (requires connection to AST2)
+overwrite.files   <- T # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
-process.cal       <- F # Process calibration results
-get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
+process.cal       <- T # Process calibration results
+get.bathy         <- T # Extract ETOPO1 bathymetry data in the survey footprint
 
 # Run all loops (T/F)?
 do.all <- F  
@@ -149,6 +149,7 @@ if (do.all) {
   download.hab    <- T
   process.cal     <- T
   get.bathy       <- T
+  resize.map      <- T 
 }
 ```  
 
@@ -183,89 +184,6 @@ names(length.max) <- c("species","sl")
 max.diff <- 3
 # Defines minimum number of transects in a stratum
 min.n.tx <- 3
-
-# Define ERDDAP data variables -------------------------------------------------
-erddap.vars       <- c("time,latitude,longitude,platformSpeed")
-erddap.classes    <- c("factor","numeric","numeric","numeric")
-erddap.headers    <- c("time","lat","long","SOG")
-
-# Set limits for latitude and longitude ----------------------------------------
-min.lat  <-   31
-max.lat  <-   52
-min.long <- -132
-max.long <- -117
-
-# Set CTD/UCTD environmental data limits ---------------------------------------
-# Temperature limits
-min.T <- 0
-max.T <- 25
-# Salinity limits
-min.S <- 30
-max.S <- 35
-```  
-
-## Map preferences  
-This section configures mapping parameters, including species-specific colors, bins for plot symbols and sizes, and the size of saved map figures (not shown; to view, change chunk options to `echo = TRUE`).
-
-```{r figure-settings}
-# Load cmocean colormaps -------------------------------------------------------
-load(here("Code/cmocean.Rdata"))
-ocean.pal <- colors
-
-# Plotting preferences -------------------------------------------------------
-# Define map options
-# Coordinate reference systems for geographic and projected data
-crs.geog <- 4326 # WGS84
-crs.proj <- 3310 # Califoria Albers Equal Area
-
-# Leaflet tile options; set both to T if caching
-useCachedTile  <- F # Use cached tiles
-useCrossOrigin <- F # USe cross origin
-
-# Configure mapview options
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
-
-# Map landmarks
-label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
-                "Newport","Point Conception","Cape Mendocino","Columbia River",
-                "Cape Blanco","Bodega Bay","Westport","Fort Bragg",
-                "Morro Bay","Long Beach","Cape Scott","San Diego")
-
-# Colors for plots
-sardine.color      <- '#FF0000'
-anchovy.color      <- '#00CD66'
-jack.mack.color    <- '#0000FF'
-jacksmelt.color    <- '#A020F0'
-pac.mack.color     <- '#00FFFF'
-pac.herring.color  <- '#F5DEB3'
-
-# Define plotting parameters -------------------------------------------------------
-# NASC map
-# nasc.summ.interval <- 20 # number of intervals over which to summarize; 20 = 2000 m or 2 km
-nasc.breaks        <- c(0,50,500,2500,5000,20000,50000,100000000) # for backscatter legend breaks
-nasc.labels        <- c("0-50","50-500", "500-2500", "2500-5000","5000-20,000", # legend labels
-                        "20,000-50,000",">50,000")
-nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
-                        "#FF0000", "#FFC0CB", "#FFFFFF") # legend colors
-nasc.sizes         <- c(0.25,1,2.25,3,4.25,5.5,6.5) # for legend sizes
-# Density map
-dens.breaks        <- c(0,1,10,100,500,1000,10000,50000,1000000)
-dens.labels        <- c("0-1","1-10","10-100","100-500","500-1000",
-                        "1000-10,000","10,000-50,000",">50,000")
-dens.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
-                        "#FF0000", "#FFC0CB", "#FFFFFF", "#00FF00") # for legend colors
-dens.sizes         <- c(0.25,1,2.25,3,4.25,5.5,6.5,7.5) # for legend sizes
-
-# CUFES map
-cufes.breaks       <- c(0,0.1,1,10,25,50,500) # for legend breaks
-cufes.labels       <- c("<0.01","0.1-1","1-10", "10-25", "25-50","50-500") # for legend labels
-cufes.sizes        <- c(0.5,1,2,3,4,5) # for legend sizes
-cufes.colors       <- c(anchovy.color, jack.mack.color, sardine.color) # colors for sardine and anchovy plot
-# Catch map
-scale.pies         <- FALSE# Scale pie charts (TRUE/FALSE)
-catch.breaks       <- c(0,10,100,500,1000,10000) # breaks for legend
-catch.labels       <- c("0-10","10-100", "100-500", "500-1000", ">1000") # labels for legend
-catch.pie.sizes    <- c(1,2,3,4,5,6,7) # sizes for legend
 ```  
 
 ## File handling  
@@ -274,59 +192,38 @@ Files are copied locally for processing to avoid slow results when working acros
 ```{r copy-files,include=F}
 # Copy bibliography and CSL files -------------------------------------------------------
 if (copy.bib) {
-  file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
+  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
             here("Doc/csl"), overwrite = TRUE)
-  file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
+  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
             here("Doc/bib"), overwrite = TRUE)    
 }
   
 if (copy.files) {
+  # Create directories for CSV files
+  dir_create(here("Data/Backscatter", nasc.vessels))
+  
   # Copy CSV files -------------------------------------------------------
   for (i in nasc.vessels) {
-    # Create subdirectory if it doesn't already exist
-    dir.create(here("Data", "Backscatter", i))
-    # List CSV files on survey directory
-    nasc.files <- list.files(file.path(survey.dir[i], nasc.dir[i]),
-                             pattern = nasc.file.pattern[i], full.names = TRUE)
-    # Copy CSV files to local directory
-    file.copy(nasc.files, here("Data/Backscatter", i), overwrite = overwrite.csv)
-  }
-  
+    if (dir.exists(file.path(survey.dir[i], nasc.dir[i]))) {
+      # List CSV files on survey directory
+      nasc.files <- dir_ls(file.path(survey.dir[i], nasc.dir[i]),
+                           regex = nasc.pattern.cps[i])
+      # Copy CSV files to local directory
+      file_copy(nasc.files, here("Data/Backscatter", i), overwrite = overwrite.csv)  
+    }
+  } 
+   
   # Copy CUFES files -------------------------------------------------------
   if (cufes.source == "SQLite") {
-    file.copy(file.path(cufes.dir.sqlite, cufes.db.sqlite), here("Data/CUFES"),
+    file_copy(file.path(cufes.dir.sqlite, cufes.db.sqlite), here("Data/CUFES"),
               overwrite = overwrite.files)
   }
   
   # Copy Access database -------------------------------------------------------
   if (trawl.source == "Access") {
-    file.copy(file.path(trawl.dir.access, trawl.db.access),here("Data/Trawl"),
+    file_copy(file.path(trawl.dir.access, trawl.db.access),here("Data/Trawl"),
               overwrite = overwrite.files)
   }
-  
-  # Copy CTD files -------------------------------------------------------
-  # List raw CTD ASCII files
-  ctd.hdr.files <- list.files(ctd.dir, pattern = ctd.hdr.pattern, full.names = TRUE)
-  # Copy files to plotCTD directory
-  file.copy(ctd.hdr.files, here("Data/CTD"), overwrite = overwrite.ctd)
-  # Location of processed CTD files on survey directory
-  ctd.cast.files <- list.files(ctd.dir, pattern = ctd.cast.pattern, full.names = TRUE)
-  # Copy files to plotCTD directory
-  file.copy(ctd.cast.files, here("Data/CTD"), overwrite = overwrite.ctd)
-  
-  # Copy UCTD files -------------------------------------------------------
-  # Location of header files on survey directory
-  uctd.hdr.files <- list.files(uctd.dir, pattern = uctd.hdr.pattern, full.names = TRUE)
-  # Copy files to plotCTD directory
-  file.copy(uctd.hdr.files, here("Data/UCTD"), overwrite = overwrite.ctd)
-  # Location of processed UCTD files on survey directory
-  uctd.cast.files <- list.files(uctd.dir, pattern = uctd.cast.pattern, full.names = TRUE)
-  # Copy files to plotCTD directory
-  file.copy(uctd.cast.files, here("Data/UCTD"), overwrite = overwrite.ctd)
-  
-  # # Copy Echosounder calibration files -------------------------------------------------------
-  # cal.files <- list.files(cal.dir, pattern = "*.txt", full.names = TRUE)
-  # file.copy(cal.files, here("Data/Calibration"), overwrite = overwrite.files)
 }
 ```  
 ## Get habitat map  
@@ -334,13 +231,13 @@ if (copy.files) {
 ```{r get-habitat-maps}
 if (download.hab) {
   # Calculate the number of days in the survey
-  hab.days <- floor((ymd(survey.end.erddap) - ymd(survey.start.erddap))/3)
+  hab.days <- floor((ymd(erddap.survey.end) - ymd(erddap.survey.start))/3)
   
   # Format survey start date for downloading sardine potential habitat maps
-  hab.date.start <- format(ymd(survey.start.erddap), "%Y%m%d")
-  hab.date.mid1  <- format(ymd(survey.start.erddap) + hab.days, "%Y%m%d")
-  hab.date.mid2  <- format(ymd(survey.start.erddap) + hab.days*2, "%Y%m%d")
-  hab.date.end   <- format(ymd(survey.end.erddap), "%Y%m%d")
+  hab.date.start <- format(ymd(erddap.survey.start), "%Y%m%d")
+  hab.date.mid1  <- format(ymd(erddap.survey.start) + hab.days, "%Y%m%d")
+  hab.date.mid2  <- format(ymd(erddap.survey.start) + hab.days*2, "%Y%m%d")
+  hab.date.end   <- format(ymd(erddap.survey.end), "%Y%m%d")
   
   # Create URLs for downloading downloading sardine potential habitat maps
   hab.url.start <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
@@ -381,54 +278,76 @@ Vessel (e.g., lat/long, speed-over-ground, heading, etc.) and underway oceanogra
 
 ```{r process-vessel-nav}
 if (get.nav) {
-  # Import vessel nav data from ERDDAP -------------------------------------------------------
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Get max date
+    erddap.survey.start <- max(date(nav$time))
+  }
+  
   # Generate ERDDAP URL
-  dataURL = URLencode(paste("http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-                            survey.vessel.erddap, ".csv0?", erddap.vars,
-                            "&time>=", survey.start.erddap, "&time<=", 
-                            survey.end.erddap, sep = ''))
+  dataURL <- URLencode(paste(
+    "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+    erddap.vessel, ".csv0?", erddap.vars,
+    "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+    sep = ""))
   
   # Download and parse ERDDAP nav data
-  nav <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+  nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
                              row.names = NULL, skip = 0))
-  colnames(nav) <- erddap.headers
+  names(nav.temp) <- erddap.headers
   
-  # Filter to remove bad data values
-  nav <- nav %>%  
-    mutate(long     = long - 360) %>% # Put longitude into E/W format
-    mutate(datetime = as.POSIXct(time,format = "%FT%T")) %>% # Convert date/time to POSIXct
-    mutate(SOG      = SOG * 1.94384) %>%                     # Convert SOG from m/s to knots
-    filter(between(long,min.long,max.long)) %>%              # Filter lat/long data
-    filter(between(lat,min.lat,max.lat)) %>%      
-    mutate(leg      = as.factor(cumsum(c(0,diff(datetime)) > 1440) + 1), # Get leg # from time diff
-           time.align = align.time(datetime, 60))             # Align time for matching with NASC
+  # Filter to remove bad SST values
+  nav.temp <- nav.temp %>% 
+    mutate(long     = long - 360,
+           SOG      = SOG * 1.94384,
+           datetime = ymd_hms(time),
+           SST      = na_if(SST, NaN),
+           leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                  leg.breaks, labels = F))) %>%
+    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+           between(lat, min(survey.lat), max(survey.lat)), 
+           between(long, min(survey.long), max(survey.long)))
   
-  # Convert nav to sf; CRS = 4326
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
+  # Append new nav data
+  if (exists("nav")) {
+    nav <- bind_rows(nav, nav.temp) %>% 
+      distinct()
+  } else {
+    nav <- nav.temp
+  }
+  
+  # Convert nav to spatial
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  # Cast nav to transects
+  nav.legs <- nav.sf %>% 
     group_by(leg) %>% 
     summarise(do_union = F) %>% 
     st_cast("LINESTRING")
-
-  # save results
-  save(nav, nav.sf, file = here("Data/Nav/nav_data.Rdata"))
+  
+  # Save results
+  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
 } else {
-  load(here("Data/Nav/nav_data.Rdata"))
+  # Load nav data
+  load(here("Data/NAV/nav_data.Rdata"))
 }
 
-# Get saildrone nav from erddap
-if ("SD" %in% nasc.vessels) {
-  if (get.nav) {
-    source(here("Code/get_saildrone_nav.R"))
-  } else {
-    load(here("Data/Nav/nav_data_saildrone.Rdata"))
-  }
-}
-
-# Replace primary nav with Saildrone nav for select surveys
-if (prj.name %in% "1807RL-Saildrone") {
-  nav    <- nav.sd
-  nav.sf <- nav.sd.sf
-}
+# # Get saildrone nav from erddap
+# if ("SD" %in% nasc.vessels) {
+#   if (get.nav) {
+#     source(here("Code/get_saildrone_nav.R"))
+#   } else {
+#     load(here("Data/Nav/nav_data_saildrone.Rdata"))
+#   }
+# }
+# 
+# # Replace primary nav with Saildrone nav for select surveys
+# if (prj.name %in% "1807RL-Saildrone") {
+#   nav    <- nav.sd
+#   nav.sf <- nav.sd.sf
+# }
 ```
 
 # Map survey plan
@@ -439,23 +358,22 @@ Map the planned compultory (black, solid lines) and adaptive (red, dashed lines)
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
   st_as_sf(coords = c("lon","lat"), crs = crs.geog) 
+
 # Project sf
-locations <- project_sf(locations, crs.proj) %>% 
-  arrange(Y)
+locations <- project_sf(locations, crs.proj)
 
 # Get land features --------------------------
 # Get state data
 states <- ne_states(country = 'United States of America', returnclass = 'sf')
 ca     <- filter(states, name == "California")
 
-# Get North America data
-na_sf <- ne_countries(scale = "large", returnclass = "sf") %>%
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
   filter(subregion %in% c("Northern America","Central America"))
 
-# Get bathymetry data ------------------------
 # Read bathy contours shapefile 
-bathy_contours <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
-  st_transform(4326) %>% 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
   rename(Depth = Contour)
 
 # Read isoline
@@ -480,83 +398,39 @@ bathy_5m_df <- bathy_5m_points %>%
 
 write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
 
+nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(leg) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
 # Set padding around data  
-map.bounds <- nav.sf %>% 
-  st_transform(crs = crs.proj) %>% 
-  st_bbox()
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav_sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- transects.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
 
 # Determine map aspect ratio and set height and width
 map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
 map.height <- 10
 map.width  <- map.height*map.aspect
 
-# Set annotation location (for panel letters)
-annotation.lon <- min(range(nav$long))
-annotation.lat <- max(range(nav$lat))
+# Create base map
+base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
-if (save.figs) {
-  # Create base map -------------------------------------------
-  base.map <- ggplot() +
-    # Plot bathymetry contours
-    geom_sf(data = bathy_contours, colour = "gray90", alpha = 0.5) +
-    # Plot high-res land polygons
-    geom_sf(data = na_sf, fill = "gray90", color = "gray50") +
-    geom_sf(data = states, fill = "gray90", colour = "gray50") +
-    # Plot landmarks
-    geom_point(data = locations, aes(X, Y), size = 2, colour = 'gray50') +
-    geom_shadowtext(data  = locations, aes(X, Y, label = name), 
-                    colour = 'gray20', size = 2, fontface = 'bold', 
-                    hjust = 0, nudge_x = 0.2, nudge_y = 0.05, angle = 25, 
-                    bg.colour = "white") +
-    # Format axes and titles
-    xlab("Longitude") + ylab("Latitude") + 
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
-    theme_bw() + 
-    theme(axis.text.y          = element_text(angle = 90, hjust = 0.5),
-          legend.position      = c(0,0),
-          legend.justification = c(0,0),
-          legend.background    = element_blank(),
-          legend.key           = element_blank(),
-          # panel.background     = element_rect(fill = alpha("lightblue", 0.5)),
-          plot.title           = element_text(hjust = 0.5),
-          panel.grid.major     = element_line(color = "gray90"))
-  
-  # Create base map for inset maps
-  base.map.bw <- ggplot() +
-    # Plot bathymetry contours
-    geom_sf(data = bathy_contours, colour = "gray90") +
-    # Plot high-res land polygons
-    geom_sf(data = na_sf, fill = "gray90", color = "gray50") +
-    geom_sf(data = states, fill = "gray90", colour = "gray50") +
-    # Format axes and titles
-    xlab("Longitude") + ylab("Latitude") + 
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
-    theme_bw() + 
-    theme(axis.text.x  = element_blank(),
-          axis.text.y  = element_blank(),
-          axis.title.x = element_blank(),
-          axis.title.y = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.ticks.y = element_blank())
-  
-  # Save the basemap
-  ggsave(base.map,
-         file = here("Figs/fig_base_map.png"), 
-         height = map.height, width = map.width)
-  
-  ggsave(base.map.bw,
-         file = here("Figs/fig_base_map_bw.png"), 
-         height = map.height, width = map.width)
-  
-  save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
-} else {
-  # Load the basemap
-  load(here("Data/Map/basemap.Rdata"))
-}
+# Save the basemap
+ggsave(base.map,file = here("Figs/fig_base_map.png"), 
+       height = map.height, width = map.width)
+
+save(base.map, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r map-survey-plan}
