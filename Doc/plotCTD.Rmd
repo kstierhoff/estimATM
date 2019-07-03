@@ -1,7 +1,7 @@
 ---
 title: "Process CTD and UCTD casts"
 author: "Kevin L. Stierhoff"
-date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = TRUE)`'
 output:
   bookdown::html_document2:
     toc: yes
@@ -46,7 +46,7 @@ if (is.null(doc.type)) {
 
 # global knitr chunk options
 knitr::opts_chunk$set(
-  echo = F, warning = F, message = F, 
+  echo = FALSE, warning = FALSE, message = FALSE, 
   fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
 )
 
@@ -117,7 +117,7 @@ if (get.nav) {
     sep = ""))
   
   # Download and parse ERDDAP nav data
-  nav <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+  nav <- data.frame(read.csv(dataURL, header = FALSE, colClasses = erddap.classes, 
                              row.names = NULL, skip = 0))
   names(nav) <- erddap.headers
   
@@ -129,8 +129,8 @@ if (get.nav) {
            datetime = ymd_hms(time),
            SST      = na_if(SST, NaN),
            leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                  leg.breaks, labels = F, include.lowest = T))) %>%
-    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+                                  leg.breaks, labels = FALSE, include.lowest = TRUE))) %>%
+    filter(is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
            between(long, min(survey.long), max(survey.long)))
   
@@ -140,7 +140,7 @@ if (get.nav) {
   # Cast nav to transects
   nav.legs <- nav.sf %>% 
     group_by(leg) %>% 
-    summarise(do_union = F) %>% 
+    summarise(do_union = FALSE) %>% 
     st_cast("LINESTRING")
   
   # Save results
@@ -233,11 +233,11 @@ if (length(uctd.hdr) == 0) {
     left_join(select(all.uctd.hdr, cast, cast.date, lat, long, SOG)) %>%
     arrange(cast.date) %>%
     mutate(cast.num = seq(1, n()),
-           leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = F)))
+           leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = FALSE)))
   
   # Write table to CSV
   write.csv(uctd.summ, file = here("Output/cast_summary_uctd.csv"), 
-            quote = F, row.names = F)
+            quote = FALSE, row.names = FALSE)
   
   # Add SOG to all.uctd
   all.uctd.casts <- all.uctd.casts %>% 
@@ -278,7 +278,7 @@ if (length(uctd.hdr) == 0) {
   
   # Write table to CSV
   write.csv(uctd.missing, file = here("Output/unprocessed_uctd.csv"), 
-            quote = F, row.names = F)
+            quote = FALSE, row.names = FALSE)
 }
 ```
 
@@ -381,7 +381,7 @@ if (length(ctd.hdr) == 0) {
     
     all.ctd.hdr <- all.ctd.hdr %>% 
       left_join(select(ctd.class, cast, class)) %>% 
-      mutate(leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = F))) %>% 
+      mutate(leg = paste("Leg", cut(as.numeric(date(cast.date)), leg.breaks, labels = FALSE))) %>% 
       select(cast.num, cast, cast.date, lat, long, max.depth, class, leg)
     
     # add water mass to the summary table and cast data for plotting
@@ -391,7 +391,7 @@ if (length(ctd.hdr) == 0) {
     
     # write table to CSV
     write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
-              quote = F, row.names = F)
+              quote = FALSE, row.names = FALSE)
     
     # Remove unprocessed casts from the summary
     ctd.missing <- all.ctd.hdr %>% 
@@ -406,7 +406,7 @@ if (length(ctd.hdr) == 0) {
   
   # write table to CSV
   write.csv(ctd.missing, file = here("Output/unprocessed_ctd.csv"), 
-            quote = F, row.names = F)
+            quote = FALSE, row.names = FALSE)
 }
 ```
 
@@ -436,13 +436,13 @@ bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>%
 # Convert nav to sf
 nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(leg) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING")
 
 # Create transects sf
 tx_sf <- st_as_sf(wpts, coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   group_by(Group, Type, Transect) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING") %>% 
   filter(!str_detect(Group, "Extra"),
          !str_detect(Group, "Transit"))
@@ -515,7 +515,7 @@ if (nrow(uctd.missing) > 0) {
 ```  
 
 ## Cast locations
-Location of underway UCTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. UCTD cast numbers correspond to those in the previous table.  
+Location of underway UCTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. UCTD cast numbers correspond to those in the previous table. Casts with a **<span style="color:red">red</span>** border have not yet been processed. 
 
 ```{r create-map-data}
 if (exists("uctd.summ")) {
@@ -527,8 +527,24 @@ if (exists("uctd.summ")) {
       Y = as.data.frame(st_coordinates(.))$Y)   
 }
 
+if (exists("uctd.missing")) {
+  uctd.missing.sf <- st_as_sf(uctd.missing, coords = c("long","lat"), crs = crs.geog) %>%
+    st_transform(crs = crs.proj) %>% 
+    mutate(
+      X = as.data.frame(st_coordinates(.))$X,
+      Y = as.data.frame(st_coordinates(.))$Y) 
+}
+
 if (exists("all.ctd.hdr")) {
   ctd.sf  <- st_as_sf(all.ctd.hdr, coords = c("long","lat"), crs = crs.geog) %>%
+    st_transform(crs = crs.proj) %>% 
+    mutate(
+      X = as.data.frame(st_coordinates(.))$X,
+      Y = as.data.frame(st_coordinates(.))$Y) 
+}
+
+if (exists("ctd.missing")) {
+  ctd.missing.sf <- st_as_sf(ctd.missing, coords = c("long","lat"), crs = crs.geog) %>%
     st_transform(crs = crs.proj) %>% 
     mutate(
       X = as.data.frame(st_coordinates(.))$X,
@@ -566,11 +582,18 @@ if (length(all.uctd.casts) > 0) {
   }
 }
 
+# Map casts
 if (exists("uctd.sf")) {
-  # Map casts
-  mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-    mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
-    mapview(uctd.sf, zcol = "leg", cex = 4, layer.name = "UCTD Casts", legend = T)  
+  if (exists("uctd.missing.sf")) {
+    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
+      mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
+      mapview(uctd.sf, zcol = "leg", cex = 4, layer.name = "UCTD Casts", legend = TRUE) +
+      mapview(uctd.missing.sf, color = "red", cex = 6, layer.name = "UCTD Casts-Unprocessed", legend = FALSE) 
+  } else {
+    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
+      mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
+      mapview(uctd.sf, zcol = "leg", cex = 4, layer.name = "UCTD Casts", legend = TRUE)  
+  }
 } else {
   # Map only vessel location
   mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
@@ -588,8 +611,8 @@ if (length(all.uctd.casts) > 0) {
     uctd.dZt <- ggplot(data = all.uctd.casts, aes(dZt, Z, group = cast, colour = SOG)) + 
       geom_path(alpha = 0.75) +
       xlab("\nDescent rate (m/s)") + ylab("Depth (m)\n") + 
-      scale_x_continuous(limits = c(0,ceiling(max(all.uctd.casts$dZt,na.rm = T))),
-                         breaks = seq(0, ceiling(max(all.uctd.casts$dZt,na.rm = T)), 0.5), 
+      scale_x_continuous(limits = c(0,ceiling(max(all.uctd.casts$dZt, na.rm = TRUE))),
+                         breaks = seq(0, ceiling(max(all.uctd.casts$dZt, na.rm = TRUE)), 0.5), 
                          expand = c(0,0)) + 
       scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1),0),
                          breaks = seq(round(min(all.uctd.casts$Z),digits = -1), 0, 25), 
@@ -639,7 +662,7 @@ if (length(all.uctd.casts) > 0) {
             legend.background    = element_blank(),
             strip.background.x = element_blank(),
             strip.text.x = element_text(face = "bold")) +
-      geom_smooth(data = all.uctd.casts, se = F, aes(s, Z, group = survey), 
+      geom_smooth(data = all.uctd.casts, se = FALSE, aes(s, Z, group = survey), 
                   colour = 'black', linetype = 2)
     # save plot
     ggsave(uctd.Z, file = here("Figs/fig_uctd_Z_v_time.png"))
@@ -828,7 +851,7 @@ if (length(all.ctd.casts) > 0) {
 ```  
 
 ## Cast locations
-Location of underway CTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. CTD cast numbers correspond to those in the previous table.  
+Location of underway CTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. CTD cast numbers correspond to those in the previous table. Casts with a Casts with a **<span style="color:red">red</span>** border have not yet been processed.  border have not yet been processed.  
 
 ```{r ctd-map-all}
 if (save.figs) {
@@ -857,13 +880,20 @@ if (save.figs) {
          width = map.width, height = map.height)
 }
 
+# Map casts
 if (exists("ctd.sf")) {
-  # Map casts
-  mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-    mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
-    mapview(ctd.sf, zcol = "leg", cex = 4, layer.name = "CTD Casts", legend = T) 
+  if (exists("ctd.missing.sf")) {
+    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
+      mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
+      mapview(ctd.sf, zcol = "leg", cex = 4, layer.name = "CTD Casts", legend = TRUE) +
+      mapview(ctd.missing.sf, color = "red", cex = 6, layer.name = "CTD Casts-Unprocessed", legend = FALSE) 
+  } else {
+    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
+      mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
+      mapview(ctd.sf, zcol = "leg", cex = 4, layer.name = "CTD Casts", legend = TRUE)  
+  }
 } else {
- # Map only vessel track
+  # Map only vessel location
   mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
     mapview(tx_sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) 
 }
