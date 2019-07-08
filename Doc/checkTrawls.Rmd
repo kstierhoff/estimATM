@@ -16,7 +16,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,
-               here,bookdown,odbc,DBI,knitr,DT,fs)
+               here,bookdown,odbc,DBI,knitr,DT,fs,sf)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -143,6 +143,33 @@ haul.all <- haul.all %>%
     TRUE ~ "summer"),
     duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
     cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Get haul starts
+haul.starts <- select(haul.all, haul, startLatDecimal, startLongDecimal)
+names(haul.starts) <- c("haul","lat","long")
+
+# Get haul ends
+haul.ends <- select(haul.all, haul, stopLatDecimal, stopLongDecimal)
+names(haul.ends) <- c("haul","lat","long")
+
+# Create data frame for plotting haul paths
+haul.paths <- arrange(bind_rows(haul.starts, haul.ends), haul)
+
+# Convert haul paths and midpoints to sf; CRS = crs.geog
+haul.paths.sf <- st_as_sf(haul.paths, coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1)) %>% 
+  left_join(select(haul.all, haul, 
+                   startLatDeg   = startLatitudeDegrees,
+                   startLatMin   = startLatitudeMinutes,
+                   startLongDeg  = startLongitudeDegrees,
+                   startLongMin  = startLongitudeMinutes,
+                   stopLatDeg    = stopLatitudeDegrees,
+                   stopLatMin    = stopLatitudeMinutes,
+                   stopLongDeg   = stopLongitudeDegrees,
+                   stopLongMin   = stopLongitudeMinutes))
 ```
 
 ```{r process-trawl-length-data}
@@ -700,6 +727,26 @@ if (nrow(lengths.sub) > 0) {
 ```
 
 # Data checks
+## Check hauls
+
+Trawl distances are examined to look for data entry errors. Trawls longer than 6 nmi are highlighted orange.
+
+```{r check-trawl-distance}
+haul.paths.sf %>% 
+  st_set_geometry(NULL) %>% 
+  arrange(desc(distance)) %>% 
+  mutate(distance = cell_spec(
+    distance, knitr.format, color = "black",
+    background = ifelse(distance <= 6, "white", "orange"))) %>% 
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+        align = c("c")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = FALSE) %>%
+  row_spec(0, align = c("c")) %>% 
+  scroll_box(height = "500px")
+```
+
+
 ## Check clusters
 
 Trawl haul information is summarized by cluster. Those clusters where the difference in equilibrium time between the first and last haul in a cluster is $\geq$ 12 h are highlighted in yellow and should be examined in the Haul table of the Trawl database.  

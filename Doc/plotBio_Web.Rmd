@@ -63,7 +63,7 @@ process.csv     <- T # Process acoustic backscatter files
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- F # Process all CSV files (F = new files only)
+process.csv.all <- T # Process all CSV files (F = new files only)
 save.imap       <- T # Save interactive map using mapshot
 
 # Do all steps
@@ -136,6 +136,7 @@ catch.pie.sizes    <- c(1,2,3,4,5,6)
 if (copy.files) {
   # Create data directories
   dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
+  dir_create(here("Backscatter", nasc.vessels))
   
   # Copy trawl Access database
   haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
@@ -151,13 +152,15 @@ if (copy.files) {
   csv.files.cps <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
                                     nasc.dir[survey.vessel.primary]), 
                           regex = nasc.pattern.cps[survey.vessel.primary])
-  file_copy(csv.files.cps, here("Data/Backscatter"), overwrite = overwrite.csv)
+  file_copy(csv.files.cps, here("Data/Backscatter", survey.vessel.primary), 
+            overwrite = overwrite.csv)
   
   # Copy CSV files for Krill
   csv.files.krill <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
                                     nasc.dir[survey.vessel.primary]), 
                           regex = nasc.pattern.krill[survey.vessel.primary])
-  file_copy(csv.files.krill, here("Data/Backscatter"), overwrite = overwrite.csv)
+  file_copy(csv.files.krill, here("Data/Backscatter", survey.vessel.primary), 
+            overwrite = overwrite.csv)
 }
 ```
 
@@ -605,7 +608,7 @@ if (process.csv) {
   }
   
   # List local CSV files
-  csv.files.cps <- dir_ls(here("Data/Backscatter"), 
+  csv.files.cps <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
                           regex = nasc.pattern.cps[survey.vessel.primary])
   
   if (process.csv.all) {
@@ -698,7 +701,7 @@ if (process.csv) {
   }
   
   # List local CSV files
-  csv.files.krill <- dir_ls(here("Data/Backscatter"), 
+  csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
                           regex = nasc.pattern.krill[survey.vessel.primary])
   
   if (process.csv.all) {
@@ -957,8 +960,9 @@ haul.paths.sf <- st_as_sf(haul.paths, coords = c("long","lat"), crs = crs.geog) 
   st_cast("LINESTRING") %>% 
   left_join(select(haul.catch, -X, -Y, -cluster)) %>% 
   mutate(
-    label = paste("Haul", haul),
-    popup = paste('<b>Haul:', haul, '</b><br/>',
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Haul", haul),
+    popup    = paste('<b>Haul:', haul, '</b><br/>',
                        'Anchovy:', Anchovy, 'kg<br/>',
                        'Jack Mackerel:', JackMack, 'kg<br/>',
                        'P. herring:', PacHerring, 'kg<br/>',
