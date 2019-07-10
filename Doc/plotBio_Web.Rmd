@@ -383,20 +383,9 @@ haul <- haul %>%
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
          cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
 
-# Get haul starts
-haul.starts <- select(haul, haul, startLatDecimal, startLongDecimal)
-names(haul.starts) <- c("haul","lat","long")
-
-# Get haul ends
-haul.ends <- select(haul, haul, stopLatDecimal, stopLongDecimal)
-names(haul.ends) <- c("haul","lat","long")
-
-# Create data frame for plotting haul paths
-haul.paths <- arrange(bind_rows(haul.starts, haul.ends), haul)
-
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
-  group_by(cluster,haul) %>% 
+  group_by(cluster, haul) %>% 
   summarise(
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
     long = mean(c(startLongDecimal, stopLongDecimal))) 
@@ -955,7 +944,11 @@ nasc.cps.sf.small <- nasc.cps %>%
   filter(NASC < 200) 
 
 # Convert haul paths and midpoints to sf; CRS = crs.geog
-haul.paths.sf <- st_as_sf(haul.paths, coords = c("long","lat"), crs = crs.geog) %>% 
+# Create haul paths from starts and ends
+haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
@@ -1144,7 +1137,7 @@ i.map <- leaflet() %>%
                    fillOpacity = 0.75, fillColor =  "#000414", label = ~htmlEscape(label),
                    group = "Backscatter-CPS (Small)") %>%
   # Add trawl paths 
-  addPolylines(data = haul.paths.sf, color = c("#000000"), weight = 5, opacity = 0.8, 
+  addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
                popup = ~popup, label = ~label, 
                group = "Trawls") %>% 
   # Add trawl catch
