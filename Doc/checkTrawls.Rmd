@@ -144,19 +144,11 @@ haul.all <- haul.all %>%
     duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
     cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
 
-# Get haul starts
-haul.starts <- select(haul.all, haul, startLatDecimal, startLongDecimal)
-names(haul.starts) <- c("haul","lat","long")
-
-# Get haul ends
-haul.ends <- select(haul.all, haul, stopLatDecimal, stopLongDecimal)
-names(haul.ends) <- c("haul","lat","long")
-
-# Create data frame for plotting haul paths
-haul.paths <- arrange(bind_rows(haul.starts, haul.ends), haul)
-
-# Convert haul paths and midpoints to sf; CRS = crs.geog
-haul.paths.sf <- st_as_sf(haul.paths, coords = c("long","lat"), crs = crs.geog) %>% 
+# Create haul paths from starts and ends
+haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
@@ -442,7 +434,7 @@ Specimens with missing length measurements. It is expected that standard length 
 # Select only outliers that have not yet been flagged
 # Select outliers
 lengths %>% 
-  filter(missing.length == TRUE) %>% 
+  filter(missing.length == TRUE, is.na(flaggedData)) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
@@ -457,7 +449,7 @@ Self explanatory; weight is missing and estimated from total length.
 # Select only outliers that have not yet been flagged
 # Select outliers
 lengths %>% 
-  filter(missing.weight == TRUE) %>% 
+  filter(missing.weight == TRUE, is.na(flaggedData)) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
@@ -732,7 +724,7 @@ if (nrow(lengths.sub) > 0) {
 Trawl distances are examined to look for data entry errors. Trawls longer than 6 nmi are highlighted orange.
 
 ```{r check-trawl-distance}
-haul.paths.sf %>% 
+haul.paths %>% 
   st_set_geometry(NULL) %>% 
   arrange(desc(distance)) %>% 
   mutate(distance = cell_spec(
@@ -744,6 +736,12 @@ haul.paths.sf %>%
                 full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>% 
   scroll_box(height = "500px")
+```
+
+## Map hauls
+
+```{r map-hauls}
+mapview(haul.paths, zcol = "distance")
 ```
 
 
