@@ -538,9 +538,10 @@ cufes <- cufes.raw %>%
   # Convert cufes to long format for plotting
   select(
     SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, Duration, 
-    SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs) %>%
+    SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+    Comments) %>%
   gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
-         -StartLatitude, -StartLongitude, -Duration) %>% 
+         -StartLatitude, -StartLongitude, -Duration, -Comments) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
          bin = cut(Density, cufes.breaks, include.lowest = T),
@@ -572,7 +573,7 @@ cufes <- cufes %>%
   mutate(bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin))
 
-# Project cufes data
+# Project CUFES data from CPS
 cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
   st_transform(crs = crs.proj) %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
@@ -580,12 +581,23 @@ cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs 
 
 cufes.plot <- project_sf(cufes.plot, crs.proj)
 
+# Project CUFES data from squid
 cufes.plot.squid <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
   st_transform(crs = crs.proj) %>% 
   filter(Density > 0, Species == "SquidEggs") %>% 
   arrange(desc(Density))
 
 cufes.plot.squid <- project_sf(cufes.plot.squid, crs.proj)
+
+# Project CUFES data from other fish eggs (mostly P. mackerel)
+cufes.plot.ofe <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_transform(crs = crs.proj) %>% 
+  filter(Density > 0, Species == "OtherFishEggs") %>%
+  filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
+                                "S. japonicus"))) %>% 
+  arrange(desc(Density))
+
+cufes.plot.ofe <- project_sf(cufes.plot.ofe, crs.proj)
 
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
@@ -1017,6 +1029,21 @@ cufes.squid.sf <- cufes %>%
     popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
+cufes.ofe.sf <- cufes %>% 
+  rename(lat = StartLatitude,
+         long = StartLongitude) %>% 
+  filter(Density > 0, Species == "OtherFishEggs") %>%
+  filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
+                                "S. japonicus"))) %>%
+  mutate(
+    spp.label = case_when(
+      Species == "OtherFishEggs" ~ "Other fish",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup><br/>", 
+                  '</b>Comment:</b>', Comments)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
 # Convert negative CUFES samples to sf; CRS - crs.geog
 cufes.neg.sf <- cufes.neg %>% 
   mutate(bin.level = 1)
@@ -1126,6 +1153,10 @@ i.map <- leaflet() %>%
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
                    popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
+  addCircleMarkers(data = cufes.ofe.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Other") %>% 
   addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
                    fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                    group = "CUFES (Negative)") %>%
@@ -1193,8 +1224,8 @@ i.map <- leaflet() %>%
                       "Vessel Track", "Vessel Positions", "Trawls",
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
                       "Backscatter-Krill", "Backscatter (Large)",
-                      "CUFES Egg Density", "CUFES (Negative)",
-                      "CUFES Egg Density-Squid"),
+                      "CUFES Egg Density", "CUFES Egg Density-Other",
+                      "CUFES Egg Density-Squid", "CUFES (Negative)"),
     options = layersControlOptions(collapsed = F)) %>%  
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)", 
               "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
