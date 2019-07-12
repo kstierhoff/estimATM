@@ -741,7 +741,20 @@ haul.paths %>%
 ## Map hauls
 
 ```{r map-hauls}
-mapview(haul.paths, zcol = "distance")
+if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+  # Load existing navigation data
+  load(here("Data/Nav/nav_data.Rdata"))
+  
+  nav.sf <- nav.sf %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Map haul paths with vessel nav
+  mapview(nav.sf, color = "#747C8A", alpha = 0.5, layer.name = "Vessel Track", legend = FALSE) +
+    mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)
+} else {
+  mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)  
+}
 ```
 
 
@@ -852,36 +865,38 @@ catch.comp.errors <- catch.comp %>%
 if (nrow(catch.comp.errors) > 0) {
   write.csv(catch.comp.errors, file = here("Output/catch_comparison_errors.csv"),
             quote = FALSE, row.names = FALSE)
+  
+  # Display results
+  catch.comp %>% 
+    filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
+    filter(binnedLengths == 0) %>% 
+    mutate(
+      totalWtSpecimens = cell_spec(round(totalWtSpecimens,digits = 4),
+                                   knitr.format, color = "black",
+                                   background = ifelse(is.na(totalWtSpecimens),"red","white")),
+      totalCtSpecimens = cell_spec(round(totalCtSpecimens,digits = 4),
+                                   knitr.format,color = "black",
+                                   background = ifelse(is.na(totalCtSpecimens),"red","white")),
+      diffWt           = cell_spec(round(diffWt,digits = 4),
+                                   knitr.format,color = "black",
+                                   background = ifelse(diffWt == 0,"white","orange")),
+      diffCt           = cell_spec(diffCt,knitr.format,color = "black",
+                                   background = ifelse(diffCt == 0,"white","yellow")),
+      binnedLengths    = cell_spec(binnedLengths,knitr.format,color = "black",
+                                   background = ifelse(binnedLengths == 0,"white","green"))) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          align = c("c","l",rep("r",ncol(catch.comp) - 2)),
+          digits = c(0,0,3,3,4,0,0,0,0),
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
+    column_spec(1, italic = TRUE) %>%
+    # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
+    # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
+    row_spec(0, align = c("c")) %>%
+    collapse_rows(columns = 1) %>% 
+    scroll_box(height = "250px") 
+} else {
+  print("Hooray, no (obvious) errors!")
 }
-
-# Display results
-catch.comp %>% 
-  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
-  filter(binnedLengths == 0) %>% 
-  mutate(
-    totalWtSpecimens = cell_spec(round(totalWtSpecimens,digits = 4),
-                                 knitr.format, color = "black",
-                                 background = ifelse(is.na(totalWtSpecimens),"red","white")),
-    totalCtSpecimens = cell_spec(round(totalCtSpecimens,digits = 4),
-                                 knitr.format,color = "black",
-                                 background = ifelse(is.na(totalCtSpecimens),"red","white")),
-    diffWt           = cell_spec(round(diffWt,digits = 4),
-                                 knitr.format,color = "black",
-                                 background = ifelse(diffWt == 0,"white","orange")),
-    diffCt           = cell_spec(diffCt,knitr.format,color = "black",
-                                 background = ifelse(diffCt == 0,"white","yellow")),
-    binnedLengths    = cell_spec(binnedLengths,knitr.format,color = "black",
-                                 background = ifelse(binnedLengths == 0,"white","green"))) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-        digits = c(0,0,3,3,4,0,0,0,0),
-        format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
-  column_spec(1, italic = TRUE) %>%
-  # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-  # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
-  row_spec(0, align = c("c")) %>%
-  collapse_rows(columns = 1) %>% 
-  scroll_box(height = "250px") 
 ```
 
