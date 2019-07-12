@@ -15,8 +15,8 @@ css: css/ast.css
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,
-               here,bookdown,odbc,DBI,knitr,DT,fs,sf)
+pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,leaflet,
+               here,bookdown,odbc,DBI,knitr,DT,fs,sf,atm,reshape2)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -86,7 +86,6 @@ spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
 dbDisconnect(trawl.con)
 ```
 
-
 ```{r modify-data}
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
@@ -144,6 +143,115 @@ haul.all <- haul.all %>%
     duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
     cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
 
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul.all %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+```
+
+```{r process-catch-data, message=FALSE}
+# Filter catch data
+catch <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           scientificName %in% cps.spp & netSampleType == 'codend') %>% 
+  left_join(select(haul.all, haul, cluster)) %>% 
+  mutate(key = paste(haul, scientificName),
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg)
+
+if (nrow(catch) > 0) {
+  # Summarize trawl catch by species
+  haul.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
+                         haul + cluster ~ scientificName, sum)
+  
+  # Add species with zero total weight
+  if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (is.null(haul.summ.wt$`Scomber japonicus`))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  
+  # Calculate total weight of all CPS species
+  haul.summ.wt <- haul.summ.wt %>% 
+    mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
+  
+  # Summarise catch by cluster
+  cluster.summ.wt <- haul.summ.wt %>% 
+    select(-haul, -AllCPS) %>% 
+    group_by(cluster) %>% 
+    summarise_all(list(sum)) %>% 
+    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+    right_join(cluster.mid) %>% 
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") %>% 
+    replace(is.na(.), 0)
+  
+  # Add lat/long to haul summary for plotting
+  haul.summ.wt <- haul.summ.wt %>% 
+    right_join(haul.mid) %>% 
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") %>% 
+    replace(is.na(.), 0)
+  
+} else {
+  # Summarize trawl catch by species
+  haul.summ.wt <- bind_cols(select(haul, haul, cluster),
+                             data.frame(
+                               "Jacksmelt"  = rep(0, nrow(haul)),
+                               "PacHerring" = rep(0, nrow(haul)),
+                               "Anchovy"    = rep(0, nrow(haul)),
+                               "Sardine"    = rep(0, nrow(haul)),
+                               "PacMack"    = rep(0, nrow(haul)),
+                               "JackMack"   = rep(0, nrow(haul)),
+                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
+    right_join(haul.mid)
+                             
+  # Summarise catch by cluster
+  cluster.summ.wt <- haul.summ.wt %>% 
+    select(-haul, -AllCPS) %>% 
+    group_by(cluster) %>% 
+    summarise_all(funs(sum)) %>% 
+    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+    right_join(cluster.mid) 
+}
+
+# Prepare catch data for plotting ----------------------------------------------
+# Select and rename trawl data for pie charts
+catch.pie <- cluster.summ.wt %>% 
+  select(cluster, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
+# Project pie data
+catch.pie <- project_sf(catch.pie, crs.proj) 
+
+# Convert haul data for plotting
+haul.catch <- haul.summ.wt %>% 
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) 
+
+haul.catch <- project_sf(haul.catch, crs = crs.proj)
+```
+
+
+```{r summarise-hauls}
 # Create haul paths from starts and ends
 haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
   bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
@@ -152,7 +260,17 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
-  mutate(distance = round(as.numeric(st_length(.))/1852,1)) %>% 
+  left_join(select(haul.catch, -X, -Y, -cluster)) %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Haul", haul),
+    popup    = paste('<b>Haul:', haul, '</b><br/>',
+                       'Anchovy:', Anchovy, 'kg<br/>',
+                       'Jack Mackerel:', JackMack, 'kg<br/>',
+                       'P. herring:', PacHerring, 'kg<br/>',
+                       'P. mackerel:', PacMack, 'kg<br/>',
+                       'Sardine:', Sardine, 'kg<br/>',
+                       'All CPS:', AllCPS, 'kg')) %>% 
   left_join(select(haul.all, haul, 
                    startLatDeg   = startLatitudeDegrees,
                    startLatMin   = startLatitudeMinutes,
@@ -162,6 +280,28 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
                    stopLatMin    = stopLatitudeMinutes,
                    stopLongDeg   = stopLongitudeDegrees,
                    stopLongMin   = stopLongitudeMinutes))
+
+haul.locs.sf <- haul.mid %>% 
+  mutate(label = paste("Haul", haul)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+cluster.locs.sf <- cluster.mid %>% 
+  mutate(label = paste("Cluster", cluster)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+# Convert haul catch to sf and create labels
+cluster.catch.sf <- catch.pie %>%
+  st_as_sf(coords = c("X","Y"), crs = crs.proj) %>%
+  st_transform(crs = crs.geog) %>% 
+  mutate(
+    label = paste("Cluster", cluster),
+    popup = paste('<b>Cluster:', cluster, '</b><br/>',
+                       'Anchovy:', Anchovy, 'kg<br/>',
+                       'Jack Mackerel:', JackMack, 'kg<br/>',
+                       'P. herring:', PacHerring, 'kg<br/>',
+                       'P. mackerel:', PacMack, 'kg<br/>',
+                       'Sardine:', Sardine, 'kg<br/>',
+                       'All CPS:', AllCPS, 'kg'))
 ```
 
 ```{r process-trawl-length-data}
@@ -745,15 +885,44 @@ if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
   # Load existing navigation data
   load(here("Data/Nav/nav_data.Rdata"))
   
-  nav.sf <- nav.sf %>% 
-    summarise(do_union = F) %>% 
-    st_cast("LINESTRING")
+  # nav.sf <- nav.sf %>% 
+  #   summarise(do_union = F) %>% 
+  #   st_cast("LINESTRING")
+  # 
+  # # Map haul paths with vessel nav
+  # mapview(nav.sf, color = "#747C8A", alpha = 0.5, layer.name = "Vessel Track", legend = FALSE) +
+  #   mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)
   
-  # Map haul paths with vessel nav
-  mapview(nav.sf, color = "#747C8A", alpha = 0.5, layer.name = "Vessel Track", legend = FALSE) +
-    mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)
+  
+  leaflet() %>% 
+    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    addProviderTiles(providers$Esri.OceanBasemap) %>%
+    # Add nav data
+    addPolylines(data = nav.legs, color = "#000414", weight = 1, 
+                 label = ~leg, group = "Vessel Track") %>%
+    # Add trawl paths 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~popup, label = ~label, 
+                 group = "Trawls") %>% 
+    # Add trawl catch
+    addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     popup = ~popup, label = ~label,
+                     group =  "Trawls")
 } else {
-  mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)  
+  # mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)  
+  leaflet() %>% 
+    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    addProviderTiles(providers$Esri.OceanBasemap) %>%
+    # Add trawl paths 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~popup, label = ~label, 
+                 group = "Trawls") %>% 
+    # Add trawl catch
+    addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     popup = ~popup, label = ~label,
+                     group =  "Trawls")
 }
 ```
 
