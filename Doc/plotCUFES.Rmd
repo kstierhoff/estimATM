@@ -375,7 +375,8 @@ cufes.sf <- cufes %>%
       Species == "JackMackerelEggs"~ "Jack mackerel",
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1), "eggs m<sup>3</sup><br/>",
+                  Counts, "eggs in", round(Duration), "mins")) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   arrange(desc(Density))
 
@@ -466,10 +467,18 @@ i.map <- leaflet() %>%
   addPolylines(data = nav_sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
   # Add CUFES data
-  addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
+  addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                   popup = ~popup, group = "CUFES Egg Density") %>%
+                   popup = ~popup, group = "CUFES Egg Density-Anchovy") %>%
+  addCircleMarkers(data = filter(cufes.sf, Species == "JackMackerelEggs"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Jack Mackerel") %>%
+  addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Sardine") %>%
   addCircleMarkers(data = cufes.squid.sf,
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
@@ -500,7 +509,8 @@ i.map <- leaflet() %>%
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
                       "Planned Transects (Core)", "Vessel Track", 
-                      "CUFES Egg Density", "CUFES Egg Density-Other",
+                      "CUFES Egg Density-Sardine", "CUFES Egg Density-Anchovy",
+                      "CUFES Egg Density-Jack Mackerel", "CUFES Egg Density-Other",
                       "CUFES Egg Density-Squid", "CUFES (Negative)"),
     options = layersControlOptions(collapsed = F)) %>%  
   hideGroup(c("CUFES (Negative)", "CUFES Egg Density-Squid", 
