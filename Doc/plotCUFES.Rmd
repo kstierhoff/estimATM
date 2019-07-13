@@ -1,0 +1,558 @@
+---
+output:
+  bookdown::html_document2:
+    toc: no
+    toc_float: no
+    number_sections: no
+css: css/ast.css
+---
+
+```{r setup,echo=F,message=F,warning=F,error=F,include=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,vroom,
+               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
+               shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
+               leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra,
+               lwgeom)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+if (is.null(doc.type)) {
+  doc.type <- "html"
+}
+
+# global knitr chunk options
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE, 
+  fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
+)
+```
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r processing-controls}
+# Control script behavior (usually T)
+save.figs       <- F # Resave figures
+get.nav         <- F # Download nav data from ERDDAP
+copy.files      <- T # Copy data files from data to plotBio directory
+overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
+resize.map      <- F # Scale map to fit survey data
+```
+
+```{r plot-settings}
+# Define plotting parameters -------------------------
+# Set species colors
+sardine.color      <- '#FF0000'
+anchovy.color      <- '#00CD66'
+jack.mack.color    <- '#0000FF'
+jacksmelt.color    <- '#A020F0'
+pac.mack.color     <- '#00FFFF'
+pac.herring.color  <- '#F5DEB3'
+cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+                       "Scomber japonicus","Trachurus symmetricus")
+# CUFES
+# For legend objects
+cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
+cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
+                        "50-250", "250-500", ">500")
+cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6, 7)
+cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
+cufes.colors       <- c("AnchovyEggs"      = anchovy.color, 
+                        "JackMackerelEggs" = jack.mack.color, 
+                        "SardineEggs"      = sardine.color)
+cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
+                        "JackMackerelEggs" = "J. mackerel",
+                        "SardineEggs"      = "Sardine")
+```
+
+```{r copy-files, include=F}
+if (copy.files) {
+  # Create data directories
+  dir_create(here("Data/CUFES"))
+  
+  # Copy CUFES files
+  cufes.file <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
+                           regex = cufes.db.sqlite)
+  file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
+}
+```
+
+```{r process-nav}
+if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time))
+  }
+  
+  # Generate ERDDAP URL
+  dataURL <- URLencode(paste(
+    "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+    erddap.vessel, ".csv0?", erddap.vars,
+    "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+    sep = ""))
+  
+  # Download and parse ERDDAP nav data
+  nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                             row.names = NULL, skip = 0))
+  names(nav.temp) <- erddap.headers
+  
+  # Filter to remove bad SST values
+  nav.temp <- nav.temp %>% 
+    mutate(long     = long - 360,
+           SOG      = SOG * 1.94384,
+           datetime = ymd_hms(time),
+           SST      = na_if(SST, NaN),
+           leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                  leg.breaks, labels = F))) %>%
+    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+           between(lat, min(survey.lat), max(survey.lat)), 
+           between(long, min(survey.long), max(survey.long)))
+  
+  # Append new nav data
+  if (exists("nav")) {
+    nav <- bind_rows(nav, nav.temp) %>% 
+      distinct()
+  } else {
+    nav <- nav.temp
+  }
+  
+  # Convert nav to spatial
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  # Cast nav to transects
+  nav.legs <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
+} else {
+  # Load nav data
+  load(here("Data/NAV/nav_data.Rdata"))
+}
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
+# Get most recent vessel position for plotting
+nav.now <- tail(nav.sf, 1) %>% 
+  mutate(label = paste("Last position:", datetime, "GMT"))
+```
+
+```{r process-cufes}
+# Read CUFES data
+cufes.filename <- list.files(here("Data/CUFES"), pattern = "*.sqlite")
+cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
+cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
+  collect() %>% 
+  mutate(
+    Start = case_when(
+      cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+      cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+    Stop = case_when(
+      cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+      cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
+    Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+    Year = year(Start),
+    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs)
+
+# Close connection
+dbDisconnect(cufes.con)
+
+# save raw cufes table to CSV
+write.csv(cufes.raw, file = here("Output/cufes_raw.csv"), 
+          quote = F, row.names = F)
+
+# Process CUFES data
+cufes <- cufes.raw %>% 
+  # Convert cufes to long format for plotting
+  select(
+    SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, Duration, 
+    SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+    Comments) %>%
+  gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
+         -StartLatitude, -StartLongitude, -Duration, -Comments) %>% 
+  mutate(Density = Counts/Duration/0.64,
+         # Create bins for defining point size in NASC plots
+         bin = cut(Density, cufes.breaks, include.lowest = T),
+         bin.level = as.numeric(bin)) %>% 
+  left_join(select(cufes.raw, SampleNumber, Start, Stop))
+
+# Save processed cufes to CSV
+write.csv(cufes, file = here("Output/cufes_proc.csv"), 
+          quote = F, row.names = F)
+
+# Prepare CUFES data for plotting ----------------------------------------------
+# Select CUFES sample with zero density for plotting
+cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
+  mutate(bin.level = 1)
+
+# Identify bad CUFES samples
+cufes.bad <- filter(cufes.raw, Duration <= 0)
+save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
+
+# Remove bad samples from CUFES
+cufes <- cufes %>% 
+  filter(!SampleNumber %in% cufes.bad$SampleNumber)
+
+# Write CUFES data from current survey to CSV
+write.csv(cufes, file = here("Output/cufes_data.csv"), quote = F)
+
+# Create bins for defining point size in NASC plots
+cufes <- cufes %>% 
+  mutate(bin = cut(Density, cufes.breaks, include.lowest = T),
+         bin.level = as.numeric(bin))
+
+# Project CUFES data from CPS
+cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_transform(crs = crs.proj) %>% 
+  filter(Density > 0, Species %in% cufes.plot.spp) %>%
+  arrange(desc(Density))
+
+cufes.plot <- project_sf(cufes.plot, crs.proj)
+
+# Project CUFES data from squid
+cufes.plot.squid <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_transform(crs = crs.proj) %>% 
+  filter(Density > 0, Species == "SquidEggs") %>% 
+  arrange(desc(Density))
+
+cufes.plot.squid <- project_sf(cufes.plot.squid, crs.proj)
+
+# Project CUFES data from other fish eggs (mostly P. mackerel)
+cufes.plot.ofe <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_transform(crs = crs.proj) %>% 
+  filter(Density > 0, Species == "OtherFishEggs") %>%
+  filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
+                                "S. japonicus"))) %>% 
+  arrange(desc(Density))
+
+cufes.plot.ofe <- project_sf(cufes.plot.ofe, crs.proj)
+
+# Select CUFES sample with zero density for plotting
+cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
+  st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  select(SampleNumber)
+```  
+
+```{r create-basemap,include=F}
+# Configure base map options -----------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
+  st_as_sf(coords = c("lon","lat"), crs = crs.geog) 
+
+# Project sf
+locations <- project_sf(locations, crs.proj)
+
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(leg) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav_sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- transects.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.height <- 10
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+
+# Save the basemap
+ggsave(base.map,file = here("Figs/fig_base_map.png"), 
+       height = map.height, width = map.width)
+
+save(base.map, file = here("Data/Map/basemap.Rdata"))
+```
+
+```{r create-static-maps}
+if (save.figs) {
+  # Create CUFES egg density maps
+  source(here("Code/plot_cufes.R"))
+}
+```
+
+```{r get-spatial-files,include=F}
+# Import shapefiles ------------------------------------------------
+# Read CA State Waters shapefile
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
+  st_transform(crs.geog)
+
+or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>% 
+  st_transform(crs.geog)
+
+# Read CA MPAs shapefile
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = paste(NAME, Type))
+
+or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>% 
+  st_transform(crs.geog) 
+
+# Read CA MPAs shapefile
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(crs.geog)
+eez_can <- st_read(here("Data/GIS/eez_canada.shp")) %>% 
+  st_transform(crs.geog)
+eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
+  st_transform(crs.geog)
+
+# Convert CUFES to sf; CRS - crs.geog
+cufes.sf <- cufes %>% 
+  rename(lat = StartLatitude,
+         long = StartLongitude) %>% 
+  filter(Density > 0, Species %in% cufes.plot.spp) %>%
+  mutate(
+    spp.label = case_when(
+      Species == "SardineEggs" ~ "Sardine",
+      Species == "AnchovyEggs" ~ "Anchovy",
+      Species == "JackMackerelEggs"~ "Jack mackerel",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  arrange(desc(Density))
+
+cufes.squid.sf <- cufes %>% 
+  rename(lat = StartLatitude,
+         long = StartLongitude) %>% 
+  filter(Density > 0, Species == "SquidEggs") %>%
+  mutate(
+    spp.label = case_when(
+      Species == "SquidEggs" ~ "Squid",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
+cufes.ofe.sf <- cufes %>% 
+  rename(lat = StartLatitude,
+         long = StartLongitude) %>% 
+  filter(Density > 0, Species == "OtherFishEggs") %>%
+  filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
+                                "S. japonicus"))) %>%
+  mutate(
+    spp.label = case_when(
+      Species == "OtherFishEggs" ~ "Other fish",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup><br/>", 
+                  '</b>Comment:</b>', Comments)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
+# Convert negative CUFES samples to sf; CRS - crs.geog
+cufes.neg.sf <- cufes.neg %>% 
+  mutate(bin.level = 1)
+```
+
+```{r create-leaflet-map, out.width="100%", out.height="8in"}
+# Leaflet options
+# https://rstudio.github.io/leaflet/
+
+# Info on tile caching
+# https://bhaskarvk.github.io/leaflet.extras/reference/TileCaching.html
+
+# Set padding around data  
+imap.bounds <- map_bounds(nav$lat, nav$long, 0.1) 
+
+# Create color palette for MPAs
+all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
+                   unique(as.character(or_mpas$Label))))
+
+mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
+
+# Create color pallette for CUFES
+cufesPal <- colorFactor(cufes.colors, cufes.plot.spp)
+# Create color palette for seep types
+seepPal <- colorFactor(c("red","blue"), c("Seep","Uncertain"))
+# Create color pallette for planned transects
+txPal    <- colorFactor(wpt.colors, wpt.types)
+trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
+              '#F5DEB3', '#00FFFF', '#FF0000')
+
+# Plotting preferences -------------------------------------------------------
+# Leaflet tile options; set both to T if caching
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
+
+# Create leaflet map
+i.map <- leaflet() %>% 
+  # Enable tile caching
+  enableTileCaching() %>% 
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.OceanBasemap, 
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  # Add EEZs
+  addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+               label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
+  addPolylines(data = eez_can, color = "#000414", weight = 3, 
+               label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
+  addPolylines(data = eez_mex, color = "#000414", weight = 3, 
+               label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
+  # Add bathymetry contours
+  addPolylines(data = bathy, color = "white", weight = 2, 
+               label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
+  # Add State waters
+  addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
+              label = ~htmlEscape("OR State Waters"),
+              group = "State Waters") %>%
+  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent", 
+              label = ~htmlEscape("CA State Waters"),
+              group = "State Waters") %>%
+  # Add CA MPAs
+  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+              fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+  # Add OR MPAs
+  addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+              fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+  # Add core planned transects
+  addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, 
+               label = ~htmlEscape(paste(Type, Transect)), 
+               group = "Planned Transects (Core)") %>%
+  addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F,
+                   fillOpacity = 0.75, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   group = "Planned Transects (Core)") %>%
+  # Add ancillary planned transects 
+  addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, 
+               label = ~htmlEscape(paste(Type, Transect)), 
+               group = "Planned Transects (Ancillary)") %>%
+  addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F,
+                   fillOpacity = 0.75, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   group = "Planned Transects (Ancillary)") %>%
+  # Add nav data
+  addPolylines(data = nav_sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") %>%
+  # addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3, 
+  #              label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>%
+  # Add CUFES data
+   addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density") %>%
+  addCircleMarkers(data = cufes.squid.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
+  addCircleMarkers(data = cufes.ofe.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Other") %>% 
+  addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                   fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                   group = "CUFES (Negative)") %>%
+  # Add legends
+  addLegend("bottomleft", colors = cufes.colors, 
+            values = ~sort(unique(cufes.sf$Species)), 
+            labels = cufes.spp.labels, 
+            title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)", 
+            opacity = 1, group = "CUFES Egg Density") %>% 
+  # Add scale bar
+  addScaleBar(position = "bottomright") %>%
+  # Add map coordinates
+  addMouseCoordinates() %>% 
+  # Add measurement tool
+  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+             position = "topleft") %>% 
+  # Add layer controls
+  addLayersControl(
+    overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+                      "Bathymetry Contours",
+                      "Planned Transects (Core)", "Planned Transects (Ancillary)",
+                      "Vessel Track", "Vessel Positions", 
+                      "CUFES Egg Density", "CUFES Egg Density-Other",
+                      "CUFES Egg Density-Squid", "CUFES (Negative)"),
+    options = layersControlOptions(collapsed = F)) %>%  
+  hideGroup(c("CUFES (Negative)", "CUFES Egg Density-Squid", 
+              "Vessel Positions", "Planned Transects (Ancillary)")) %>% 
+  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+```
+
+### Continuous Underway Fish Egg Sampler (CUFES) egg density for the `r survey.name` 
+
+#### SWFSC Advanced Survey Technologies Group  
+
+_**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`
+
+An interactive map of the CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel. Other fish eggs (cyan points) are plotted that have Pacific mackerel eggs. Hover-over or click on some map objects for more info.  
+
+```{r plot-leaflet-map, echo=F, out.height="8in", out.width="100%"}
+# Display map
+i.map
+```  
+
+For questions about this page, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
