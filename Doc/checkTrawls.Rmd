@@ -352,7 +352,7 @@ lengths.expanded.all <- lengthFreq.all %>%
 lengths.all <- lengths.all  %>% 
   # Add scientific and common names
   left_join(select(spp.codes, species, scientificName, commonName)) %>%
-  # Filter for CPS species
+  # Filter for CPS species and market squid
   filter(scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens")) %>% 
   # Select desired columns
   select(cruise, ship, haul, collection, species, individual_ID, 
@@ -390,7 +390,8 @@ lengths.all  <- lengths.all %>%
       is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
       is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
       TRUE ~ F)) %>% 
-  mutate(totalLength_mm = round(totalLength_mm))
+  mutate(totalLength_mm = round(totalLength_mm),
+         mantleLength_mm = round(mantleLength_mm))
 
 # Get max TL for plotting L/W models
 L.max <- lengths.all %>% 
@@ -437,7 +438,9 @@ lengths.all <- lengths.all %>%
     totalLength_mm = case_when(
       is.na(totalLength_mm) ~ round((weightg/a)^(1/b)),
       TRUE ~ totalLength_mm),
-    K = round((weightg/totalLength_mm*10^3)*100))
+    K = case_when(
+      !scientificName == "Doryteuthis (Loligo) opalescens" ~ round((weightg/totalLength_mm*10^3)*100),
+      TRUE ~ round((weightg/mantleLength_mm*10^3)*100)))
 
 # Filter samples with missing length AND weight measurements
 bad.lengths <-  lengths.all %>% 
@@ -553,7 +556,7 @@ View the distribution of Fulton's Condition Factor ($K = (w/TL^3)*100$) for each
 ```{r, fig.pos="hold"}
 # Plot lengths and bounds of outliers
 lengths %>% 
-  filter(!scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  # filter(!scientificName == "Doryteuthis (Loligo) opalescens") %>% 
   ggplot(aes(K)) + geom_histogram() +
   geom_vline(data = K.summ, aes(xintercept =  K.lower), linetype = "dashed") +
   geom_vline(data = K.summ, aes(xintercept =  K.upper), linetype = "dashed") +
@@ -576,7 +579,8 @@ lengths %>%
   filter(K <= K.lower | K >= K.upper) %>% 
   filter(binned == FALSE) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, weightg, 
+         sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -594,7 +598,8 @@ lengths %>%
   filter(binned == FALSE,
          is.na(flaggedData)) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm,
+         weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -610,7 +615,8 @@ Specimens with missing length measurements. It is expected that standard length 
 lengths %>% 
   filter(missing.length == TRUE, is.na(flaggedData)) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, 
+         weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -625,7 +631,8 @@ Self explanatory; weight is missing and estimated from total length.
 lengths %>% 
   filter(missing.weight == TRUE, is.na(flaggedData)) %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, 
+         weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -639,7 +646,8 @@ Self explanatory; both length and weight measurements are missing, so K may not 
 # Select outliers
 bad.lengths %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, 
+         weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -654,7 +662,8 @@ Self explanatory; sex is not specified as either male, female, or unknown.
 lengths %>% 
   filter(sex == "missing") %>% 
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, weightg, sex, K, flaggedData) %>%
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, 
+         weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -690,7 +699,7 @@ if (nrow(lengths.sub) > 0) {
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
-                                               "unknown" = "green", "missing" = "purple")) +
+                                               "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
@@ -736,7 +745,7 @@ if (nrow(lengths.sub) > 0) {
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
-                                               "unknown" = "green", "missing" = "purple")) +
+                                               "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
@@ -782,7 +791,7 @@ if (nrow(lengths.sub) > 0) {
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
-                                               "unknown" = "green", "missing" = "purple")) +
+                                               "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
@@ -828,7 +837,7 @@ if (nrow(lengths.sub) > 0) {
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
-                                               "unknown" = "green", "missing" = "purple")) +
+                                               "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
@@ -874,7 +883,7 @@ if (nrow(lengths.sub) > 0) {
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
-                                               "unknown" = "green", "missing" = "purple")) +
+                                               "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
@@ -893,6 +902,7 @@ if (nrow(lengths.sub) > 0) {
 ```
 
 ## Market squid
+Unlike other species, the dashed line represents the results of a Loess smoother on the length and weight data from this survey, not the length-weight model from all specimens. 
 
 ```{r squid-data}
 # Select species
@@ -903,7 +913,6 @@ lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
                           season ==  survey.season)
-lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
   # Plot L/W data from past and current survey -----------------------------------
@@ -917,10 +926,11 @@ if (nrow(lengths.sub) > 0) {
                                        colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     # Plot Loess smoother around data
-    geom_smooth(data = lengths.sub, aes(mantleLength_mm, weightg), linetype = "dashed") +
+    geom_smooth(data = lengths.sub, aes(mantleLength_mm, weightg), se = FALSE, 
+                color = "black", alpha = 0.5, linetype = "dashed", size = 0.5) +
     
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
-                                               "unknown" = "green", "missing" = "purple")) +
+                                               "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
@@ -1087,7 +1097,7 @@ catch.comp %>%
     diffCt           = cell_spec(diffCt, knitr.format,color = "black",
                                  background = ifelse(diffCt == 0, "white", "yellow")),
     binnedLengths    = cell_spec(binnedLengths, knitr.format,color = "black",
-                                 background = ifelse(binnedLengths == 0, "white", "green"))) %>%
+                                 background = ifelse(binnedLengths == 0, "white", "#FFC926"))) %>%
   kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
         align = c("c","l",rep("r",ncol(catch.comp) - 2)),
         digits = c(0,0,3,3,4,0,0,0,0),
