@@ -265,12 +265,12 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
     distance = round(as.numeric(st_length(.))/1852,1),
     label    = paste("Haul", haul),
     popup    = paste('<b>Haul:', haul, '</b><br/>',
-                       'Anchovy:', Anchovy, 'kg<br/>',
-                       'Jack Mackerel:', JackMack, 'kg<br/>',
-                       'P. herring:', PacHerring, 'kg<br/>',
-                       'P. mackerel:', PacMack, 'kg<br/>',
-                       'Sardine:', Sardine, 'kg<br/>',
-                       'All CPS:', AllCPS, 'kg')) %>% 
+                     'Anchovy:', Anchovy, 'kg<br/>',
+                     'Sardine:', Sardine, 'kg<br/>',
+                     'Jack mackerel:', JackMack, 'kg<br/>',
+                     'P. herring:', PacHerring, 'kg<br/>',
+                     'P. mackerel:', PacMack, 'kg<br/>',
+                     'All CPS:', AllCPS, 'kg')) %>% 
   left_join(select(haul.all, haul, 
                    startLatDeg   = startLatitudeDegrees,
                    startLatMin   = startLatitudeMinutes,
@@ -296,12 +296,12 @@ cluster.catch.sf <- catch.pie %>%
   mutate(
     label = paste("Cluster", cluster),
     popup = paste('<b>Cluster:', cluster, '</b><br/>',
-                       'Anchovy:', Anchovy, 'kg<br/>',
-                       'Jack Mackerel:', JackMack, 'kg<br/>',
-                       'P. herring:', PacHerring, 'kg<br/>',
-                       'P. mackerel:', PacMack, 'kg<br/>',
-                       'Sardine:', Sardine, 'kg<br/>',
-                       'All CPS:', AllCPS, 'kg'))
+                  'Anchovy:', Anchovy, 'kg<br/>',
+                  'Sardine:', Sardine, 'kg<br/>',
+                  'Jack mackerel:', JackMack, 'kg<br/>',
+                  'P. herring:', PacHerring, 'kg<br/>',
+                  'P. mackerel:', PacMack, 'kg<br/>',
+                  'All CPS:', AllCPS, 'kg'))
 ```
 
 ```{r process-trawl-length-data}
@@ -334,13 +334,15 @@ lengths.expanded.all <- lengthFreq.all %>%
   if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
   if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
   if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
+  if (is.null(lengths.expanded.final$ML)) {lengths.expanded.final$ML <- NA}
   
   # Remove unwanted columns and rename length columns  
   lengths.expanded.final <- lengths.expanded.final %>% 
     # select(-lengthType, -count) %>%
     rename(forkLength_mm     = FL,
            standardLength_mm = SL,
-           totalLength_mm    = TL) %>% 
+           totalLength_mm    = TL,
+           mantleLength_mm   = ML) %>% 
     mutate(
       flaggedData = "N",
       isRandomSample = "Y",
@@ -351,11 +353,11 @@ lengths.all <- lengths.all  %>%
   # Add scientific and common names
   left_join(select(spp.codes, species, scientificName, commonName)) %>%
   # Filter for CPS species
-  filter(scientificName %in% cps.spp) %>% 
+  filter(scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens")) %>% 
   # Select desired columns
   select(cruise, ship, haul, collection, species, individual_ID, 
          scientificName, commonName, specimenNumber, 
-         standardLength_mm, forkLength_mm, totalLength_mm, 
+         standardLength_mm, forkLength_mm, totalLength_mm, mantleLength_mm,
          sex, weightg, isRandomSample, flaggedData) %>%
   # Convert individual IDs to numeric
   mutate(individual_ID = as.numeric(individual_ID)) %>% 
@@ -372,7 +374,7 @@ lengths.all <- lengths.all  %>%
                        ", Specimen: ", specimenNumber), sep = "") %>% 
   # Add season from haul
   left_join(select(haul.all, cruise, ship, haul, season)) %>% 
-  filter(scientificName %in% cps.spp)
+  filter(scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens"))
 
 # Convert lengths to totalLength_mm for TS estimates ---------------------------
 lengths.all  <- lengths.all %>%
@@ -384,13 +386,22 @@ lengths.all  <- lengths.all %>%
       scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
       scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm),
     missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ F),
-    missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ F)) %>% 
+    missing.length = case_when(
+      is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
+      is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
+      TRUE ~ F)) %>% 
   mutate(totalLength_mm = round(totalLength_mm))
 
 # Get max TL for plotting L/W models
 L.max <- lengths.all %>% 
+  filter(scientificName %in% cps.spp) %>% 
   group_by(scientificName) %>% 
   summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
+
+L.max.sq <- lengths.all %>% 
+  filter(scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  group_by(scientificName) %>% 
+  summarise(max.ML = max(mantleLength_mm, na.rm = TRUE))
 
 # Real length/weigth relationship models for each species
 lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
@@ -432,18 +443,20 @@ lengths.all <- lengths.all %>%
 bad.lengths <-  lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
+           scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens") & 
+           toupper(isRandomSample) == "Y") %>% 
   filter(is.na(totalLength_mm), is.na(weightg))
 
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
-  filter(!is.na(K))
+           scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens") & 
+           toupper(isRandomSample) == "Y") #%>%   filter(!is.na(K))
 
 # Summarize Fulton's condition factor (K) for identifying outliers
 K.summ <- lengths %>%
+  filter(!is.na(K)) %>% 
   group_by(scientificName) %>%
   summarise(
     K.lower = quantile(K, probs = 0.001),
@@ -452,7 +465,8 @@ K.summ <- lengths %>%
 # Filter binned lengths for the present survey
 lengths.binned <- lengths.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & binned == TRUE) 
+           scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens") & 
+           binned == TRUE) 
 
 # If binned lengths are present, plot their distribution
 if (nrow(lengths.binned) > 0) {
@@ -496,9 +510,12 @@ The data below was collected during the **`r survey.name.long` (`r survey.name`)
 
 View the length (cm; total length, standard length, and fork length, as appropriate) and weight (g) range for each species.
 
+## CPS
+
 ```{r length-summary}
 # Summarise lengths by species
 lengths %>% 
+  filter(!scientificName == "Doryteuthis (Loligo) opalescens") %>% 
   group_by(scientificName) %>% 
   summarise(
     TL.min = round(min(totalLength_mm, na.rm = TRUE)/10,0),
@@ -512,6 +529,21 @@ lengths %>%
   datatable(rownames = FALSE)
 ```
 
+## Market squid
+
+```{r length-summary-squid}
+# Summarise lengths by species
+lengths %>% 
+  filter(scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  group_by(scientificName) %>% 
+  summarise(
+    ML.min = round(min(mantleLength_mm, na.rm = TRUE)/10,0),
+    ML.max = round(max(mantleLength_mm, na.rm = TRUE)/10,0),
+    w.min  = round(min(weightg, na.rm = TRUE),1),
+    w.max  = round(max(weightg, na.rm = TRUE),1)) %>% 
+  datatable(rownames = FALSE)
+```
+
 # Outliers
 
 ## Outlier plot  
@@ -520,7 +552,9 @@ View the distribution of Fulton's Condition Factor ($K = (w/TL^3)*100$) for each
 
 ```{r, fig.pos="hold"}
 # Plot lengths and bounds of outliers
-ggplot(lengths, aes(K)) + geom_histogram() +
+lengths %>% 
+  filter(!scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  ggplot(aes(K)) + geom_histogram() +
   geom_vline(data = K.summ, aes(xintercept =  K.lower), linetype = "dashed") +
   geom_vline(data = K.summ, aes(xintercept =  K.upper), linetype = "dashed") +
   facet_wrap(~scientificName, scales = "free") +
@@ -851,6 +885,52 @@ if (nrow(lengths.sub) > 0) {
                shape = 21, fill = 'blue', size = 2.5, colour = NA) +
     # Format plot
     xlab("Total length (mm)") + ylab("Mass (g)") 
+  
+  ggplotly(lw.plot, dynamicTicks = TRUE) 
+} else {
+  print("No specimens present.")
+}
+```
+
+## Market squid
+
+```{r squid-data}
+# Select species
+scientificName.sub <- "Doryteuthis (Loligo) opalescens"
+
+# Subset lengths and models
+lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
+lengths.all.sub <- filter(lengths.all, 
+                          scientificName == scientificName.sub,
+                          season ==  survey.season)
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+if (nrow(lengths.sub) > 0) {
+  # Plot L/W data from past and current survey -----------------------------------
+  lw.plot <- ggplot() + 
+    # Plot L/W data from all years/surveys
+    geom_point(data = lengths.all.sub,
+               aes(mantleLength_mm),
+               colour = "gray70", alpha = 0.3) +
+    # Plot L/W data for current survey
+    geom_point(data = lengths.sub, aes(mantleLength_mm, weightg, fill = sex, 
+                                       colour = outlier, label = label), 
+               shape = 21, alpha = 0.9) + 
+    # Plot Loess smoother around data
+    geom_smooth(data = lengths.sub, aes(mantleLength_mm, weightg), linetype = "dashed") +
+    
+    scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
+                                               "unknown" = "green", "missing" = "purple")) +
+    scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
+    # Plot individuals with missing lengths and weights
+    geom_point(data = filter(lengths.sub, missing.length == TRUE), 
+               aes(mantleLength_mm, weightg, label = label),
+               shape = 21, fill = 'red',  size = 2.5, colour = NA) +
+    geom_point(data = filter(lengths.sub, missing.weight == TRUE), 
+               aes(mantleLength_mm, weightg, label = label),
+               shape = 21, fill = 'blue', size = 2.5, colour = NA) +
+    # Format plot
+    xlab("Mantle length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
