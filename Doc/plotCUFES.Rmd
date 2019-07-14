@@ -455,18 +455,21 @@ i.map <- leaflet() %>%
                label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
   # Add core planned transects
   addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
-               color = ~txPal(Type), weight = 3, 
+               color = ~txPal(Type), weight = 3, opacity = 0.25,
                label = ~htmlEscape(paste(Type, Transect)), 
                group = "Planned Transects (Core)") %>%
   addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
-                   radius = 3, color = "#000414", stroke = F,
-                   fillOpacity = 0.75, fillColor =  ~txPal(Type), 
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.25,
+                   fillOpacity = 0.25, fillColor =  ~txPal(Type), 
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    group = "Planned Transects (Core)") %>%
   # Add nav data
   addPolylines(data = nav_sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
   # Add CUFES data
+  addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                   fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                   group = "CUFES (Negative)") %>%
   addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
@@ -487,9 +490,6 @@ i.map <- leaflet() %>%
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
                    popup = ~popup, group = "CUFES Egg Density-Other") %>% 
-  addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
-                   fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
-                   group = "CUFES (Negative)") %>%
   # Add legends
   addLegend("bottomleft", colors = cufes.colors, 
             values = ~sort(unique(cufes.sf$Species)), 
@@ -513,8 +513,7 @@ i.map <- leaflet() %>%
                       "CUFES Egg Density-Jack Mackerel", "CUFES Egg Density-Other",
                       "CUFES Egg Density-Squid", "CUFES (Negative)"),
     options = layersControlOptions(collapsed = F)) %>%  
-  hideGroup(c("CUFES (Negative)", "CUFES Egg Density-Squid", 
-              "Vessel Positions", "Planned Transects (Ancillary)")) %>% 
+  hideGroup(c("CUFES Egg Density-Squid", "Vessel Positions", "Planned Transects (Ancillary)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 ```
