@@ -15,7 +15,7 @@ bibliography: bib/ast_bib.bib
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,
+pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,mapview,
           knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,
           maptools,png,grid,gridExtra,cowplot,flextable,fs,magick,
           stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
@@ -67,11 +67,7 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r load-libraries, echo=F, error=F, message=F, warning=F}
-# axis options for calibration plots
-cal.scales    <- "fixed" # fixed or free
-axis.limits   <- c(-8, 8) # set manual limits for plot scales; for 18 kHz, -8 to 8 encompases the entire beam pattern
-
-# processing instructions (T/F)
+# Processing instructions (T/F)
 copy.files      <- F # copy files from source
 download.maps   <- F # download habitat map
 save.figs       <- F # draw plots and maps, or use existing
@@ -88,47 +84,47 @@ calc.raw.size   <- F # computer RAW file size, or use existing
 # Define ggplot theme
 theme_set(theme_bw())
 
-# Define map options
-# Coordinate reference systems for geographic and projected data
-crs.geog <- 4326 # WGS84
-crs.proj <- 3310 # Califoria Albers Equal Area
-
-# Define plotting parameters #####
-# Set species colors
-sardine.color      <- '#FF0000'
-anchovy.color      <- '#00CD66'
-jack.mack.color    <- '#0000FF'
-jacksmelt.color    <- '#A020F0'
-pac.mack.color     <- '#00FFFF'
-pac.herring.color  <- '#F5DEB3'
-cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
-                       "Scomber japonicus","Trachurus symmetricus")
-# CUFES
-cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 500, 10000) # for legend breaks
-cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", "50-500", ">500") # for legend labels
-cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6) # for legend sizes
-cufes.colors       <- c(anchovy.color, jack.mack.color, sardine.color)
-cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
-cufes.spp.labels   <- c("Anchovy","J. mackerel","Sardine")
-# Trawl
-trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) # for legend breaks
-trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") # for legend labels
-trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) # for legend sizes
-trawl.performance  <- c("good","ok","poor") # Character vector for filtering trawl hauls based on trawl performance
-# NASC
-nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000) # for legend breaks
-nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
-                        "5000-20,000", "20,000-50,000", ">50,000") # for legend labels
-nasc.scale         <- 0.7 # Scale nasc.sizes by this percentage (smaller for larger scale)
-nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale # for legend sizes
-nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
-                        "#FF0000", "#FFC0CB", "#FFFFFF")# for legend colors
-nasc.summ.interval <- 20
-# Catch map
-scale.pies         <- F # Scale pie charts (TRUE/FALSE)
-catch.breaks       <- c(0,10,100,500,1000) # breaks for legend
-catch.labels       <- c("0-10","10-100", "100-500", "500-1000") # labels for legend
-catch.pie.sizes    <- c(1,2,3,4,5,6) # sizes for legend
+# # Define map options
+# # Coordinate reference systems for geographic and projected data
+# crs.geog <- 4326 # WGS84
+# crs.proj <- 3310 # Califoria Albers Equal Area
+# 
+# # Define plotting parameters #####
+# # Set species colors
+# sardine.color      <- '#FF0000'
+# anchovy.color      <- '#00CD66'
+# jack.mack.color    <- '#0000FF'
+# jacksmelt.color    <- '#A020F0'
+# pac.mack.color     <- '#00FFFF'
+# pac.herring.color  <- '#F5DEB3'
+# cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+#                        "Scomber japonicus","Trachurus symmetricus")
+# # CUFES
+# cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 500, 10000) # for legend breaks
+# cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", "50-500", ">500") # for legend labels
+# cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6) # for legend sizes
+# cufes.colors       <- c(anchovy.color, jack.mack.color, sardine.color)
+# cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
+# cufes.spp.labels   <- c("Anchovy","J. mackerel","Sardine")
+# # Trawl
+# trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) # for legend breaks
+# trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") # for legend labels
+# trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) # for legend sizes
+# trawl.performance  <- c("good","ok","poor") # Character vector for filtering trawl hauls based on trawl performance
+# # NASC
+# nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000) # for legend breaks
+# nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
+#                         "5000-20,000", "20,000-50,000", ">50,000") # for legend labels
+# nasc.scale         <- 0.7 # Scale nasc.sizes by this percentage (smaller for larger scale)
+# nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale # for legend sizes
+# nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
+#                         "#FF0000", "#FFC0CB", "#FFFFFF")# for legend colors
+# nasc.summ.interval <- 20
+# # Catch map
+# scale.pies         <- F # Scale pie charts (TRUE/FALSE)
+# catch.breaks       <- c(0,10,100,500,1000) # breaks for legend
+# catch.labels       <- c("0-10","10-100", "100-500", "500-1000") # labels for legend
+# catch.pie.sizes    <- c(1,2,3,4,5,6) # sizes for legend
 ```
 
 ```{r copy-bib,include=F}
@@ -143,14 +139,18 @@ if (copy.files) {
 
 ```{r download-habitat-maps}
 if (download.maps) {
+  # If survey is ongoing, use today's date to get habitat maps
+  if (date(erddap.survey.end) > date(now())) {
+    erddap.survey.end <- date(now()) - days(2)
+  } 
   # Calculate the number of days in the survey
-  hab.days <- floor((ymd(survey.end.erddap) - ymd(survey.start.erddap))/3)
+  hab.days <- floor((ymd(erddap.survey.end) - ymd(erddap.survey.start))/3)
   
   # Format survey start date for downloading sardine potential habitat maps
-  hab.date.start <- format(ymd(survey.start.erddap), "%Y%m%d")
-  hab.date.mid1  <- format(ymd(survey.start.erddap) + hab.days, "%Y%m%d")
-  hab.date.mid2  <- format(ymd(survey.start.erddap) + hab.days*2, "%Y%m%d")
-  hab.date.end   <- format(ymd(survey.end.erddap), "%Y%m%d")
+  hab.date.start <- format(ymd(erddap.survey.start), "%Y%m%d")
+  hab.date.mid1  <- format(ymd(erddap.survey.start) + hab.days, "%Y%m%d")
+  hab.date.mid2  <- format(ymd(erddap.survey.start) + hab.days*2, "%Y%m%d")
+  hab.date.end   <- format(ymd(erddap.survey.end), "%Y%m%d")
   
   # Create URLs for downloading downloading sardine potential habitat maps
   hab.url.start <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
@@ -186,13 +186,13 @@ if (download.maps) {
 
 ```{r process-cal-all}
 if (process.cal) {
-  source(here("Code/cal_extract_all.R"))
+  source(here("Code/extractCalAll.R"))
 } else {
-  load(here("Data/cal/cal_results_all.Rdata"))
+  load(here("Data/Calibration", survey.name,"cal_results_all.Rdata"))
 }
 
 if (save.figs) {
-  source(here("Code/cal_ts_plot.R"))
+  source(here("Code/plotCalTimeSeries.R"))
 }
 ```  
 
@@ -216,10 +216,10 @@ cal.params <- cal.res %>%
 
 # add noise estimates
 # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
-if (length(cal.noise) == 1) { 
-  cal.params$noise <- rep("N/A",length(cal.files))
+if (is.na(cal.noise[cal.vessels])) { 
+  cal.params$noise <- rep("N/A", length(cal.files))
 }else{
-  cal.params$noise <- cal.noise
+  cal.params$noise <- unlist(cal.noise[cal.vessels])
 }
 
 # create data frame for beam model results
@@ -288,10 +288,11 @@ all.output <- rbind(param.output, bm.output) %>%
 
 # save output to .Rdata and CSV
 save(all.output,
-     file = here("Output/cal/cal_output_table.Rdata"))
+     file = here("Output/cal_output_table.Rdata"))
 
 write.csv(all.output,
-          file = here("Output/cal/cal_output_table.csv"), quote = F, row.names = F)
+          file = here("Output/cal_output_table.csv"), 
+          quote = F, row.names = F)
 ```
 
 ```{r plot-cal-pings}
@@ -302,6 +303,16 @@ cal.pings <- cal.pings.all %>%
                  ymd(cal.plot.date) - days(cal.window),
                  ymd(cal.plot.date) + days(cal.window))) %>% 
   arrange(txdr_freq, ping_num)
+
+# Set axis limits based on range of ping angles
+cal.lim.tmp <- round(max(max(cal.pings$along), max(cal.pings$athw))) 
+
+if (cal.lim.tmp %% 2) {
+  # If range is odd, add 1 to make axis ticks look nice
+  cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
+} else {
+  cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+}
 
 # subset only outlier points
 outliers <- filter(cal.pings, outlier == 1)
@@ -334,10 +345,10 @@ tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
   facet_wrap(~txdr_type, scales = cal.scales) +
   scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
                        option = "magma") +
-  scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = axis.limits,
-                     breaks = seq(min(axis.limits), max(axis.limits), 2)) +
-  scale_y_continuous('Alongship Beam Angle (deg)\n',limits = axis.limits,
-                     breaks = seq(min(axis.limits), max(axis.limits), 2)) +
+  scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
+                     breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+  scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                     breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
   guides(size =  F) + theme_bw() + 
   theme(panel.spacing    = unit(1, "lines"),
         strip.background = element_rect(fill = "white"),
@@ -345,7 +356,7 @@ tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
   coord_equal()
 
 # Save TS_c plot 
-ggsave(here("Figs/fig_TSu_scatter.png"), tsu.scatter, width = 9, height = 6)
+ggsave(here("Figs/fig_cal_TSu_scatter.png"), tsu.scatter, width = 9, height = 6)
 
 # Plot beam-compensated target strength data #####
 tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
@@ -355,10 +366,10 @@ tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
   facet_wrap(~txdr_type, scales = cal.scales) + 
   scale_fill_distiller(name = expression(italic(TS)[rel]),
                        type = "div", palette = "RdBu", limits = c(-1,1)) +
-  scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = axis.limits,
-                     breaks = seq(min(axis.limits), max(axis.limits), 2)) +
-  scale_y_continuous('Alongship Beam Angle (deg)\n',limits = axis.limits,
-                     breaks = seq(min(axis.limits), max(axis.limits), 2)) +
+  scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
+                     breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+  scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                     breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
   theme_bw() + 
   theme(panel.spacing = unit(1, "lines"),
         strip.background = element_rect(fill = "white"),
@@ -366,31 +377,69 @@ tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
   coord_equal()
 
 # Save TS_c plot 
-ggsave(here("Figs/fig_TSrel_scatter.png"),tsc.scatter,width = 9,height = 6)
+ggsave(here("Figs/fig_cal_TSrel_scatter.png"),tsc.scatter,width = 9,height = 6)
 ```
 
 ```{r get-nav}
 if (get.nav) {
-# Import vessel nav data from ERDDAP -------------------------------------------------------
-  # Generate ERDDAP URL
-  dataURL = URLencode(paste("http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-                          survey.vessel.erddap, ".csv0?", erddap.vars,
-                          "&time>=", survey.start.erddap, "&time<=", survey.end.erddap, sep = ''))
-  # Download and parse ERDDAP nav data
-  nav <- data.frame(read.csv(dataURL,header = F, colClasses = erddap.classes, row.names = NULL, skip = 0))
-  colnames(nav) <- erddap.headers
-  # save results
-
-# Filter to remove bad data values
-  nav <- nav %>%  
-    mutate(long = long - 360) %>% # Put longitude into E/W format
-    mutate(datetime = as.POSIXct(time,format = "%FT%T")) %>% # Convert date/time to POSIXct
-    mutate(SOG = SOG * 1.94384) %>% # Convert SOG from m/s to knots
-    filter(between(long, min.long, max.long)) %>% # Filter lat/long data
-    filter(between(lat, min.lat, max.lat))  
+# Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time))
+  }
   
-  # Save nav data
-  save(nav, file = here("Data/nav/vessel_nav.Rdata"))
+  # Generate ERDDAP URL
+  dataURL <- URLencode(paste(
+    "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+    erddap.vessel, ".csv0?", erddap.vars,
+    "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+    sep = ""))
+  
+  # Download and parse ERDDAP nav data
+  nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                             row.names = NULL, skip = 0))
+  names(nav.temp) <- erddap.headers
+  
+  # Filter to remove bad SST values
+  nav.temp <- nav.temp %>% 
+    mutate(long     = long - 360,
+           SOG      = SOG * 1.94384,
+           datetime = ymd_hms(time),
+           SST      = na_if(SST, NaN),
+           leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                  leg.breaks, labels = F))) %>%
+    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+           between(lat, min(survey.lat), max(survey.lat)), 
+           between(long, min(survey.long), max(survey.long)))
+  
+  # Append new nav data
+  if (exists("nav")) {
+    nav <- bind_rows(nav, nav.temp) %>% 
+      distinct()
+  } else {
+    nav <- nav.temp
+  }
+  
+  # Convert nav to spatial
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  # Cast nav to transects
+  nav.legs <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
+} else {
+  # Load nav data
+  load(here("Data/Nav/nav_data.Rdata"))
+}
 }  else {
   # Load nav data
   load(here("Data/nav/vessel_nav.Rdata"))

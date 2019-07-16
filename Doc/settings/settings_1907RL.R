@@ -494,6 +494,9 @@ cal.max.z          <-    8     # enter maximum water depth below transducers
 # Lowest to highest frequency
 cal.noise          <- list(RL = c(-128,-142,-148,-155,-140,-138))
 
+# Axis options for calibration plots
+cal.scales    <- "fixed"  # fixed or free
+
 # Vessel echosounder info  ------------------------------------------------
 if (survey.vessel.primary == "SH") {
   echo.freqs      <- "18, 38, 70, 120, and 200" # list of echosounder frequencies for Shimada

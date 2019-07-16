@@ -64,7 +64,7 @@ process.csv     <- T # Process acoustic backscatter files
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- F # Process all CSV files (F = new files only)
+process.csv.all <- T # Process all CSV files (F = new files only)
 save.imap       <- T # Save interactive map using mapshot
 
 # Do all steps
@@ -645,7 +645,9 @@ if (process.csv) {
     # Calculate summary interval
     nasc.cps <- nasc.cps %>%
       mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                       labels = F, include.lowest = T))
+                       labels = F, include.lowest = T)) %>% 
+      filter(lat != 999, long != 999)
+    
     # Save results
     save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
     write.csv(nasc.cps, file = here("Output/nasc_cps.csv"), row.names = F, quote = F)
@@ -658,32 +660,34 @@ if (process.csv) {
 nasc.summ.cps <- nasc.cps %>%
   group_by(transect, int) %>%
   summarise(
-    bins = length(int),
+    bins    = length(int),
     bin.mid = as.integer(round(bins / 2)),
-    lat = lat[1],
-    long = long[1],
-    NASC = mean(NASC.70)
+    lat     = lat[1],
+    long    = long[1],
+    NASC    = mean(NASC.70)
   )
 
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
-nasc.plot.cps <- nasc.cps %>%
-  select(filename, transect, int, lat, long, cps.nasc = NASC.70) %>% 
+nasc.cps.sf <- nasc.cps %>%
+  select(filename, transect, int, dist_m, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
-    lat  = lat[1],
-    long = long[1],
-    NASC = mean(cps.nasc)) %>% 
-  # Create bins for defining point size in NASC plots%>% 
+    lat   = lat[1],
+    long  = long[1],
+    NASC  = mean(cps.nasc),
+    label = paste0('Transect: ', transect[1], "; ",
+                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
+  # Create bins for defining point size in NASC plots
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin))
-
-# create bins for defining point size in NASC plots
-nasc.plot.cps <- nasc.plot.cps %>% 
+         bin.level =  as.numeric(bin)) %>% 
   filter(!is.na(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
-nasc.plot.cps <- project_sf(nasc.plot.cps, crs.proj)
+nasc.plot.cps <- project_sf(nasc.cps.sf, crs.proj)
 
 # create acoustic transect labels
 nasc.tx.labels.cps <- nasc.cps %>%
@@ -738,7 +742,8 @@ if (process.csv) {
     # Calculate summary interval
     nasc.krill <- nasc.krill %>%
       mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                       labels = F, include.lowest = T))
+                       labels = F, include.lowest = T)) %>% 
+      filter(lat != 999, long != 999)
     # Save results
     save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
     write.csv(nasc.krill, file = here("Output/nasc_krill.csv"), row.names = F, quote = F)
@@ -751,31 +756,34 @@ if (process.csv) {
 nasc.summ.krill <- nasc.krill %>%
   group_by(transect, int) %>%
   summarise(
-    bins = length(int),
+    bins    = length(int),
     bin.mid = as.integer(round(bins / 2)),
-    lat = lat[1],
-    long = long[1],
-    NASC = mean(NASC.350)
+    lat     = lat[1],
+    long    = long[1],
+    NASC    = mean(NASC.350)
   )
 
 # Average krill.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
-nasc.plot.krill <- nasc.krill %>%
-  dplyr::select(filename, transect, int, lat, long, krill.nasc = NASC.350) %>% 
+nasc.krill.sf <- nasc.krill %>%
+  select(filename, transect, int, dist_m, lat, long, krill.nasc = NASC.350) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
-    lat  = lat[1],
-    long = long[1],
-    NASC = mean(krill.nasc)) %>% 
+    lat   = lat[1],
+    long  = long[1],
+    NASC  = mean(krill.nasc),
+    label = paste0('Transect: ', transect[1], "; ",
+                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
   # Create bins for defining point size in NASC plots%>% 
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin)) 
-
-nasc.plot.krill <- nasc.plot.krill %>% 
+         bin.level =  as.numeric(bin))  %>% 
   filter(!is.na(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
-nasc.plot.krill <- project_sf(nasc.plot.krill, crs.proj)
+nasc.plot.krill <- project_sf(nasc.krill.sf, crs.proj)
 
 # create acoustic transect labels
 nasc.tx.labels.krill <- nasc.krill %>%
@@ -790,19 +798,22 @@ processed.krill <- unique(nasc.krill$filename)
 save(processed.krill, file =  here("Output/processed_krill.Rdata"))
 
 # Select plot levels for backscatter data
-nasc.plot.all   <- bind_rows(nasc.plot.cps, nasc.plot.krill) %>% 
-  filter(NASC >= 200) %>% 
-  ungroup()
+nasc.plot.all   <- bind_rows(nasc.cps.sf, nasc.krill.sf) %>% 
+  filter(NASC >= 200) 
 
 # Select top 200 nasc values and look for outliers
 big.nasc <- nasc.cps %>%
   bind_rows(nasc.krill) %>% 
   arrange(desc(NASC)) %>%
-  mutate(NASC = NASC/19,
-         rank = seq(n()),
-         label = paste("Tx", transect, "-Int", Interval, "-", type, sep = "")) %>% 
+  mutate(NASC  = NASC/19,
+         rank  = seq(n()),
+         label = paste0('Transect: ', transect, 
+                        ' - Distance: ', round(dist_m), " m"),
+         popup = paste0('<b>Transect: </b>', transect, '<br/>', 
+                        '<b>Distance: </b>', round(dist_m), ' m<br/>',
+                        '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
   top_n(100, NASC) %>% 
-  select(rank, NASC, label, type, datetime, dist_m, lat, long) 
+  select(rank, NASC, label, popup, type, datetime, dist_m, lat, long) 
 
 # Save NASC outliers
 save(big.nasc, file = here("Output/nasc_big.Rdata"))
@@ -899,64 +910,12 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 
 # Create spatial objects -------------------------------------------
 # Convert NASC data to sf; CRS = crs.geog (WGS84)
-nasc.cps.sf <- nasc.cps %>%
-  select(filename, transect, int, lat, long, cps.nasc = NASC.70) %>% 
-  group_by(filename, transect, int) %>% 
-  summarise(
-    lat  = lat[1],
-    long = long[1],
-    NASC = mean(cps.nasc)) %>% 
-  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin),
-         type  = "CPS",
-         label = paste(transect, int, sep = "-"),
-         popup = paste(transect, "-", int, ": ", round(NASC), 
-                       " m<sup>2</sup> nmi<sup>-2</sup>", 
-                       sep = "")) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(NASC >= 200) 
-
-nasc.krill.sf <- nasc.krill %>%
-  select(filename, transect, int, lat, long, krill.nasc = NASC.350) %>% 
-  group_by(filename, transect, int) %>% 
-  summarise(
-    lat  = lat[1],
-    long = long[1],
-    NASC = mean(krill.nasc)) %>% 
-  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin),
-         type  = "Krill",
-         label = paste(transect, int, sep = "-"),
-         popup = paste(transect, "-", int, ": ", round(NASC), 
-                       " m<sup>2</sup> nmi<sup>-2</sup>", 
-                       sep = "")) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(NASC >= 200) 
-
 big.nasc.sf <- big.nasc %>% 
   top_n(20, NASC) %>%
-  mutate(popup = paste(label, ": ", round(NASC), 
-                       " m<sup>2</sup> nmi<sup>-2</sup>", 
-                       sep = "")) %>% 
+  mutate(popup = paste(label, ": ", round(NASC),
+                       " m<sup>2</sup> nmi<sup>-2</sup>",
+                       sep = "")) %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
-
-# Convert NASC small nasc data to sf; CRS = crs.geog (WGS84)
-nasc.cps.sf.small <- nasc.cps %>%
-  select(filename, transect, int, lat, long, cps.nasc = NASC.70) %>% 
-  group_by(filename, transect, int) %>% 
-  summarise(
-    lat  = lat[1],
-    long = long[1],
-    NASC = mean(cps.nasc)) %>% 
-  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin),
-         type  = "CPS",
-         label = paste(transect, int, sep = "-"),
-         popup = paste(transect, "-", int, ": ", round(NASC), 
-                       " m<sup>2</sup> nmi<sup>-2</sup>", 
-                       sep = "")) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(NASC < 200) 
 
 # Convert haul paths and midpoints to sf; CRS = crs.geog
 # Create haul paths from starts and ends
@@ -1163,14 +1122,19 @@ i.map <- leaflet() %>%
                    fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                    group = "CUFES (Negative)") %>%
   # Add backscatter data
-  addCircleMarkers(data = nasc.cps.sf.small, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  "#000414", label = ~htmlEscape(label),
+  addCircleMarkers(data = filter(nasc.cps.sf, NASC < 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#000414", 
+                   label = ~label, popup = ~popup, 
                    group = "Backscatter-CPS (Small)") %>%
   addCircleMarkers(data = nasc.krill.sf, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), label = ~htmlEscape(label),
+                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup,
                    group = "Backscatter-Krill") %>% 
-  addCircleMarkers(data = nasc.cps.sf, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), label = ~htmlEscape(label),
+  addCircleMarkers(data = filter(nasc.cps.sf, NASC >= 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup,
                    group = "Backscatter-CPS") %>%
   # Add trawl paths 
   addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
@@ -1191,9 +1155,6 @@ i.map <- leaflet() %>%
   # Add backscatter outliers
   addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
              group = "Backscatter (Large)") %>%
-  # Add seep locations from acoustics
-  # addMarkers(data = seeps, label = ~htmlEscape(Name),
-  #                  group = "Methane Seeps") %>% 
   # Add legends
   addLegend("bottomleft", colors = nasc.colors.all, 
             values = sort(unique(nasc.cps.sf$bin.level)),
