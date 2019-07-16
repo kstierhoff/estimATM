@@ -64,7 +64,7 @@ process.csv     <- T # Process acoustic backscatter files
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- T # Process all CSV files (F = new files only)
+process.csv.all <- F # Process all CSV files (F = new files only)
 save.imap       <- T # Save interactive map using mapshot
 
 # Do all steps
@@ -670,7 +670,7 @@ nasc.summ.cps <- nasc.cps %>%
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.cps.sf <- nasc.cps %>%
-  select(filename, transect, int, dist_m, lat, long, cps.nasc = NASC.70) %>% 
+  select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat   = lat[1],
@@ -679,6 +679,7 @@ nasc.cps.sf <- nasc.cps %>%
     label = paste0('Transect: ', transect[1], "; ",
                    'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
     popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
                    '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
                    '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
   # Create bins for defining point size in NASC plots
@@ -766,7 +767,7 @@ nasc.summ.krill <- nasc.krill %>%
 # Average krill.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.krill.sf <- nasc.krill %>%
-  select(filename, transect, int, dist_m, lat, long, krill.nasc = NASC.350) %>% 
+  select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat   = lat[1],
@@ -775,6 +776,7 @@ nasc.krill.sf <- nasc.krill %>%
     label = paste0('Transect: ', transect[1], "; ",
                    'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
     popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
                    '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
                    '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
   # Create bins for defining point size in NASC plots%>% 
@@ -810,6 +812,7 @@ big.nasc <- nasc.cps %>%
          label = paste0('Transect: ', transect, 
                         ' - Distance: ', round(dist_m), " m"),
          popup = paste0('<b>Transect: </b>', transect, '<br/>', 
+                        '<b>Time: </b>', min(datetime), "-", max(datetime), ' UTC<br/>',
                         '<b>Distance: </b>', round(dist_m), ' m<br/>',
                         '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
   top_n(100, NASC) %>% 
