@@ -384,7 +384,8 @@ lengths.all  <- lengths.all %>%
       scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
       scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
       scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
-      scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm),
+      scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm,
+      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
     missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ F),
     missing.length = case_when(
       is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
@@ -395,7 +396,7 @@ lengths.all  <- lengths.all %>%
 
 # Get max TL for plotting L/W models
 L.max <- lengths.all %>% 
-  filter(scientificName %in% cps.spp) %>% 
+  filter(scientificName %in% cps.spp) %>%
   group_by(scientificName) %>% 
   summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
 
@@ -501,7 +502,9 @@ outliers <- lengths %>%
 # Add outlier flag to length data
 lengths <- lengths %>% 
   mutate(key = paste(collection, species, specimenNumber)) %>% 
-  left_join(outliers)
+  left_join(outliers) %>% 
+  left_join(select(haul.all, haul, datetime = equilibriumTime)) %>% 
+  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = F))
 ```
 
 # Overview
@@ -511,7 +514,7 @@ The data below was collected during the **`r survey.name.long` (`r survey.name`)
 
 # Length-weight summary
 
-View the length (cm; total length, standard length, and fork length, as appropriate) and weight (g) range for each species.
+View the length (cm) and weight (g) range for each species.
 
 ## CPS
 
@@ -545,6 +548,19 @@ lengths %>%
     w.min  = round(min(weightg, na.rm = TRUE),1),
     w.max  = round(max(weightg, na.rm = TRUE),1)) %>% 
   datatable(rownames = FALSE)
+```
+
+# Length-frequencies
+Length frequency by cruise leg. 
+
+```{r length-freq-leg}
+ggplot(lengths, aes(totalLength_mm, group = factor(leg))) +
+  geom_histogram(aes(fill = factor(leg)), alpha = 0.5) + 
+  facet_wrap(~scientificName, scales = "free") +
+  scale_fill_viridis_d("Leg") +
+  xlab("Length (mm)") + ylab("Frequency") +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
 ```
 
 # Outliers
@@ -946,6 +962,41 @@ if (nrow(lengths.sub) > 0) {
 } else {
   print("No specimens present.")
 }
+```
+
+## Lengths by leg
+
+```{r length-weight-leg}
+# Examine length differences by leg
+lw.plot.leg <- ggplot() + 
+  # Plot seasonal length models for each species
+  geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
+  # Plot L/W data for current survey
+  geom_point(data = lengths, 
+             aes(totalLength_mm, weightg, group = sex, fill = factor(leg)), 
+             shape = 21, alpha = 0.75) + 
+  scale_fill_viridis_d(name = "Leg") +
+  # Plot individuals with missing lengths and weights
+  geom_point(data = filter(lengths, missing.length == TRUE), 
+             aes(totalLength_mm, weightg),
+             shape = 21, fill = 'red',  size = 2.5) +
+  geom_point(data = filter(lengths, missing.weight == TRUE), 
+             aes(totalLength_mm, weightg),
+             shape = 21, fill = 'blue', size = 2.5) +
+  # Facet by species
+  facet_wrap(~scientificName, scales = "free") +
+  # Format plot
+  xlab("Total length (mm)") + ylab("Mass (g)") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
+
+# Save length/weight plot
+ggsave(lw.plot.leg, filename = here("Figs/fig_LW_plots_leg.png"),
+       width = 10, height = 7) 
+
+# View plot
+ggplotly(lw.plot.leg)
 ```
 
 # Data checks
