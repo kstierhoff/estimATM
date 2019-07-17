@@ -645,8 +645,7 @@ if (process.csv) {
     # Calculate summary interval
     nasc.cps <- nasc.cps %>%
       mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                       labels = F, include.lowest = T)) %>% 
-      filter(lat != 999, long != 999)
+                       labels = F, include.lowest = T))
     
     # Save results
     save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
@@ -656,8 +655,13 @@ if (process.csv) {
   load(here("Output/nasc_cps.Rdata"))
 }
 
+# Get intervals with bad lat/long values
+bad.nasc.cps <- filter(nasc.cps, lat == 999, long == 999)
+write_csv(bad.nasc.cps, here("Output/nasc_bad_cps.csv"))
+
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ.cps <- nasc.cps %>%
+  filter(lat != 999, long != 999) %>% 
   group_by(transect, int) %>%
   summarise(
     bins    = length(int),
@@ -670,6 +674,7 @@ nasc.summ.cps <- nasc.cps %>%
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.cps.sf <- nasc.cps %>%
+  filter(lat != 999, long != 999) %>%
   select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
@@ -743,8 +748,8 @@ if (process.csv) {
     # Calculate summary interval
     nasc.krill <- nasc.krill %>%
       mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                       labels = F, include.lowest = T)) %>% 
-      filter(lat != 999, long != 999)
+                       labels = F, include.lowest = T)) 
+    
     # Save results
     save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
     write.csv(nasc.krill, file = here("Output/nasc_krill.csv"), row.names = F, quote = F)
@@ -753,8 +758,13 @@ if (process.csv) {
   load(here("Output/nasc_krill.Rdata"))
 }
 
+# Get intervals with bad lat/long values
+bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
+write_csv(bad.nasc.krill, here("Output/nasc_bad_krill.csv"))
+
 # Average NASC.350 data over new intervals or number of intervals in a 2 km radius
 nasc.summ.krill <- nasc.krill %>%
+  filter(lat != 999, long != 999) %>%
   group_by(transect, int) %>%
   summarise(
     bins    = length(int),
@@ -767,6 +777,7 @@ nasc.summ.krill <- nasc.krill %>%
 # Average krill.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.krill.sf <- nasc.krill %>%
+  filter(lat != 999, long != 999) %>%
   select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
@@ -801,8 +812,10 @@ save(processed.krill, file =  here("Output/processed_krill.Rdata"))
 
 # Select plot levels for backscatter data
 nasc.plot.all   <- bind_rows(nasc.cps.sf, nasc.krill.sf) %>% 
-  filter(NASC >= 200) 
+  filter(NASC >= 200)
+```
 
+```{r find-big-nasc}
 # Select top 200 nasc values and look for outliers
 big.nasc <- nasc.cps %>%
   bind_rows(nasc.krill) %>% 
