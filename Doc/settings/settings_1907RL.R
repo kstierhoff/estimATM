@@ -137,6 +137,7 @@ cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
 trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) 
 trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
 trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
+trawl.performance  <- c("good","ok","poor") # Character vector for filtering trawl hauls based on trawl performance
 
 # NASC
 # For legend objects
@@ -158,13 +159,17 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
-nasc.vessels           <- c("RL","LM", "SD") # Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
-nasc.interval          <-  100    # Interval length (m); from Echoview
-nasc.summ.interval     <- 2000/nasc.interval # number of intervals over which to summarize NASC
-# Location of survey data on AST1, AST2, etc. (a vector of file paths)
+# Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
+nasc.vessels           <- c("RL","LM", "SD") 
+# Interval length (m); from Echoview
+nasc.interval          <-  100    
+# Number of intervals over which to summarize NASC
+nasc.summ.interval     <- 2000/nasc.interval 
+# Echosounder type; e.g., EK60, EK80, other
 sounder.type           <- c(RL = "EK60",
                             LM = "EK60",
-                            SD = "EK80") # Echosounder type; e.g., EK60, EK80, other
+                            SD = "EK80") 
+# Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
   survey.dir           <- c(RL = "C:/SURVEY/1907RL",
@@ -175,54 +180,70 @@ if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
                             LM = "C:/SURVEY/1907RL",
                             SD = "C:/SURVEY/1907RL")
 }
+# Backscatter data (within survey.dir, typically; a vector of file paths)
 nasc.dir               <- c(RL = "PROCESSED/EV/CSV/LASKER",
                             LM = "PROCESSED/EV/CSV/LISA_MARIE",
-                            SD = "PROCESSED/EV/CSV/SAILDRONE") # Backscatter data (within survey.dir, typically; a vector of file paths)
+                            SD = "PROCESSED/EV/CSV/SAILDRONE") 
 nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
                             LM = "*Final 38 kHz CPS.csv",
                             SD = "*CPS-Final CPS.csv")
 nasc.pattern.krill     <- c(RL = "*Juan Krill Final 120.csv",
                             LM = "*Juan Krill Final 120.csv",
                             SD = "*Juan Krill Final 120.csv")
+# If T, read cps.nasc from file; else use NASC.50 
 source.cps.nasc        <- c(RL = F,
                             LM = F,
-                            SD = F) # If T, read cps.nasc from file; else use NASC.50 
+                            SD = F) 
+# File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL = here("Data/CPS_NASC/cps_nasc_1907RL.csv"),
                             LM = NA,
-                            SD = NA) # File containing CPS nasc from CTD app
+                            SD = NA) 
+# regex for matching character pattern
 tx.char.pattern        <- c(RL = "[^0-9]",
                             LM = "[^0-9]",
-                            SD = "[^0-9]") # regex for matching character pattern
+                            SD = "[^0-9]") 
+# If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL = F,
                             LM = F,
-                            SD = F) # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
+                            SD = F) 
+# If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
 strip.tx.chars         <- c(RL = F,
                             LM = F,
-                            SD = F) # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
+                            SD = F) 
+# If T, removes transects with names including "transit"
 rm.transit             <- c(RL = F,
                             LM = F,
-                            SD = F) # If T, removes transects with names including "transit"
+                            SD = F) 
+# If T, removes transects with names including "offshore"
 rm.offshore            <- c(RL = T,
                             LM = F,
-                            SD = F) # If T, removes transects with names including "offshore"
+                            SD = F) 
+# If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL = T,
                             LM = F,
-                            SD = F) # If T, removes transects with names including "nearshore"
+                            SD = F) 
+# If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL = F,
                             LM = F,
-                            SD = F) # If T, subtracts NASC.5 from cps.nasc
+                            SD = F) 
+# regex for matching number pattern
 tx.num.pattern         <- c(RL = "-\\d{1}",
                             LM = "-\\d{1}",
-                            SD = "-\\d{1}") # regex for matching number pattern
+                            SD = "-\\d{1}") 
+# Use transect names for transect numbers
 use.tx.number          <- c(RL = F,
                             LM = F,
-                            SD = F) # Use transect names for transect numbers
-tx.rm                  <- c(RL = NA,
+                            SD = F) 
+# Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
+tx.rm                  <- c(RL = c("SF2VI1", "SF2VI2"),
                             LM = NA,
-                            SD = NA) # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
+                            SD = NA) 
+# Minimum acoustic transect length (nmi)
 min.tx.length          <- c(RL = 3,
                             LM = 1,
-                            SD = 1)  # Minimum acoustic transect length (nmi)
+                            SD = 1)  
+# SCS data
+scs.source             <- "ELG" # "CSV" or "ELG"
 # CUFES database
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
@@ -270,164 +291,164 @@ stratify.manually <- FALSE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects
-strata.manual <- bind_rows(
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 1,
-    transect = 60:64),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 2,
-    transect = 66:99),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 3,
-    transect = 100:107),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 1,
-    transect = 1:16),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 2,
-    transect = 17:19),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 3,
-    transect = 20:39),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 4,
-    transect = 67:90),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 5,
-    transect = 94:96),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 6,
-    transect = 98:101),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 7,
-    transect = 111:149),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 1,
-    transect = 2:16),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 2,
-    transect = 23:34),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 3,
-    transect = 50:85),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 4,
-    transect = 94:96),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 5,
-    transect = 98:101),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 6,
-    transect = 125:127),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 7,
-    transect = 136:139),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 1,
-    transect = 2:16),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 2,
-    transect = 20:28),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 3,
-    transect = 50:72),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 4,
-    transect = 74:86),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 5,
-    transect = 94:96),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 6,
-    transect = 97:101),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 1,
-    transect = 1:16),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 2,
-    transect = 20:33),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 3,
-    transect = 38:40),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 4,
-    transect = 41:46),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 5,
-    transect = 47:85),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 6,
-    transect = 87:96),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 7,
-    transect = 97:99),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 8,
-    transect = 124:129),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 9,
-    transect = 136:139)
-)
-
-# Offshore strata
-strata.manual.os <- bind_rows(
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 1,
-    transect = 1:8),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 1,
-    transect = 1:3),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 2,
-    transect = 4:8),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 1,
-    transect = 1:8),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 1,
-    transect = 1:8),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 1,
-    transect = 1:8),
-)
+# strata.manual <- bind_rows(
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 1,
+#     transect = 60:64),
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 2,
+#     transect = 66:99),
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 3,
+#     transect = 100:107),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 1,
+#     transect = 1:16),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 2,
+#     transect = 17:19),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 3,
+#     transect = 20:39),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 4,
+#     transect = 67:90),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 5,
+#     transect = 94:96),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 6,
+#     transect = 98:101),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 7,
+#     transect = 111:149),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 1,
+#     transect = 2:16),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 2,
+#     transect = 23:34),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 3,
+#     transect = 50:85),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 4,
+#     transect = 94:96),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 5,
+#     transect = 98:101),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 6,
+#     transect = 125:127),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 7,
+#     transect = 136:139),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 1,
+#     transect = 2:16),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 2,
+#     transect = 20:28),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 3,
+#     transect = 50:72),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 4,
+#     transect = 74:86),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 5,
+#     transect = 94:96),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 6,
+#     transect = 97:101),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 1,
+#     transect = 1:16),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 2,
+#     transect = 20:33),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 3,
+#     transect = 38:40),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 4,
+#     transect = 41:46),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 5,
+#     transect = 47:85),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 6,
+#     transect = 87:96),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 7,
+#     transect = 97:99),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 8,
+#     transect = 124:129),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 9,
+#     transect = 136:139)
+# )
+# 
+# # Offshore strata
+# strata.manual.os <- bind_rows(
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 1,
+#     transect = 1:3),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 2,
+#     transect = 4:8),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 1,
+#     transect = 1:8),
+# )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
@@ -440,21 +461,21 @@ raw.size      <-  50   # file size in megabytes (MB)
 raw.log.range <- 350  # depth of ER60 logging (m)
 
 # Echoview settings
-er60.version  <- "V2.4.3" # ER60 version
-ek80.version  <- "V1.10.3" # EK80 version
-ev.version    <- "V9.0.318.34509" # Echoview version
-int.start        <-   5  # Integration start line depth (m)
-int.stop         <- 650  # Integration start line depth (m)
-cps.depth        <-  70  # Integration depth for CPS (m)
-krill.depth      <- 350  # Integration depth for krill (m)
-hake.depth       <- 750  # integration depth for hake (m)
-speed.filter     <-   5  # Speed filter threshold (kn)
-vmr.krill        <- -45  # VMR value for krill formula operator (dB)
-vmr.cps          <- -45  # VMR value for CPS (with swim bladders) formula operator (dB)
-bin.depth        <-   5  # Integration bin depth (m)
-bin.length       <- 100  # Integration bin width (m)
-adz.range        <-   3  # Range (m) of acoustic dead zone
-nasc.freq        <-  38  # Echosounder frequency used to estimate CPS biomass
+er60.version  <- "v2.4.3" # ER60 version
+ek80.version  <- "v1.11" # EK80 version
+ev.version    <- "v10.0" # Echoview version
+int.start        <-    5  # Integration start line depth (m)
+int.stop         <- 1000  # Integration start line depth (m)
+cps.depth        <-   70  # Integration depth for CPS (m)
+krill.depth      <-  350  # Integration depth for krill (m)
+hake.depth       <-  750  # integration depth for hake (m)
+speed.filter     <-    5  # Speed filter threshold (kn)
+vmr.krill        <-  -45  # VMR value for krill formula operator (dB)
+vmr.cps          <-  -45  # VMR value for CPS (with swim bladders) formula operator (dB)
+bin.depth        <-    5  # Integration bin depth (m)
+bin.length       <-  100  # Integration bin width (m)
+adz.range        <-    3  # Range (m) of acoustic dead zone
+nasc.freq        <-   38  # Echosounder frequency used to estimate CPS biomass
 
 # Adaptive sampling information ------------------------------------------
 compulsory.spacing      <- 20  # minimum transect spacing (nmi) for compulsory acoustic transects
@@ -531,3 +552,21 @@ max.long <- -117
 # Files to manually exclude
 exclude.uctd <- c(NA)
 exclude.ctd  <- c(NA)
+
+# SCS values and structure
+# vessel echosounder info
+tx.start.button    <- "Start Transect"
+tx.end.button      <- "Break Transect"
+ctd.button         <- "CTD IN"
+uctd.button        <- "UCTD Deployed"
+trawl.start.button <- "Begin Fishing (EQ)"
+trawl.end.button   <- "Haul Back"
+bongo.button       <- "Bongo IN"
+pairovet.button    <- "Pairovet IN"
+cb.flush.button    <- "CB Flush"
+cb.int.button      <- "CB Interm"
+cb.ext.button      <- "CB Extended"
+gps.lat.hdr        <- "MX512-Lat"
+gps.lon.hdr        <- "MX512-Lon"
+order.occ.hdr      <- "Order_Occ"
+notes.hdr          <- "Notes"

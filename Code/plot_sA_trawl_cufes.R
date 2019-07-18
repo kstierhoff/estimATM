@@ -178,11 +178,10 @@ ggsave(trawl.catch.plot,
        width = map.width, height = map.height)
 
 # Combine all plots #####
-nasc.cufes.trawl.plot <- plot_grid(nasc.map.cps, nasc.map.krill, 
-                                   cufes.density.all, trawl.catch.plot, 
-                                   nrow = 1, labels = c("a)", "b)", "c)", "d)")) 
+nasc.cufes.trawl.plot <- plot_grid(nasc.map.cps, cufes.density.all, trawl.catch.plot, 
+                                   nrow = 1, labels = c("a)", "b)", "c)")) 
 
 # Save composite plot
 ggsave(nasc.cufes.trawl.plot,
        filename = here("Figs/fig_nasc_cufes_trawl.png"),
-       width = map.width*4, height = map.height)
+       width = map.width*3, height = map.height)
