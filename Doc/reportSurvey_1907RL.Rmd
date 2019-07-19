@@ -342,9 +342,9 @@ ggsave(here("Figs/fig_cal_TSrel_scatter.png"), tsc.scatter,
        width = 9, height = 6)
 ```
 
-```{r get-nav}
+```{r process-nav}
 if (get.nav) {
-# Load existing nav data
+  # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
     load(here("Data/Nav/nav_data.Rdata"))
     
@@ -355,36 +355,38 @@ if (get.nav) {
     erddap.survey.start <- max(date(nav$time))
   }
   
-  # Generate ERDDAP URL
-  dataURL <- URLencode(paste(
-    "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-    erddap.vessel, ".csv0?", erddap.vars,
-    "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
-    sep = ""))
-  
-  # Download and parse ERDDAP nav data
-  nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                             row.names = NULL, skip = 0))
-  names(nav.temp) <- erddap.headers
-  
-  # Filter to remove bad SST values
-  nav.temp <- nav.temp %>% 
-    mutate(long     = long - 360,
-           SOG      = SOG * 1.94384,
-           datetime = ymd_hms(time),
-           SST      = na_if(SST, NaN),
-           leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                  leg.breaks, labels = F))) %>%
-    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
-           between(lat, min(survey.lat), max(survey.lat)), 
-           between(long, min(survey.long), max(survey.long)))
-  
-  # Append new nav data
-  if (exists("nav")) {
-    nav <- bind_rows(nav, nav.temp) %>% 
-      distinct()
-  } else {
-    nav <- nav.temp
+  if (nav.lag > 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      sep = ""))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                                    row.names = NULL, skip = 0))
+    names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = long - 360,
+             SOG      = SOG * 1.94384,
+             datetime = ymd_hms(time),
+             SST      = na_if(SST, NaN),
+             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(lat, min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
   }
   
   # Convert nav to spatial
@@ -400,7 +402,7 @@ if (get.nav) {
   save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
-  load(here("Data/Nav/nav_data.Rdata"))
+  load(here("Data/NAV/nav_data.Rdata"))
 }
 
 # Read transect waypoints
@@ -1270,13 +1272,13 @@ La Jolla, CA 92037, USA
 \pagenumbering{arabic}
 
 # Introduction {#introduction}
-The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA Ship _`r survey.vessel.long`_ (hereafter, _`r survey.vessel`_; **Fig. \@ref(fig:lasker-pic)**), `r survey.start` to `r survey.end` `r survey.year`. The Acoustic-Trawl Method (ATM) was used to assess coastal pelagic fish species (CPS) and krill within the CCE. Data were collected using multi-frequency echosounders, surface trawls, vertically and obliquely integrating net tows, a continuous underway fish-egg sampler (CUFES), and conductivity-temperature-depth probes (CTDs).  
+The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA Ship _`r survey.vessel.long`_ (hereafter, _`r survey.vessel`_; **Fig. \@ref(fig:lasker-pic)**), `r survey.start` to `r survey.end` `r survey.year`. The Acoustic-Trawl Method (ATM) was used to assess coastal pelagic fish species (CPS) and krill within the CCE. Data were collected using multi-frequency echosounders, surface trawls, obliquely integrating net tows, a continuous underway fish-egg sampler (CUFES), and conductivity-temperature-depth probes (CTDs).  
 
-The objectives for the survey were to: 1) acoustically map the distributions and estimate the abundances of CPS, i.e., Pacific Sardine _Sardinops sagax_, Northern Anchovy _Engraulis mordax_, Pacific Herring _Clupea pallasii_, Pacific Mackerel _Scomber japonicus_, and Jack Mackerel _Trachurus symmetricus_; and krill (euphausiid spp.); 2) characterize their biotic and abiotic environments, and investigate linkages; 3) gather information regarding their life histories; and 4) evaluate the use of Saildrones to augment the ship-based sampling. Reported elsewhere, the Marine Mammal and Turtle Division (MMTD) of the SWFSC concurrently surveyed the abundances and distributions of whales, dolphins, and seabirds in the survey area; characterized their pelagic ecosystem; and identified certain cetacean species using biopsies and photographs.  
+The objectives for the survey were to: 1) acoustically map the distributions and estimate the abundances of CPS, i.e., Pacific Sardine _Sardinops sagax_, Northern Anchovy _Engraulis mordax_, Pacific Herring _Clupea pallasii_, Pacific Mackerel _Scomber japonicus_, and Jack Mackerel _Trachurus symmetricus_; and krill (euphausiid spp.); 2) characterize their biotic and abiotic environments, and investigate linkages; 3) gather information regarding their life histories; and 4) evaluate the use of unmanned surface vehicles (USVs) and industry vessels to augment the sampling from NOAA ships.  
 
-The survey domain encompassed the anticipated distributions of the northern sub-population (stock) of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S. and Canada from approximately `r survey.landmark.s`, to `r survey.landmark.n`, but also encompassed a large portion of the anticipated distributions of Pacific Mackerel, Jack Mackerel, and Pacific Herring. The survey domain was defined by the modeled distribution of Pacific Sardine potential habitat [@Zwolinski2011], and information recently gathered from other research projects (e.g., California Cooperative Oceanic Fisheries Investigations [CalCOFI] samples) or the fishing industry (e.g., bycatch of Pacific Sardine).  
+The survey domain encompassed the anticipated distributions of the northern sub-population (stock) of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S. and Canada from approximately `r survey.landmark.s`, to `r survey.landmark.n`, but also encompassed a large portion of the anticipated distributions of the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, and Pacific Herring. The survey domain was defined by the modeled distribution of Pacific Sardine potential habitat [@Zwolinski2011], and information recently gathered from other research projects (e.g., California Cooperative Oceanic Fisheries Investigations [CalCOFI] samples) or the fishing industry (e.g., bycatch of Pacific Sardine).  
 
-This report provides an overview of the survey objectives and a summary of the survey equipment, acoustic-system calibration, sampling and analysis methods, and preliminary results. This report does not include estimates of the distributions and biomasses of CPS, krill, marine mammals, or seabirds; and does not elaborate on the evaluation of Saildrone technology. Advantages and disadvantages to the combination of CPS and marine mammal and seabird sampling are discussed from the ATM perspective.  
+This report provides an overview of the survey objectives and a summary of the survey equipment, acoustic-system calibration, sampling and analysis methods, and preliminary results. **This report does not include estimates of the distributions and biomasses of CPS or krill. Advantages and disadvantages to the combination of NOAA ships, USVs, and industry vessels are discussed from the SWFSC perspective.**  
 
 (ref:lasker-pic) NOAA Ship _`r survey.vessel`_.
 
@@ -1329,7 +1331,7 @@ include_graphics(here("Images/img_survey_region.png"))
 
 (ref:survey-plan) Planned pre-survey transit (orange line); compulsory (black lines) and adaptive (red lines) acoustic transect lines; offshore extensions to acoustic transects for marine mammal and CPS sampling (green lines); and Saildrone transects for nearshore CPS (magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately ~1,000 fathoms). **Remove unsampled nearshore/offshore transects**
 
-```{r survey-plan, fig.cap='(ref:survey-plan)', out.width = '4in',fig.align='center',fig.pos='H'}
+```{r survey-plan, fig.cap='(ref:survey-plan)', out.height='8in',fig.align='center',fig.pos='H'}
 include_graphics(here("Figs/fig_survey_plan.png"))
 ```  
 
@@ -1345,7 +1347,7 @@ include_graphics(here("Figs/fig_habitat_map.png"))
 
 ## Acoustic sampling {#methods-acoustic-sampling}
 ### Echosounders {#methods-echosounders}
-Multi-frequency (`r echo.freqs` kHz) General Purpose Transceivers (EK60 GPTs, Simrad) and Wideband Transceivers (EK80 WBTs, Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise (**Appendix \@ref(appendix-cb-pos)**).  
+Multi-frequency (`r echo.freqs` kHz) Wideband Transceivers (EK80 WBTs, Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise (**Appendix \@ref(appendix-cb-pos)**).  
 
 (ref:cb-config) Transducer locations on the bottom of the centerboard aboard _`r survey.vessel`_.
 
@@ -1363,7 +1365,7 @@ Prior to calibration, the integrity of each transducer was verified through impe
 ### Data collection {#methods-acoustic-data-collection}
 Computer clocks were synchronized with the GPS clock (GMT) using synchronization software (NetTime^[http://timesynctool.com]). Echosounder pulses were transmitted simultaneously at all frequencies, at variable intervals, as controlled by the ER60 Adaptive Logger [EAL, @Renfree2016]. The EAL optimizes the pulse interval, based on the seabed depth, while minimizing aliased seabed echoes. Acoustic sampling for CPS-density estimation along the pre-determined transects was limited to daylight hours (approximately between sunrise and sunset).
 
-Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$, dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were logged to 60 m beyond the detected seabed range or to a maximum of `r raw.log.range` m and stored in Simrad .raw format with a `r raw.size`-MB maximum file size. For each acoustic instrument, the prefix for the file names is a concatenation of the survey name (e.g.,  `r survey.name`), the acoustic system (e.g., EK80), and the logging commencement date and time from the GPT-control software. **Add description of CW- vs. FM-mode files.** For example, file generated by the Simrad EK80 software (`r ek80.version`) is named `1907RL-CW-D20190723-T125901.raw`.   
+Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$, dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were logged to 60 m beyond the detected seabed range or to a maximum of `r raw.log.range` m and stored in Simrad .raw format with a `r raw.size`-MB maximum file size. For each acoustic instrument, the prefix for the file names is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW for continuous wave or chirp mode; FM for frequency modulation or broadband mode), and the logging commencement date and time from the GPT-control software. **Add description of CW- vs. FM-mode files.** For example, file generated by the Simrad EK80 software (`r ek80.version`) is named `1907RL-CW-D20190723-T125901.raw`.   
 
 To minimize acoustic interference, transmit pulses from the ME70, the MS70, the SX90, and the acoustic Doppler current profiler (Ocean Surveyor Model OS75, Teledyne RD Instruments) were triggered using the K-Sync synchronization system (Simrad). All other instruments that produce sound within the echosounder bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Sperry Marine Model SRD-500A), or both.  
 
@@ -1440,7 +1442,7 @@ The EK80s were calibrated on `r cal.datetime` while the vessel was at anchor nea
 
 WBT information, configuration settings, and beam model results following calibration are presented in **Table \@ref(tab:cal-results)**. Measurements of uncompensated sphere target strength ($TS_u$, dB re 1 m^2^) are plotted in **Fig. \@ref(fig:tsu-plot)** and beam-compensated sphere target strength ($TS_{rel}$, dB re 1 m^2^), relative to the theoretical target strength, are plotted in **Fig. \@ref(fig:tsc-plot)**. A time-series of calibration results for _`r survey.vessel`_, including on-axis gain ($G_0$), $S_a$ correction ($S_\mathrm{a}\mathrm{corr}$), beamwidths ($\alpha_{-3dB}$ and $\beta_{-3dB}$), offset angles ($\alpha_0$ and $\beta_0$), and RMS, are plotted in **Fig. \@ref(fig:cal-ts-plot)**.  
 
-(ref:cal-results) Simrad EK80 wide-band transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80). **Update calibration results!**
+(ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80). **Update calibration results!**
 
 ```{r cal-results,results='asis'}
 if (doc.type == "docx") {

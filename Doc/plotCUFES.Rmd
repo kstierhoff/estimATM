@@ -112,36 +112,38 @@ if (get.nav) {
     erddap.survey.start <- max(date(nav$time))
   }
   
-  # Generate ERDDAP URL
-  dataURL <- URLencode(paste(
-    "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-    erddap.vessel, ".csv0?", erddap.vars,
-    "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
-    sep = ""))
-  
-  # Download and parse ERDDAP nav data
-  nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                             row.names = NULL, skip = 0))
-  names(nav.temp) <- erddap.headers
-  
-  # Filter to remove bad SST values
-  nav.temp <- nav.temp %>% 
-    mutate(long     = long - 360,
-           SOG      = SOG * 1.94384,
-           datetime = ymd_hms(time),
-           SST      = na_if(SST, NaN),
-           leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                  leg.breaks, labels = F))) %>%
-    filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
-           between(lat, min(survey.lat), max(survey.lat)), 
-           between(long, min(survey.long), max(survey.long)))
-  
-  # Append new nav data
-  if (exists("nav")) {
-    nav <- bind_rows(nav, nav.temp) %>% 
-      distinct()
-  } else {
-    nav <- nav.temp
+  if (nav.lag > 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      sep = ""))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                                    row.names = NULL, skip = 0))
+    names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = long - 360,
+             SOG      = SOG * 1.94384,
+             datetime = ymd_hms(time),
+             SST      = na_if(SST, NaN),
+             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(lat, min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
   }
   
   # Convert nav to spatial
@@ -172,6 +174,14 @@ transects.sf <- wpts.sf %>%
   group_by(Type, Transect) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
+
+# Create gps.csv file from nav to replace missing data in Echoview
+nav.gps <- nav %>% 
+      mutate(GPS_date = format(datetime, format = "%F"),
+             GPS_time = format(datetime, format = "%T")) %>% 
+      select(GPS_date, GPS_time, latitude = lat, longitude = long)
+
+write_csv(nav.gps, here("Output/nav.gps.csv"))
 
 # Get most recent vessel position for plotting
 nav.now <- tail(nav.sf, 1) %>% 
@@ -270,7 +280,7 @@ cufes.plot.ofe <- project_sf(cufes.plot.ofe, crs.proj)
 
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
-  st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
+  st_as_sf(coords = c("StartLongitude", "StartLatitude"), crs = crs.geog) %>% 
   select(SampleNumber)
 ```  
 
