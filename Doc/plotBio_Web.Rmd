@@ -234,12 +234,23 @@ wpts <- read_csv(here("Data/Nav", wpt.filename))
 # Convert planned transects to sf; CRS = crs.geog
 wpts.sf <- wpts %>% 
   filter(Type %in% wpt.types) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
 
 transects.sf <- wpts.sf %>% 
   group_by(Type, Transect) %>% 
   summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                       'Distance:', distance, 'nmi<br/>')
+  )
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -1101,22 +1112,26 @@ i.map <- leaflet() %>%
   # Add core planned transects
   addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)), 
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
                group = "Planned Transects (Core)") %>%
   addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
                    radius = 3, color = "#000414", stroke = F, opacity = 0.5,
                    fillOpacity = 0.5, fillColor =  ~txPal(Type), 
                    label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
                    group = "Planned Transects (Core)") %>%
   # Add ancillary planned transects 
   addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,
                label = ~htmlEscape(paste(Type, Transect)), 
+               popup = ~popup,
                group = "Planned Transects (Ancillary)") %>%
   addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
                    radius = 3, color = "#000414", stroke = F, opacity = 0.5,
                    fillOpacity = 0.5, fillColor =  ~txPal(Type), 
                    label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
                    group = "Planned Transects (Ancillary)") %>%
   # Add nav data
   addPolylines(data = nav_sf, color = "#000414", weight = 1, 

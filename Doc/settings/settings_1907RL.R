@@ -149,11 +149,19 @@ nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
 nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
                         "#FF0000", "#FFC0CB", "#FFFFFF")
 
+# Acoustic biomass density map
+dens.breaks        <- c(0, 1, 10, 100, 500, 1000, 10000, 50000, 1000000)
+dens.labels        <- c("0-1", "1-10", "10-100", "100-500", "500-1000",
+                        "1000-10,000", "10,000-50,000", ">50,000")
+dens.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
+                        "#FF0000", "#FFC0CB", "#FFFFFF", "#00FF00") # for legend colors
+dens.sizes         <- c(0.25, 1, 2.25, 3, 4.25, 5.5, 6.5, 7.5) # for legend sizes
+
 # Catch map
 # For legend objects
-catch.breaks       <- c(0,10,100,500,1000)
-catch.labels       <- c("0-10","10-100", "100-500", "500-1000")
-catch.pie.sizes    <- c(1,2,3,4,5,6)
+catch.breaks       <- c(0, 10, 100, 500, 1000)
+catch.labels       <- c("0-10", "10-100", "100-500", "500-1000")
+catch.pie.sizes    <- c(1, 2, 3, 4, 5, 6)
 
 annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
 
@@ -235,7 +243,7 @@ use.tx.number          <- c(RL = F,
                             LM = F,
                             SD = F) 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- c(RL = c("SF2VI1", "SF2VI2"),
+tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
                             LM = NA,
                             SD = NA) 
 # Minimum acoustic transect length (nmi)
@@ -265,6 +273,14 @@ uctd.hdr.pattern       <- ".*UCTD\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
 # Biomass estimation settings ------------------------------------------
+# Length bins and labels for calculating length frequencies 
+length.min <- 1 # Minimum length bin for length frequencies
+# (max. anchovy = 20 cm, sardine & herring = 30 cm, Pac. mack = 40, and jack mack. = 60)
+length.max <- data.frame("species" = c("Clupea pallasii","Engraulis mordax",
+                                       "Sardinops sagax", "Scomber japonicus",
+                                       "Trachurus symmetricus"),
+                         "sl" = c(30,20,30,40,60))
+
 # Species to generate point estimates
 point.est.spp          <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                             "Scomber japonicus","Trachurus symmetricus")
@@ -281,6 +297,12 @@ do.lf    <- TRUE
 # Estimate biomass in nearshore and offshore strata
 estimate.nearshore <- FALSE
 estimate.offshore  <- FALSE
+
+# Define rules for selecting and pruning sampling strata -----------------------
+# Defines breaks between strata
+max.diff <- 3
+# Defines minimum number of transects in a stratum
+min.n.tx <- 3
 
 # Stratum pruning settings
 nIndiv.min    <- 10
