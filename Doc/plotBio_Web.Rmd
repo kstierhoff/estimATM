@@ -420,16 +420,16 @@ save(haul, file = here("Output/haul_info.Rdata"))
 ```{r process-catch-data, message=FALSE}
 # Filter catch data
 catch <- catch.all %>% 
-  left_join(dplyr::select(spp.codes, species, scientificName, commonName)) %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-  left_join(dplyr::select(haul, haul, cluster)) %>% 
+  left_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg)
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
-  haul.summ.wt <- dcast(dplyr::select(catch, haul, cluster, scientificName, totalWeight),
+  haul.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
                          haul + cluster ~ scientificName, sum)
   
   # Add species with zero total weight
@@ -442,33 +442,27 @@ if (nrow(catch) > 0) {
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>% 
-    mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
+    mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>% 
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") %>% 
+    replace(is.na(.), 0)
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS) %>% 
     group_by(cluster) %>% 
     summarise_all(list(sum)) %>% 
-    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+    mutate(AllCPS = rowSums(select(., -cluster))) %>%
     right_join(cluster.mid) %>% 
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
     replace(is.na(.), 0)
   
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
-    right_join(haul.mid) %>% 
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
-    replace(is.na(.), 0)
+    right_join(haul.mid) 
   
 } else {
   # Summarize trawl catch by species
@@ -487,9 +481,10 @@ if (nrow(catch) > 0) {
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS) %>% 
     group_by(cluster) %>% 
-    summarise_all(funs(sum)) %>% 
-    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
-    right_join(cluster.mid) 
+    summarise_all(list(sum)) %>% 
+    mutate(AllCPS = rowSums(select(., -cluster))) %>%
+    right_join(cluster.mid) %>% 
+    replace(is.na(.), 0)
 }
 
 # Prepare catch data for plotting ----------------------------------------------

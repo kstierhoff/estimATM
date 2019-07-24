@@ -114,11 +114,11 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
-get.nav           <- F # Download nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+get.db            <- T # Download data from databases (fast; generally TRUE)
+get.nav           <- T # Download nav data from ERDDAP
+copy.files        <- T # Copy data files to local directory 
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
 do.bootstrap      <- F # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
@@ -131,6 +131,7 @@ overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 process.cal       <- F # Process calibration results
+process.ctd       <- T # Process CTD and UCTD casts
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
 
 # Run all loops (T/F)?
@@ -173,7 +174,7 @@ if (copy.bib) {
   
 if (copy.files) {
   # Create data directories
-  dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
+  dir_create(here("Data", c("Backscatter", "CTD", "CUFES", "Trawl", "UCTD")))
   dir_create(here("Data/Backscatter", nasc.vessels))
   
   # Copy trawl Access database
@@ -199,6 +200,40 @@ if (copy.files) {
                           regex = nasc.pattern.krill[survey.vessel.primary])
   file_copy(csv.files.krill, here("Data/Backscatter", survey.vessel.primary), 
             overwrite = overwrite.csv)
+  
+  # Copy UCTD data ------------------------------------
+  # Location of header files on survey directory
+  uctd.hdr <- dir_ls(uctd.dir, regexp = uctd.hdr.pattern) %>% 
+    path_filter(regexp = "_processed", invert = TRUE)
+  
+  # Copy files to plotCTD directory
+  file_copy(uctd.hdr, here("Data/UCTD"), 
+            overwrite = overwrite.files)
+  
+  # Location of processed UCTD files on survey directory
+  uctd.proc <- dir_ls(uctd.dir, regexp = uctd.cast.pattern) %>% 
+    path_filter(regexp = "_processed")
+  
+  # Copy files to plotCTD directory
+  file_copy(uctd.proc, here("Data/UCTD"), 
+            overwrite = overwrite.files)
+  
+  # Copy CTD data -------------------------------------
+  # List raw CTD ASCII files
+  ctd.hdr <- dir_ls(ctd.dir, regexp = ctd.hdr.pattern) %>% 
+    path_filter(regexp = "_processed", invert = TRUE)
+  
+  # Copy files to plotCTD directory
+  file_copy(ctd.hdr, here("Data/CTD"), 
+            overwrite = overwrite.files)
+  
+  # Location of processed CTD files on survey directory
+  ctd.proc <- dir_ls(ctd.dir, regexp = ctd.cast.pattern) %>% 
+    path_filter(regexp = "_processed")
+  
+  # Copy files to plotCTD directory
+  file_copy(ctd.proc, here("Data/CTD"),
+            overwrite = overwrite.files)
 }
 ```  
 ## Get habitat map  
@@ -301,16 +336,20 @@ if (get.nav) {
   }
   
   # Convert nav to spatial
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(leg) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
   
-  # Cast nav to transects
-  nav.legs <- nav.sf %>% 
-    group_by(leg) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("LINESTRING")
+  # # Cast nav to transects
+  # nav.legs <- nav.sf %>% 
+  #   group_by(leg) %>% 
+  #   summarise(do_union = F) %>% 
+  #   st_cast("LINESTRING")
   
   # Save results
-  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
+  save(nav, nav.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
   load(here("Data/NAV/nav_data.Rdata"))
@@ -322,12 +361,29 @@ wpts <- read_csv(here("Data/Nav", wpt.filename))
 # Convert planned transects to sf; CRS = crs.geog
 wpts.sf <- wpts %>% 
   filter(Type %in% wpt.types) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+   mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
 
+# Create transect lines from waypoint files and add line bearing
 transects.sf <- wpts.sf %>% 
   group_by(Type, Transect) %>% 
   summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.),
+         label    = paste("Transect", Transect),
+         popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                       'Distance:', distance, 'nmi<br/>')) 
+
+st_write(transects.sf, here("Output/planned_transects.shp"), 
+         delete_layer = TRUE)
+
+# Convert waypoints back to data frame with projected coordinates
+wpts.proj <- project_sf(wpts.sf, crs = crs.proj)
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -338,7 +394,8 @@ nav.gps <- nav %>%
 write_csv(nav.gps, here("Output/nav.gps.csv"))
 
 # Get most recent vessel position for plotting
-nav.now <- tail(nav.sf, 1) %>% 
+nav.now <- tail(nav, 1) %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   mutate(label = paste("Last position:", datetime, "GMT"))
 ```
 
@@ -390,15 +447,10 @@ bathy_5m_df <- bathy_5m_points %>%
 
 write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
 
-nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(leg) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
-
 # Set padding around data  
 if (resize.map) {
   # Use nav data to resize map to survey progress
-  map.bounds <- nav_sf %>% 
+  map.bounds <- nav.sf %>% 
     st_transform(crs = crs.proj) %>%
     st_bbox()  
 } else {
@@ -413,7 +465,7 @@ map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$
 map.width  <- map.height*map.aspect
 
 # Create base map
-base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+base.map <- get_basemap(nav.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
@@ -425,17 +477,6 @@ save(base.map, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r map-survey-plan}
-# Create transect lines from waypoint files and add line bearing
-transects.sf <- transects.sf %>% 
-  ungroup() %>% 
-  mutate(distance = round(as.numeric(st_length(.))/1852,1),
-         brg      = 360 + stplanr::line_bearing(.))
-
-st_write(transects.sf, here("Output/planned_transects.shp"), delete_layer = TRUE)
-
-# Convert waypoints back to data frame with projected coordinates
-wpts.proj <- project_sf(wpts.sf, crs = crs.proj)
-
 # Map planned transects
 survey.plan <- base.map +    
   # plot adaptive transects
@@ -499,14 +540,15 @@ For each .CSV file produced during Echoview processing, data within each `r bin.
 ```{r process-backscatter}
 if (process.csv) {
   # Load already processed CSV files 
-  if (length(dir_ls(here("Output"), regexp = "processed_csv.Rdata")) > 0) {
+  if (file.exists(here("Output/processed_csv.Rdata"))) {
+    # Load already processed CSV files
     load(here("Output/processed_csv.Rdata"))
   }
-  
+
   if (process.csv.all) {
     nasc <- data.frame() 
   } else {
-    load(here("Data/Backscatter/nasc_cps.Rdata"))
+    load(here("Data/Backscatter/nasc_all.Rdata"))
   }
   
   # Process CSV files for each vessel
@@ -526,6 +568,7 @@ if (process.csv) {
       
       # Configure progress bar
       pb <- tkProgressBar("R Progress Bar", "CSV File Processing", 0, 100, 0)
+      
       # Process all .CSV files
       for (ii in seq_along(nasc.files)) {
         # Extract vessel nasc
@@ -546,7 +589,11 @@ if (process.csv) {
       close(pb)
       
       # Save/load nasc.vessel (for debugging)
-      save(nasc.vessel, file = here("Output", paste("nasc_vessel_", i, "_RAW.Rdata", sep = "")))
+      save(nasc.vessel, 
+           file = here("Data/Backscatter", i, 
+                       paste("nasc_vessel_", i, "_RAW.Rdata", sep = "")))
+      
+      processed.csv.vessel <- unique(nasc.vessel$filename)
       
       # Save original transect name before modifying
       # Convert date and time to POSIXct
@@ -679,28 +726,42 @@ if (process.csv) {
       # Remove transit data
       if (rm.transit[i]) {
         nasc.vessel <- nasc.vessel %>% 
-          filter(!str_detect(tolower(filename), "transit")) %>% 
-          filter(!str_detect(transect.orig, "\\d\\.5")) # Remove inter-transects e.g., 102.5
+          # Remove based on transit pattern
+          filter(str_detect(transect.orig, nasc.pattern.transit[i], negate = TRUE)) %>%
+          # Remove inter-transects e.g., 102.5
+          filter(str_detect(transect.orig, "\\d\\.5", negate = TRUE)) 
       }
       
       # Remove offshore transects data
       if (rm.offshore[i]) {
+        # Filter based on offshore pattern
         nasc.offshore <- nasc.vessel %>% 
-          filter(str_detect(transect.orig, "\\d{3}O") | str_detect(tolower(filename), "offshore")) 
+          filter(str_detect(transect.orig, nasc.pattern.offshore[i])) 
         
         # Save processed CSV data from each survey vessel
         save(nasc.offshore, 
-             file = here("Output", paste("nasc_vessel_", i, "_offshore.Rdata",sep = "")))
+             file = here("Data/Backscatter", i, 
+                         paste0("nasc_vessel_", i, "_offshore.Rdata")))
         
+        # Filter offshore transects
         nasc.vessel <- nasc.vessel %>% 
-          filter(!str_detect(tolower(filename), "offshore")) %>% 
-          filter(!str_detect(transect.orig, "\\d{3}O"))  
+          filter(str_detect(transect.orig, nasc.pattern.offshore[i], negate = TRUE)) 
       }
       
       # Remove nearshore transects data
       if (rm.nearshore[i]) {
+        nasc.nearshore <- nasc.vessel %>% 
+          filter(str_detect(transect.orig, nasc.pattern.nearshore[i]) |
+                 str_detect(tolower(filename), "nearshore")) 
+        
+        # Save processed CSV data from each survey vessel
+        save(nasc.nearshore, 
+             file = here("Data/Backscatter", i, 
+                         paste0("nasc_vessel_", i, "_nearshore.Rdata")))
+        
         nasc.vessel <- nasc.vessel %>% 
-          filter(!str_detect(tolower(filename), "nearshore"))  
+          filter(str_detect(transect.orig, nasc.pattern.nearshore[i], negate = TRUE)) %>% 
+          filter(str_detect(tolower(filename), "nearshore", negate = TRUE))
       }
       
       # Set stop integration depth
@@ -710,10 +771,8 @@ if (process.csv) {
         cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
           mutate(key = paste(lat, long, dist_m),
                  datetime = ymd_hms(paste(date, time))) %>% 
-          filter(!str_detect(tolower(filename), "krill")) # remove data from krill files (1807RL)
-        
-        # For now, assume a direct match between both data frames
-        # nasc.vessel$cps.nasc <- cps.nasc.temp$cps.nasc
+          # Remove data from krill files (1807RL)
+          filter(!str_detect(tolower(filename), "krill")) 
         
         # Join nasc.vessel and cps.nasc on datetime
         nasc.vessel <- nasc.vessel %>% 
@@ -730,21 +789,30 @@ if (process.csv) {
       }
       
       # Save processed CSV data from each survey vessel
-      save(nasc.vessel, file = here("Output", paste("nasc_vessel_", i, ".Rdata",sep = "")))
+      save(nasc.vessel, file = here("Data/Backscatter", i, 
+                                    paste0("nasc_vessel_", i, ".Rdata")))
       
       # Combine results from different vessels
       nasc <- bind_rows(nasc, nasc.vessel)
+      
+      # Combine processed.csv.vessel
+      if (exists("processed.csv")) {
+        processed.csv <- c(processed.csv, processed.csv.vessel)
+      } else {
+        processed.csv <- processed.csv.vessel
+      }
     }
   }  
-  # Save raw NASC file import
-  save(nasc, file = here("Data/Backscatter/nasc_cps.Rdata"))
+  
+  # Save processed NASC file import
+  save(nasc, file = here("Data/Backscatter/nasc_all.Rdata"))
+  
+  # Save processed CSV file names
+  save(processed.csv, file =  here("Output/processed_csv.Rdata"))
+  
 } else {
-  load(here("Data/Backscatter/nasc_cps.Rdata"))
+  load(here("Data/Backscatter/nasc_all.Rdata"))
 }
-
-# List already processed CSV files and save
-processed.csv <- unique(nasc$filename)
-save(processed.csv, file =  here("Output/processed_csv.Rdata"))
 
 # Manually remove transect for 1807RL
 if (survey.name == "1807RL") {
@@ -789,7 +857,8 @@ for (i in nasc.vessels) {
 }
 
 # Add transect numbers to NASC
-nasc <- left_join(select(nasc, -transect), select(tx.order, transect.name, transect))  
+nasc <- left_join(select(nasc, -transect), 
+                  select(tx.order, transect.name, transect))  
 
 # Create survey strata polygons
 source(here("Code/drawStrataSurvey.R"))
@@ -851,7 +920,12 @@ big.nasc <- nasc %>%
   arrange(desc(cps.nasc)) %>%
   mutate(cps.nasc = cps.nasc/19,
          rank = seq(n()),
-         label = paste(transect.name, Interval, sep = "-")) %>% 
+         label = paste0('Transect: ', transect,
+                        ' - Distance: ', round(dist_m), " m"),
+         popup = paste0('<b>Transect: </b>', transect, '<br/>',
+                        '<b>Time: </b>', min(datetime), "-", max(datetime), ' UTC<br/>',
+                        '<b>Distance: </b>', round(dist_m), ' m<br/>',
+                        '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
   top_n(100, cps.nasc) %>% 
   select(rank, cps.nasc, label, datetime, dist_m, sounder, 
          lat, long, vessel.name) 
@@ -939,7 +1013,8 @@ if (save.figs) {
   # Plot results
   nasc.daynight.plot <- base.map + 
     geom_point(data = nasc.sf, aes(X, Y, colour = day_night, size = day_night)) +
-    geom_shadowtext(data = nasc.sun.labels, aes(X, Y, label = date), color = "black", bg.colour = "white", size = 2) +
+    geom_shadowtext(data = nasc.sun.labels, aes(X, Y, label = date), 
+                    color = "black", bg.colour = "white", size = 2) +
     scale_colour_manual(name = "Time of day", values = c("Day" = "orange", "Night" = "black")) +
     scale_size_manual(name = "Time of day", values = c("Day" = 1, "Night" = 2)) +
     # Configure legend guides
@@ -974,7 +1049,7 @@ Acoustic backscatter is averaged over 2,000-m intervals and plotted along each t
 
 (ref:map-nasc-tx) Survey transects performed aboard _`r survey.vessel`_ overlaid with the distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r cps.depth` to `r int.start`-m deep) ascribed to CPS. Panels are labeled with a) transect names (from Echoview files) and b) transect numbers (used to define sampling strata).
 
-```{r map-nasc-tx,fig.cap='(ref:map-nasc-tx)'}  
+```{r map-nasc-tx, fig.cap='(ref:map-nasc-tx)'}  
 # Create acoustic transect labels for maps
 tx.labels.tmp <- nasc %>% 
   group_by(transect) %>% 
@@ -1003,13 +1078,19 @@ tx.labels <- project_sf(tx.start.labels, crs = crs.proj)
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
 nasc.plot <- nasc %>%
-  select(filename, transect.name, transect, int, lat, long, cps.nasc) %>% 
+  select(filename, transect.name, transect, int, dist_m, datetime, lat, long, cps.nasc) %>% 
   group_by(filename, transect.name, transect, int) %>% 
   summarise(
     lat  = lat[1],
     long = long[1],
-    NASC = mean(cps.nasc)) %>% 
-# Create bins for defining point size in NASC plots%>% 
+    NASC = mean(cps.nasc),
+    label = paste0('Transect: ', transect[1], "; ",
+                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
+                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
+  # Create bins for defining point size in NASC plots%>% 
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
          bin.level =  as.numeric(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
@@ -1199,14 +1280,12 @@ if (get.db) {
   # Save imported database data to .Rdata file
   save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
        file = here("Data/Trawl/trawl_data.Rdata"))
-  # Save imported database data to .Rdata file
-  save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all,
-       file = here("Data/Trawl/trawl_data_SQL.Rdata"))
+  
   # Save species codes
   save(spp.codes, file = here("Output/species_codes.Rdata"))
 } else {
   # Load previously imported database data
-  load(here("Data/Trawl/trawl_data_SQL.Rdata"))
+  load(here("Data/Trawl/trawl_data.Rdata"))
 }
 ```  
 
@@ -1214,6 +1293,10 @@ if (get.db) {
 Haul data are filtered, foramatted, and assigned to clusters, where a trawl cluster contains only trawls conducted on the same evening (i.e., the difference in equilibrium time between trawls in the same cluster is < 12 h).
 
 ```{r process-trawl-haul-data}
+# Save image
+# save.image(here("Data/debug_img.Rdata"))
+# load(here("Data/debug_img.Rdata"))
+
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
@@ -1281,8 +1364,7 @@ haul <- haul.all %>%
   # Remove bad trawls
   filter(haul, trawlPerformance %in% trawl.performance) %>% 
   # Assign cluster based on yearday
-  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% 
-  droplevels() # Remove unused factor levels
+  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
 
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
@@ -1290,6 +1372,11 @@ haul.mid <- haul %>%
   summarise(
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
     long = mean(c(startLongDecimal, stopLongDecimal)))
+
+# Convert to sf for plotting
+haul.mid.sf <- haul.mid %>% 
+  mutate(label = paste("Haul", haul)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 # Convert haul paths and midpoints to sf; CRS = crs.geog
 # Create haul paths from starts and ends
@@ -1301,10 +1388,6 @@ haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal)
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") 
 
-haul.locs.sf <- haul.mid %>% 
-  mutate(label = paste("Haul", haul)) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
-
 # Find midpoint of each haul cluster as the average of haul midpoints
 cluster.mid <- haul.mid %>% 
   group_by(cluster) %>% 
@@ -1313,10 +1396,10 @@ cluster.mid <- haul.mid %>%
     long = mean(long)) 
 
 # Conver cluster midpoints to projected points
-cluster.locs.sf <- cluster.mid %>% 
+cluster.mid.sf <- cluster.mid %>% 
   st_as_sf(coords = c("long", "lat"), crs = crs.geog)
 
-cluster.locs.proj <- project_sf(cluster.locs.sf, crs = crs.proj)
+cluster.mid.proj <- project_sf(cluster.mid.sf, crs = crs.proj)
 
 # Save haul data
 save(haul, file = here("Output/haul_info.Rdata"))
@@ -1390,11 +1473,11 @@ if (save.figs) {
     # Plot trawl paths
     geom_sf(data = haul.paths) +
     # Plot trawl midpoint
-    geom_sf(data = haul.locs.sf, shape = 4, colour = "red") +
+    geom_sf(data = haul.mid.sf, shape = 4, colour = "red") +
     # Plot cluster midpoint
-    geom_point(data = cluster.locs.proj, aes(X, Y), colour = "green", shape = 21) +
+    geom_point(data = cluster.mid.proj, aes(X, Y), colour = "green", shape = 21) +
     geom_shadowtext(
-      data = cluster.locs.proj, aes(X, Y, label = cluster),
+      data = cluster.mid.proj, aes(X, Y, label = cluster),
       colour = "black", bg.colour = "white", size = 2) +
     # Plot panel label
     ggtitle("Trawl clusters") +
@@ -1416,80 +1499,6 @@ include_graphics(here("Figs/fig_trawl_cluster_map.png"))
 Catch data are filtered, formatted, summarized by weight, and formatted for plotting.
 
 ```{r process-catch-data, message=FALSE}
-# # Filter catch data
-# catch <- catch.all %>% 
-#   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-#   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-#            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-#   left_join(select(haul, haul, cluster)) %>% 
-#   mutate(key = paste(haul, scientificName),
-#          totalWeight = subSampleWtkg + remainingSubSampleWtkg)
-# 
-# if (nrow(catch) > 0) {
-#   # Summarize trawl catch by species
-#   haul.summ.wt <- dcast(dplyr::select(catch, haul, cluster, scientificName, totalWeight),
-#                          haul + cluster ~ scientificName, sum)
-#   
-#   # Add species with zero total weight
-#   if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
-#   if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
-#   if (is.null(haul.summ.wt$`Scomber japonicus`))     {haul.summ.wt$`Scomber japonicus`     <- 0}
-#   if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
-#   if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
-#   if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
-#   
-#   # Calculate total weight of all CPS species
-#   haul.summ.wt <- haul.summ.wt %>% 
-#     mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
-#   
-#   # Summarise catch by cluster
-#   cluster.summ.wt <- haul.summ.wt %>% 
-#     select(-haul, -AllCPS) %>% 
-#     group_by(cluster) %>% 
-#     summarise_all(list(sum)) %>% 
-#     mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
-#     right_join(cluster.mid) %>% 
-#     rename("Jacksmelt"  = "Atherinopsis californiensis",
-#            "PacHerring" = "Clupea pallasii",
-#            "Anchovy"    = "Engraulis mordax",
-#            "Sardine"    = "Sardinops sagax",
-#            "PacMack"    = "Scomber japonicus",
-#            "JackMack"   = "Trachurus symmetricus") %>% 
-#     replace(is.na(.), 0)
-#   
-#   # Add lat/long to haul summary for plotting
-#   haul.summ.wt <- haul.summ.wt %>% 
-#     right_join(haul.mid) %>% 
-#     rename("Jacksmelt"  = "Atherinopsis californiensis",
-#            "PacHerring" = "Clupea pallasii",
-#            "Anchovy"    = "Engraulis mordax",
-#            "Sardine"    = "Sardinops sagax",
-#            "PacMack"    = "Scomber japonicus",
-#            "JackMack"   = "Trachurus symmetricus") %>% 
-#     replace(is.na(.), 0)
-#   
-# } else {
-#   # Summarize trawl catch by species
-#   haul.summ.wt <- bind_cols(select(haul, haul, cluster),
-#                              data.frame(
-#                                "Jacksmelt"  = rep(0, nrow(haul)),
-#                                "PacHerring" = rep(0, nrow(haul)),
-#                                "Anchovy"    = rep(0, nrow(haul)),
-#                                "Sardine"    = rep(0, nrow(haul)),
-#                                "PacMack"    = rep(0, nrow(haul)),
-#                                "JackMack"   = rep(0, nrow(haul)),
-#                                "AllCPS"     = rep(0, nrow(haul)))) %>% 
-#     right_join(haul.mid)
-#                              
-#   # Summarise catch by cluster
-#   cluster.summ.wt <- haul.summ.wt %>% 
-#     select(-haul, -AllCPS) %>% 
-#     group_by(cluster) %>% 
-#     summarise_all(funs(sum)) %>% 
-#     mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
-#     right_join(cluster.mid) 
-# }
-
 # # Prepare catch data for plotting ----------------------------------------------
 # # Select and rename trawl data for pie charts
 # catch.pie <- cluster.summ.wt %>% 
@@ -1527,61 +1536,133 @@ catch <- catch.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
   left_join(select(haul, haul, cluster)) %>% 
-  mutate(key = paste(haul, scientificName),   # Create key for merging datasets
-         totalWeight = subSampleWtkg + remainingSubSampleWtkg) # Compute total weight
+  mutate(key = paste(haul, scientificName),  
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg) 
 
 save(catch, file = here("Output/catch_final.Rdata"))
 
 # Summarize trawl catch by species
-catch.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
-                       haul + cluster ~ scientificName, sum)
+# haul.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
+#                        haul + cluster ~ scientificName, sum)
+haul.summ.wt <- catch %>% 
+  select(haul, cluster, scientificName, totalWeight) %>% 
+  tidyr::spread(scientificName, totalWeight) %>% 
+  replace(is.na(.), 0)
 
 # Add species with zero total weight
-if (is.null(catch.summ.wt$`Engraulis mordax`))      {catch.summ.wt$`Engraulis mordax`      <- 0}
-if (is.null(catch.summ.wt$`Sardinops sagax`))       {catch.summ.wt$`Sardinops sagax`       <- 0}
-if (is.null(catch.summ.wt$`Scomber japonicus`))     {catch.summ.wt$`Scomber japonicus`     <- 0}
-if (is.null(catch.summ.wt$`Trachurus symmetricus`)) {catch.summ.wt$`Trachurus symmetricus` <- 0}
-if (is.null(catch.summ.wt$`Clupea pallasii`))       {catch.summ.wt$`Clupea pallasii`       <- 0}
-if (is.null(catch.summ.wt$`Atherinopsis californiensis`)) {catch.summ.wt$`Atherinopsis californiensis` <- 0}
+if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+if (!has_name(haul.summ.wt, "Sardinops sagax"))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+if (!has_name(haul.summ.wt, "Scomber japonicus"))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+
+# haul.summ.wt <- haul.summ.wt %>% 
+#   select(-haul, -AllCPS) %>% 
+#   group_by(cluster) %>% 
+#   summarise_all(list(sum)) %>% 
+#   mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+#   left_join(cluster.mid) %>% 
+#   rename("Jacksmelt"  = "Atherinopsis californiensis",
+#          "PacHerring" = "Clupea pallasii",
+#          "Anchovy"    = "Engraulis mordax",
+#          "Sardine"    = "Sardinops sagax",
+#          "PacMack"    = "Scomber japonicus",
+#          "JackMack"   = "Trachurus symmetricus")
 
 # Calculate total weight of all CPS species
-catch.summ.wt <- catch.summ.wt %>% 
-  mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
+haul.summ.wt <- haul.summ.wt %>% 
+  mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>%
+  # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
+  rename("Jacksmelt"  = "Atherinopsis californiensis",
+         "PacHerring" = "Clupea pallasii",
+         "Anchovy"    = "Engraulis mordax",
+         "Sardine"    = "Sardinops sagax",
+         "PacMack"    = "Scomber japonicus",
+         "JackMack"   = "Trachurus symmetricus") %>% 
+    replace(is.na(.), 0)
 
 # Summarise catch by cluster
-cluster.summ.wt <- catch.summ.wt %>% 
+cluster.summ.wt <- haul.summ.wt %>% 
   select(-haul, -AllCPS) %>% 
   group_by(cluster) %>% 
-  summarise_all(funs(sum)) %>% 
-  mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
-  left_join(cluster.mid) %>% 
-  rename("Jacksmelt"  = "Atherinopsis californiensis",
-         "PacHerring" = "Clupea pallasii",
-         "Anchovy"    = "Engraulis mordax",
-         "Sardine"    = "Sardinops sagax",
-         "PacMack"    = "Scomber japonicus",
-         "JackMack"   = "Trachurus symmetricus")
+  summarise_all(list(sum)) %>% 
+  mutate(AllCPS = rowSums(select(., -cluster))) %>% 
+  right_join(cluster.mid) %>% 
+  replace(is.na(.), 0)
+
+# Prepare catch data for plotting ----------------------------------------------
+# Select and rename trawl data for pie charts
+catch.pie <- cluster.summ.wt %>% 
+  select(cluster, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
+# Project pie data
+catch.pie <- project_sf(catch.pie, crs.proj) 
+
+# Filter for positive trawls
+cluster.pos <- filter(catch.pie, AllCPS > 0) %>% 
+  arrange(desc(X))
+
+if (nrow(cluster.pos) > 0) {
+  # Substitute very small value for species with zero catch, just for pie charts
+  cluster.pos <- cluster.pos %>% 
+    replace(. == 0, 0.0000001) 
+}
+
+# Filter for empty trawls
+cluster.zero <- filter(catch.pie, AllCPS == 0)
+
+
+# Calculate pie radius based on latitude range
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
+
+# Calculate pie radius of each pie, based on All CPS landings
+if (scale.pies) {
+  catch.pie$radius <- pie.radius*catch.pie$bin
+} else {
+  catch.pie$radius <- pie.radius
+}
+# 
+# # Filter for positive trawls
+# cluster.pos <- filter(catch.pie, AllCPS > 0)
+# 
+# # Substitute very small value for species with zero catch, just for pie charts
+# if (nrow(cluster.pos) > 0) {
+#   cluster.pos <- cluster.pos %>%
+#     replace(. == 0, 0.0000001)
+# }
+# 
+# # Filter for empty trawls
+# cluster.zero <- filter(catch.pie, AllCPS == 0)
+
+# Add catch to haul paths for Leaflet plots
+haul.paths <- haul.paths %>% 
+  left_join(select(haul.summ.wt, -cluster)) %>%
+  replace(is.na(.), 0) %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Haul", haul),
+    popup    = paste('<b>Haul:', haul, '</b><br/>',
+                       'Anchovy:', Anchovy, 'kg<br/>',
+                       'Jack Mackerel:', JackMack, 'kg<br/>',
+                       'P. herring:', PacHerring, 'kg<br/>',
+                       'P. mackerel:', PacMack, 'kg<br/>',
+                       'Sardine:', Sardine, 'kg<br/>',
+                       'All CPS:', AllCPS, 'kg')) 
 
 # Select positive clusters
-super.clusters <- filter(cluster.mid, cluster %in% catch.summ.wt$cluster)
-
-# Combine haul and catch data for plotting
-catch.plot <- left_join(haul, catch.summ.wt) %>% 
-  rename("Jacksmelt"  = "Atherinopsis californiensis",
-         "PacHerring" = "Clupea pallasii",
-         "Anchovy"    = "Engraulis mordax",
-         "Sardine"    = "Sardinops sagax",
-         "PacMack"    = "Scomber japonicus",
-         "JackMack"   = "Trachurus symmetricus")
+super.clusters <- filter(cluster.mid, cluster %in% unique(cluster.pos$cluster))
 
 # Save trawl summary data
-save(catch.summ.wt, file = here("Output/catch_info.Rdata"))
+save(haul.summ.wt, cluster.summ.wt, file = here("Output/catch_summary_wt.Rdata"))
 ```
 
 ```{r get-herring-limits}
 # Get positive herring hauls
-herring.hauls <- catch.summ.wt %>% 
-  select(haul, weight_kg = `Clupea pallasii`) %>% 
+herring.hauls <- haul.summ.wt %>% 
+  select(haul, weight_kg = PacHerring) %>% 
   filter(weight_kg > 0) %>% 
   left_join(select(haul.mid, haul, lat, long))
 
@@ -1626,7 +1707,8 @@ if (nrow(herring.hauls) > 0) {
   if (save.figs) {
     # Create map of herring hauls colored by seabed depth
     herring.map <- base.map + 
-      geom_sf(data = herring.hauls, aes(fill = depth, size = weight_kg), shape = 21) +
+      geom_sf(data = herring.hauls, aes(fill = depth, size = weight_kg), 
+              shape = 21, show.legend = "point") +
       scale_fill_viridis_c("Seabed depth (m)") +
       scale_size_area("Catch (kg)") + 
       ggtitle("Herring trawl locations") +
@@ -1663,10 +1745,10 @@ Trawl hauls where a single species makes up $\geq$ 80% of the catch (by weight) 
 ```{r export-single-species-hauls}
 # Summarize hauls with single species CPS catch for target strength estimation
 # Calculate total sample weight for each CPS species
-catch.ts <- catch.all %>% 
-  left_join(select(spp.codes, species, scientificName, commonName)) %>%
-  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           netSampleType == 'codend' & scientificName %in% cps.spp) %>% 
+catch.ts <- catch %>% 
+  # left_join(select(spp.codes, species, scientificName, commonName)) %>%
+  # filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+  #          netSampleType == 'codend' & scientificName %in% cps.spp) %>% 
   mutate(totalSampleWeight = subSampleWtkg + remainingSubSampleWtkg) 
 
 # Calculate total CPS weight per
@@ -1737,6 +1819,13 @@ include_graphics(here("Figs/fig_haul_target_strength_map.png"))
 
 ```{r assign-trawl-clusters}
 # Assign nearest trawl cluster to each NASC interval -------------------------------------------------------
+# Explore st_vironoi for faster assignment of clusters
+# nasc.env <- st_convex_hull(nav.sf) %>% st_transform(crs = 3310)
+# # 
+# clust <- st_transform(cluster.mid.sf, crs = 3310)
+# 
+# voronoi.clusters <- st_voronoi(clust, envelope = nasc.env)
+
 if (process.csv) {
   # Create varialble for nearest cluster and minumum distance
   cluster.distance <- data.frame(cluster = rep(NA, nrow(nasc)), 
@@ -1798,10 +1887,10 @@ if (save.figs) {
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
     # Plot cluster midpoints
-    geom_text(data = cluster.locs.proj, aes(X, Y, label = cluster),
+    geom_text(data = cluster.mid.proj, aes(X, Y, label = cluster),
               colour = 'gray20', size = 2) +
     # Plot positive trawl cluster midpoints
-    geom_shadowtext(data = filter(cluster.locs.proj, cluster %in% super.clusters$cluster), 
+    geom_shadowtext(data = filter(cluster.mid.proj, cluster %in% super.clusters$cluster), 
                                   aes(X, Y, label = cluster), 
                     size = 2, colour = "black", bg.colour = "white") +
     # Plot panel label
@@ -1827,45 +1916,6 @@ A map showing trawl clusters assigned to 100-m acoustic transect intervals. Clus
 
 ```{r map-trawl-species-proportions}
 # Map trawl species proportions -------------------------------------------------------
-# Select and rename trawl data for pie charts
-catch.pie <- cluster.summ.wt %>% 
-  select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-# catch.pie <- catch.plot %>% 
-#   select(haul, long = startLongDecimal, lat = startLatDecimal, Anchovy, JackMack, 
-#          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-# Replace NA values with minute value for proper pie plotting
-catch.pie[is.na(catch.pie) == TRUE] <- 0
-
-# Bin catch by All CPS landing, for scaling pie radius   
-catch.pie <- catch.pie %>% 
-  mutate(bin = cut(AllCPS, catch.breaks, include.lowest = TRUE, labels = F))
-
-# Calculate pie radius based on latitude range
-pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale) 
-
-# Calculate pie radius of each pie, based on All CPS landings
-if (scale.pies == TRUE) {
-  catch.pie$radius <- pie.radius*catch.pie$bin
-} else {
-  catch.pie$radius <- pie.radius
-} 
-
-catch.pie.proj <- project_sf(catch.pie, crs = crs.proj)
-
-# Filter for positive trawls
-cluster.pos <- filter(catch.pie.proj, AllCPS > 0)
-
-# Substitute very small value for species with zero catch, just for pie charts
-cluster.pos[cluster.pos == 0] <- 0.0000001
-
-# Filter for empty trawls
-cluster.zero <- filter(catch.pie.proj, AllCPS == 0)
-
 if (save.figs) {
   # Create trawl figure
   trawl.catch.plot <- base.map +
@@ -1874,13 +1924,15 @@ if (save.figs) {
                size = 0.5, colour = "gray50", alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("Anchovy","JackMack","Jacksmelt","PacHerring","PacMack","Sardine"),
+                    cols = c("Anchovy", "JackMack", "Jacksmelt",
+                             "PacHerring", "PacMack", "Sardine"),
                     color = 'black', alpha = 0.8) +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy","J. Mackerel","Jacksmelt","P. herring","P. mackerel","Sardine"),
-                      values = c(anchovy.color,jack.mack.color,jacksmelt.color,
-                                 pac.herring.color,pac.mack.color,sardine.color)) +
+                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                                 "P. herring", "P. mackerel", "Sardine"),
+                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                                 pac.herring.color, pac.mack.color, sardine.color)) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
@@ -1896,11 +1948,11 @@ if (save.figs) {
   
   # Save trawl species proportions plot
   ggsave(trawl.catch.plot,
-         filename = here("Figs/fig_trawl_species_proportion_map.png"),
+         filename = here("Figs/fig_trawl_species_proportion_wt.png"),
          width = map.width, height = map.height)
   
   ggsave(nasc.trawl.plot,
-         filename = here("Figs/fig_nasc_cluster_trawl_prop_map.png"),
+         filename = here("Figs/fig_nasc_cluster_trawl_proportion.png"),
          width = map.width*2, height = map.height)
   
   save(trawl.catch.plot,
@@ -1912,10 +1964,10 @@ if (save.figs) {
   load(here("Output/trawl_species_proportion_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_trawl_species_proportion_map.png"))
+include_graphics(here("Figs/fig_trawl_species_proportion_wt.png"))
 ```  
 
-Survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawls with no CPS). Pie radius is scaled relative to total CPS biomass (kg) in each haul.  
+Survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawl clusters with no CPS). 
 
 ## Process trawl length data  
 
@@ -1941,7 +1993,9 @@ if (nrow(lengthFreq.all) > 0) {
   
   for (i in unique(lengths.expanded.all$lengthType)) {
     l.temp <- filter(lengths.expanded.all, lengthType == i)
+    
     names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
+    
     lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
   }
   
@@ -2405,17 +2459,31 @@ if (get.db) {
 #     AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs)
 
 # Select columns and summarize by sample
-cufes <-  
-  select(cufes.all, SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, 
-         Duration, SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, 
-         OtherFishEggs) %>%
-  gather(Species, Counts, -SampleNumber ,-Year, -Ship, -Cruise, -StartLatitude, 
-         -StartLongitude, -Duration) %>% 
-  # Calculate density (eggs/cu. m) from counts, duration, and pump flow rate (0.64 L/mi
-  mutate(Density   = Counts/Duration/0.64,
+# cufes <-  
+#   select(cufes.all, SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, 
+#          Duration, SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, 
+#          OtherFishEggs) %>%
+#   gather(Species, Counts, -SampleNumber ,-Year, -Ship, -Cruise, -StartLatitude, 
+#          -StartLongitude, -Duration) %>% 
+#   # Calculate density (eggs/cu. m) from counts, duration, and pump flow rate (0.64 L/mi
+#   mutate(Density   = Counts/Duration/0.64,
+#          # Create bins for defining point size in NASC plots
+#          bin       = cut(Density,cufes.breaks,include.lowest = TRUE),
+#          bin.level = as.numeric(bin)) %>% 
+#   filter(Cruise %in% cruise.name, Ship %in% cruise.ship, !is.na(Duration)) %>% 
+#   st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog)
+
+cufes <- cufes.all %>% 
+  select(SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, Duration, 
+         SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+         Comments) %>%
+  gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
+         -StartLatitude, -StartLongitude, -Duration, -Comments) %>% 
+  mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
-         bin       = cut(Density,cufes.breaks,include.lowest = TRUE),
+         bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
+  left_join(select(cufes.all, SampleNumber, Start, Stop)) %>% 
   filter(Cruise %in% cruise.name, Ship %in% cruise.ship, !is.na(Duration)) %>% 
   st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog)
 
@@ -2490,18 +2558,18 @@ if (save.figs) {
                                      ncol = 1, labels = c("a)", "b)", "c)"))
   # Save maps
   ggsave(nasc.cufes.trawl.plot, 
-         filename = here("Figs/fig_nasc_cufes_trawl_map.png"),
+         filename = here("Figs/fig_nasc_cufes_trawl.png"),
          width = map.width*3, height = map.height)
   
   ggsave(nasc.cufes.trawl.plot.long, 
-         filename = here("Figs/fig_nasc_cufes_trawl_map_long.png"),
+         filename = here("Figs/fig_nasc_cufes_trawl_long.png"),
          width = map.width, height = map.height*3)
   
   save(nasc.cufes.trawl.plot, nasc.cufes.trawl.plot.long, 
        file = here("Output/nasc_cufes_trawl_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_nasc_cufes_trawl_map_long.png"))
+include_graphics(here("Figs/fig_nasc_cufes_trawl_long.png"))
 ```
 
 # Calculate target strengths (TS) from lengths 
@@ -2514,8 +2582,10 @@ View the parameters used to estimate target strength in the estimate.ts function
 # Currently these variable are not used; rather variables are hard-coded
 # in the estimate.ts() function above
 ts.vars <- read.csv(here("Data/Acoustic/ts_variables.csv"))
+
 # Estimate TS
 ts.df <- estimate_ts(lengths$scientificName, lengths$totalLength_mm)
+
 # Add TS estimates to lengths data frame
 lengths <- bind_cols(lengths, select(ts.df, -species, -TL)) %>% 
   # Add cluster to lengths data frame
@@ -2534,6 +2604,7 @@ To determine whether target strength is being calculated correctly, compare targ
 ```{r plot-target-strength}
 # Calculate theoretical TS for each species
 ts.theory <- data.frame()
+
 for (i in unique(length.max$species)) {
   ts.theory <- bind_rows(ts.theory,
                          estimate_ts(i, seq(0, length.max$sl[length.max$species == i]*10, 0.5)))
@@ -2730,7 +2801,7 @@ write.csv(ts.summ, file = here("Output/ts_summ_cluster.csv"),
           quote = F, row.names = F)
 
 # Subset sardine results
-ts.sub.sar <- filter(ts.summ,scientificName == "Sardinops sagax") %>% 
+ts.sub.sar <- filter(ts.summ, scientificName == "Sardinops sagax") %>% 
   select(-scientificName)
 names(ts.sub.sar) <- paste(names(ts.sub.sar),"sar", sep = ".")
 # Subset anchovy results
@@ -2776,7 +2847,7 @@ catch.summ.num <- clf %>%
                           num.jack, num.her, na.rm = TRUE))
 
 # Calculate total CPS weight in each cluster
-catch.summ.wt <- catch %>% 
+haul.summ.wt <- catch %>% 
   filter(scientificName %in% cps.spp) %>% 
   group_by(cluster) %>% 
   summarise(CPS.wg = sum(totalWeight))
@@ -2833,7 +2904,7 @@ write.csv(ts.proportions, file = here("Output/ts_proportions_raw.csv"),
 # Add cluster weights, numbers, and TS proportions
 clf <- clf %>% 
   left_join(catch.summ.num, by = 'cluster') %>% 
-  left_join(catch.summ.wt,  by = 'cluster') %>% 
+  left_join(haul.summ.wt,   by = 'cluster') %>% 
   left_join(ts.proportions, by = 'cluster')
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
@@ -2862,6 +2933,7 @@ Acoustic proportions of CPS are mapped for each positive trawl cluster by a) num
 acoustic.pie.indiv <- clf %>%
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
          prop.mack, prop.sar) %>% 
+  replace(is.na(.), 0) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 acoustic.pie.indiv <- project_sf(acoustic.pie.indiv, crs = crs.proj)
@@ -2869,13 +2941,14 @@ acoustic.pie.indiv <- project_sf(acoustic.pie.indiv, crs = crs.proj)
 acoustic.pie.wg <- clf %>%
   select(cluster, lat, long, prop.anch.wg, prop.jack.wg, prop.her.wg,
          prop.mack.wg, prop.sar.wg) %>% 
+  replace(is.na(.), 0) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 acoustic.pie.wg <- project_sf(acoustic.pie.wg, crs = crs.proj)
 
-# Replace NA values with minute value for proper pie plotting
-acoustic.pie.indiv[is.na(acoustic.pie.indiv) == TRUE] <- 0
-acoustic.pie.wg[is.na(acoustic.pie.wg) == TRUE] <- 0
+# # Replace NA values with minute value for proper pie plotting
+# acoustic.pie.indiv[is.na(acoustic.pie.indiv) == TRUE] <- 0
+# acoustic.pie.wg[is.na(acoustic.pie.wg) == TRUE] <- 0
 
 if (save.figs) {
   # Create trawl figure
@@ -2930,7 +3003,7 @@ if (save.figs) {
   
   # Save trawl species proportions plots
   ggsave(acoustic.pie.plot.comp,
-         filename = here("Figs/fig_acoustic_proportion_comp_map.png"),
+         filename = here("Figs/fig_trawl_acoustic_proportion_comparison.png"),
          width = map.width*2, height = map.height)
   
   save(acoustic.pie.plot.indiv, acoustic.pie.plot.wg, acoustic.pie.plot.comp,
@@ -2939,7 +3012,7 @@ if (save.figs) {
   load(here("Output/acoustic_proportion_comp_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_acoustic_proportion_comp_map.png"))
+include_graphics(here("Figs/fig_trawl_acoustic_proportion_comparison.png"))
 ```
 
 ## Create final backscatter, CUFES, and acoustic proportion maps
@@ -2976,18 +3049,18 @@ if (save.figs) {
                                      ncol = 1, labels = c("a)", "b)", "c)"))
   # Save maps
   ggsave(nasc.cufes.prop.plot, 
-         filename = here("Figs/fig_nasc_cufes_trawl_prop_map.png"),
+         filename = here("Figs/fig_nasc_cufes_trawl_proportion.png"),
          width = map.width*3, height = map.height)
   
   ggsave(nasc.cufes.prop.plot.long, 
-         filename = here("Figs/fig_nasc_cufes_trawl_prop_map_long.png"),
+         filename = here("Figs/fig_nasc_cufes_trawl_proportion_long.png"),
          width = map.width, height = map.height*3)
   
   save(nasc.cufes.prop.plot, nasc.cufes.prop.plot.long, 
        file = here("Output/nasc_cufes_prop_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_nasc_cufes_trawl_prop_map_long.png"))
+include_graphics(here("Figs/fig_nasc_cufes_trawl_proportion_long.png"))
 ```
 
 
@@ -3179,7 +3252,7 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save map
-  ggsave(here("Figs/fig_acoustic_proportions_map.png"), map.prop.all,
+  ggsave(here("Figs/fig_nasc_acoustic_proportions.png"), map.prop.all,
          width = map.width*3, height = map.height*2)
   
   # Save plot objects
@@ -3189,7 +3262,7 @@ if (save.figs) {
   load(here("Output/acoustic_proportion_maps.Rdata"))
 }
 
-include_graphics(here("Figs/fig_acoustic_proportions_map.png"))
+include_graphics(here("Figs/fig_nasc_acoustic_proportions.png"))
 ```  
 
 ## Summarize biomass density by transect 
@@ -3409,7 +3482,7 @@ nasc.density.summ <- nasc.density.summ %>%
 
 Sampling strata are defined automatically according to survey vessel, transct spacing, coastline features, and acoustic biomass density. For a stratum to be included in the analysis, it must:
 
-* Contain a minimum of `r min.n.tx` transects,
+* Contain a minimum of `r nTx.min` transects,
 * Have a transect with zero biomass at the beginning and end,
 * Have no more than two consecutive zero biomass transects. 
 
@@ -3479,7 +3552,7 @@ if (stratify.manually) {
       strata.df.summ <- strata.df %>% 
         group_by(stratum.key) %>% 
         summarise(n.tx = n()) %>% 
-        filter(n.tx >= min.n.tx) %>% 
+        filter(n.tx >= nTx.min) %>% 
         mutate(stratum = seq(1, n()))
       
       # Remove strata with less than minimum number of transects
@@ -3611,11 +3684,11 @@ strata.summ %>%
   rename(Vessel = vessel.name,
          Species = scientificName) %>% 
   mutate(nTx = cell_spec(nTx, knitr.format, color = "black",
-                     background = ifelse(nTx >= 3,"green","red")),
+                     background = ifelse(nTx >= nTx.min,"green","red")),
          nClust = cell_spec(nClust, knitr.format, color = "black",
-                     background = ifelse(nClust >= 2,"green","red")),
+                     background = ifelse(nClust >= nClusters.min,"green","red")),
          nIndiv = cell_spec(nIndiv, knitr.format, color = "black",
-                     background = ifelse(nIndiv >= 10,"green","red"))) %>% 
+                     background = ifelse(nIndiv >= nIndiv.min,"green","red"))) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = F,
         align = c("l","c","r","r","r","r","r")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
@@ -4300,11 +4373,11 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save figure
-  ggsave(here("Figs/fig_acoustic_strata_map.png"), map.stratum.all,
+  ggsave(here("Figs/fig_acoustic_strata.png"), map.stratum.all,
          width = map.width*2.6, height = map.height*1.5)
 }
 
-include_graphics(here("Figs/fig_acoustic_strata_map.png"))
+include_graphics(here("Figs/fig_acoustic_strata.png"))
 ```  
 
 
@@ -4349,7 +4422,7 @@ if (save.figs) {
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
         # Plot vessel track
-        geom_sf(data = nav_sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+        geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
         # Plot zero nasc data
         geom_point(data = filter(nasc.proj, cps.nasc == 0), aes(X, Y),
                    colour = 'gray50',size = 0.15, alpha = 0.5) +
@@ -4405,8 +4478,6 @@ for (i in cps.spp) {
 Assemble together latitude and longitude data from NASC and ERDDAP for matching with CTD and UCTD casts based on time.  
 
 ```{r get-ctd-nav}
-# RESUME HERE #######################################
-
 # Assemble lat/long data from nav and nasc
 ctd.nav <- select(nav, datetime, long, lat) %>% 
   bind_rows(select(nasc, datetime, long, lat)) %>% 
@@ -4418,170 +4489,133 @@ Read header and ASCII files from underway CTD (UCTD) casts and plot results. The
 
 ```{r process-uctd-casts}
 if (process.ctd) {
-  # Process UCTD header files -------------------------------------------------------
-  # List UCTD header files
-  uctd.hdr.files  <- list.files(here("Data/UCTD"), 
-                                pattern = uctd.hdr.pattern, full.names = TRUE)
-  uctd.cast.names <- as.factor(gsub("_processed.asc", "", 
-                                    list.files(here("Data/UCTD"), 
-                                               pattern = uctd.cast.pattern)))
-  # Create a data frame for header info  
-  uctd.hdr.all    <- data.frame()
-  # Configure task bar
-  pb <- tkProgressBar("UCTD Header Processing", 
-                      "UCTD Header Processing", 0, 100, 50)
-  for (i in 1:length(uctd.hdr.files)) {
-    # Create a factor for the cast name
-    cast <- uctd.cast.names[i]
-    # Read header file
-    txt <- readLines(uctd.hdr.files[i])
-    # Extract cast date as POSIXct
-    cast.date  <- as.POSIXct(str_extract(
-      unlist(str_extract_all(txt, 
-                             pattern = '\\*Cast[\\s\\S]*end')),
-                                       '\\d{2}\\s\\w{3}\\s\\d{4}\\s\\d{2}:\\d{2}:\\d{2}'),
-                             format  = "%d %b %Y %H:%M:%S")
-    if (length(cast.date) == 0) {
-      cast.date  <- as.POSIXct(str_extract(
-        unlist(str_extract_all(txt, 
-                               pattern = '\\*Cast[\\s\\S]*stop')),
-                                         '\\d{2}\\s\\w{3}\\s\\d{4}\\s\\d{2}:\\d{2}:\\d{2}'),
-                               format  = "%d %b %Y %H:%M:%S")
+  # Process UCTD header files #####
+  # List raw UCTD ASCII files
+  uctd.hdr <- dir_ls(here("Data/UCTD"), regexp = uctd.hdr.pattern) %>% 
+    path_filter(regexp = "_processed", invert = TRUE)
+  
+  # Plot UCTD casts
+  if (length(uctd.hdr) == 0) {
+    # Create empty figure if no UCTD casts present
+    df <- data.frame()
+    
+    uctd.empty <- ggplot(df) + geom_point() + 
+      xlim(0,10) + ylim(0,10) + 
+    annotate('text', 5, 5, label = 'No UCTD Casts', size = 6, fontface = 'bold') +
+    theme_bw()  
+  
+  # Save blank figure
+  ggsave(uctd.empty, filename = here("Figs/fig_uctd_missing.png"))
+  
+} else {
+  if (process.ctd) {
+    # Create a data frame for header info  
+    all.uctd.hdr <- data.frame()
+    
+    for (i in uctd.hdr) {
+      # Extract header information
+      all.uctd.hdr <- bind_rows(all.uctd.hdr,
+                                extract_ctd_header(i, type = "UCTD"))
     }
-    # Extract probe serial number
-    sn <- as.numeric(str_extract(
-        unlist(str_extract_all(txt, 
-                               pattern = '\\*SerialNumber=\\d{8}'))[1],"\\d{8}"))
-    # Assemble a temporary data frame and add to uctd.hdr.all
-    uctd.hdr.all <- bind_rows(uctd.hdr.all, 
-                              data.frame(cast, cast.date, sn))
-    # Update the progress bar
-    pb.prog <- round(i/length(uctd.hdr.files)*100)
-    info <- sprintf("%d%% done", pb.prog)
-    setTkProgressBar(pb, pb.prog, 
-                     sprintf("UCTD Header Processing (%s)", info), info)
+    
+    # Process UCTD cast files --------------------------------------------------
+    # List processed UCTD cast files
+    uctd.proc <- dir_ls(here("Data/UCTD"), pattern = uctd.cast.pattern) %>% 
+      path_filter(regexp = "_processed")
+    
+    # create a data frame for storing results
+    all.uctd.casts <- data.frame()
+    
+    # Process all UCTD casts
+    for (i in uctd.proc) {
+      all.uctd.casts <- bind_rows(all.uctd.casts, 
+                                  extract_ctd_cast(i, type = "UCTD"))
+    }
+    
+    # Arrange and filter results
+    all.uctd.casts <- arrange(all.uctd.casts, cast, scan) %>% 
+      filter(between(S, min.S, max.S)) # Remove bad salinity data
+    
+    # Save results
+    save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc,
+         file = here("Data/UCTD/uctd_data.Rdata"))
+  } else {
+    # Load results
+    load(here("Data/UCTD/uctd_data.Rdata"))
   }
-  # Close progress bar
-  close(pb)
+  
+  # Match UCTD headers to nav data
+  nav.match.uctd <- data.frame()
+  
+  for (i in seq_along(all.uctd.hdr$cast)) {
+    min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], nav$datetime)))
+    nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
+  }
+  
+  # Combine header and nav data
+  all.uctd.hdr <- all.uctd.hdr %>% 
+    bind_cols(nav.match.uctd) %>% 
+    mutate(lag = difftime(cast.date, datetime)) %>% 
+    arrange(cast.date)
 
-  # Process UCTD cast files -------------------------------------------------------
-  # List processed UCTD ASCII files
-  uctd.cast.files <- list.files(here("Data/UCTD"), 
-                                pattern = uctd.cast.pattern, full.names = TRUE)
-  # Create a data frame for storing results
-  uctd.casts.all <- data.frame()
-  # Configure task bar
-  pb <- tkProgressBar("UCTD Cast Processing", 
-                      "UCTD Cast Processing", 0, 100, 50)
-  # Process cast files
-  for (i in 1:length(uctd.cast.files)) {
-    # Read the ucast and rename columns
-    ucast <- read.table(uctd.cast.files[i], header = TRUE)
-    # names(ucast) <- c("scan","C","T","P","Z","dZt","S","sV","flag")
-    names(ucast) <- c("scan","C","T","P","Z","S","Sv","avgsVCM","Dens","Flag")
-    # Calculate time (s) from scan (scan rate is 16 Hz)
-    ucast <- ucast %>% 
-      mutate(
-        scan = scan - 1,
-        s   = scan/16)
-    # calculate time interval (dt, s)
-    ucast$dt[2:dim(ucast)[1]] <- ucast$s[2:dim(ucast)[1]] - 
-      ucast$s[1:(dim(ucast)[1] - 1)]
-    ucast$dt[1] <- ucast$dt[2]
-    # calculate change in depth (dZ, m)
-    ucast$dZ[2:dim(ucast)[1]] <- ucast$Z[2:dim(ucast)[1]] - 
-      ucast$Z[1:(dim(ucast)[1] - 1)]
-    ucast <- ucast %>% 
-      mutate(
-        dZt  =  as.numeric(ma(dZ/dt,order = 5)),
-        Z    = -Z,
-        cast = uctd.cast.names[i])
-    # Add to resultsConductivity Depth Plot
-    uctd.casts.all <- bind_rows(uctd.casts.all, ucast)
-    # Update the progress bar
-    pb.prog <- round(i/length(uctd.cast.files)*100)
-    info <- sprintf("%d%% done", pb.prog)
-    setTkProgressBar(pb, pb.prog, 
-                     sprintf("UCTD Cast Processing (%s)", info), info)
-  }
-  # Close progress bar
-  close(pb)
+  # Summarize uctd casts for water classification
+  uctd.class <- 
+    group_by(all.uctd.casts, cast) %>% 
+    summarise(
+      min.T = min(T),
+      min.S = min(S),
+      max.T = max(T),
+      max.S = max(S)) %>% 
+    # Assign classes based on salinity
+    mutate(class = case_when(
+      min.S <= 31.4 ~ "Type 1",
+      min.S >= 33.4 ~ "Type 2",
+      TRUE ~ "Type 3"))
+
+  # Add water mass to the summary table and cast data for plotting
+  all.uctd.casts <- all.uctd.casts %>% 
+    left_join(select(uctd.class, cast, class))
   
-  # Arrange cast data by cast and scan
-  uctd.casts.all <- uctd.casts.all %>% 
-    arrange(cast, scan) %>% 
-    # Remove out-of-range values
-    filter(S < max.S, S > min.S, 
-           T > min.T, T < max.T)
+  # Summarize UCTD cast results
+  uctd.summ <- all.uctd.casts %>% 
+    group_by(cast) %>% 
+    summarise(
+      time = round(sum(dt),0),
+      max.depth = round(min(Z),0),
+      type = "UCTD") %>%
+    left_join(select(all.uctd.hdr, cast, cast.date, datetime, lat, long, SOG, leg, lag)) %>%
+    left_join(select(uctd.class, cast, class)) %>% 
+    arrange(cast.date) %>%
+    mutate(cast.num = seq(1, n()))
   
-  # save results 
-  save(uctd.casts.all, uctd.hdr.all, uctd.hdr.files, uctd.cast.files,
+  # Add SOG to all.uctd
+  all.uctd.casts <- all.uctd.casts %>% 
+    left_join(select(uctd.summ, cast, SOG)) %>% 
+    mutate(survey = as.factor(survey.name))
+  
+  # Write table to CSV
+  write.csv(uctd.summ, file = here("Output/cast_summary_uctd.csv"), 
+            quote = FALSE, row.names = FALSE)
+
+  # Remove unprocessed casts from the summary
+  uctd.missing <- all.uctd.hdr %>% 
+    filter(!cast %in% unique(all.uctd.casts$cast))
+
+    # Write table to CSV
+  write.csv(uctd.missing, file = here("Output/unprocessed_uctd.csv"), 
+            quote = FALSE, row.names = FALSE)
+    
+  # Exclude bad casts
+  all.uctd.casts <- all.uctd.casts %>%
+    filter(!cast %in% exclude.ctd)
+
+  # Save results
+  save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc,
        file = here("Data/UCTD/uctd_data.Rdata"))
+  }  
 } else {
   load(here("Data/UCTD/uctd_data.Rdata"))
 }
-
-# Match UCTD headers to nav data
-nav.match.uctd <- data.frame()
-for (i in 1:nrow(uctd.hdr.all)) {
-  min.diff <- which.min(abs(difftime(uctd.hdr.all$cast.date[i], ctd.nav$datetime)))
-  nav.match.uctd <- bind_rows(nav.match.uctd,
-                              ctd.nav[min.diff,c("datetime","long","lat") ])
-}
-# Combine header and nav data
-uctd.hdr.all <- uctd.hdr.all %>% 
-  bind_cols(nav.match.uctd) %>%
-  # Calculate lag between cast date and nearest nav record date
-  mutate(lag = round(difftime(cast.date, datetime, units = "mins"), 1)) %>% 
-  arrange(cast.date)
-
-# Summarize UCTD cast results
-uctd.summ <- uctd.casts.all %>% 
-  group_by(cast) %>% 
-  summarise(
-    time = round(sum(dt, na.rm = TRUE),0),
-    max.depth = round(min(Z), 0),
-    type = "UCTD")
-
-# Add log info to summary
-uctd.hdr.all <- uctd.hdr.all %>% 
-  select(cast, cast.date, lat, long, lag) %>% 
-  left_join(uctd.summ) %>% 
-  mutate(cast.num = seq(1, n()))
-
-# Write table to CSV
-write.csv(uctd.hdr.all, file = here("Output/cast_summary_uctd.csv"), 
-          quote = F, row.names = F)
-
-# Add SOG to all.uctd
-uctd.casts.all <- uctd.casts.all %>% 
-  left_join(select(uctd.hdr.all, cast)) %>% 
-  mutate(survey = survey.name)
-# Summarize uctd casts for water classification
-uctd.class <- 
-  group_by(uctd.casts.all, cast) %>% 
-  summarise(
-    min.T = min(T),
-    min.S = min(S),
-    max.T = max(T),
-    max.S = max(S),
-    class = "CC")
-
-# Assign classes based on salinity
-uctd.class$class[uctd.class$min.S <= 31.4] <- "Plume"
-uctd.class$class[uctd.class$min.S >= 33.4] <- "Spicy"
-
-# Add water mass to the summary table and cast data for plotting
-uctd.casts.all <- uctd.casts.all %>% 
-  left_join(select(uctd.class, cast, class)) %>% 
-  left_join(select(uctd.hdr.all, cast, lat, long)) %>% 
-  # Add cast type to data frame
-  mutate(type = 'UCTD')
-
-uctd.hdr.all <- uctd.hdr.all %>% 
-  left_join(select(uctd.class, cast, class)) %>% 
-  select(cast.num, cast, cast.date, lat, long, 
-         time, max.depth, class, type, lag)
 ```  
 
 ### UCTD cast summary  
@@ -4589,19 +4623,21 @@ Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard
 
 ```{r summarize-uctd-casts}
 # Make a copy of uctd.summ
-uctd.table <- select(uctd.hdr.all, -type)
-uctd.table$cast.date <- format(uctd.table$cast.date, "%m/%d/%Y %H:%M:%S") 
-# Rename columns
-names(uctd.table) <- c("Cast","Filename","Date","Lat","Long",
-                       "Dutation","Depth","Class","Lag")
+uctd.table <- uctd.summ %>% 
+  select("Cast" = cast.num, "Filename" = cast, "Date" = cast.date, 
+         "Lat" = lat, "Long" = long, "Dutation" = time, "Depth" = max.depth,
+         "Class" = class, "Lag" = lag) %>% 
+  mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S"))
+
 # Print table
 uctd.table %>% 
  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                              background = ifelse(Lag <= 1,"white","orange"))) %>% 
+                              background = ifelse(Lag <= 30,"white","orange"))) %>% 
   kable(format = knitr.format,booktabs = TRUE, escape = F,
         digits = c(0,0,0,4,4,0,0,0,0),
         align = c("c","l","c","r","r","r","r","c","r")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = F) %>%
   row_spec(0, align = c("c")) %>% 
   scroll_box(height = "500px")
 ```
@@ -4611,19 +4647,19 @@ Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all
 
 ```{r plot-uctd-casts}
 # Plot temperature data
-uctd.T <- ggplot(data = uctd.casts.all,
+uctd.T <- ggplot(data = all.uctd.casts,
                  aes(T, Z, group = cast, colour = factor(cast))) +
   geom_path(alpha = 0.75) +
   xlab("\nTemperature (C)") + 
   ylab("Depth (m)\n") +
   # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(uctd.casts.all$T),0) - 1,
-                                round(max(uctd.casts.all$T),0) + 1),
-                     breaks = seq(round(min(uctd.casts.all$T),0) - 1, 
-                                  round(max(uctd.casts.all$T),0) + 1, 2),
+  scale_x_continuous(limits = c(round(min(all.uctd.casts$T),0) - 1,
+                                round(max(all.uctd.casts$T),0) + 1),
+                     breaks = seq(round(min(all.uctd.casts$T),0) - 1, 
+                                  round(max(all.uctd.casts$T),0) + 1, 2),
                      expand = c(0,0)) + 
-  scale_y_continuous(limits = c(round(min(uctd.casts.all$Z), digits = -1), 0),
-                     breaks = seq(round(min(uctd.casts.all$Z), digits = -1), 0, 25),
+  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
+                     breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
                      expand = c(0,0)) +
   theme_bw() +
   theme(panel.grid.major = element_line(size = 0.75),
@@ -4631,19 +4667,19 @@ uctd.T <- ggplot(data = uctd.casts.all,
   ggtitle("Temperature")
 
 # Plot salinity data
-uctd.S <- ggplot(data = uctd.casts.all,
+uctd.S <- ggplot(data = all.uctd.casts,
                  aes(S, Z, group = cast, colour = factor(cast))) +
   geom_path(alpha = 0.75) +
   xlab("\nSalinity") + 
   ylab("Depth (m)\n") +
   # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(uctd.casts.all$S),2) - 0.1,
-                                round(max(uctd.casts.all$S),2) + 0.1),
-                     breaks = seq(round(min(uctd.casts.all$S),2) - 0.1, 
-                                  round(max(uctd.casts.all$S),2) + 0.1, 1),
+  scale_x_continuous(limits = c(round(min(all.uctd.casts$S),2) - 0.1,
+                                round(max(all.uctd.casts$S),2) + 0.1),
+                     breaks = seq(round(min(all.uctd.casts$S),2) - 0.1, 
+                                  round(max(all.uctd.casts$S),2) + 0.1, 1),
                      expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(uctd.casts.all$Z),digits = -1),0),
-                     breaks = seq(round(min(uctd.casts.all$Z),digits = -1),0,25),
+  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                     breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
                      expand = c(0,0)) + 
   theme_bw() +
   theme(panel.grid.major = element_line(size = 0.75),
@@ -4651,19 +4687,19 @@ uctd.S <- ggplot(data = uctd.casts.all,
   ggtitle("Salinity")
 
 # Plot salinity data
-uctd.Sv <- ggplot(data = uctd.casts.all,
+uctd.Sv <- ggplot(data = all.uctd.casts,
                   aes(Sv, Z, group = cast, colour = factor(cast))) + 
   geom_path(alpha = 0.75) +
   xlab("\nSound speed (m/s)") + 
   ylab("Depth (m)\n") +
   # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(uctd.casts.all$Sv),0) - 1,
-                                round(max(uctd.casts.all$Sv),0) + 1),
-                     breaks = seq(round(min(uctd.casts.all$Sv),0) - 1, 
-                                  round(max(uctd.casts.all$Sv),0) + 1, 10),
+  scale_x_continuous(limits = c(round(min(all.uctd.casts$Sv),0) - 1,
+                                round(max(all.uctd.casts$Sv),0) + 1),
+                     breaks = seq(round(min(all.uctd.casts$Sv),0) - 1, 
+                                  round(max(all.uctd.casts$Sv),0) + 1, 10),
                      expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(uctd.casts.all$Z),digits = -1),0),
-                     breaks = seq(round(min(uctd.casts.all$Z),digits = -1),0,25),
+  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                     breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
                      expand = c(0,0)) + 
   theme_bw() +
   theme(panel.grid.major = element_line(size = 0.75),
@@ -4685,148 +4721,131 @@ include_graphics(here("Figs/fig_uctd_cast_plots.png"))
 Read header and ASCII files from traditional CTD casts and plot results. The location of each cast is determined by matching the date/time of the cast (extracted from the header; assumes probe was synchronized to the ship's time server) to the navigation data extracted from ERDDAP.  
 
 ```{r process-ctd-casts}
-if (process.ctd) {
-  # list raw UCTD ASCII files
-  ctd.hdr.files  <- list.files(here("Data/CTD"), 
-                               pattern = ctd.hdr.pattern, full.names = TRUE)
-  ctd.cast.names <- as.factor(gsub(".hdr", "", 
-                                   list.files(here("Data/CTD"),
-                                              pattern = ctd.hdr.pattern)))
-  
-  # Extract the deployment time and other info from the header file
-  # Create a data frame for header info
-  ctd.hdr.all <- data.frame()
-  # Configure task bar
-  pb <- tkProgressBar("CTD Header Processing", 
-                      "CTD Header Processing", 0, 100, 50)
-  # Process CTD headers
-  for (i in 1:length(ctd.hdr.files)) {
-    # create a factor for the cast name
-    cast <- ctd.cast.names[i]
-    # scan header for text extraction
-    txt <- readLines(ctd.hdr.files[i])
-    # extract cast date as POSIXct
-     cast.date  <- as.POSIXct(str_extract(
-        unlist(str_extract_all(txt, pattern = '\\* NMEA UTC \\(Time\\).*')),
-        "\\w{3}\\s\\d{2}\\s\\d{4}\\s*\\d{2}:\\d{2}:\\d{2}"),
-        format = "%b %d %Y %H:%M:%S") # * NMEA UTC (Time) = Jun 29 2016 15:15:09
-      if (length(cast.date) == 0) {
-        cast.date  <- as.POSIXct(str_extract(
-          unlist(str_extract_all(
-            txt, pattern = '\\*Cast[\\s\\S]*stop')), 
-          "\\d{2}\\s\\w{3}\\s\\d{4}\\s\\d{2}:\\d{2}:\\d{2}"),
-          format = "%d %b %Y %H:%M:%S")
-      }
-    # assemble a temporary data frame and add to uctd.hdr.all
-    temp.df <- data.frame(cast,cast.date)
-    ctd.hdr.all <- bind_rows(ctd.hdr.all,temp.df)
-    # Update the progress bar
-    pb.prog <- round(i/length(ctd.hdr.files)*100)
-    info <- sprintf("%d%% done", pb.prog)
-    setTkProgressBar(pb, pb.prog, 
-                     sprintf("CTD Header Processing (%s)", info), info)
-  }
-  # Close progress bar
-  close(pb)
-  
-  # Create column for CTD type
-  ctd.hdr.all$type <- "CTD"
-  
-  # list processed CTD ASCII files
-  ctd.cast.files <- list.files(here("Data/CTD"), 
-                               pattern = ctd.cast.pattern, full.names = TRUE)
-  # create a data frame for storing results
-  ctd.casts.all <- data.frame()
-  # Configure progress bar
-  pb <- tkProgressBar("CTD Cast Processing", 
-                      "CTD Cast Processing", 0, 100, 50)
-  # Process CTD casts
-  for (i in 1:length(ctd.cast.files)) {
-    # read the ucast and rename columns
-    cast <- read.table(ctd.cast.files[i],header = TRUE)
-    names(cast) <- c("P","T","C","Z","S","Sv","avgsVCM","Dens","Flag")
-    # make depth negative
-    cast$Z <- -cast$Z
-    # add ucast name to df
-    cast$cast <- ctd.cast.names[i]
-    # add to resultsConductivity Depth Plot
-    ctd.casts.all <- bind_rows(ctd.casts.all,cast)
-    # Update the progress bar
-    pb.prog <- round(i/length(ctd.cast.files)*100)
-    info <- sprintf("%d%% done", pb.prog)
-    setTkProgressBar(pb, pb.prog, 
-                     sprintf("CTD Cast Processing (%s)", info), info)
-  }
-  # Close progress bar
-  close(pb)
+# List raw CTD ASCII files
+ctd.hdr <- dir_ls(here("Data/CTD"), regexp = ctd.hdr.pattern) %>% 
+    path_filter(regexp = "_processed", invert = TRUE)
 
-  # reorder all.ctd.data by cast and depth
-  ctd.casts.all <- arrange(ctd.casts.all,cast,desc(Z))
-  # filter all.ctd.data to remove bad temperature and salinity 
-  ctd.casts.all <- ctd.casts.all %>% 
-    filter(T > min.T,T < max.T) %>% 
-    filter(S > min.S,S < max.S) %>% 
-    droplevels()
+# Create empty figure if no CTD casts present
+if (length(ctd.hdr) == 0) {
+  df <- data.frame()
   
-  # save results
-  save(ctd.casts.all, ctd.hdr.all, ctd.hdr.files, 
-       file = here("Data/CTD/ctd_data.Rdata"))
+  ctd.empty <- ggplot(df) + geom_point() + 
+    xlim(0,10) + ylim(0,10) + 
+    annotate('text', 5, 5, label = 'No CTD Casts', size = 6, fontface = 'bold') +
+    theme_bw()  
+  
+  ggsave(ctd.empty, filename = here("Figs/fig_ctd_missing.png"))
+  
+  # Create empty data frame for missing CTD casts
+  ctd.missing <- data.frame()
+  
 } else {
-  load(here("Data/CTD/ctd_data.Rdata"))
+  if (process.ctd) {
+    # Extract header info
+    all.ctd.hdr <- data.frame()
+    
+    for (i in ctd.hdr) {
+      all.ctd.hdr <- bind_rows(all.ctd.hdr,
+                               extract_ctd_header(i, type = "CTD"))
+    }
+    
+    # Process CTD cast files --------------------------------------------------
+    # List processed CTD cast files
+    ctd.proc <- dir_ls(here("Data/CTD"), regexp = ctd.cast.pattern) %>% 
+      path_filter(regexp = "_processed")
+    
+    # Create a data frame for storing results
+    all.ctd.casts <- data.frame()
+    
+    if (length(ctd.proc) > 0) {
+      for (i in ctd.proc) {
+        all.ctd.casts <- bind_rows(all.ctd.casts, 
+                                   extract_ctd_cast(i, type = "CTD"))
+      }
+    }
+    
+    # Save results
+    save(all.ctd.casts, all.ctd.hdr, ctd.hdr, ctd.proc, 
+         file = here("Data/CTD/ctd_data.Rdata"))
+    
+  } else {
+    load(here("Data/CTD/ctd_data.Rdata"))
+  }
+  
+  # Match UCTD headers to nav data
+  nav.match.ctd <- data.frame()
+  
+  for (i in 1:nrow(all.ctd.hdr)) {
+    min.diff      <- which.min(abs(difftime(all.ctd.hdr$cast.date[i], nav$datetime)))
+    nav.match.ctd <- bind_rows(nav.match.ctd, nav[min.diff, ])
+  }
+  
+  # combine header and nav data
+  all.ctd.hdr <- all.ctd.hdr %>% 
+    bind_cols(nav.match.ctd) %>% 
+    mutate(
+      cast.num = seq(1, n()),
+      type = "CTD",
+      lag = difftime(cast.date, datetime, units = "secs"))
+  
+  if (nrow(all.ctd.casts) > 0) {
+    # reorder all.ctd by cast and depth
+    all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>% 
+      # filter all.ctd to remove bad temperature and salinity 
+      filter(between(T, min.T, max.T)) %>% 
+      filter(between(S, min.S, max.S)) 
+    
+    # calculate max depth of each cast
+    ctd.depth <- all.ctd.casts %>% 
+      group_by(cast) %>% 
+      summarise(max.depth = min(Z))
+    
+    # extract cast number from filename
+    all.ctd.hdr <- all.ctd.hdr %>% 
+      left_join(ctd.depth)
+    
+    # summarize uctd casts for water classification
+    ctd.class <- all.ctd.casts %>% 
+      group_by(cast) %>% 
+      summarise(
+        min.T = min(T),
+        min.S = min(S),
+        max.T = max(T),
+        max.S = max(S)) %>% 
+      # assign classes based on salinity
+      mutate(class = case_when(
+        min.S <= 31.4 ~ "Type 1",
+        min.S >= 33.4 ~ "Type 2",
+        TRUE ~ "Type 3"))
+    
+    all.ctd.hdr <- all.ctd.hdr %>% 
+      left_join(select(ctd.class, cast, class)) %>% 
+      select(cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)
+    
+    # add water mass to the summary table and cast data for plotting
+    all.ctd.casts <- all.ctd.casts %>% 
+      left_join(select(ctd.class, cast, class)) %>% 
+      left_join(select(all.ctd.hdr, cast, leg))  
+    
+    # write table to CSV
+    write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
+              quote = FALSE, row.names = FALSE)
+    
+    # Remove unprocessed casts from the summary
+    ctd.missing <- all.ctd.hdr %>% 
+      filter(!cast %in% all.ctd.casts$cast)
+    
+    # Exclude bad casts
+    all.ctd.casts <- all.ctd.casts %>%
+      filter(!cast %in% exclude.ctd)
+  } else {
+    ctd.missing <- all.ctd.hdr
+  }
+  
+  # write table to CSV
+  write.csv(ctd.missing, file = here("Output/unprocessed_ctd.csv"), 
+            quote = FALSE, row.names = FALSE)
 }
-# Match CTD casts to nav
-nav.match.ctd <- data.frame()
-for (i in 1:nrow(ctd.hdr.all)) {
-  min.diff      <- which.min(abs(difftime(ctd.hdr.all$cast.date[i], 
-                                          ctd.nav$datetime)))
-  nav.match.ctd <- bind_rows(nav.match.ctd, 
-                             ctd.nav[min.diff, c("datetime", "long", "lat")])
-}
-# combine header and nav data
-ctd.hdr.all <- bind_cols(ctd.hdr.all, nav.match.ctd) %>% 
-  mutate(lag = round(difftime(cast.date, datetime, units = "mins"), 1))
-
-# calculate max depth of each cast
-ctd.depth <- ctd.casts.all %>% 
-  group_by(cast) %>% 
-  summarise(max.depth = min(Z))
-
-# extract cast number from filename
-ctd.hdr.all$cast.num <- as.numeric(substr(levels(ctd.hdr.all$cast),
-                                    nchar(levels(ctd.hdr.all$cast)[1]) - 2,
-                                    nchar(levels(ctd.hdr.all$cast)[1])))
-
-ctd.hdr.all <- left_join(ctd.hdr.all, ctd.depth)
-
-# summarize uctd casts for water classification
-ctd.class <- ctd.casts.all %>% 
-  group_by(cast) %>% 
-  summarise(
-     min.T = min(T),
-     min.S = min(S),
-     max.T = max(T),
-     max.S = max(S),
-     class = "CC")
-
-# assign classes based on salinity
-ctd.class$class[ctd.class$min.S <= 31.4] <- "Plume"
-ctd.class$class[ctd.class$min.S >= 33.4] <- "Spicy"
-
-# add water mass to the summary table and cast data for plotting
-ctd.casts.all <- ctd.casts.all %>% 
-  left_join(select(ctd.class, cast, class)) %>% 
-  left_join(select(ctd.hdr.all, cast, lat, long )) %>% 
-  # Add cast type to data frame
-  mutate(type = 'CTD')
-
-ctd.hdr.all <- ctd.hdr.all %>% 
-  left_join(select(ctd.class, cast, class)) %>% 
-  select(cast, cast.num, cast.date, lat, long, 
-                      max.depth, class, type, lag) %>% 
-  arrange(cast.date)
-# write table to CSV
-write.csv(ctd.hdr.all, file = here("Output/cast_summary_ctd.csv"), 
-          quote = F, row.names = F)
 ```  
 
 ### CTD cast summary 
@@ -4834,20 +4853,21 @@ Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r
 
 ```{r summarize-ctd-casts}
 # make a copy of uctd.summ
-ctd.table <- ctd.hdr.all %>% 
-  select(cast.num, cast, cast.date, lat, long, max.depth, class, lag) %>% 
-  mutate(cast.date = format(cast.date, "%m/%d/%Y %H:%M:%S"),
-         lag = cell_spec(lag, knitr.format, color = "black",
-                         background = ifelse(lag <= 1, "white", "orange"))) 
-# Rename columns
-names(ctd.table) <- c("Cast","Filename","Date","Lat","Long",
-                       "Depth","Class","Lag")
+ctd.table <- all.ctd.hdr %>% 
+  select("Cast" = cast.num,  "Filename" = cast, "Date" = cast.date, 
+         "Lat" = lat, "Long" = long, "Depth" = max.depth, "Class" = class, 
+         "Lag" = lag) %>% 
+  mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S")) 
+
 # Print table
 ctd.table %>%
+  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
+                         background = ifelse(Lag <= 30, "white", "orange"))) %>% 
   kable(format = knitr.format,booktabs = TRUE, escape = F,
         digits = c(0,0,0,2,2,0,0,0,0),
         align = c("c","l","c","r","r","r","c","r")) %>% 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                full_width = F) %>%
   row_spec(0, align = c("c")) %>% 
   scroll_box(height = "500px")
 ```  
@@ -4857,19 +4877,19 @@ Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all
 
 ```{r plot-ctd-casts}
 # Plot temperature data
-ctd.T <- ggplot(data = ctd.casts.all, 
+ctd.T <- ggplot(data = all.ctd.casts, 
                 aes(T, Z, group = cast, colour = factor(cast))) + 
   geom_path(alpha = 0.75) +
   xlab("\nTemperature (C)") + 
   ylab("Depth (m)\n") +
   # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(ctd.casts.all$T),0) - 1, 
-                                round(max(ctd.casts.all$T),0) + 1),
-                     breaks = seq(round(min(ctd.casts.all$T),0) - 1, 
-                                  round(max(ctd.casts.all$T),0) + 1, 2),
+  scale_x_continuous(limits = c(round(min(all.ctd.casts$T),0) - 1, 
+                                round(max(all.ctd.casts$T),0) + 1),
+                     breaks = seq(round(min(all.ctd.casts$T),0) - 1, 
+                                  round(max(all.ctd.casts$T),0) + 1, 2),
                      expand = c(0,0)) + 
-  scale_y_continuous(limits = c(round(min(ctd.casts.all$Z),digits = -1), 0),
-                     breaks = seq(round(min(ctd.casts.all$Z),digits = -1), 0, 25),
+  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
                      expand = c(0,0)) +
   theme_bw() +
   theme(panel.grid.major = element_line(size = 0.75),
@@ -4877,19 +4897,19 @@ ctd.T <- ggplot(data = ctd.casts.all,
   ggtitle("Temperature")
 
 # Plot salinity data
-ctd.S <- ggplot(data = ctd.casts.all,
+ctd.S <- ggplot(data = all.ctd.casts,
                 aes(S,Z,group = cast, colour = factor(cast))) + 
   geom_path(alpha = 0.75) +
   xlab("\nSalinity") + 
   ylab("Depth (m)\n") +
   # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(ctd.casts.all$S),2) - 0.1, 
-                                round(max(ctd.casts.all$S),2) + 0.1),
-                     breaks = seq(round(min(ctd.casts.all$S),2) - 0.1, 
-                                  round(max(ctd.casts.all$S),2) + 0.1, 1),
+  scale_x_continuous(limits = c(round(min(all.ctd.casts$S),2) - 0.1, 
+                                round(max(all.ctd.casts$S),2) + 0.1),
+                     breaks = seq(round(min(all.ctd.casts$S),2) - 0.1, 
+                                  round(max(all.ctd.casts$S),2) + 0.1, 1),
                      expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(ctd.casts.all$Z),digits = -1), 0),
-                     breaks = seq(round(min(ctd.casts.all$Z),digits = -1), 0, 25),
+  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
                      expand = c(0,0)) + 
   theme_bw() +
   theme(panel.grid.major = element_line(size = 0.75),
@@ -4897,19 +4917,19 @@ ctd.S <- ggplot(data = ctd.casts.all,
   ggtitle("Salinity")
 
 # Plot salinity data
-ctd.Sv <- ggplot(data = ctd.casts.all, 
+ctd.Sv <- ggplot(data = all.ctd.casts, 
                  aes(Sv, Z, group = cast, colour = factor(cast))) + 
   geom_path(alpha = 0.75) +
   xlab("\nSound speed (m/s)") + 
   ylab("Depth (m)\n") +
   # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(ctd.casts.all$Sv),0) - 1,
-                                round(max(ctd.casts.all$Sv),0) + 1),
-                     breaks = seq(round(min(ctd.casts.all$Sv),0) - 1, 
-                                  round(max(ctd.casts.all$Sv),0) + 1, 10),
+  scale_x_continuous(limits = c(round(min(all.ctd.casts$Sv),0) - 1,
+                                round(max(all.ctd.casts$Sv),0) + 1),
+                     breaks = seq(round(min(all.ctd.casts$Sv),0) - 1, 
+                                  round(max(all.ctd.casts$Sv),0) + 1, 10),
                      expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(ctd.casts.all$Z),digits = -1),0),
-                     breaks = seq(round(min(ctd.casts.all$Z),digits = -1),0,25),
+  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1),0),
+                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1),0,25),
                      expand = c(0,0)) + 
   theme_bw() +
   theme(panel.grid.major = element_line(size = 0.75),
@@ -4920,6 +4940,7 @@ if (save.figs) {
   # Arrange and save temperature, salinity, and sound speed plots
   all.ctd.plots <- plot_grid(ctd.T, ctd.S,ctd.Sv, 
                              nrow = 1, labels = c("a)","b)","c)"))
+  
   ggsave(here("Figs/fig_ctd_cast_plots.png"),all.ctd.plots,
          height = 5,width = 9)
 }
@@ -4931,10 +4952,14 @@ include_graphics(here("Figs/fig_ctd_cast_plots.png"))
 
 ```{r combine-cast-data}
 # Combine all CTD and UCTD cast data in one data frame
-ctd.data.all <- bind_rows(ctd.casts.all, uctd.casts.all)
+ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts)
 
 # Combine all CTD and UCTD cast info in one data frame
-ctd.info.all <- bind_rows(ctd.hdr.all, uctd.hdr.all)
+ctd.info.all <- all.ctd.hdr %>% 
+  bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
+  mutate(type = case_when(
+    str_detect(cast, "UCTD") ~ "UCTD",
+    TRUE ~ "CTD"))
 
 # Save to CSV file
 write.csv(ctd.data.all, file = here("Output/all_ctd_data.csv"), 
@@ -4949,40 +4974,41 @@ UCTD and CTD casts are assigned to acoustic transects so that they may be later 
 
 ```{r assign-ctd-transects}
 if (process.ctd) {
-# Assign nearest acoustic transect to CTD/UCTD cast
-# Create varialble for nearest cluster
-ctd.info.all$transect.name <- NA_character_
-ctd.info.all$transect      <- NA_real_
-
-# Configure progress bar
-pb <- tkProgressBar("CTD Transect Assignment", "CTD Transect", 0, 100, 50)
-
-# Match CTD casts to transects
-for (i in 1:nrow(ctd.info.all)) {
-  # Calculate distance between each CTD/UCTD and all NASC data
-  transect.distance <- distance(ctd.info.all$lat[i], ctd.info.all$long[i], 
-                                nasc$lat, nasc$long, units = "nm")
-  # Assign trawl name and number with minimum distance to the CTD/UCTD cast
-  ctd.info.all$transect.name[i] <- nasc$transect.name[which.min(transect.distance)]
-  ctd.info.all$transect[i]      <- nasc$transect[which.min(transect.distance)]
-  # Update the progress bar
-  pb.prog <- round(i/nrow(ctd.info.all)*100)
-  info <- sprintf("%d%% done", pb.prog)
-  setTkProgressBar(pb, pb.prog, 
-                   sprintf("CTD Transect Assignment (%s)", info), info)
-}
-# Close progress bar
-close(pb)
-
-# Save results
-save(ctd.info.all, file = here("Output/all_ctd_info.Rdata"))
-
+  # Assign nearest acoustic transect to CTD/UCTD cast
+  # Create varialble for nearest cluster
+  ctd.info.all$transect.name <- NA_character_
+  ctd.info.all$transect      <- NA_real_
+  
+  # Configure progress bar
+  pb <- tkProgressBar("CTD Transect Assignment", "CTD Transect", 0, 100, 50)
+  
+  # Match CTD casts to transects
+  for (i in 1:nrow(ctd.info.all)) {
+    # Calculate distance between each CTD/UCTD and all NASC data
+    transect.distance <- distance(ctd.info.all$lat[i], ctd.info.all$long[i], 
+                                  nasc$lat, nasc$long, units = "nm")
+    # Assign trawl name and number with minimum distance to the CTD/UCTD cast
+    ctd.info.all$transect.name[i] <- nasc$transect.name[which.min(transect.distance)]
+    ctd.info.all$transect[i]      <- nasc$transect[which.min(transect.distance)]
+    # Update the progress bar
+    pb.prog <- round(i/nrow(ctd.info.all)*100)
+    info <- sprintf("%d%% done", pb.prog)
+    setTkProgressBar(pb, pb.prog, 
+                     sprintf("CTD Transect Assignment (%s)", info), info)
+  }
+  # Close progress bar
+  close(pb)
+  
+  # Save results
+  save(ctd.info.all, file = here("Output/all_ctd_info.Rdata"))
+  
 } else {
   # Load ctd.info.all
   load(here("Output/all_ctd_info.Rdata"))
 }
 # Convert CTD dataframe so sf for mapping
-ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = 4326) 
+ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = 4326) %>% 
+  mutate(cast.type = type)
 
 ctd.info.proj <- project_sf(ctd.info.sf, crs = crs.proj)
 ```
@@ -5023,8 +5049,10 @@ if (save.figs) {
   # Save maps
   ggsave(here("Figs/fig_ctd_uctd_map.png"), map.ctd.uctd, 
          width = map.width, height = map.height)
+  
   ggsave(here("Figs/fig_ctd_tx_map.png"),   map.ctd.tx,   
          width = map.width, height = map.height)
+  
   ggsave(here("Figs/fig_ctd_map_all.png"),  map.ctd.all,  
          width = map.width*2, height = map.height)
 }
@@ -5037,8 +5065,9 @@ An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click point
 ```{r map-ctd-casts-interactive}
 # Create interactive map of CTD locations
 mapview(nav.sf, color = "black", alpha = 0.5, 
-        layer.name = "Vessel track", col.regions = "black") +
-  mapview(ctd.info.sf, zcol = c("type"), cex = 4, 
+        layer.name = "Vessel track", col.regions = "black",
+        legend = FALSE) +
+  mapview(ctd.info.sf, cex = 4, zcol = "leg",
           layer.name = "CTD Casts", legend = TRUE)
 ```
 
@@ -5056,20 +5085,38 @@ This is currently being done by hand using Juan's CTD "app" and added to the `na
 The map below allows for the interacitve exploration of acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.  
 
 ```{r create-imap-objects, include=FALSE}
-# Convert backscatter data to sf -----------------------------------
-nasc.plot <- nasc.plot %>%
-  # Create bins for defining point size in NASC plots%>% 
-  mutate(type      = "CPS",
-         label     = paste(transect.name, int, sep = "-"),
-         popup     = paste(transect.name, "-", int, ": ", round(NASC, 2), 
-                       " m<sup>2</sup> nmi<sup>-2</sup>", 
-                       sep = "")) 
+# # Convert backscatter data to sf -----------------------------------
+# nasc.plot <- nasc.plot %>%
+#   # Create bins for defining point size in NASC plots%>% 
+#   mutate(type      = "CPS",
+#          label     = paste(transect.name, int, sep = "-"),
+#          popup     = paste(transect.name, "-", int, ": ", round(NASC, 2), 
+#                        " m<sup>2</sup> nmi<sup>-2</sup>", 
+#                        sep = "")) 
+# 
+# 
+# nasc.cps.sf <- nasc %>%
+#   filter(lat != 999, long != 999) %>%
+#   select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
+#   group_by(filename, transect, int) %>% 
+#   summarise(
+#     lat   = lat[1],
+#     long  = long[1],
+#     NASC  = mean(cps.nasc),
+#     label = paste0('Transect: ', transect[1], "; ",
+#                    'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+#     popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+#                    '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
+#                    '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+#                    '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
+#   # Create bins for defining point size in NASC plots
+#   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
+#          bin.level =  as.numeric(bin)) %>% 
+#   filter(!is.na(bin)) %>% 
+#   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 big.nasc.sf <- big.nasc %>% 
   top_n(20, cps.nasc) %>%
-  mutate(popup = paste(label, ": ", round(cps.nasc), 
-                       " m<sup>2</sup> nmi<sup>-2</sup>", 
-                       sep = "")) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326) 
 
 # Convert NASC small nasc data to sf; CRS = 4326 (WGS84)
@@ -5077,8 +5124,8 @@ small.nasc <- nasc.plot %>%
   filter(NASC < 200) 
 
 # Convert CTD and UCTD cast data to sf -----------------------------------
-ctd.sf <- ctd.hdr.all %>%
-  bind_rows(uctd.hdr.all) %>% 
+ctd.sf <- ctd.info.all %>%
+  # bind_rows(all.uctd.hdr) %>% 
   mutate(name = paste(type, cast.num)) %>% 
   select(name, lat, long, max.depth, type) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326) 
@@ -5097,6 +5144,7 @@ haul.catch.sf <- catch.pie %>%
                        'All CPS:', AllCPS, 'kg'))
 
 # Convert CUFES data to sf -----------------------------------
+# Convert CUFES to sf; CRS - crs.geog
 cufes.sf <- cufes %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
   mutate(
@@ -5106,7 +5154,30 @@ cufes.sf <- cufes %>%
       Species == "JackMackerelEggs"~ "Jack mackerel",
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+  # st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  arrange(desc(Density))
+
+cufes.squid.sf <- cufes %>% 
+  filter(Density > 0, Species == "SquidEggs") %>%
+  mutate(
+    spp.label = case_when(
+      Species == "SquidEggs" ~ "Squid",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
     popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) 
+
+cufes.ofe.sf <- cufes %>% 
+  filter(Density > 0, Species == "OtherFishEggs") %>%
+  filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
+                                "S. japonicus"))) %>%
+  mutate(
+    spp.label = case_when(
+      Species == "OtherFishEggs" ~ "Other fish",
+      TRUE ~ Species),
+    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup><br/>", 
+                  '</b>Comment:</b>', Comments))
 
 # Convert negative CUFES samples to sf; CRS - 4326
 cufes.neg.sf <- cufes %>% 
@@ -5117,16 +5188,19 @@ cufes.neg.sf <- cufes %>%
     popup = label)  
 
 # Read State Waters shapefiles -------------------------------
-ca_waters <- st_read(here("Data/GIS/MAN_CA_StateWater.shp")) %>% 
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
   st_transform(4326)
 
 or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>% 
   st_transform(4326)
 
 # Read CA MPAs shapefile --------------------------------------
-ca_mpas <- st_read(here("Data/GIS/MPA_CA_Existing.shp")) %>% 
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
   st_transform(4326) %>% 
   mutate(MPA = paste(NAME, Type))
+
+or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>% 
+  st_transform(crs.geog) 
 
 # Read CA MPAs shapefile --------------------------------------
 nms <- st_read(here("Data/GIS/national_marine_sanctuaries.shp")) %>% 
@@ -5153,7 +5227,10 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 imap.bounds <- map_bounds(nasc$lat, nasc$long, 0.1) 
 
 # Create color palette for MPAs
-mpaPal  <- colorFactor(topo.colors(10), ca_mpas$Type)
+all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
+                   unique(as.character(or_mpas$Label))))
+
+mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
 # Create color palette for NASC
 nascPal <- colorFactor(nasc.colors.all, nasc.sf$bin.level)
 # Create color pallette for CUFES
@@ -5165,8 +5242,8 @@ cpsPal <- colorFactor(
   c("Engraulis mordax","Trachurus symmetricus","Atherinopsis californiensis",
     "Clupea pallasii","Scomber japonicus","Sardinops sagax"))
 # Create color pallette for planned transects
-txPal    <- colorFactor(c("red","blue","green","orange"), 
-                        c("adaptive","compulsory","mammal","saildrone"))
+txPal    <- colorFactor(c("red","blue","orange","green"), 
+                        c("Adaptive","Compulsory","Nearshore","Offshore"))
 # Create color pallette for trawls casts (presently unused)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
@@ -5196,7 +5273,7 @@ i.map <- leaflet() %>%
   addPolylines(data = eez_mex, color = "#000414", weight = 3, 
                label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
   # Add bathymetry contours
-  addPolylines(data = bathy_contours, color = "white", weight = 2, 
+  addPolylines(data = bathy, color = "white", weight = 2, 
                label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
   # Add State waters
   addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
@@ -5212,8 +5289,8 @@ i.map <- leaflet() %>%
   addPolygons(data = nms, color = "#000414", weight = 2, 
               label = ~htmlEscape(NAME), group = "MPAs") %>%
   # Add planned transects
-  addPolylines(data = transects.sf, color = ~txPal(type), weight = 3, 
-               label = ~htmlEscape(paste(type, line)), 
+  addPolylines(data = transects.sf, color = ~txPal(Type), weight = 3, 
+               label = ~htmlEscape(paste(Type, Line)), 
                group = "Planned Transects") %>%
   # addCircleMarkers(data = wpts.sf,
   #                  radius = 3, color = "#000414", stroke = F,

@@ -192,12 +192,27 @@ if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
 nasc.dir               <- c(RL = "PROCESSED/EV/CSV/LASKER",
                             LM = "PROCESSED/EV/CSV/LISA_MARIE",
                             SD = "PROCESSED/EV/CSV/SAILDRONE") 
+# Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
                             LM = "*Final 38 kHz CPS.csv",
                             SD = "*CPS-Final CPS.csv")
+# Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL = "*Juan Krill Final 120.csv",
                             LM = "*Juan Krill Final 120.csv",
                             SD = "*Juan Krill Final 120.csv")
+# Regex pattern for identifying nearshore transects
+nasc.pattern.nearshore <- c(RL = "\\d{3}N",
+                            LM = "\\d{3}N",
+                            SD = "\\d{3}N")
+# Regex pattern for identifying offshore transects
+nasc.pattern.offshore  <- c(RL = "\\d{3}O",
+                            LM = "\\d{3}O",
+                            SD = "\\d{3}O")
+# Regex pattern for identifying transits
+nasc.pattern.transit   <- c(RL = "\\d{3}T",
+                            LM = "\\d{3}T",
+                            SD = "\\d{3}T")
+
 # If T, read cps.nasc from file; else use NASC.50 
 source.cps.nasc        <- c(RL = F,
                             LM = F,
@@ -302,7 +317,7 @@ estimate.offshore  <- FALSE
 # Defines breaks between strata
 max.diff <- 3
 # Defines minimum number of transects in a stratum
-min.n.tx <- 3
+nTx.min <- 3
 
 # Stratum pruning settings
 nIndiv.min    <- 10
