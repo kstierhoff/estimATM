@@ -76,10 +76,10 @@ theme_set(theme_bw())
 # Processing instructions (T/F)
 copy.files      <- F # copy files from source
 download.maps   <- F # download habitat map
-save.figs       <- F # draw plots and maps, or use existing
+save.figs       <- T # draw plots and maps, or use existing
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 process.scs     <- F # process SCS logs, or load processed data
-get.nav         <- F # download nave data from ERDDAP
+get.nav         <- T # download nave data from ERDDAP
 process.csv     <- F # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal     <- F # process calibration results from previous surveys for time series plots
@@ -585,17 +585,6 @@ haul <- haul.all %>%
   droplevels() # Remove unused factor levels
 
 # # Get haul starts
-# haul.starts <- haul %>% 
-#   select(haul, lat = startLatDecimal, long = startLongDecimal)
-# 
-# # Get haul ends
-# haul.ends <- haul %>% 
-#   select(haul, lat = stopLatDecimal, long = stopLongDecimal)
-# 
-# # Create data frame for plotting haul paths
-# haul.paths <- bind_rows(haul.starts, haul.ends) %>% 
-#   arrange(haul)
-
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
   group_by(cluster, haul) %>% 
@@ -640,45 +629,42 @@ catch <- catch.all %>%
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
-  haul.summ.wt <- dcast(dplyr::select(catch, haul, cluster, scientificName, totalWeight),
-                         haul + cluster ~ scientificName, sum)
+  haul.summ.wt <- catch %>% 
+    select(haul, cluster, scientificName, totalWeight) %>% 
+    tidyr::spread(scientificName, totalWeight) 
   
   # Add species with zero total weight
-  if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
-  if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
-  if (is.null(haul.summ.wt$`Scomber japonicus`))     {haul.summ.wt$`Scomber japonicus`     <- 0}
-  if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
-  if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
-  if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (!has_name(haul.summ.wt, "Sardinops sagax"))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (!has_name(haul.summ.wt, "Scomber japonicus"))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
   
   # Calculate total weight of all CPS species
-  haul.summ.wt <- haul.summ.wt %>% 
-    mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
+  haul.summ.wt <- haul.summ.wt %>%  
+    replace(is.na(.), 0) %>% 
+    mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>%
+    # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") 
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS) %>% 
     group_by(cluster) %>% 
     summarise_all(list(sum)) %>% 
-    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
+    mutate(AllCPS = rowSums(select(., -cluster))) %>% 
     right_join(cluster.mid) %>% 
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
     replace(is.na(.), 0)
   
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
     right_join(haul.mid) %>% 
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
     replace(is.na(.), 0)
   
 } else {
@@ -698,9 +684,10 @@ if (nrow(catch) > 0) {
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS) %>% 
     group_by(cluster) %>% 
-    summarise_all(funs(sum)) %>% 
-    mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
-    right_join(cluster.mid) 
+    summarise_all(list(sum)) %>% 
+    mutate(AllCPS = rowSums(select(., -cluster))) %>%
+    right_join(cluster.mid) %>% 
+    replace(is.na(.), 0)
 }
 
 # Prepare catch data for plotting ----------------------------------------------
@@ -1085,7 +1072,7 @@ processed.krill <- unique(nasc.krill$filename)
 save(processed.krill, file =  here("Output/processed_krill.Rdata"))
 
 # Select plot levels for backscatter data
-nasc.plot.all   <- bind_rows(nasc.cps.sf, nasc.krill.sf) %>% 
+nasc.plot.all   <- rbind(nasc.cps.sf, nasc.krill.sf) %>% 
   filter(NASC >= 200)
 ```
 

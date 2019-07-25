@@ -429,40 +429,43 @@ catch <- catch.all %>%
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
-  haul.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
-                         haul + cluster ~ scientificName, sum)
+  haul.summ.wt <- catch %>% 
+    select(haul, cluster, scientificName, totalWeight) %>% 
+    tidyr::spread(scientificName, totalWeight) 
   
   # Add species with zero total weight
-  if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
-  if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
-  if (is.null(haul.summ.wt$`Scomber japonicus`))     {haul.summ.wt$`Scomber japonicus`     <- 0}
-  if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
-  if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
-  if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (!has_name(haul.summ.wt, "Sardinops sagax"))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (!has_name(haul.summ.wt, "Scomber japonicus"))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
   
   # Calculate total weight of all CPS species
-  haul.summ.wt <- haul.summ.wt %>% 
-    mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>% 
+  haul.summ.wt <- haul.summ.wt %>%  
+    replace(is.na(.), 0) %>% 
+    mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>%
+    # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
     rename("Jacksmelt"  = "Atherinopsis californiensis",
            "PacHerring" = "Clupea pallasii",
            "Anchovy"    = "Engraulis mordax",
            "Sardine"    = "Sardinops sagax",
            "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
-    replace(is.na(.), 0)
+           "JackMack"   = "Trachurus symmetricus") 
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS) %>% 
     group_by(cluster) %>% 
     summarise_all(list(sum)) %>% 
-    mutate(AllCPS = rowSums(select(., -cluster))) %>%
+    mutate(AllCPS = rowSums(select(., -cluster))) %>% 
     right_join(cluster.mid) %>% 
     replace(is.na(.), 0)
   
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
-    right_join(haul.mid) 
+    right_join(haul.mid) %>% 
+    replace(is.na(.), 0)
   
 } else {
   # Summarize trawl catch by species
@@ -951,16 +954,17 @@ haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal)
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   left_join(select(haul.catch, -X, -Y, -cluster)) %>% 
+  replace(is.na(.), 0) %>% 
   mutate(
     distance = round(as.numeric(st_length(.))/1852,1),
     label    = paste("Haul", haul),
     popup    = paste('<b>Haul:', haul, '</b><br/>',
-                       'Anchovy:', Anchovy, 'kg<br/>',
-                       'Jack Mackerel:', JackMack, 'kg<br/>',
-                       'P. herring:', PacHerring, 'kg<br/>',
-                       'P. mackerel:', PacMack, 'kg<br/>',
-                       'Sardine:', Sardine, 'kg<br/>',
-                       'All CPS:', AllCPS, 'kg'))
+                     'Anchovy:', Anchovy, 'kg<br/>',
+                     'Sardine:', Sardine, 'kg<br/>',
+                     'Jack Mackerel:', JackMack, 'kg<br/>',
+                     'P. herring:', PacHerring, 'kg<br/>',
+                     'P. mackerel:', PacMack, 'kg<br/>',
+                     'All CPS:', AllCPS, 'kg'))
 
 haul.locs.sf <- haul.mid %>% 
   mutate(label = paste("Haul", haul)) %>% 
@@ -977,12 +981,12 @@ cluster.catch.sf <- catch.pie %>%
   mutate(
     label = paste("Cluster", cluster),
     popup = paste('<b>Cluster:', cluster, '</b><br/>',
-                       'Anchovy:', Anchovy, 'kg<br/>',
-                       'Jack Mackerel:', JackMack, 'kg<br/>',
-                       'P. herring:', PacHerring, 'kg<br/>',
-                       'P. mackerel:', PacMack, 'kg<br/>',
-                       'Sardine:', Sardine, 'kg<br/>',
-                       'All CPS:', AllCPS, 'kg'))
+                  'Anchovy:', Anchovy, 'kg<br/>',
+                  'Sardine:', Sardine, 'kg<br/>',
+                  'Jack Mackerel:', JackMack, 'kg<br/>',
+                  'P. herring:', PacHerring, 'kg<br/>',
+                  'P. mackerel:', PacMack, 'kg<br/>',
+                  'All CPS:', AllCPS, 'kg'))
 
 # Convert CUFES to sf; CRS - crs.geog
 cufes.sf <- cufes %>% 
