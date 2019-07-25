@@ -28,12 +28,12 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
-          knitr,maps,geosphere,Hmisc,ggrepel,png,cowplot,forecast,
+          knitr,maps,geosphere,Hmisc,ggrepel,png,cowplot,forecast,xts,
           RSQLite,geoR,kableExtra,devtools,scatterpie,marmap,magick,
-          beepr,rnaturalearth,shadowtext,here,leaflet,htmltools,
+          beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
           leaflet.extras,maptools,mapview,photobiology,fs,plotly,
           concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,
-          rworldmap,rworldxtra,data.table,xts,stplanr,ggspatial)
+          rworldmap,rworldxtra,data.table,stplanr,ggspatial)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -119,7 +119,7 @@ get.nav           <- T # Download nav data from ERDDAP
 copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
-save.imap         <- F # Save Leaflet maps
+save.imap         <- T # Save Leaflet maps
 do.bootstrap      <- F # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -1669,13 +1669,13 @@ herring.hauls <- haul.summ.wt %>%
 if (nrow(herring.hauls) > 0) {
   # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
   if (get.bathy) {
-    bathy <- getNOAA.bathy(lon1 = min(nasc$long - 1), 
+    noaa.bathy <- getNOAA.bathy(lon1 = min(nasc$long - 1), 
                            lon2 = max(nasc$long + 1),
                            lat1 = max(nasc$lat) + 1, 
                            lat2 = min(nasc$lat) - 1, 
                            resolution = 1)
     # Save bathy results
-    save(bathy, file = paste(here("Data/GIS"), "/bathy_data_",
+    save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
                              survey.name,".Rdata", sep = ""))  
   } else {
     load(paste(here("Data/GIS"), "/bathy_data_",
@@ -1683,7 +1683,7 @@ if (nrow(herring.hauls) > 0) {
   }
   
   # Get depth of positive herring hauls
-  herring.depth <- get.depth(bathy, 
+  herring.depth <- get.depth(noaa.bathy, 
                              herring.hauls$long, 
                              herring.hauls$lat, 
                              locator = F, distance = F) 
@@ -5092,13 +5092,20 @@ The map below allows for the interacitve exploration of acoustic backscatter (_s
 #   filter(!is.na(bin)) %>% 
 #   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
+# big.nasc.sf <- big.nasc %>% 
+#   top_n(20, cps.nasc) %>%
+#   st_as_sf(coords = c("long","lat"), crs = 4326) 
+
 big.nasc.sf <- big.nasc %>% 
   top_n(20, cps.nasc) %>%
-  st_as_sf(coords = c("long","lat"), crs = 4326) 
+  mutate(popup = paste(label, ": ", round(cps.nasc),
+                       " m<sup>2</sup> nmi<sup>-2</sup>",
+                       sep = "")) %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
-# Convert NASC small nasc data to sf; CRS = 4326 (WGS84)
-small.nasc <- nasc.plot %>% 
-  filter(NASC < 200) 
+# # Convert NASC small nasc data to sf; CRS = 4326 (WGS84)
+# small.nasc <- nasc.plot %>% 
+#   filter(NASC < 200) 
 
 # Convert CTD and UCTD cast data to sf -----------------------------------
 ctd.sf <- ctd.info.all %>%
@@ -5109,9 +5116,23 @@ ctd.sf <- ctd.info.all %>%
 
 # Convert trawl data to sf -----------------------------------
 # Convert haul catch to sf and create labels
-haul.catch.sf <- catch.pie %>%
+# haul.catch.sf <- catch.pie %>%
+#   mutate(
+#     label = paste("Haul", cluster),
+#     popup = paste('<b>Cluster:', cluster, '</b><br/>',
+#                        'Anchovy:', Anchovy, 'kg<br/>',
+#                        'Jack Mackerel:', JackMack, 'kg<br/>',
+#                        'P. herring:', PacHerring, 'kg<br/>',
+#                        'P. mackerel:', PacMack, 'kg<br/>',
+#                        'Sardine:', Sardine, 'kg<br/>',
+#                        'All CPS:', AllCPS, 'kg'))
+
+# Convert haul catch to sf and create labels
+cluster.catch.sf <- catch.pie %>%
+  st_as_sf(coords = c("X","Y"), crs = crs.proj) %>%
+  st_transform(crs = crs.geog) %>% 
   mutate(
-    label = paste("Haul", cluster),
+    label = paste("Cluster", cluster),
     popup = paste('<b>Cluster:', cluster, '</b><br/>',
                        'Anchovy:', Anchovy, 'kg<br/>',
                        'Jack Mackerel:', JackMack, 'kg<br/>',
@@ -5159,7 +5180,6 @@ cufes.ofe.sf <- cufes %>%
 # Convert negative CUFES samples to sf; CRS - 4326
 cufes.neg.sf <- cufes %>% 
   filter(Density == 0, Species %in% cufes.plot.spp) %>%
-  # select(SampleNumber, Density, lat = StartLatitude, long = StartLongitude, bin.level) %>%
   mutate(
     label = paste(round(Density, 1), " eggs/cubic m", sep = ""),
     popup = label)  
@@ -5208,10 +5228,10 @@ all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)),
                    unique(as.character(or_mpas$Label))))
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
-# Create color palette for NASC
-nascPal <- colorFactor(nasc.colors.all, nasc.sf$bin.level)
+
 # Create color pallette for CUFES
 cufesPal <- colorFactor(cufes.colors, cufes.sf$Species)
+
 # Create color pallette for CPS species
 cpsPal <- colorFactor(
   c(anchovy.color, jack.mack.color, jacksmelt.color,
@@ -5227,6 +5247,15 @@ trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
 # Create color pallette for CTD casts
 ctdPal <- colorFactor(c("#FFA500", "#A020F0"), c("CTD", "UCTD"))
 
+# Select plot levels for backscatter data
+nasc.levels.all <- sort(unique(nasc.plot$bin.level))
+nasc.labels.all <- nasc.labels[sort(nasc.levels.all)]
+nasc.sizes.all  <- nasc.sizes[sort(nasc.levels.all)]
+nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
+
+# Create color palette for NASC
+nascPal <- colorFactor(nasc.colors.all, nasc.levels.all)
+
 # Remove GEOMETRYCOLLECTION sf strata for Leaflet map
 strata.primary.sub <- strata.primary %>% 
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
@@ -5235,7 +5264,8 @@ strata.nearshore.sub <- strata.nearshore %>%
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
 
 # Create leaflet map
-i.map <- leaflet() %>% 
+i.map <-# Create leaflet map
+leaflet() %>% 
   # Enable tile caching
   enableTileCaching() %>% 
   # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
@@ -5246,7 +5276,7 @@ i.map <- leaflet() %>%
   addPolylines(data = eez_usa, color = "#000414", weight = 3, 
                label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
   addPolylines(data = eez_can, color = "#000414", weight = 3, 
-               label = "EEZ-Canada.", group = "Exclusive Economic Zones") %>% 
+               label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
   addPolylines(data = eez_mex, color = "#000414", weight = 3, 
                label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
   # Add bathymetry contours
@@ -5254,27 +5284,44 @@ i.map <- leaflet() %>%
                label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
   # Add State waters
   addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
+              opacity = 0.75,
               label = ~htmlEscape("OR State Waters"),
               group = "State Waters") %>%
-  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent", 
+  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
+              opacity = 0.75,
               label = ~htmlEscape("CA State Waters"),
               group = "State Waters") %>%
   # Add CA MPAs
-  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Type), fillOpacity = 0.3,
-              label = ~htmlEscape(MPA), popup = ~htmlEscape(MPA), group = "MPAs") %>%
-  # Add National Marine Sanctuaries
-  addPolygons(data = nms, color = "#000414", weight = 2, 
-              label = ~htmlEscape(NAME), group = "MPAs") %>%
-  # Add planned transects
-  addPolylines(data = transects.sf, color = ~txPal(Type), weight = 3, 
-               label = ~htmlEscape(paste(Type, Line)), 
-               group = "Planned Transects") %>%
-  # addCircleMarkers(data = wpts.sf,
-  #                  radius = 3, color = "#000414", stroke = F,
-  #                  fillOpacity = 0.75, fillColor =  ~txPal(type), 
-  #                  label = ~htmlEscape(paste(type, waypoint)),
-  #                  group = "Planned Transects") %>%
-    # Add nearshore stratum polygons
+  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+              fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+  # Add OR MPAs
+  addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+              fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+  # Add core planned transects
+  addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
+               group = "Planned Transects (Core)") %>%
+  addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Core)") %>%
+  # Add ancillary planned transects 
+  addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)), 
+               popup = ~popup,
+               group = "Planned Transects (Ancillary)") %>%
+  addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Ancillary)") %>%
+  # Add nearshore stratum polygons
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Clupea pallasii"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
               group = "Stratum (Herring)") %>%
@@ -5307,53 +5354,64 @@ i.map <- leaflet() %>%
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
               group = "Stratum (J. mackerel)") %>%
   # Add nav data
-  addPolylines(data = nav.sf, color = "#000414", weight = 1, label = "Vessel Track", group = "Vessel Track") %>% 
+  addPolylines(data = nav.sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") %>%
   # Add CUFES data
-  addCircleMarkers(data = cufes.sf,
+  addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
                    popup = ~popup, group = "CUFES Egg Density") %>%
-  addCircleMarkers(data = cufes.neg.sf,
-                   radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
-                   fillOpacity = 0.75, label = ~label,
-                   popup = ~popup, group = "CUFES (Empty)") %>%
+  addCircleMarkers(data = cufes.squid.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
+  addCircleMarkers(data = cufes.ofe.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Other") %>% 
+  addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                   fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                   group = "CUFES (Negative)") %>%
+  
   # Add CTD and UCTD data
   addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
                    weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type), 
                    label = ~htmlEscape(name), group =  "CTD Casts") %>% 
   # Add backscatter data
-  addCircleMarkers(data = nasc.plot, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), label = ~label,
-                   popup = ~popup, group = "Backscatter-CPS") %>%
-  addCircleMarkers(data = small.nasc, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  "#000414", label = ~htmlEscape(label),
+  addCircleMarkers(data = filter(nasc.plot, NASC < 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#000414", 
+                   label = ~label, popup = ~popup, 
                    group = "Backscatter-CPS (Small)") %>%
+  addCircleMarkers(data = filter(nasc.plot, NASC >= 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup,
+                   group = "Backscatter-CPS") %>%
   # Add trawl paths 
-  addPolylines(data = haul.paths.sf, color = c("#000000"), weight = 5, opacity = 0.8, 
-               label = ~paste("Haul", haul), group = "Trawls") %>% 
+  addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+               popup = ~popup, label = ~label, 
+               group = "Trawls") %>% 
   # Add trawl catch
-  addCircleMarkers(data = haul.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+  addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
                    opacity = 0.8, fillOpacity = 1, fillColor =  "white",
                    popup = ~popup, label = ~label,
                    group =  "Trawls") %>%
+  addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
   # Add backscatter outliers
   addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
              group = "Backscatter (Large)") %>%
-  # # Add graticule
-  # addGraticule(interval = 2, group = "Graticule") %>% 
   # Add legends
-  # addLegend("bottomleft", colors = nasc.colors.all,
-  #           values = sort(unique(nasc.plot$bin.level)),
-  #           labels = nasc.labels.all,
-  #           title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
-  #           opacity = 1, group = "Backscatter-CPS") %>%
-  # addLegend("bottomleft", colors = cufes.colors,
-  #           values = sort(unique(cufes.sf$Species)),
-  #           labels = cufes.spp.labels,
-  #           title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
-  #           opacity = 1, group = "CUFES Egg Density") %>%
-  # Add minimap
-  addMiniMap(position = "topright") %>% 
+  leaflet::addLegend("bottomleft", colors = nasc.colors.all,
+                     values = sort(unique(nasc.plot$bin.level)),
+                     labels = nasc.labels.all,
+                     title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Backscatter-CPS") %>%
+  leaflet::addLegend("bottomleft", colors = cufes.colors,
+                     values = sort(unique(cufes.sf$Species)),
+                     labels = cufes.spp.labels,
+                     title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
+                     opacity = 1, group = "CUFES Egg Density") %>%
   # Add scale bar
   addScaleBar(position = "bottomright") %>%
   # Add map coordinates
@@ -5365,20 +5423,26 @@ i.map <- leaflet() %>%
   # Add layer controls
   addLayersControl(
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
-                      "Bathymetry Contours","Planned Transects", "Vessel Track", 
-                      "Trawls","Backscatter-CPS", "Backscatter-CPS (Small)", 
-                      "Backscatter (Large)", "CUFES Egg Density", "CUFES (Empty)",
-                      "CTD Casts", "Stratum (Anchovy)", "Stratum (Sardine)",
+                      "Bathymetry Contours",
+                      "Planned Transects (Core)", "Planned Transects (Ancillary)",
+                      "Vessel Track", "Vessel Positions", "Trawls", "CTD Casts",
+                      "Backscatter-CPS", "Backscatter-CPS (Small)",
+                      "Backscatter-Krill", "Backscatter (Large)",
+                      "CUFES Egg Density", "CUFES Egg Density-Other",
+                      "CUFES Egg Density-Squid", "CUFES (Negative)",
+                      "Stratum (Anchovy)", "Stratum (Sardine)",
                       "Stratum (J. mackerel)", "Stratum (P. mackerel)", 
                       "Stratum (Herring)"),
-    options = layersControlOptions(collapsed = F)) %>% 
-  hideGroup(c("Backscatter (Large)", "CUFES (Empty)","CUFES Egg Density",
-              "MPAs","State Waters",
-              "CTD Casts", "Backscatter-CPS (Small)","Stratum (Anchovy)", 
-              "Stratum (Sardine)", "Stratum (J. mackerel)", 
-              "Stratum (P. mackerel)", "Stratum (Herring)")) %>%  
-  fitBounds(imap.bounds$range.lon[1],imap.bounds$range.lat[1],
-            imap.bounds$range.lon[2],imap.bounds$range.lat[2])
+    options = layersControlOptions(collapsed = F)) %>%  
+  hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)", 
+              "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
+              "Planned Transects (Ancillary)",
+              "Stratum (Anchovy)", "Stratum (Sardine)",
+              "Stratum (J. mackerel)", "Stratum (P. mackerel)", 
+              "Stratum (Herring)", "CTD Casts")) %>% 
+  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+
 
 # Save Leaflet map to HTML file
 if (save.imap) {
@@ -5462,7 +5526,7 @@ for (i in unique(strata.final$scientificName)) {
     st_set_geometry(NULL)
   
   # Get nearshore nasc data
-  nasc.nearshore <- estimate.inshore(nasc.temp, bathy_5m_df) %>% 
+  nasc.nearshore <- estimate_inshore(nasc.temp, bathy_5m_df) %>% 
     mutate(scientificName = i,
            key            = paste(transect, int)) %>% 
     filter(stratum %in% stratum.info.nearshore$stratum)
@@ -5473,11 +5537,11 @@ for (i in unique(strata.final$scientificName)) {
   # Currently has na.rm = TRUE for calculting biomass
   point.estimates <- bind_rows(point.estimates,
                                data.frame(scientificName = i,
-                                          point.estimate(nasc.temp, stratum.info, spp = i)))
+                                          estimate_point(nasc.temp, stratum.info, species = i)))
   
   point.estimates.nearshore <- bind_rows(point.estimates.nearshore,
                                data.frame(scientificName = i,
-                                          point.estimate(nasc.nearshore, stratum.info.nearshore, spp = i)))
+                                          estimate_point(nasc.nearshore, stratum.info.nearshore, species = i)))
 }
 
 # Save results
@@ -5675,7 +5739,7 @@ if (do.bootstrap) {
                                           stratum.info$stratum == j]
       # Calculate biomass using bootstrap function ----
       set.seed(1) # Set seed for repeatable results
-      boot.df <- bootstrap.estimate(nasc.temp, j, stratum.area = stratum.area, 
+      boot.df <- estimate_bootstrap(nasc.temp, j, stratum.area = stratum.area, 
                                     species = i, length.frequency = do.lf, 
                                     cluster.final[[i]], boot.number = boot.num)$data.frame
       # Extract biomass estimates; remove first (point) estimate
@@ -5685,7 +5749,7 @@ if (do.bootstrap) {
       bootstrap.estimates <- bind_rows(bootstrap.estimates, boot.temp)
       
       # Calculate abundance by length class using bootstrap function ----
-      abund.vec <- bootstrap.estimate(nasc.temp, j, stratum.area = stratum.area, 
+      abund.vec <- estimate_bootstrap(nasc.temp, j, stratum.area = stratum.area, 
                                       species = i, length.frequency = do.lf, 
                                       cluster.final[[i]], boot.number = 0)$abundance.vector
       # Extract abundance estimates
@@ -5695,7 +5759,7 @@ if (do.bootstrap) {
       abundance.estimates <- bind_rows(abundance.estimates, abundance.temp)
 
       # Calculate abundance and biomass all ways ----
-      boot.comp.temp <- bootstrap.estimate(nasc.temp, j, stratum.area = stratum.area, 
+      boot.comp.temp <- estimate_bootstrap(nasc.temp, j, stratum.area = stratum.area, 
                                       species = i, length.frequency = do.lf, 
                                       cluster.final[[i]], boot.number = 0)$data.frame
       
@@ -6080,7 +6144,7 @@ if (do.bootstrap) {
                                           strata.nearshore$stratum == j])
       # Calculate biomass using bootstrap function ----
       set.seed(1) # Set seed for repeatable results
-      boot.df <- bootstrap.estimate(nasc.nearshore, j, stratum.area = stratum.area, 
+      boot.df <- estimate_bootstrap(nasc.nearshore, j, stratum.area = stratum.area, 
                                     species = i, length.frequency = do.lf, 
                                     cluster.final[[i]], boot.number = boot.num)$data.frame
       # Extract biomass estimates; remove first (point) estimate
@@ -6090,7 +6154,7 @@ if (do.bootstrap) {
       bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
       
       # Calculate abundance by length class using bootstrap function ----
-      abund.vec <- bootstrap.estimate(nasc.nearshore, j, stratum.area = stratum.area, 
+      abund.vec <- estimate_bootstrap(nasc.nearshore, j, stratum.area = stratum.area, 
                                       species = i, length.frequency = do.lf, 
                                       cluster.final[[i]], boot.number = 0)$abundance.vector
       # Extract abundance estimates

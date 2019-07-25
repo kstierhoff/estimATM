@@ -14,7 +14,7 @@ leaflet() %>%
   addPolylines(data = eez_mex, color = "#000414", weight = 3, 
                label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
   # Add bathymetry contours
-  addPolylines(data = bathy, color = "white", weight = 2, 
+  addPolylines(data = bathy_contours, color = "white", weight = 2, 
                label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
   # Add State waters
   addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
@@ -55,11 +55,41 @@ leaflet() %>%
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
                    group = "Planned Transects (Ancillary)") %>%
+  # Add nearshore stratum polygons
+  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Clupea pallasii"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              group = "Stratum (Herring)") %>%
+  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Engraulis mordax"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
+              group = "Stratum (Anchovy)") %>%
+  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Sardinops sagax"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
+              group = "Stratum (Sardine)") %>%
+  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Scomber japonicus"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
+              group = "Stratum (P. mackerel)") %>%
+  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Trachurus symmetricus"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
+              group = "Stratum (J. mackerel)") %>%
+  # Add primary stratum polygons
+  addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              group = "Stratum (Herring)") %>%
+  addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414", 
+              group = "Stratum (Anchovy)") %>%
+  addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              group = "Stratum (Sardine)") %>%
+  addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              group = "Stratum (P. mackerel)") %>%
+  addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              group = "Stratum (J. mackerel)") %>%
   # Add nav data
-  addPolylines(data = nav_sf, color = "#000414", weight = 1, 
+  addPolylines(data = nav.sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
-  # addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3, 
-  #              label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>%
   # Add CUFES data
   addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
@@ -76,17 +106,18 @@ leaflet() %>%
   addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
                    fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                    group = "CUFES (Negative)") %>%
+  
+  # Add CTD and UCTD data
+  addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
+                   weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type), 
+                   label = ~htmlEscape(name), group =  "CTD Casts") %>% 
   # Add backscatter data
-  addCircleMarkers(data = filter(nasc.sf, NASC < 200), 
+  addCircleMarkers(data = filter(nasc.plot, NASC < 200), 
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  "#000414", 
                    label = ~label, popup = ~popup, 
                    group = "Backscatter-CPS (Small)") %>%
-  # addCircleMarkers(data = nasc.krill.sf, radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-  #                  fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
-  #                  label = ~label, popup = ~popup,
-  #                  group = "Backscatter-Krill") %>% 
-  addCircleMarkers(data = filter(nasc.sf, NASC >= 200), 
+  addCircleMarkers(data = filter(nasc.plot, NASC >= 200), 
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
                    label = ~label, popup = ~popup,
@@ -101,31 +132,20 @@ leaflet() %>%
                    popup = ~popup, label = ~label,
                    group =  "Trawls") %>%
   addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
-  # addMinicharts(catch.pie$X, catch.pie$Y,
-  #               type = "pie",
-  #               chartdata = catch.pie[, c("Anchovy", "JackMack", "Jacksmelt", "PacHerring",
-  #                                         "PacMack", "Sardine")],
-  #               colorPalette = trawlPal,
-  #               width = 30, transitionTime = 0) %>% 
   # Add backscatter outliers
   addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
              group = "Backscatter (Large)") %>%
   # Add legends
-  addLegend("bottomleft", colors = nasc.colors.all, 
-            values = sort(unique(nasc.cps.sf$bin.level)),
-            labels = nasc.labels.all, 
-            title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
-            opacity = 1, group = "Backscatter-CPS") %>% 
-  addLegend("bottomleft", colors = nasc.colors.all, 
-            values = ~sort(unique(nasc.krill.sf$bin.level)),
-            labels = nasc.labels.all, 
-            title = "Krill Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
-            opacity = 1, group = "Backscatter-Krill") %>% 
-  addLegend("bottomleft", colors = cufes.colors, 
-            values = ~sort(unique(cufes.sf$Species)), 
-            labels = cufes.spp.labels, 
-            title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)", 
-            opacity = 1, group = "CUFES Egg Density") %>% 
+  leaflet::addLegend("bottomleft", colors = nasc.colors.all,
+                     values = sort(unique(nasc.plot$bin.level)),
+                     labels = nasc.labels.all,
+                     title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Backscatter-CPS") %>%
+  leaflet::addLegend("bottomleft", colors = cufes.colors,
+                     values = sort(unique(cufes.sf$Species)),
+                     labels = cufes.spp.labels,
+                     title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
+                     opacity = 1, group = "CUFES Egg Density") %>%
   # Add scale bar
   addScaleBar(position = "bottomright") %>%
   # Add map coordinates
@@ -139,14 +159,20 @@ leaflet() %>%
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
-                      "Vessel Track", "Vessel Positions", "Trawls",
+                      "Vessel Track", "Vessel Positions", "Trawls", "CTD Casts",
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
                       "Backscatter-Krill", "Backscatter (Large)",
                       "CUFES Egg Density", "CUFES Egg Density-Other",
-                      "CUFES Egg Density-Squid", "CUFES (Negative)"),
+                      "CUFES Egg Density-Squid", "CUFES (Negative)",
+                      "Stratum (Anchovy)", "Stratum (Sardine)",
+                      "Stratum (J. mackerel)", "Stratum (P. mackerel)", 
+                      "Stratum (Herring)"),
     options = layersControlOptions(collapsed = F)) %>%  
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)", 
               "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
-              "Planned Transects (Ancillary)")) %>% 
+              "Planned Transects (Ancillary)",
+              "Stratum (Anchovy)", "Stratum (Sardine)",
+              "Stratum (J. mackerel)", "Stratum (P. mackerel)", 
+              "Stratum (Herring)", "CTD Casts")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
