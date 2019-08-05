@@ -52,11 +52,11 @@ survey.start.sd  <- "2019-06-13" # Start of Saildrone survey
 survey.end.sd    <- "2019-09-09" # End of Saildrone survey
 
 # Set date range
-erddap.survey.start.sd <- "2019-06-13T00%3A00%3A00Z"
-erddap.survey.end.sd   <- "2019-09-09T19%3A59%3A00Z"
-
+erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2019"
+erddap.survey.start.sd <- "2019-06-18T00%3A00%3A00Z"
+erddap.survey.end.sd   <- "2019-09-30T23%3A59%3A00Z"
 # Configure columns and classes
-erddap.vars.sd       <- c("trajectory,Clatitude,Clongitude")
+erddap.vars.sd       <- c("trajectory,latitude,longitude,time")
 erddap.headers.sd    <- c("saildrone", "lat", "long", "time")
 # erddap.headers.sd    <- c("saildrone","lat","long","COG","HDG","time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")

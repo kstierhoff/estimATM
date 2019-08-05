@@ -56,7 +56,7 @@ source(here("Doc/settings", prj.settings))
 # Control script behavior (usually T)
 save.figs       <- T # Resave figures
 get.nav         <- T # Download nav data from ERDDAP
-get.nav.sd      <- F # Download nav data from ERDDAP
+get.nav.sd      <- T # Download nav data from ERDDAP
 copy.files      <- T # Copy data files from data to plotBio directory
 overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
 process.csv     <- T # Process acoustic backscatter files
@@ -176,9 +176,11 @@ if (get.nav) {
     
     # Get new erddap start date from max date
     erddap.survey.start <- max(date(nav$time))
+  } else {
+    nav.lag <- 24
   }
   
-  if (nav.lag > 24) {
+  if (nav.lag >= 24) {
     # Generate ERDDAP URL
     dataURL <- URLencode(paste(
       "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
@@ -267,35 +269,66 @@ nav.now <- tail(nav.sf, 1) %>%
 
 ```{r get-saildrone-nav}
 if (get.nav.sd) {
+   # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data_saildrone.Rdata"))) {
+    load(here("Data/Nav/nav_data_saildrone.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start.sd <- paste0(format(max(date(nav.sd$time)), ""), "T00%3A00%3A00Z")
+  } else {
+    nav.lag.sd <- 24
+  }
+  
   if (get.nav) {
-    # Generate ERDDAP URL
-    saildroneURL <- URLencode("https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2018.csv0?trajectory%2Clatitude%2Clongitude%2Ctime&time%3E=2018-06-24T00%3A00%3A00Z&time%3C=2018-10-15T19%3A59%3A00Z")
-    
-    # Download and parse ERDDAP nav data
-    nav.sd <- data.frame(read.csv(saildroneURL, header = F, 
-                                  colClasses = erddap.classes.sd, 
-                                  row.names = NULL, skip = 0))
-    names(nav.sd) <- erddap.headers.sd
-    
-    # Filter to remove bad SST values
-    nav.sd <- nav.sd %>% 
-      mutate(datetime = as.POSIXct(time, format = "%FT%T")) %>%
-      filter(!is.nan(lat), !is.nan(long)) %>%
-      filter(long != 0, lat != 0)
+    if (nav.lag.sd >= 24) {
+      # Generate ERDDAP URL
+      saildroneURL <- URLencode(paste0(
+        erddap.url.sd, ".csv0?", erddap.vars.sd,
+        "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
+      
+      # Download and parse ERDDAP nav data
+      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = F, 
+                                         colClasses = erddap.classes.sd, 
+                                         row.names = NULL, skip = 0))
+      names(nav.temp.sd) <- erddap.headers.sd
+      
+      # Filter to remove bad SST values
+      nav.temp.sd <- nav.temp.sd %>% 
+        mutate(datetime = ymd_hms(time)) %>%
+        filter(!is.nan(lat), !is.nan(long)) %>%
+        filter(long != 0, lat != 0)
+      
+      # Append new nav data
+      if (exists("nav.sd")) {
+        nav.sd <- bind_rows(nav.sd, nav.temp.sd) %>% 
+          distinct()
+      } else {
+        nav.sd <- nav.temp.sd
+      }
+    }
     
     # Convert saildrone nav to spatial
-    nav.sd.sf <- st_as_sf(nav.sd, coords = c("long","lat"), crs = crs.geog) %>% 
+    nav.sd.sf <- st_as_sf(nav.sd, coords = c("long","lat"), crs = crs.geog)
+    
+    # Get most recent vessel position for plotting
+    nav.now.sd <- nav.sd.sf %>% 
+      group_by(saildrone) %>% 
+      slice(n()) %>% 
+      mutate(label = paste("Last position:", datetime, "GMT"))
+    
+    # Convert saildrone nav to spatial
+    nav.sd.sf <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
       summarise(do_union = F) %>% 
       st_cast("LINESTRING") %>% 
       mutate(tracklength = st_length(.))
-    
-    sd.1024 <- nav.sd %>% 
-      select(saildrone, lat, long, datetime) %>% 
-      filter(saildrone == 1024)
-    
+
     # Save nav data
-    save(nav.sd, nav.sd.sf, file = here("Data/NAV/nav_data_saildrone.Rdata"))
+    save(nav.sd, nav.sd.sf, nav.now.sd, 
+         file = here("Data/NAV/nav_data_saildrone.Rdata"))
     
     # Create gps.csv files from ERDDAP data
     for (i in unique(nav.sd$saildrone)) {
@@ -360,22 +393,22 @@ if (trawl.source == "Access") {
 
   # Filter haul data for current survey
   haul <- haul.all %>% 
-    dplyr::select(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection,
-                  startLatDecimal, startLongDecimal, stopLatDecimal,
-                  stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes = Notes)
+    select(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection,
+           startLatDecimal, startLongDecimal, stopLatDecimal,
+           stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes = Notes)
   
 } else if (trawl.source == "SQL") {
   # Filter haul data for current survey
   haul <- haul.all %>% 
     mutate(equilibriumTime = ymd_hms(equilibriumTime),
            haulBackTime    = ymd_hms(haulBackTime)) %>% 
-    dplyr::select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
-                  stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
+    select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
+           stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
     filter(cruise %in% cruise.name & ship %in% cruise.ship) 
 
 } else if (trawl.source == "Excel") {
   # Format haul data
-   haul.all <- haul.all %>% 
+  haul.all <- haul.all %>% 
     mutate(
       startLatDecimal  =   DecLatitude,
       startLongDecimal =   DecLongitude,
@@ -385,12 +418,12 @@ if (trawl.source == "Access") {
                                          format(haul.all$EquilibriumTime, 
                                                 format = "%H:%M:%S"))),
       haulBackTime     =   equilibriumTime + minutes(`Duration(dec)`*60))
-
+  
   # Filter haul data for current survey
   haul <- haul.all %>% 
-    dplyr::select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
-                  startLatDecimal,startLongDecimal,stopLatDecimal,
-                  stopLongDecimal,equilibriumTime,haulBackTime)
+    select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
+           startLatDecimal,startLongDecimal,stopLatDecimal,
+           stopLongDecimal,equilibriumTime,haulBackTime)
 }
 
 haul <- haul %>% 
@@ -1230,6 +1263,30 @@ i.map <- leaflet() %>%
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
+# Add Saildrone data
+if (get.nav.sd) {
+  i.map <- i.map %>% 
+    addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3,
+                 label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>% 
+    addMarkers(data = nav.now.sd, label = ~label, group = "Saildrone Positions") %>%
+    addLayersControl(
+    overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+                      "Bathymetry Contours",
+                      "Planned Transects (Core)", "Planned Transects (Ancillary)",
+                      "Vessel Track", "Vessel Positions", "Trawls",
+                      "Backscatter-CPS", "Backscatter-CPS (Small)",
+                      "Backscatter-Krill", "Backscatter (Large)",
+                      "CUFES Egg Density", "CUFES Egg Density-Other",
+                      "CUFES Egg Density-Squid", "CUFES (Negative)",
+                      "Saildrone Tracks", "Saildrone Positions"),
+    options = layersControlOptions(collapsed = F)) %>%  
+  hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)", 
+              "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
+              "Planned Transects (Ancillary)", "Saildrone Tracks", "Saildrone Positions")) %>% 
+  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+}
+
 # Save imap
 dir_create(here("Output/imap"))
 save(i.map, file = here("Output/imap/interactive_explorer.Rdata"))
@@ -1269,38 +1326,40 @@ if (save.figs) {
 }
 ```  
 
-```{r create-saidrone-map, eval=FALSE}
-if (save.figs) {
-  # Create saildrone map
-  saildrone.map <- base.map +
-    geom_sf(data = nav.sd.sf, aes(colour = factor(saildrone))) + 
-    scale_colour_discrete("Saildrone") + 
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+```{r create-saidrone-map}
+if (get.nav.sd) {
+  if (save.figs) {
+    # Create saildrone map
+    saildrone.map <- base.map +
+      geom_sf(data = nav.sd.sf, aes(colour = factor(saildrone)), 
+              show.legend = "line") + 
+      scale_colour_discrete("Saildrone") + 
+      coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+               xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+               ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    
+    # Save map
+    ggsave(saildrone.map, file = here("Figs/fig_saildrone_map.png"),
+           height = map.height, width = map.width)
+  }
   
-  # Save map
-  ggsave(saildrone.map, file = here("Figs/fig_saildrone_map.png"),
-         height = map.height, width = map.width)
+  # Subset tracklengths
+  sd.tracklength <- nav.sd.sf %>% 
+    select(saildrone, tracklength) %>% 
+    mutate(tracklength = as.numeric(tracklength/1000)) %>% 
+    st_set_geometry(NULL)
+  
+  # Summarize saildrone data
+  nav.sd.summ <- nav.sd %>% 
+    group_by(saildrone) %>% 
+    summarise(start = min(datetime), 
+              end = max(datetime),
+              das = n_distinct(date(datetime))) %>% 
+    left_join(sd.tracklength)
+  
+  write_csv(nav.sd.summ, here("Output/saildrone_nav_summary.csv")) 
 }
-
-# Subset tracklengths
-sd.tracklength <- nav.sd.sf %>% 
-  select(saildrone, tracklength) %>% 
-  mutate(tracklength = as.numeric(tracklength/1000)) %>% 
-  st_set_geometry(NULL)
-
-# Summarize saildrone data
-nav.sd.summ <- nav.sd %>% 
-  group_by(saildrone) %>% 
-  summarise(start = min(datetime), 
-            end = max(datetime),
-            das = n_distinct(date(datetime))) %>% 
-  left_join(sd.tracklength)
-
-write_csv(nav.sd.summ, here("Output/saildrone_summary.csv"))
 ```
-
 
 ### Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the `r survey.name` 
 
