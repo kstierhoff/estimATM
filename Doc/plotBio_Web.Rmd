@@ -64,7 +64,7 @@ process.csv     <- T # Process acoustic backscatter files
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- F # Process all CSV files (F = new files only)
+process.csv.all <- T # Process all CSV files (F = new files only)
 save.imap       <- T # Save interactive map using mapshot
 
 # Do all steps
@@ -218,13 +218,13 @@ if (get.nav) {
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
   
   # Cast nav to transects
-  nav.legs <- nav.sf %>% 
+  nav.paths.sf <- nav.sf %>% 
     group_by(leg) %>% 
     summarise(do_union = F) %>% 
     st_cast("LINESTRING")
   
   # Save results
-  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
   load(here("Data/NAV/nav_data.Rdata"))
@@ -264,7 +264,9 @@ write_csv(nav.gps, here("Output/nav.gps.csv"))
 
 # Get most recent vessel position for plotting
 nav.now <- tail(nav.sf, 1) %>% 
-  mutate(label = paste("Last position:", datetime, "GMT"))
+  mutate(label = paste("Last position:", datetime, "UTC"),
+         popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
+                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
 ```
 
 ```{r get-saildrone-nav}
@@ -283,6 +285,7 @@ if (get.nav.sd) {
   }
   
   if (get.nav) {
+    # Update only every 24 h to reduce processing time, especially at sea
     if (nav.lag.sd >= 24) {
       # Generate ERDDAP URL
       saildroneURL <- URLencode(paste0(
@@ -317,17 +320,19 @@ if (get.nav.sd) {
     nav.now.sd <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
       slice(n()) %>% 
-      mutate(label = paste("Last position:", datetime, "GMT"))
+      mutate(label = paste("Saildrone", saildrone, "Last position:", datetime, "UTC"),
+             popup = paste0('<b>Saildrone: </b>', saildrone, '<br/>',
+                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
     
     # Convert saildrone nav to spatial
-    nav.sd.sf <- nav.sd.sf %>% 
+    nav.sd.paths.sf <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
       summarise(do_union = F) %>% 
       st_cast("LINESTRING") %>% 
       mutate(tracklength = st_length(.))
 
     # Save nav data
-    save(nav.sd, nav.sd.sf, nav.now.sd, 
+    save(nav.sd, nav.sd.sf, nav.sd.paths.sf, nav.now.sd, 
          file = here("Data/NAV/nav_data_saildrone.Rdata"))
     
     # Create gps.csv files from ERDDAP data
@@ -1169,8 +1174,6 @@ i.map <- leaflet() %>%
   # Add nav data
   addPolylines(data = nav_sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
-  # addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3, 
-  #              label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>%
   # Add CUFES data
   addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
@@ -1212,13 +1215,8 @@ i.map <- leaflet() %>%
                    opacity = 0.8, fillOpacity = 1, fillColor =  "white",
                    popup = ~popup, label = ~label,
                    group =  "Trawls") %>%
-  addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
-  # addMinicharts(catch.pie$X, catch.pie$Y,
-  #               type = "pie",
-  #               chartdata = catch.pie[, c("Anchovy", "JackMack", "Jacksmelt", "PacHerring",
-  #                                         "PacMack", "Sardine")],
-  #               colorPalette = trawlPal,
-  #               width = 30, transitionTime = 0) %>% 
+  addMarkers(data = nav.now, label = ~label, popup = ~popup, 
+             group = "Vessel Positions") %>% 
   # Add backscatter outliers
   addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
              group = "Backscatter (Large)") %>%
@@ -1266,9 +1264,10 @@ i.map <- leaflet() %>%
 # Add Saildrone data
 if (get.nav.sd) {
   i.map <- i.map %>% 
-    addPolylines(data = nav.sd.sf, color = c("#000414"), weight = 3,
+    addPolylines(data = nav.sd.paths.sf, color = c("#000414"), weight = 3,
                  label = ~paste("Saildrone", saildrone), group = "Saildrone Tracks") %>% 
-    addMarkers(data = nav.now.sd, label = ~label, group = "Saildrone Positions") %>%
+    addMarkers(data = nav.now.sd, label = ~label, popup = ~popup, 
+               group = "Saildrone Positions") %>%
     addLayersControl(
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
@@ -1331,7 +1330,7 @@ if (get.nav.sd) {
   if (save.figs) {
     # Create saildrone map
     saildrone.map <- base.map +
-      geom_sf(data = nav.sd.sf, aes(colour = factor(saildrone)), 
+      geom_sf(data = nav.sd.paths.sf, aes(colour = factor(saildrone)), 
               show.legend = "line") + 
       scale_colour_discrete("Saildrone") + 
       coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -1344,7 +1343,7 @@ if (get.nav.sd) {
   }
   
   # Subset tracklengths
-  sd.tracklength <- nav.sd.sf %>% 
+  sd.tracklength <- nav.sd.paths.sf %>% 
     select(saildrone, tracklength) %>% 
     mutate(tracklength = as.numeric(tracklength/1000)) %>% 
     st_set_geometry(NULL)

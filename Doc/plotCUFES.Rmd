@@ -150,13 +150,13 @@ if (get.nav) {
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
   
   # Cast nav to transects
-  nav.legs <- nav.sf %>% 
+  nav.paths.sf <- nav.sf %>% 
     group_by(leg) %>% 
     summarise(do_union = F) %>% 
     st_cast("LINESTRING")
   
   # Save results
-  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
   load(here("Data/NAV/nav_data.Rdata"))
@@ -306,15 +306,10 @@ bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>%
   st_transform(crs.geog) %>% 
   rename(Depth = Contour)
 
-nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(leg) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
-
 # Set padding around data  
 if (resize.map) {
   # Use nav data to resize map to survey progress
-  map.bounds <- nav_sf %>% 
+  map.bounds <- nav.paths.sf %>% 
     st_transform(crs = crs.proj) %>%
     st_bbox()  
 } else {
@@ -330,7 +325,7 @@ map.height <- 10
 map.width  <- map.height*map.aspect
 
 # Create base map
-base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
@@ -474,7 +469,7 @@ i.map <- leaflet() %>%
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    group = "Planned Transects (Core)") %>%
   # Add nav data
-  addPolylines(data = nav_sf, color = "#000414", weight = 1, 
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
   # Add CUFES data
   addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,

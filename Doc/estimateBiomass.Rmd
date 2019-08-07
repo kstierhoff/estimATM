@@ -115,12 +115,13 @@ Options in this section control the execution of various code chunks. All chunks
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
 get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download nav data from ERDDAP
+get.nav           <- T # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
 copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 save.imap         <- T # Save Leaflet maps
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
@@ -139,6 +140,7 @@ do.all <- F
 if (do.all) {
   get.db          <- T 
   get.nav         <- T 
+  get.nav.sd      <- T
   copy.files      <- T 
   copy.bib        <- T
   overwrite.files <- T
@@ -298,7 +300,7 @@ if (get.nav) {
     nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
     
     # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time))
+    erddap.survey.start <- max(date(nav$time)) - days(1)
   }
   
   if (nav.lag > 24) {
@@ -337,19 +339,15 @@ if (get.nav) {
   
   # Convert nav to spatial
   # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(leg) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
   
-  # # Cast nav to transects
-  # nav.legs <- nav.sf %>% 
-  #   group_by(leg) %>% 
-  #   summarise(do_union = F) %>% 
-  #   st_cast("LINESTRING")
+  nav.paths.sf <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
   
   # Save results
-  save(nav, nav.sf, file = here("Data/Nav/nav_data.Rdata"))
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
   load(here("Data/NAV/nav_data.Rdata"))
@@ -396,7 +394,88 @@ write_csv(nav.gps, here("Output/nav.gps.csv"))
 # Get most recent vessel position for plotting
 nav.now <- tail(nav, 1) %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  mutate(label = paste("Last position:", datetime, "GMT"))
+  mutate(label = paste("Last position:", datetime, "UTC"))
+```
+
+```{r process-nav-saildrone}
+if (get.nav.sd) {
+   # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data_saildrone.Rdata"))) {
+    load(here("Data/Nav/nav_data_saildrone.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start.sd <- paste0(format(max(date(nav.sd$time)), ""), "T00%3A00%3A00Z")
+  } else {
+    nav.lag.sd <- 24
+  }
+  
+  if (get.nav) {
+    if (nav.lag.sd >= 24) {
+      # Generate ERDDAP URL
+      saildroneURL <- URLencode(paste0(
+        erddap.url.sd, ".csv0?", erddap.vars.sd,
+        "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
+      
+      # Download and parse ERDDAP nav data
+      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = F, 
+                                         colClasses = erddap.classes.sd, 
+                                         row.names = NULL, skip = 0))
+      names(nav.temp.sd) <- erddap.headers.sd
+      
+      # Filter to remove bad SST values
+      nav.temp.sd <- nav.temp.sd %>% 
+        mutate(datetime = ymd_hms(time)) %>%
+        filter(!is.nan(lat), !is.nan(long)) %>%
+        filter(long != 0, lat != 0)
+      
+      # Append new nav data
+      if (exists("nav.sd")) {
+        nav.sd <- bind_rows(nav.sd, nav.temp.sd) %>% 
+          distinct()
+      } else {
+        nav.sd <- nav.temp.sd
+      }
+    }
+    
+    # Convert saildrone nav to spatial
+    nav.sd.sf <- st_as_sf(nav.sd, coords = c("long","lat"), crs = crs.geog)
+    
+    # Get most recent vessel position for plotting
+    nav.now.sd <- nav.sd.sf %>% 
+      group_by(saildrone) %>% 
+      slice(n()) %>% 
+      mutate(label = paste("Saildrone", saildrone, "Last position:", datetime, "UTC"),
+             popup = paste0('<b>Saildrone: </b>', saildrone, '<br/>',
+                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
+    
+    # Convert saildrone nav to spatial
+    nav.sd.sf <- nav.sd.sf %>% 
+      group_by(saildrone) %>% 
+      summarise(do_union = F) %>% 
+      st_cast("LINESTRING") %>% 
+      mutate(tracklength = st_length(.))
+
+    # Save nav data
+    save(nav.sd, nav.sd.sf, nav.now.sd, 
+         file = here("Data/NAV/nav_data_saildrone.Rdata"))
+    
+    # Create gps.csv files from ERDDAP data
+    for (i in unique(nav.sd$saildrone)) {
+      saildrone.gps <- filter(nav.sd, saildrone == i) %>% 
+        mutate(GPS_date = format(datetime, format = "%F"),
+               GPS_time = format(datetime, format = "%T")) %>% 
+        select(GPS_date, GPS_time, latitude = lat, longitude = long)
+      
+      write_csv(saildrone.gps, here("Output", paste(i, "_erddap.gps.csv", sep = "")))
+    }
+  } else {
+    # Load nav data
+    load(here("Data/NAV/nav_data_saildrone.Rdata"))
+  }
+}
 ```
 
 # Map survey plan
@@ -452,7 +531,7 @@ if (resize.map) {
   # Use nav data to resize map to survey progress
   map.bounds <- nav.sf %>% 
     st_transform(crs = crs.proj) %>%
-    st_bbox()  
+    st_bbox() 
 } else {
   # Use nav data to resize map to survey progress
   map.bounds <- transects.sf %>%
@@ -599,6 +678,7 @@ if (process.csv) {
       # Convert date and time to POSIXct
       nasc.vessel <- nasc.vessel %>% 
         mutate(datetime      = ymd_hms(paste(date, time), tz = "UTC"),
+               leg = cut(as.numeric(date(datetime)), leg.breaks, labels = F),
                transect.orig = transect)
       
       if (i == "SD") {
@@ -705,9 +785,7 @@ if (process.csv) {
       
       # Remove backscatter data from short transects
       nasc.vessel <- nasc.vessel %>% 
-        filter(transect %in% tx.include$transect,
-               nasc.vessel$lat != 999,
-               nasc.vessel$long != 999)
+        filter(transect %in% tx.include$transect)
 
       # Create new interval for summarizing and plotting backscatter 
       # and add vessel abbreviation to transect name
@@ -791,7 +869,7 @@ if (process.csv) {
       # Save processed CSV data from each survey vessel
       save(nasc.vessel, file = here("Data/Backscatter", i, 
                                     paste0("nasc_vessel_", i, ".Rdata")))
-      
+
       # Combine results from different vessels
       nasc <- bind_rows(nasc, nasc.vessel)
       
@@ -813,6 +891,15 @@ if (process.csv) {
 } else {
   load(here("Data/Backscatter/nasc_all.Rdata"))
 }
+
+# Get intervals with bad lat/long values
+bad.nasc <- filter(nasc, lat == 999, long == 999)
+
+write_csv(bad.nasc, here("Output/nasc_bad.csv"))
+
+# Remove bad intervals
+nasc <- nasc %>% 
+  filter(lat != 999, long != 999)
 
 # Manually remove transect for 1807RL
 if (survey.name == "1807RL") {
@@ -902,6 +989,23 @@ nasc.sf <- nasc %>%
   st_as_sf(coords = c("long", "lat"), crs = crs.geog)
 ```
 
+```{r export-backscatter-ctd-app, include=FALSE}
+# Export CSV files for CTD.app -------------------------------------------------
+# Create directory for output
+dir_create(here("Output/CTDapp"))
+
+# Write each file to .csv
+nasc %>%  
+  arrange(vessel.name, datetime) %>% 
+  group_by(vessel.name, leg) %>%  
+  group_walk(~ write.csv(.x, 
+                         file = here("Output/CTDapp", 
+                                     paste0("CTDapp_", 
+                                            unique(.y$vessel.name), "_Leg", 
+                                            unique(.y$leg), ".csv")),
+                         row.names = FALSE))
+```
+
 ```{r filter-saildrone-nav,eval=FALSE}
 # Add COG and HDG to Saildrone NASC from ERDDAP nav
 if ("SD" %in% nasc.vessels & prj.name != "1807RL-Saildrone") {
@@ -920,9 +1024,9 @@ big.nasc <- nasc %>%
   arrange(desc(cps.nasc)) %>%
   mutate(cps.nasc = cps.nasc/19,
          rank = seq(n()),
-         label = paste0('Transect: ', transect,
+         label = paste0('Transect: ', transect.name,
                         ' - Distance: ', round(dist_m), " m"),
-         popup = paste0('<b>Transect: </b>', transect, '<br/>',
+         popup = paste0('<b>Transect: </b>', transect.name, '<br/>',
                         '<b>Time: </b>', min(datetime), "-", max(datetime), ' UTC<br/>',
                         '<b>Distance: </b>', round(dist_m), ' m<br/>',
                         '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
@@ -942,10 +1046,11 @@ nasc.outlier.plot <- ggplot(big.nasc, aes(rank, cps.nasc, ids = label)) +
         legend.justification = c(1,1))
 
 # Create outlier plot
-nasc.outlier.plotly <- ggplot(big.nasc, aes(rank, cps.nasc, ids = label)) +
-  geom_point(aes(colour = vessel.name)) +
-  ylab("cps.nasc / 19\n") + xlab("\nRank") +
-  theme_bw() 
+nasc.outlier.plotly <- ggplot(big.nasc, 
+                              aes(rank, cps.nasc, ids = label, fill = vessel.name)) +
+  geom_point(shape = 21, size = 4, alpha = 0.7) +
+  ylab("NASC / 19\n") + xlab("\nRank") +
+  theme_bw()
   
 if (save.figs) {
   # Save figure
@@ -1268,11 +1373,11 @@ if (get.db) {
   }
   
   # Import trawl database tables
-  catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
-  haul.all       <- tbl(trawl.con,"Haul") %>% collect()
-  lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-  lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
-  spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+  catch.all	     <- tbl(trawl.con, "Catch") %>% collect()
+  haul.all       <- tbl(trawl.con, "Haul") %>% collect()
+  lengths.all    <- tbl(trawl.con, "Specimen") %>% collect()
+  lengthFreq.all <- tbl(trawl.con, "LengthFrequency") %>% collect()
+  spp.codes      <- tbl(trawl.con, "SpeciesCodes") %>% collect()
   
   # Close database channel
   dbDisconnect(trawl.con)
@@ -1485,7 +1590,7 @@ if (save.figs) {
          xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
-  # save trawl plot
+  # Save trawl plot
   ggsave(trawl.cluster.plot,
     filename = here("Figs/fig_trawl_cluster_map.png"),
     width = map.width, height = map.height
@@ -1670,11 +1775,18 @@ herring.hauls <- haul.summ.wt %>%
 if (nrow(herring.hauls) > 0) {
   # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
   if (get.bathy) {
-    noaa.bathy <- getNOAA.bathy(lon1 = min(nasc$long - 1), 
-                           lon2 = max(nasc$long + 1),
-                           lat1 = max(nasc$lat) + 1, 
-                           lat2 = min(nasc$lat) - 1, 
-                           resolution = 1)
+    # Get boundaries for bathymetry grid
+    bathy.bounds <- transects.sf %>% 
+      st_bbox() 
+    
+    # Download bathy grid
+    noaa.bathy <- getNOAA.bathy(
+      lon1 = bathy.bounds$xmin - 1, 
+      lon2 = bathy.bounds$xmax + 1,
+      lat1 = bathy.bounds$ymax + 1, 
+      lat2 = bathy.bounds$ymin - 1, 
+      resolution = 1)
+    
     # Save bathy results
     save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
                              survey.name,".Rdata", sep = ""))  
@@ -1856,6 +1968,7 @@ if (process.csv) {
 } else {
   load(here("Output/nasc_cluster_distance.Rdata"))  
 }
+
 # Add cluster distances to nasc
 nasc <- bind_cols(nasc, cluster.distance)
 ```
@@ -2529,6 +2642,7 @@ Finally, examine the a) distribution of 38-kHz integrated backscattering coeffic
 
 ```{r map-nasc-cufes-trawl}
 if (save.figs) {
+  # Combine backscatter, CUFES, and trawl maps
   nasc.cufes.trawl.plot      <- plot_grid(nasc.map, cufes.density.all, trawl.catch.plot,
                                      nrow = 1, labels = c("a)", "b)", "c)"))
   
@@ -7151,7 +7265,8 @@ if (process.cal) {
           tz = "GMT", format = "%m/%d/%Y")
         if (is.na(cal.date) == TRUE) { #use alternate date format
           cal.date  <- as.POSIXct(str_extract(
-            str_subset(cal, pattern = 'Date:\\s+\\S+'),"[0-9].*[0-9]"),tz = "GMT",format = "%Y-%m-%d")
+            str_subset(cal, pattern = 'Date:\\s+\\S+'), "[0-9].*[0-9]"), 
+            tz = "GMT", format = "%Y-%m-%d")
         }
         # extract comments; sub semi colons for commas
         comments           <- gsub(",",";",trim(str_extract(cal[which(cal == "#  Comments:") + 1],"[^#]+")))
