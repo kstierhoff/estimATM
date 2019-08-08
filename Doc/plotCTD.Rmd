@@ -329,6 +329,10 @@ if (length(uctd.hdr) == 0) {
   all.uctd.casts <- all.uctd.casts %>%
     filter(!cast %in% exclude.ctd)
   
+  # Save cast data to CSV
+  write.csv(all.uctd.casts, file = here("Output/cast_data_uctd.csv"), 
+            quote = FALSE, row.names = FALSE)
+  
   # Write table to CSV
   write.csv(uctd.missing, file = here("Output/unprocessed_uctd.csv"), 
             quote = FALSE, row.names = FALSE)
@@ -453,6 +457,11 @@ if (length(ctd.hdr) == 0) {
     # Exclude bad casts
     all.ctd.casts <- all.ctd.casts %>%
       filter(!cast %in% exclude.ctd)
+    
+    # Save cast data to CSV
+    write.csv(all.ctd.casts, file = here("Output/cast_data_ctd.csv"), 
+              quote = FALSE, row.names = FALSE)
+    
   } else {
     ctd.missing <- all.ctd.hdr
   }
@@ -1151,3 +1160,23 @@ if (length(all.ctd.casts) > 0) {
   include_graphics(here("Figs/fig_ctd_missing.png"))
 }
 ```
+
+```{r combine-cast-data,eval=FALSE}
+# Combine all CTD and UCTD cast data in one data frame
+ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts)
+
+# Combine all CTD and UCTD cast info in one data frame
+ctd.info.all <- all.ctd.hdr %>% 
+  bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
+  mutate(type = case_when(
+    str_detect(cast, "UCTD") ~ "UCTD",
+    TRUE ~ "CTD"))
+
+# Save to CSV file
+write.csv(ctd.data.all, file = here("Output/cast_data_all.csv"), 
+          quote = F, row.names = F)
+
+write.csv(ctd.info.all, file = here("Output/cast_info_all.csv"), 
+          quote = F, row.names = F)
+```
+

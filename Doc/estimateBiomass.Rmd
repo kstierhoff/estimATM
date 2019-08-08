@@ -860,9 +860,9 @@ if (process.csv) {
         # Use fixed integration depth (NASC.50), with or without surface noise removal
         if (rm.surface[i]) {
           # Remove surface noise, often from Saildrone backscatter
-          nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.50 - NASC.5)
+          nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70 - NASC.5)
         } else {
-          nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.50)
+          nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
         }
       }
       
@@ -1031,8 +1031,8 @@ big.nasc <- nasc %>%
                         '<b>Distance: </b>', round(dist_m), ' m<br/>',
                         '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
   top_n(100, cps.nasc) %>% 
-  select(rank, cps.nasc, label, datetime, dist_m, sounder, 
-         lat, long, vessel.name) 
+  select(rank, cps.nasc, label, popup, datetime, dist_m, sounder, 
+         lat, long, transect.name, vessel.name) 
 
 # Create outlier plot
 nasc.outlier.plot <- ggplot(big.nasc, aes(rank, cps.nasc, ids = label)) +
@@ -4334,7 +4334,8 @@ save(strata.primary,
 
 # Clip nearshore polygons using the 5 m isobathy polygon -----------------------
 # Remove self-intersecting portions of polygons
-strata.nearshore.temp <- st_make_valid(strata.nearshore.temp)
+strata.nearshore.temp <- st_make_valid(strata.nearshore.temp) %>% 
+  ungroup()
 
 if (exists("strata.nearshore")) rm(strata.nearshore)
 
@@ -4514,7 +4515,7 @@ if (save.figs) {
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
         # Plot vessel track
-        geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+        geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
         # Plot zero nasc data
         geom_point(data = filter(nasc.proj, cps.nasc == 0), aes(X, Y),
                    colour = 'gray50',size = 0.15, alpha = 0.5) +
@@ -5113,7 +5114,7 @@ if (save.figs) {
   # Plot all CTDs and UCTDs, labeled by cast number
   map.ctd.uctd <- base.map + 
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = 'gray50',alpha = 0.5) +
+    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
     # Plot CTD cast locations
     geom_shadowtext(data = ctd.info.proj, aes(X, Y, label = cast.num, colour = type),
               size = 2, bg.colour = "white", fontface = "bold") + 
@@ -5125,7 +5126,7 @@ if (save.figs) {
   # Plot all CTDs and UCTDs, labeled by transect assignment
   map.ctd.tx <- base.map + 
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = 'gray50',alpha = 0.5) +
+    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
     # Plot CTD cast locations
     geom_shadowtext(data = ctd.info.proj, aes(X, Y, label = transect, colour = type),
               size = 2, bg.colour = "white", fontface = "bold") + 
@@ -5156,7 +5157,7 @@ An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click point
 
 ```{r map-ctd-casts-interactive}
 # Create interactive map of CTD locations
-mapview(nav.sf, color = "black", alpha = 0.5, 
+mapview(nav.paths.sf, color = "black", alpha = 0.5, 
         layer.name = "Vessel track", col.regions = "black",
         legend = FALSE) +
   mapview(ctd.info.sf, cex = 4, zcol = "leg",
@@ -5177,50 +5178,10 @@ This is currently being done by hand using Juan's CTD "app" and added to the `na
 The map below allows for the interacitve exploration of acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.  
 
 ```{r create-imap-objects, include=FALSE}
-# # Convert backscatter data to sf -----------------------------------
-# nasc.plot <- nasc.plot %>%
-#   # Create bins for defining point size in NASC plots%>% 
-#   mutate(type      = "CPS",
-#          label     = paste(transect.name, int, sep = "-"),
-#          popup     = paste(transect.name, "-", int, ": ", round(NASC, 2), 
-#                        " m<sup>2</sup> nmi<sup>-2</sup>", 
-#                        sep = "")) 
-# 
-# 
-# nasc.cps.sf <- nasc %>%
-#   filter(lat != 999, long != 999) %>%
-#   select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
-#   group_by(filename, transect, int) %>% 
-#   summarise(
-#     lat   = lat[1],
-#     long  = long[1],
-#     NASC  = mean(cps.nasc),
-#     label = paste0('Transect: ', transect[1], "; ",
-#                    'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
-#     popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
-#                    '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
-#                    '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
-#                    '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
-#   # Create bins for defining point size in NASC plots
-#   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-#          bin.level =  as.numeric(bin)) %>% 
-#   filter(!is.na(bin)) %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
-
-# big.nasc.sf <- big.nasc %>% 
-#   top_n(20, cps.nasc) %>%
-#   st_as_sf(coords = c("long","lat"), crs = 4326) 
-
+# Convert backscatter data to sf -----------------------------------
 big.nasc.sf <- big.nasc %>% 
   top_n(20, cps.nasc) %>%
-  mutate(popup = paste(label, ": ", round(cps.nasc),
-                       " m<sup>2</sup> nmi<sup>-2</sup>",
-                       sep = "")) %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
-
-# # Convert NASC small nasc data to sf; CRS = 4326 (WGS84)
-# small.nasc <- nasc.plot %>% 
-#   filter(NASC < 200) 
 
 # Convert CTD and UCTD cast data to sf -----------------------------------
 ctd.sf <- ctd.info.all %>%
@@ -5244,7 +5205,6 @@ cluster.catch.sf <- catch.pie %>%
                   'All CPS:', AllCPS, 'kg'))
 
 # Convert CUFES data to sf -----------------------------------
-# Convert CUFES to sf; CRS - crs.geog
 cufes.sf <- cufes %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
   mutate(
@@ -5340,12 +5300,15 @@ cpsPal <- colorFactor(
     pac.herring.color, pac.mack.color, sardine.color),
   c("Engraulis mordax","Trachurus symmetricus","Atherinopsis californiensis",
     "Clupea pallasii","Scomber japonicus","Sardinops sagax"))
+
 # Create color pallette for planned transects
 txPal    <- colorFactor(c("red","blue","orange","green"), 
                         c("Adaptive","Compulsory","Nearshore","Offshore"))
+
 # Create color pallette for trawls casts (presently unused)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
+
 # Create color pallette for CTD casts
 ctdPal <- colorFactor(c("#FFA500", "#A020F0"), c("CTD", "UCTD"))
 
@@ -5366,8 +5329,7 @@ strata.nearshore.sub <- strata.nearshore %>%
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
 
 # Create leaflet map
-i.map <-# Create leaflet map
-leaflet() %>% 
+i.map <- leaflet() %>% 
   # Enable tile caching
   enableTileCaching() %>% 
   # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
@@ -5456,7 +5418,7 @@ leaflet() %>%
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
               group = "Stratum (J. mackerel)") %>%
   # Add nav data
-  addPolylines(data = nav.sf, color = "#000414", weight = 1, 
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
   # Add CUFES data
   addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
@@ -5517,7 +5479,7 @@ leaflet() %>%
   # Add scale bar
   addScaleBar(position = "bottomright") %>%
   # Add map coordinates
-  addMouseCoordinates() %>% 
+  leafem::addMouseCoordinates() %>% 
   # Add measurement tool
   addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
              primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
@@ -5842,7 +5804,7 @@ if (do.bootstrap) {
       # Calculate biomass using bootstrap function ----
       set.seed(1) # Set seed for repeatable results
       boot.df <- estimate_bootstrap(nasc.temp, j, stratum.area = stratum.area, 
-                                    species = i, length.frequency = do.lf, 
+                                    species = i, do.lf = do.lf, 
                                     cluster.final[[i]], boot.number = boot.num)$data.frame
       # Extract biomass estimates; remove first (point) estimate
       boot.temp <- data.frame(Species = i, Stratum = j, Area = stratum.area,
@@ -5852,7 +5814,7 @@ if (do.bootstrap) {
       
       # Calculate abundance by length class using bootstrap function ----
       abund.vec <- estimate_bootstrap(nasc.temp, j, stratum.area = stratum.area, 
-                                      species = i, length.frequency = do.lf, 
+                                      species = i, do.lf = do.lf, 
                                       cluster.final[[i]], boot.number = 0)$abundance.vector
       # Extract abundance estimates
       abundance.temp <- data.frame(Species = i, Stratum = j,
@@ -5862,7 +5824,7 @@ if (do.bootstrap) {
 
       # Calculate abundance and biomass all ways ----
       boot.comp.temp <- estimate_bootstrap(nasc.temp, j, stratum.area = stratum.area, 
-                                      species = i, length.frequency = do.lf, 
+                                      species = i, do.lf = do.lf, 
                                       cluster.final[[i]], boot.number = 0)$data.frame
       
       # Extract abundance estimates
