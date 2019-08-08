@@ -126,10 +126,10 @@ download.hab      <- F # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 # Often or usually F
-copy.bib          <- F # Copy bibliography files (requires connection to AST2)
+copy.bib          <- T # Copy bibliography files (requires connection to AST2)
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 process.cal       <- F # Process calibration results
 process.ctd       <- T # Process CTD and UCTD casts
@@ -1007,11 +1007,11 @@ nasc %>%
 ```
 
 ```{r filter-saildrone-nav,eval=FALSE}
-# Add COG and HDG to Saildrone NASC from ERDDAP nav
-if ("SD" %in% nasc.vessels & prj.name != "1807RL-Saildrone") {
-  nasc <- nasc %>% 
-    mutate(time.align = align.time(datetime, 60)) %>% 
-    left_join(select(nav.sd, vessel.name, time.align, COG, HDG))  
+# # Add COG and HDG to Saildrone NASC from ERDDAP nav
+# if ("SD" %in% nasc.vessels & prj.name != "1807RL-Saildrone") {
+#   nasc <- nasc %>% 
+#     mutate(time.align = align.time(datetime, 60)) %>% 
+#     left_join(select(nav.sd, vessel.name, time.align, COG, HDG))  
 }
 ```
 
@@ -1398,10 +1398,6 @@ if (get.db) {
 Haul data are filtered, foramatted, and assigned to clusters, where a trawl cluster contains only trawls conducted on the same evening (i.e., the difference in equilibrium time between trawls in the same cluster is < 12 h).
 
 ```{r process-trawl-haul-data}
-# Save image
-# save.image(here("Data/debug_img.Rdata"))
-# load(here("Data/debug_img.Rdata"))
-
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
@@ -1443,11 +1439,13 @@ if (trawl.source == "Access") {
            sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
            inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
            subSampleNumber = SubSampleNumber)
+  
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
+  
 }
 
 # Classify hauls by season (spring or summer)
@@ -1464,10 +1462,9 @@ haul <- haul.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
   # Calculate haul duration
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins")) %>% 
-  # Format trawlPerformance
-  mutate(trawlPerformance = tolower(trimws(trawlPerformance))) %>% 
   # Remove bad trawls
-  filter(haul, trawlPerformance %in% trawl.performance) %>% 
+  filter(!trawlPerformance %in% trawl.performance) %>%
+  filter(!haul %in% trawl.haul.exclude) %>%
   # Assign cluster based on yearday
   mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
 
@@ -2342,7 +2339,8 @@ catch.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSa
          diffCt    = subSampleCount - totalCtSpecimens) %>%
   # Reorder columns
   select(scientificName, haul, subSampleWtkg, totalWtSpecimens, diffWt, 
-         diffWtPct, subSampleCount, totalCtSpecimens, diffCt, binnedLengths)
+         diffWtPct, subSampleCount, totalCtSpecimens, diffCt, binnedLengths) %>% 
+    replace(is.na(.), -999)
 
 # Write to CSV
 write.csv(catch.comp, file = here("Output/catch_comparison.csv"), 
@@ -2378,8 +2376,7 @@ catch.comp %>%
 
 # Filter hauls with diffCt or diffWt != zero
 catch.comp.errors <- catch.comp %>% 
-  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
-  filter(binnedLengths == 0) 
+  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) 
 
 # Save output to CSV
 if (nrow(catch.comp.errors) > 0) {
@@ -3111,27 +3108,27 @@ include_graphics(here("Figs/fig_trawl_acoustic_proportion_comparison.png"))
 
 ```{r map-nasc-cufes-acoustic-proportion}
 # Create trawl figure
-  acoustic.pie.plot.final <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.proj, aes(X, Y, group = transect.name),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = acoustic.pie.indiv, 
-                    aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("prop.anch","prop.jack","prop.her",
-                             "prop.mack","prop.sar"),
-                    color = 'black', alpha = 0.8) +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "P. herring", "J. mackerel",
-                                 "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                                 pac.mack.color, sardine.color)) +
-    # Plot panel label
-    ggtitle("Acoustic Proportions by Cluster") +
-    coord_sf(crs = crs.proj, 
-         xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-         ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+acoustic.pie.plot.final <- base.map +
+  # Plot nasc data
+  geom_point(data = nasc.proj, aes(X, Y, group = transect.name),
+             size = 0.5, colour = "gray50", alpha = 0.5) +
+  # Plot trawl pies
+  geom_scatterpie(data = acoustic.pie.indiv, 
+                  aes(X, Y, group = cluster, r = pie.radius),
+                  cols = c("prop.anch","prop.jack","prop.her",
+                           "prop.mack","prop.sar"),
+                  color = 'black', alpha = 0.8) +
+  # Configure trawl scale
+  scale_fill_manual(name = 'Species',
+                    labels = c("Anchovy", "P. herring", "J. mackerel",
+                               "P. mackerel", "Sardine"),
+                    values = c(anchovy.color, pac.herring.color, jack.mack.color,  
+                               pac.mack.color, sardine.color)) +
+  # Plot panel label
+  ggtitle("Acoustic Proportions by Cluster") +
+  coord_sf(crs = crs.proj, 
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
 if (save.figs) {
   nasc.cufes.prop.plot      <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.plot.final,

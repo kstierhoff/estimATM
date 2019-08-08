@@ -137,7 +137,6 @@ cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
 trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) 
 trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
 trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
-trawl.performance  <- c("good","ok","poor") # Character vector for filtering trawl hauls based on trawl performance
 
 # NASC
 # For legend objects
@@ -274,9 +273,11 @@ cufes.db.sqlite        <- "cufes201907RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl database
 trawl.source           <- "Access" # "SQL" or "Access"
-trawl.dsn              <- "TRAWL" # System DSN for Trawl database on SQL server
+trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry1907RL.accdb"
+trawl.performance      <- c("Aborted") # Character vector; trawl performance to exclude
+trawl.haul.exclude     <- NA           # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
 ctd.dir                <- unique(file.path(survey.dir,"DATA/CTD"))
 ctd.hdr.pattern        <- "1907\\d{3}.hdr"
