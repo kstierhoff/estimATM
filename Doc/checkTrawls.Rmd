@@ -1126,7 +1126,8 @@ catch.comp <- left_join(select(catch.all, haul, scientificName, subSampleWtkg, s
          diffCt    = subSampleCount - totalCtSpecimens) %>%
   # Reorder columns
   select(scientificName, haul, subSampleWtkg, totalWtSpecimens, diffWt, 
-         diffWtPct, subSampleCount, totalCtSpecimens, diffCt, binnedLengths)
+         diffWtPct, subSampleCount, totalCtSpecimens, diffCt, binnedLengths) %>% 
+  replace(is.na(.), -999)
 
 # Display results
 catch.comp %>% 
@@ -1164,8 +1165,7 @@ This table includes only those hauls where `diffWt` and `diffCt` are not equal t
 ```{r catch-errors}
 # Filter hauls with diffCt or diffWt != zero
 catch.comp.errors <- catch.comp %>% 
-  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
-  filter(binnedLengths == 0) 
+  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) 
 
 # Save output to CSV
 if (nrow(catch.comp.errors) > 0) {
@@ -1175,32 +1175,30 @@ if (nrow(catch.comp.errors) > 0) {
   # Display results
   catch.comp %>% 
     filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
-    filter(binnedLengths == 0) %>% 
     mutate(
-      totalWtSpecimens = cell_spec(round(totalWtSpecimens,digits = 4),
+      totalWtSpecimens = cell_spec(round(totalWtSpecimens, digits = 4),
                                    knitr.format, color = "black",
-                                   background = ifelse(is.na(totalWtSpecimens),"red","white")),
-      totalCtSpecimens = cell_spec(round(totalCtSpecimens,digits = 4),
+                                   background = ifelse(is.na(totalWtSpecimens), "red", "white")),
+      totalCtSpecimens = cell_spec(round(totalCtSpecimens, digits = 4),
                                    knitr.format,color = "black",
-                                   background = ifelse(is.na(totalCtSpecimens),"red","white")),
-      diffWt           = cell_spec(round(diffWt,digits = 4),
-                                   knitr.format,color = "black",
-                                   background = ifelse(diffWt == 0,"white","orange")),
-      diffCt           = cell_spec(diffCt,knitr.format,color = "black",
-                                   background = ifelse(diffCt == 0,"white","yellow")),
-      binnedLengths    = cell_spec(binnedLengths,knitr.format,color = "black",
-                                   background = ifelse(binnedLengths == 0,"white","green"))) %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+                                   background = ifelse(is.na(totalCtSpecimens), "red", "white")),
+      diffWt           = cell_spec(round(diffWt, digits = 4),
+                                   knitr.format, color = "black",
+                                   background = ifelse(diffWt == 0, "white", "orange")),
+      diffCt           = cell_spec(diffCt, knitr.format, color = "black",
+                                   background = ifelse(diffCt == 0, "white", "yellow")),
+      binnedLengths    = cell_spec(binnedLengths, knitr.format, color = "black",
+                                   background = ifelse(binnedLengths == 0, "white", "green"))) %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
           align = c("c","l",rep("r",ncol(catch.comp) - 2)),
           digits = c(0,0,3,3,4,0,0,0,0),
           format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
-    # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-    # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = 1) %>% 
     scroll_box(height = "250px") 
+  
 } else {
   print("Hooray, no (obvious) errors!")
 }
