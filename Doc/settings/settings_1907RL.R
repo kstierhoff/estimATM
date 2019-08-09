@@ -101,7 +101,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
 stock.ns      <- "Northern"
-strata.ns     <- 4
+strata.ns     <- 2
 
 # Figure preferences ------------------------------------------------------
 # Set species colors
@@ -305,7 +305,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 5 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
