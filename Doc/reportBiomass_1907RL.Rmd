@@ -5,7 +5,7 @@
 output: 
   bookdown::pdf_document2:
     includes: 
-      in_header: ../yaml/header_1807RL.tex
+      in_header: yaml/header_1907RL.tex
     toc: yes
     toc_depth: 3
     number_sections: yes
@@ -14,14 +14,14 @@ output:
     toc: yes
     toc_depth: 3
     pandoc_args: [
-     "--filter", "../yaml/pandoc-newpage-filter.R"
+     "--filter", "yaml/pandoc-newpage-filter.R"
      ]
   bookdown::html_document2:
     toc: yes
     toc_float: yes
-csl: ../csl/ices-journal-of-marine-science.csl
-bibliography: ../bib/ast_bib.bib
-css: ../css/ast.css
+csl: csl/ices-journal-of-marine-science.csl
+bibliography: bib/ast_bib.bib
+css: css/ast.css
 always_allow_html: yes
 ---
 
@@ -37,6 +37,7 @@ pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
 # Install and load required packages from Github -------------------------------
 # surveyR
 pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
 
 # set system time zone to GMT
 Sys.setenv(tz = "GMT")
@@ -115,7 +116,7 @@ load(here("Output/nasc_summ_tx.Rdata"))
 # Load transect spacing
 load(here("Output/transect_spacing.Rdata"))
 # Load calibration results
-# load(paste(here("Output/cal"), "/", survey.vessel.primary, "/", "cal_output_table.Rdata", sep = ""))
+load(here("Output/cal_output_table.Rdata"))
 ```  
 
 \newpage
@@ -261,7 +262,7 @@ if (doc.type == "docx") {
 
 (ref:cal-results-saildrone) USV (SD-1024) EK80 miniature wideband transceiver (WBT-Mini, Simrad; Serial Number 264024) and dual-frequency transducer (ES38-18|200-18, Simrad; Serial Number 101) information, and beam model results following calibration. Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $s_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (EK80, Simrad).
 
-```{r cal-results-saildrone, results='asis'}
+```{r cal-results-saildrone, results='asis',eval=FALSE}
 # Combine cal results from Lasker and Lisa Marie
 cal.results <- read_csv(here("Output/cal/SD/cal_results_saildrone1024.csv"), 
                         col_names = FALSE,
@@ -357,7 +358,7 @@ At sea, trawl data were entered into a database (Microsoft Access). During and f
 
 ```{r CreateConversionTables}
 # Generate L/L and L/W conversion tables
-source(here("Code/length_conversions.R"))
+source(here("Code/convertLengths.R"))
 ```  
 
 (ref:lw-conversions) General linear model (GLM) coefficients describing the total length ($L_T$, mm) versus weight ($W$, g) relationships used to estimate missing lengths or weights, where: $L_T = (W/\beta_0)^{(1/\beta_1)}$ and $W = \beta_0 {L_T}^{\beta_1}$.
@@ -402,7 +403,7 @@ if (doc.type == "docx") {
 
 ```{r lw-coeff,results='asis',eval=F}
 # Real length/weigth relationship models for each species
-lw.models <- read.csv(here("Data/TS/cps_lw_relationships.csv")) %>% 
+lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
   filter(season == model.season, model_type == model.type)
 
 if (doc.type == "docx") {
@@ -479,7 +480,7 @@ In addition to echoes from target CPS, echoes may also be present from other CPS
 (ref:ev-filtering-example) Echogram depicting CPS schools (red) and plankton aggregations (blue and green) at 38 kHz (top) and 120 kHz (bottom). Example data processing steps include the original echogram (left), after noise subtraction and bin-averaging (middle), and filtering to retain only putative CPS echoes (right).
 
 ```{r ev-filtering-example,fig.cap='(ref:ev-filtering-example)',out.width='6.5in',fig.pos='H'}
-include_graphics(here("Images/fig_echoview_filtering_example-labeled.png"))
+include_graphics(here("Images/img_echoview_filtering_example-labeled.png"))
 ```  
 
 \newpage
@@ -654,7 +655,7 @@ The transects were used as sampling units [@Simmonds1996]. Because each species 
 
 ```{r trawl-cluster-map,fig.cap='(ref:trawl-cluster-map)',out.width='4.5in',fig.pos='H'}
 # Insert trawl cluster map
-include_graphics(here("Figs/fig_nasc_cluster_trawl_prop_map.png"))
+include_graphics(here("Figs/fig_nasc_cluster_trawl_proportion.png"))
 ```  
 
 \newpage  
@@ -674,7 +675,7 @@ include_graphics(here("Figs/fig_biomass_density_transect_lat.png"))
 (ref:acoustic-strata-map) Post-survey stratification indicating stratum polygons (outline indicates stratum number; fill indicates the species' stock designation) used to estimate the biomasses of CPS. Point sizes indicate the relative intensity ($s_A$; m^2^ nmi^-2^) of acoustic backscatter from all CPS (black points) and individual species (red points). Smaller nearshore strata (e.g., Northern Anchovy sampled by the USV) may be difficult to visualize at this scale.
 
 ```{r acoustic-strata-map,fig.cap='(ref:acoustic-strata-map)',out.height='8in',fig.pos='H'}
-include_graphics(here("Figs/fig_acoustic_strata_map.png"))
+include_graphics(here("Figs/fig_acoustic_strata.png"))
 ```  
 
 \newpage  
@@ -727,7 +728,7 @@ dist.summ <- nasc.summ %>%
 ```
 
 ## Sampling effort and allocation {#results-sampling-effort}
-The `r tolower(survey.season)` `r survey.year` survey took place between Cape Scott, Vancouver Island and San Diego during `r survey.das` DAS between `r format(ymd(survey.start.erddap),"%d %B")` and `r format(ymd(survey.end.erddap),"%d %B %Y")`. Acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects (`r sum(str_detect(nasc.summ$transect.name, "RL"))` by _`r survey.vessel`_ and `r sum(str_detect(nasc.summ$transect.name, "SD"))` by the USV) that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=0)` nmi (`r prettyNum(dist.summ$distance[dist.summ$vessel == "RL"],big.mark=",",digits=0)` nmi by _`r survey.vessel`_ and `r dist.summ$distance[dist.summ$vessel == "SD"]` by the USV). Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species.  
+The `r tolower(survey.season)` `r survey.year` survey took place between Cape Scott, Vancouver Island and San Diego during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. Acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects (`r sum(str_detect(nasc.summ$transect.name, "RL"))` by _`r survey.vessel`_ and `r sum(str_detect(nasc.summ$transect.name, "SD"))` by the USV) that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=0)` nmi (`r prettyNum(dist.summ$distance[dist.summ$vessel == "RL"],big.mark=",",digits=0)` nmi by _`r survey.vessel`_ and `r dist.summ$distance[dist.summ$vessel == "SD"]` by the USV). Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species.  
 
 **Leg I**  
 On 26 June, _`r survey.vessel`_ departed from the Exploratorium (Pier 15) in San Francisco at ~2130 (all times GMT) and began the offshore transit to northern Vancouver Island. Throughout the transit, sampling was conducted during the day with CUFES, EK60s, ME70, MS70 and SX90. The EK80 was run at night only. On 1 July, _`r survey.vessel`_ arrived at the first nearshore station off Cape Scott at ~1300 to begin acoustic sampling along transect 126. Acoustic sampling ceased after the completion of transect 90 off Tillamook Bay. On 16 July, _`r survey.vessel`_ arrived at the Marine Operations-Pacific (MOC-P) Pier in Newport, OR at ~1700 to complete Leg I.  
@@ -750,7 +751,7 @@ The majority of acoustic backscatter ascribed to CPS was observed near Cape Flat
 Northern Anchovy eggs were most abundant in the CUFES samples nearshore between Westport and Tillamook in the north, and between San Francisco and Morro Bay in central CA (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Jack Mackerel eggs were observed offshore from central Vancouver Island to Tillamook, between San Francisco and Big Sur, and to a lesser extent between Cape Blanco and Fort Bragg (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Pacific Sardine eggs observed in the CUFES samples were most abundant offshore of Tillamook (**Fig. \@ref(fig:nasc-cufes-trawl)b**, obscured by Northern Anchovy and Jack Mackerel eggs); some Pacific Sardine eggs were present in CUFES samples offshore between Cape Mendocino and San Francisco, near San Miguel Island, and near San Diego (**Fig. \@ref(fig:nasc-cufes-trawl)b**). There was little overlap in the distribution of Northern Anchovy, Pacific Sardine, and Jack Mackerel eggs in CUFES samples. The concentrations of Northern Anchovy eggs in the CUFES samples were coincident with CPS backscatter.  
 
 ## Trawl catch {#results-trawl-catch}
-Jack Mackerel comprised the greatest proportion of catch in trawl samples between the Columbia River and San Francisco (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Herring comprised the greatest proportion of catch in trawl samples nearshore along the coast of Vancouver Island and around Newport (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Northern Anchovy were predominantly found in trawls conducted between San Francisco and San Diego, with some present between Westport and the Columbia River (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were collected in trawls conducted between Newport and Coos Bay, and between Point Conception and Long Beach, CA. Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(catch.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(catch.summ.wt$'Engraulis mordax'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(catch.summ.wt$'Sardinops sagax'),big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(sum(catch.summ.wt$'Scomber japonicus'),big.mark=",",digits=3)` kg of Pacific Mackerel, `r prettyNum(sum(catch.summ.wt$'Trachurus symmetricus'),big.mark=",",digits=3)` kg of Jack Mackerel, and `r prettyNum(sum(catch.summ.wt$'Clupea pallasii'),big.mark=",",digits=3)` kg Pacific Herring).  
+Jack Mackerel comprised the greatest proportion of catch in trawl samples between the Columbia River and San Francisco (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Herring comprised the greatest proportion of catch in trawl samples nearshore along the coast of Vancouver Island and around Newport (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Northern Anchovy were predominantly found in trawls conducted between San Francisco and San Diego, with some present between Westport and the Columbia River (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were collected in trawls conducted between Newport and Coos Bay, and between Point Conception and Long Beach, CA. Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Engraulis mordax'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'Sardinops sagax'),big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(sum(cluster.summ.wt$'Scomber japonicus'),big.mark=",",digits=3)` kg of Pacific Mackerel, `r prettyNum(sum(cluster.summ.wt$'Trachurus symmetricus'),big.mark=",",digits=3)` kg of Jack Mackerel, and `r prettyNum(sum(cluster.summ.wt$'Clupea pallasii'),big.mark=",",digits=3)` kg Pacific Herring).  
 
 \newpage  
 \blandscape  
@@ -759,7 +760,7 @@ Jack Mackerel comprised the greatest proportion of catch in trawl samples betwee
 
 ```{r nasc-cufes-trawl, fig.cap='(ref:nasc-cufes-trawl)',out.width='8.5in',fig.pos='H'}
 # Insert NascCufesTrawl Map
-include_graphics(here("Figs/fig_nasc_cufes_trawl_prop_map.png"))
+include_graphics(here("Figs/fig_nasc_cufes_trawl_proportion.png"))
 ```  
 
 \elandscape
@@ -767,7 +768,7 @@ include_graphics(here("Figs/fig_nasc_cufes_trawl_prop_map.png"))
 
 (ref:nasc-saildrone) Spatial distributions of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS in the nearshore region sampled by both _`r survey.vessel`_ and the USV (SD-1024). Although the USV transects extended 4 nmi offshore, only acoustic samples from outside the area sampled by _`r survey.vessel`_ are shown.
 
-```{r nasc-saildrone, fig.cap='(ref:nasc-saildrone)',out.height='8in',fig.pos='H'}
+```{r nasc-saildrone, fig.cap='(ref:nasc-saildrone)',out.height='8in',fig.pos='H',eval=FALSE}
 # Insert Nasc Map - Saildrone only
 include_graphics(here("Figs/fig_nasc_summary_map_saildrone.png"))
 ``` 

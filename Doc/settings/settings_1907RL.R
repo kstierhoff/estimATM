@@ -276,7 +276,7 @@ trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry1907RL.accdb"
-trawl.performance      <- c("Aborted") # Character vector; trawl performance to exclude
+trawl.performance      <- c("Aborted","Bad","Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA           # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
 ctd.dir                <- unique(file.path(survey.dir,"DATA/CTD"))

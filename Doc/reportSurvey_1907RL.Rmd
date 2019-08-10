@@ -80,7 +80,7 @@ save.figs       <- T # draw plots and maps, or use existing
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- T # download nave data from ERDDAP
-process.csv     <- F # process CSV files from Echoview
+process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal     <- F # process calibration results from previous surveys for time series plots
 process.zmux    <- F # process impedance data
@@ -148,7 +148,7 @@ if (download.maps) {
 if (process.cal) {
   source(here("Code/extractCalAll.R"))
 } else {
-  load(here("Data/Calibration", survey.name,"cal_results_all.Rdata"))
+  load(here("Data/Calibration", survey.name, "cal_results_all.Rdata"))
 }
 
 if (save.figs) {
@@ -576,10 +576,8 @@ haul <- haul.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
   # Calculate haul duration
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins")) %>% 
-  # Format trawlPerformance
-  mutate(trawlPerformance = tolower(trimws(trawlPerformance))) %>% 
   # Remove bad trawls
-  filter(haul, trawlPerformance %in% trawl.performance) %>% 
+  filter(!trawlPerformance %in% trawl.performance) %>% 
   # Assign cluster based on yearday
   mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% 
   droplevels() # Remove unused factor levels
@@ -1103,7 +1101,7 @@ nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>%
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
 
-nasc.tx.sf <- st_as_sf(nasc.cps, coords = c("long","lat"), crs = crs.geog) %>% 
+nasc.tx.sf <- st_as_sf(nasc.cps.sf, coords = c("long","lat"), crs = crs.geog) %>% 
   select(transect) %>% 
   group_by(transect) %>% 
   summarise(do_union = F) %>% 
@@ -1134,7 +1132,7 @@ base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds,
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
 # Save the basemap
-ggsave(base.map,file = here("Figs/fig_base_map.png"), 
+ggsave(base.map,file = here("Figs/fig_basemap.png"), 
        height = map.height, width = map.width)
 
 save(base.map, file = here("Data/Map/basemap.Rdata"))
