@@ -63,7 +63,9 @@ transect.paths <- transects %>%
   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
   group_by(transect, region) %>% 
   summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1))
 
 # Read bathy contours shapefile 
 bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
