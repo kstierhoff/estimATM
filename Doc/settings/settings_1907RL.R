@@ -184,16 +184,16 @@ if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
                             SD = "C:/SURVEY/1907RL")   
 } else {
   survey.dir           <- c(RL = "C:/SURVEY/1907RL",
-                            LM = "C:/SURVEY/1907RL",
+                            LM = "//swc-storage3-s/SURVEYS/20190613_LISA-MARIE_SummerCPS",
                             SD = "C:/SURVEY/1907RL")
 }
 # Backscatter data (within survey.dir, typically; a vector of file paths)
 nasc.dir               <- c(RL = "PROCESSED/EV/CSV/LASKER",
-                            LM = "PROCESSED/EV/CSV/LISA_MARIE",
+                            LM = "PROCESSED/EV/CSV",
                             SD = "PROCESSED/EV/CSV/SAILDRONE") 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
-                            LM = "*Final 38 kHz CPS.csv",
+                            LM = "*CPS-Final CPS.csv",
                             SD = "*CPS-Final CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL = "*Juan Krill Final 120.csv",
