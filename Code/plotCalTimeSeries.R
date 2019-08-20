@@ -1,4 +1,4 @@
-# Plot transducer results #####
+# Plot transducer results ------------------------------------------------------
 cal.res.all <- left_join(cal.res.all, select(cal.info.all, id, vessel_name)) 
 
 cal.plot <- cal.res.all %>% 
@@ -10,7 +10,8 @@ cal.plot.used <- cal.plot %>%
   filter(vessel_name %in% survey.vessel.long,
          between(cal_date,
                  ymd(cal.plot.date) - days(cal.window),
-                 ymd(cal.plot.date) + days(cal.window)))
+                 ymd(cal.plot.date) + days(cal.window))) %>% 
+  arrange(txdr_type)
 
 bw_summ <- cal.plot %>% 
   group_by(txdr_type) %>% 

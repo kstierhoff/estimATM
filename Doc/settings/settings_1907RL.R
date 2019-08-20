@@ -180,7 +180,7 @@ sounder.type           <- c(RL = "EK60",
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
   survey.dir           <- c(RL = "C:/SURVEY/1907RL",
-                            LM = "C:/SURVEY/1907RL",
+                            LM = "//swc-storage3-s/SURVEYS/20190613_LISA-MARIE_SummerCPS",
                             SD = "C:/SURVEY/1907RL")   
 } else {
   survey.dir           <- c(RL = "C:/SURVEY/1907RL",
@@ -279,12 +279,12 @@ trawl.db.access        <- "TrawlDataEntry1907RL.accdb"
 trawl.performance      <- c("Aborted","Bad","Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA           # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
-ctd.dir                <- unique(file.path(survey.dir,"DATA/CTD"))
+ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
 ctd.hdr.pattern        <- "1907\\d{3}.hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 # UCTD data   
-uctd.dir               <- unique(file.path(survey.dir,"DATA/UCTD"))
+uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
 uctd.hdr.pattern       <- ".*UCTD\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
@@ -527,7 +527,7 @@ cal.vessels        <- "RL"
 cal.dir            <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
 cal.datetime       <- "30 April to 4 May 2019" # Date/time of calibration
 cal.plot.date      <- "2019-05-01" # Date of the calibration, used to plot cal time series
-cal.window         <- 5            # Number of days around calibration date to look for results
+cal.window         <- 50            # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "J. Renfree, T. Sessions, D. Murfin, and D. Palance" # Calibration participants
 cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name

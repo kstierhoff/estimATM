@@ -57,8 +57,8 @@ for (dd in 1:nrow(dirs)) {
 close(pb)
 
 # Format results
-cal.res.all   <- arrange(cal.res.all, cal_date, txdr_freq)
-cal.info.all  <- arrange(cal.info.all, date_time)
+cal.res.all   <- arrange(cal.res.all, mdy(cal_date), txdr_freq)
+cal.info.all  <- arrange(cal.info.all, mdy_hms(date_time))
 cal.pings.all <- arrange(cal.pings.all, date_time)
 
 # write all results to file
