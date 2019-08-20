@@ -102,12 +102,12 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
-save.figs         <- T # Draw new figures and maps
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
 save.imap         <- T # Save Leaflet maps
 do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
@@ -3395,19 +3395,22 @@ nasc.density <- nasc %>%
     `Scomber japonicus`     = mean(mack.dens),
     `Sardinops sagax`       = mean(sar.dens)) %>% 
   gather(scientificName, density, -transect, -int, -lat, -long) %>% 
-  mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
+  mutate(bin       = cut(density, dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin))
 
 # Summarise biomass density by transect and species
 nasc.density.summ <- nasc.density %>% 
-  group_by(scientificName,transect) %>% 
-  summarise(density = sum(density)) %>% 
+  group_by(scientificName, transect) %>% 
+  summarise(density = mean(density)) %>% 
   filter(scientificName %in% unique(lengths$scientificName)) %>% 
   left_join(select(tx.labels.tmp, -end.lat, -end.long, -brg))
 
 # Save biomass density data
 save(nasc.density, nasc.density.summ, 
      file = here("Output/nasc_biomass_density.Rdata"))
+
+write_csv(nasc.density, here("Output/nasc_density.csv"))
+write_csv(nasc.density.summ, here("Output/nasc_density_summary.csv"))
 
 # Select legend objects 
 dens.levels.all <- sort(unique(nasc.density$bin.level))
@@ -3776,10 +3779,10 @@ save(strata.final, strata.summ, strata.summ.rm,
 # write.csv(strata.manual, file = here("Output/strata_manual.csv"), 
 #           quote = F,row.names = F)
 
-write.csv(strata.final,file  = here("Output/strata_final.csv"),  
+write.csv(strata.final, file  = here("Output/strata_final.csv"),  
           quote = F,row.names = F)
 
-write.csv(strata.summ,file   = here("Output/strata_summary.csv"),
+write.csv(strata.summ, file   = here("Output/strata_summary.csv"),
           quote = F,row.names = F)
 
 # Print strata summary table
@@ -3812,22 +3815,23 @@ landmarks <- data.frame(
   y = rep(0,3))
 
 # Get max density for setting y limits
-max.tx.dens <- ceiling(max(log(nasc.density.summ$density + 1), na.rm = TRUE))
+max.tx.dens.log <- ceiling(max(log(nasc.density.summ$density + 1), na.rm = TRUE))
+max.tx.dens <- ceiling(max(nasc.density.summ$density, na.rm = TRUE))
 
 if (nrow(strata.summ.rm) > 0) {
   # If strata were removed
   # Biomass density by species and transect, showing stratum breaks
   biomass.dens.plot.lat <- ggplot(strata.summ) + 
-    geom_rect(aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens, 
+    geom_rect(aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens.log, 
                   group = stratum, colour = factor(stratum)), 
               fill = 'gray70', alpha = 0.5) +
-    geom_rect(data = strata.summ.rm, aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens,
+    geom_rect(data = strata.summ.rm, aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens.log,
                                          group = stratum.orig),
               fill = 'gray50', alpha = 0.5, linetype = "dotted") +
     geom_hline(yintercept = 0, colour = 'gray20') +
     geom_vline(xintercept = c(34.448266, 40.430520, 48.490), linetype = "dashed") +
     geom_text(data = landmarks, 
-              aes(lat.start, max.tx.dens, label = name), 
+              aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
               fontface = "italic", alpha = 0.5) +
     geom_path(data = nasc.density.summ,  
@@ -3845,7 +3849,7 @@ if (nrow(strata.summ.rm) > 0) {
     scale_x_continuous("Start latitude", 
                        breaks = seq(floor(min(strata.summ$lat.start)), 
                                     ceiling(max(strata.summ$lat.end)),1)) + 
-    scale_y_continuous(expression(Biomass~density~(log(t+1)~nmi^-2))) +
+    scale_y_continuous(expression(Mean~log~biomass~density~(log(t~nmi^-2)+1))) +
     theme_bw() + 
     theme(strip.text.x       = element_text(face = "bold.italic"),
           strip.background.x = element_rect(fill = NA)) +
@@ -3859,11 +3863,11 @@ if (nrow(strata.summ.rm) > 0) {
   # Original plot, based on transect number on the x-axis
   biomass.dens.plot.tx <- ggplot(strata.summ) +
     geom_rect(aes(xmin = start - 0.4, xmax = end + 0.4, 
-                  ymin = 0, ymax = max.tx.dens, 
+                  ymin = 0, ymax = max.tx.dens.log, 
                   group = stratum, colour = factor(stratum)),
               fill = 'gray70', alpha = 0.5) +
     geom_rect(data = strata.summ.rm, aes(xmin = start - 0.4, xmax = end + 0.4, 
-                                         ymin = 0, ymax = max.tx.dens, 
+                                         ymin = 0, ymax = max.tx.dens.log, 
                                          group = stratum.orig),
               fill = 'gray50', alpha = 0.5, linetype = "dotted") +
     geom_hline(yintercept = 0, colour = 'gray20') +
@@ -3880,8 +3884,8 @@ if (nrow(strata.summ.rm) > 0) {
     scale_fill_discrete("Spacing (nmi)") +
     facet_wrap(~scientificName,ncol = 1) +
     xlab("Transect") + 
-    scale_y_continuous(expression(Biomass~density~(log(t+1)~nmi^-2)), 
-                       limits = c(-0.5,max.tx.dens), expand = c(0,0)) +
+    scale_y_continuous(expression(Mean~log~biomass~density~(log(t~nmi^-2)+1)),
+                       limits = c(-0.5, max.tx.dens.log), expand = c(0,0)) +
     theme_bw() +
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic"))
@@ -3889,6 +3893,43 @@ if (nrow(strata.summ.rm) > 0) {
   ggsave(biomass.dens.plot.tx, 
          filename = here("Figs/fig_biomass_density_transect_tx.png"),
          height = 13, width = 13)
+  
+  # Original plot, based on transect name on the x-axis, with non log-transformed densities
+  biomass.dens.plot.tx.name <- ggplot(strata.summ) +
+    # geom_rect(aes(xmin = start - 0.4, xmax = end + 0.4, 
+    #               ymin = 0, ymax = max.tx.dens, 
+    #               group = stratum, colour = factor(stratum)),
+    #           fill = 'gray70', alpha = 0.5) +
+    # geom_rect(data = strata.summ.rm, aes(xmin = start - 0.4, xmax = end + 0.4, 
+    #                                      ymin = 0, ymax = max.tx.dens, 
+    #                                      group = stratum.orig),
+    #           fill = 'gray50', alpha = 0.5, linetype = "dotted") +
+    geom_hline(yintercept = 0, colour = 'gray20') +
+    geom_path(data = nasc.density.summ, 
+              aes(transect.name, density, group = scientificName)) +
+    geom_point(data = nasc.density.summ, 
+               aes(transect.name, density, group = scientificName, fill = dist.bin), 
+               shape = 21, size = 3) +
+    # Label non-zero biomass density to facilitate picking strata
+    geom_text_repel(data = filter(nasc.density.summ, density > 0.01),
+                    aes(transect.name, density, label = transect.name, group = scientificName),
+                    colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1,
+                    angle = 90) +
+    scale_colour_discrete("Stratum") +
+    scale_fill_discrete("Spacing (nmi)") +
+    facet_wrap(~scientificName, ncol = 1, scales = "free_y") +
+    xlab("Transect") + 
+    scale_y_continuous(expression(Biomass~density~(t~nmi^-2))) +
+    # scale_y_continuous(expression(Biomass~density~(t~nmi^-2)), 
+    #                    limits = c(-0.5, max.tx.dens), expand = c(0,0)) +
+    theme_bw() +
+    theme(strip.background.x = element_blank(),
+          strip.text.x       = element_text(face = "italic"),
+          axis.text.x        = element_text(angle = 90))
+  
+  ggsave(biomass.dens.plot.tx.name, 
+         filename = here("Figs/fig_biomass_density_transect_tx_name.png"),
+         height = 10, width = 20)
   
 } else {
   # If no strata were removed
@@ -3962,7 +4003,6 @@ if (nrow(strata.summ.rm) > 0) {
 
 # Add plot by latitude
 include_graphics(here("Figs/fig_biomass_density_transect_lat.png"))
-# include_graphics(here("Figs/fig_biomass_density_transect_tx.png"))
 ```  
 
 Biomass density (log(t + 1) nmi^-2^) versus latitude (easternmost portion of each transect) and strata used to estimate biomass and abundance (shaded regions; outline indicates stratum number) for each species and survey vessel (labels above plots; e.g., SH = _Bell M. Shimada_, RL = _Reuben Lasker_, LM = _Lisa Marie_). Blue number labels correspond to the transect numbers with positive biomass (log(t + 1) > 0.01) to facilitate discrimination of stratum breaks. Point fills indicate transect spacing (i.e., the shortest distance between the midpoint of each transect and midpoint of all other transects, in nmi), which is used to define different sampling strata, for example when adaptive sampling occurs. Dashed lines indicate prominent biogeographic landmarks that delineate stock boundaries (e.g., Cape Mendocino for the central and nothern stocks of Northern anchovy and Pt. Conception for the northern and southern stocks of Pacific sardine).  
@@ -4491,7 +4531,14 @@ Maps showing acoustic sampling strata used to compute abundance and biomass for 
 # Convet nasc.density to sf and project
 nasc.density <- st_as_sf(nasc.density, coords = c("long","lat"), crs = crs.geog)
 
-nasc.density <- project_sf(nasc.density, crs = crs.proj)
+nasc.density <- project_sf(nasc.density, crs.proj)
+
+# 
+# nasc.density2 <- ungroup(nasc.density)
+# 
+# nasc.density3 <- project_df(nasc.density, lat, long, crs.proj = crs.proj)
+
+# project_df(nasc.density, crs.proj = crs.proj)
 
 # Summarize positive clusters to filter clusters from removed strata
 pos.cluster.summ <- pos.clusters %>% 
@@ -4503,6 +4550,9 @@ if (save.figs) {
   # Create a list for saving biomass density plots
   biomass.dens.figs <- list()
   
+  # Create data frame for saving nasc.density.plot for each species and stratum
+  nasc.density.plot.all <- data.frame()
+  
   # Plot anchovy biomass density
   for (i in unique(strata.primary$scientificName)) {
     for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
@@ -4511,6 +4561,10 @@ if (save.figs) {
         left_join(filter(nasc.stock, scientificName == i, stock == j)) %>% 
         filter(density != 0, scientificName == i, 
                stock == j, transect %in% strata.final$transect[strata.final$scientificName == i])
+      
+      # Combine biomass density from each species and stratum
+      nasc.density.plot.all <- bind_rows(nasc.density.plot.all,
+                                         nasc.density.plot)
       
       # Filter positive clusters
       pos.cluster.txt <- pos.clusters %>% 
@@ -4557,8 +4611,10 @@ if (save.figs) {
       biomass.dens.figs[[i]][[j]] <- biomass.dens
     }
   }
+  
   # Save map objects
-  save(biomass.dens.figs, file = here("Output/biomass_dens_map_all.Rdata"))  
+  save(biomass.dens.figs, file = here("Output/biomass_dens_map_all.Rdata")) 
+  
 } else {
   load(here("Output/biomass_dens_map_all.Rdata"))
 }
@@ -5521,8 +5577,12 @@ i.map <- leaflet() %>%
 
 # Save Leaflet map to HTML file
 if (save.imap) {
-  mapshot(i.map, url = here("Output/interactive_explorer.HTML"))
+  mapshot(i.map, url = here("Output/estimateBiomass_explorer.HTML"))
 }
+
+# Save imap
+dir_create(here("Output/imap"))
+save(i.map, file = here("Output/imap/estimateBiomass_explorer.Rdata"))
 
 # Display map
 i.map
@@ -7211,6 +7271,11 @@ if (doc.type == "docx") {
     add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
 }
 ```  
+
+```{r plot-cal-time-series}
+include_graphics(here("Figs/fig_cal_time_series_combo.png"))
+```
+
 
 ```{r work-complete}
 beep(4)
