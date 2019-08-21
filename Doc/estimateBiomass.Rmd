@@ -102,12 +102,12 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
+get.db            <- T # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
 save.imap         <- T # Save Leaflet maps
 do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
@@ -1192,12 +1192,16 @@ nasc.plot <- nasc %>%
                    '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
                    '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
                    '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
-  # Create bins for defining point size in NASC plots%>% 
+  # Create bins for defining point size in NASC plots
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
          bin.level =  as.numeric(bin)) %>% 
   # st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   ungroup() %>% 
   project_df(to = crs.proj)
+
+# Convert to sf
+nasc.plot.sf <- nasc.plot %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 # Write NASC data to CSV
 write.csv(nasc.plot, file = here("Output/cps_nasc_plot.csv"), 
@@ -5228,7 +5232,7 @@ cufes.sf <- cufes %>%
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
     popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
-  # st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>%
   arrange(desc(Density))
 
 cufes.squid.sf <- cufes %>% 
@@ -5238,7 +5242,8 @@ cufes.squid.sf <- cufes %>%
       Species == "SquidEggs" ~ "Squid",
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) 
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 cufes.ofe.sf <- cufes %>% 
   filter(Density > 0, Species == "OtherFishEggs") %>%
@@ -5250,14 +5255,20 @@ cufes.ofe.sf <- cufes %>%
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
     popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup><br/>", 
-                  '</b>Comment:</b>', Comments))
+                  '</b>Comment:</b>', Comments)) %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Convert negative CUFES samples to sf; CRS - 4326
 cufes.neg.sf <- cufes %>% 
   filter(Density == 0, Species %in% cufes.plot.spp) %>%
   mutate(
     label = paste(round(Density, 1), " eggs/cubic m", sep = ""),
-    popup = label)  
+    popup = label) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
+# Convert biomass density to sf ------------------------------
+nasc.density.sf <- nasc.density.plot.all %>% 
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog)
 
 # Read State Waters shapefiles -------------------------------
 ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
@@ -5334,6 +5345,7 @@ nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 
 # Create color palette for NASC
 nascPal <- colorFactor(nasc.colors.all, nasc.levels.all)
+densPal <- colorFactor(dens.colors.all, dens.levels.all)
 
 # Remove GEOMETRYCOLLECTION sf strata for Leaflet map
 strata.primary.sub <- strata.primary %>% 
@@ -5402,35 +5414,56 @@ i.map <- leaflet() %>%
   # Add nearshore stratum polygons
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Clupea pallasii"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
-              group = "Stratum (Herring)") %>%
+              group = "Biomass (Herring)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Engraulis mordax"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Stratum (Anchovy)") %>%
+              group = "Biomass (Anchovy)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Sardinops sagax"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Stratum (Sardine)") %>%
+              group = "Biomass (Sardine)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Scomber japonicus"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Stratum (P. mackerel)") %>%
+              group = "Biomass (P. mackerel)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Trachurus symmetricus"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Stratum (J. mackerel)") %>%
+              group = "Biomass (J. mackerel)") %>%
   # Add primary stratum polygons
   addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
-              group = "Stratum (Herring)") %>%
+              group = "Biomass (Herring)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414", 
-              group = "Stratum (Anchovy)") %>%
+              group = "Biomass (Anchovy)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
-              group = "Stratum (Sardine)") %>%
+              group = "Biomass (Sardine)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
-              group = "Stratum (P. mackerel)") %>%
+              group = "Biomass (P. mackerel)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
               weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
-              group = "Stratum (J. mackerel)") %>%
+              group = "Biomass (J. mackerel)") %>%
+  # Add biomass density
+  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Clupea pallasii"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                   group = "Biomass (Herring)") %>% 
+  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                   group = "Biomass (Anchovy)") %>% 
+  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Sardinops sagax"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                   group = "Biomass (Sardine)") %>% 
+  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Scomber japonicus"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                   group = "Biomass (P. mackerel)") %>% 
+  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Trachurus symmetricus"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                   group = "Biomass (J. mackerel)") %>% 
   # Add nav data
   addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>%
@@ -5450,18 +5483,26 @@ i.map <- leaflet() %>%
   addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
                    fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                    group = "CUFES (Negative)") %>%
-  
+  # Add aerial survey data
+  addCircleMarkers(data = aerialData,
+                   radius = ~log(SardMetricTons), color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  sardine.color, label = ~SardMetricTons,
+                   group = "Aerial Data (Sardine)") %>%
+  addCircleMarkers(data = aerialData,
+                   radius = ~log(AnchMetricTons), color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  anchovy.color, label = ~AnchMetricTons,
+                   group = "Aerial Data (Anchovy)") %>%
   # Add CTD and UCTD data
   addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
                    weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type), 
                    label = ~htmlEscape(name), group =  "CTD Casts") %>% 
   # Add backscatter data
-  addCircleMarkers(data = filter(nasc.plot, NASC < 200), 
+  addCircleMarkers(data = filter(nasc.plot.sf, NASC < 200), 
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  "#000414", 
                    label = ~label, popup = ~popup, 
                    group = "Backscatter-CPS (Small)") %>%
-  addCircleMarkers(data = filter(nasc.plot, NASC >= 200), 
+  addCircleMarkers(data = filter(nasc.plot.sf, NASC >= 200), 
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
                    label = ~label, popup = ~popup,
@@ -5481,7 +5522,7 @@ i.map <- leaflet() %>%
              group = "Backscatter (Large)") %>%
   # Add legends
   leaflet::addLegend("bottomleft", colors = nasc.colors.all,
-                     values = sort(unique(nasc.plot$bin.level)),
+                     values = sort(unique(nasc.plot.sf$bin.level)),
                      labels = nasc.labels.all,
                      title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
                      opacity = 1, group = "Backscatter-CPS") %>%
@@ -5508,19 +5549,22 @@ i.map <- leaflet() %>%
                       "Backscatter-Krill", "Backscatter (Large)",
                       "CUFES Egg Density", "CUFES Egg Density-Other",
                       "CUFES Egg Density-Squid", "CUFES (Negative)",
-                      "Stratum (Anchovy)", "Stratum (Sardine)",
-                      "Stratum (J. mackerel)", "Stratum (P. mackerel)", 
-                      "Stratum (Herring)"),
+                      "Biomass (Anchovy)", "Biomass (Sardine)",
+                      "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
+                      "Biomass (Herring)", "Aerial Data (Sardine)", "Aerial Data (Anchovy)"),
     options = layersControlOptions(collapsed = F)) %>%  
-  hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)", 
-              "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
-              "Planned Transects (Ancillary)",
-              "Stratum (Anchovy)", "Stratum (Sardine)",
-              "Stratum (J. mackerel)", "Stratum (P. mackerel)", 
-              "Stratum (Herring)", "CTD Casts")) %>% 
+  hideGroup(c(
+    "Exclusive Economic Zones",
+    "Backscatter (Large)", "Backscatter-Krill", 
+    "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
+    "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
+    "Planned Transects (Ancillary)",
+    "Biomass (Anchovy)", "Biomass (Sardine)",
+    "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
+    "Biomass (Herring)", "CTD Casts",
+    "Aerial Data (Sardine)", "Aerial Data (Anchovy)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
-
 
 # Save Leaflet map to HTML file
 if (save.imap) {

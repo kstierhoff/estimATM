@@ -5,11 +5,18 @@ leaflet() %>%
   addProviderTiles(providers$Esri.OceanBasemap, 
                    options = tileOptions(useCache = useCachedTile,
                                          crossOrigin = useCrossOrigin)) %>%
-  addCircleMarkers(data = nasc.plot, 
+  addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
+              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414", 
+              group = "Stratum (Anchovy)") %>% 
+  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
-                   label = ~label, popup = ~popup,
-                 group = "Backscatter-CPS") #%>%
+                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level),
+                   group = "Backscatter-CPS") #%>%
+  # addCircleMarkers(data = nasc.plot, 
+  #                  radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+  #                  fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+  #                  label = ~label, popup = ~popup,
+  #                group = "Backscatter-CPS") %>%
   # addLegend("bottomleft", colors = nasc.colors.all,
   #           values = sort(unique(nasc.plot$bin.level)),
   #           labels = nasc.labels.all,
