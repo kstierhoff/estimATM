@@ -48,7 +48,7 @@ doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
 if (is.null(doc.type)) {doc.type <- "html"}
 ```
 
-```{r knitr-options}
+```{r knitr-options,echo=FALSE}
 # Set global knitr chunk options
 if (.Platform$OS.type == "unix") {
   # Do not specify Cairo device for MacOS
@@ -103,14 +103,14 @@ Options in this section control the execution of various code chunks. All chunks
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
 get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- F # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
+get.nav           <- T # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
+copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 save.imap         <- T # Save Leaflet maps
 do.bootstrap      <- T # Generate bootstrap estimates
-download.hab      <- F # Download habitat map
+download.hab      <- T # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 # Often or usually F
@@ -342,12 +342,14 @@ if (get.nav) {
 }
 
 # Read transect waypoints
-wpts <- read_csv(here("Data/Nav", wpt.filename))
+wpts <- read_csv(here("Data/Nav", wpt.filename)) %>% 
+  rename(lat = Latitude, long = Longitude) %>% 
+  project_df(to = crs.proj)
 
 # Convert planned transects to sf; CRS = crs.geog
 wpts.sf <- wpts %>% 
   filter(Type %in% wpt.types) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
    mutate(
     label    = paste("Transect", Transect),
     popup    = paste('<b>Transect:</b>', Transect, Type)
@@ -367,9 +369,6 @@ transects.sf <- wpts.sf %>%
 
 st_write(transects.sf, here("Output/planned_transects.shp"), 
          delete_layer = TRUE)
-
-# Convert waypoints back to data frame with projected coordinates
-wpts.proj <- project_sf(wpts.sf, crs = crs.proj)
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -569,7 +568,7 @@ save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
 # Map planned transects
 survey.plan <- base.map +    
   # plot adaptive transects
-  geom_point(data = wpts.proj, 
+  geom_point(data = wpts, 
             aes(X, Y, colour = Type), size = 1) +
   geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
           show.legend = "line") +
@@ -1672,32 +1671,45 @@ if (nrow(catch) > 0) {
 
 # Prepare catch data for plotting ----------------------------------------------
 # Select and rename trawl data for pie charts
-catch.pie <- cluster.summ.wt %>% 
+haul.pie <- haul.summ.wt %>% 
+  select(haul, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  project_df(to = crs.proj)
+
+cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
   project_df(to = crs.proj)
 
-# Filter for positive trawls
-cluster.pos <- filter(catch.pie, AllCPS > 0) %>% 
+# Filter for positive hauls and clusters
+haul.pos <- filter(haul.pie, AllCPS > 0) %>% 
   arrange(desc(X))
 
-if (nrow(cluster.pos) > 0) {
-  # Substitute very small value for species with zero catch, just for pie charts
+cluster.pos <- filter(cluster.pie, AllCPS > 0) %>% 
+  arrange(desc(X))
+
+# Substitute very small value for species with zero catch, just for pie charts
+if (nrow(haul.pos) > 0) {
+  haul.pos <- haul.pos %>% 
+    replace(. == 0, 0.0000001) 
+  
   cluster.pos <- cluster.pos %>% 
     replace(. == 0, 0.0000001) 
 }
 
 # Filter for empty trawls
-cluster.zero <- filter(catch.pie, AllCPS == 0)
+haul.zero    <- filter(haul.pie, AllCPS == 0)
+
+cluster.zero <- filter(cluster.pie, AllCPS == 0)
 
 # Calculate pie radius based on latitude range
 pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
 
 # Calculate pie radius of each pie, based on All CPS landings
 if (scale.pies) {
-  catch.pie$radius <- pie.radius*catch.pie$bin
+  cluster.pie$radius <- pie.radius*cluster.pie$bin
 } else {
-  catch.pie$radius <- pie.radius
+  cluster.pie$radius <- pie.radius
 }
 
 # Add catch to haul paths for Leaflet plots
@@ -1719,7 +1731,8 @@ haul.paths <- haul.paths %>%
 super.clusters <- filter(cluster.mid, cluster %in% unique(cluster.pos$cluster))
 
 # Save trawl summary data
-save(haul.summ.wt, cluster.summ.wt, file = here("Output/catch_info.Rdata"))
+save(haul.summ.wt, cluster.summ.wt, haul.pie, cluster.pie, haul.zero, cluster.zero,
+     file = here("Output/catch_info.Rdata"))
 ```
 
 ```{r get-herring-limits}
@@ -1994,8 +2007,33 @@ A map showing trawl clusters assigned to 100-m acoustic transect intervals. Clus
 ```{r map-trawl-species-proportions}
 # Map trawl species proportions -------------------------------------------------------
 if (save.figs) {
-  # Create trawl figure
-  trawl.catch.plot <- base.map +
+  # Create trawl haul figure
+  trawl.pie.haul.wt <- base.map +
+    # Plot transects data
+    geom_point(data = nasc, aes(X, Y, group = transect.name),
+               size = 0.5, colour = "gray50", alpha = 0.5) +
+    # Plot trawl pies
+    geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = pie.radius),
+                    cols = c("Anchovy", "JackMack", "Jacksmelt",
+                             "PacHerring", "PacMack", "Sardine"),
+                    color = 'black', alpha = 0.8) +
+    # Configure trawl scale
+    scale_fill_manual(name = 'Species',
+                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                                 "P. herring", "P. mackerel", "Sardine"),
+                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                                 pac.herring.color, pac.mack.color, sardine.color)) +
+    # Plot empty cluster locations
+    geom_point(data = haul.zero, aes(X, Y),
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
+    # Plot panel label
+    ggtitle("CPS Species Proportions in Trawl Hauls") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  # Create trawl cluster figure
+  trawl.pie.cluster.wt <- base.map +
     # Plot transects data
     geom_point(data = nasc, aes(X, Y, group = transect.name),
                size = 0.5, colour = "gray50", alpha = 0.5) +
@@ -2010,29 +2048,33 @@ if (save.figs) {
                                  "P. herring", "P. mackerel", "Sardine"),
                       values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                  pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty trawl locations
+    # Plot empty cluster locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawls") +
+    ggtitle("CPS Species Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.plot <- plot_grid(nasc.cluster.plot, trawl.catch.plot,
+  nasc.trawl.plot <- plot_grid(nasc.cluster.plot, trawl.pie.cluster.wt,
                                      nrow = 1, labels = c("a)", "b)"))
   
   # Save trawl species proportions plot
-  ggsave(trawl.catch.plot,
-         filename = here("Figs/fig_trawl_species_proportion_wt.png"),
+  ggsave(trawl.pie.haul.wt,
+         filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
+         width = map.width, height = map.height)
+  
+  ggsave(trawl.pie.cluster.wt,
+         filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
          width = map.width, height = map.height)
   
   ggsave(nasc.trawl.plot,
-         filename = here("Figs/fig_nasc_cluster_trawl_proportion.png"),
+         filename = here("Figs/fig_nasc_trawl_proportion.png"),
          width = map.width*2, height = map.height)
   
-  save(trawl.catch.plot,
+  save(trawl.pie.cluster.wt,
        file = here("Output/trawl_species_proportion_map.Rdata"))
   
   save(nasc.trawl.plot,
@@ -2041,7 +2083,7 @@ if (save.figs) {
   load(here("Output/trawl_species_proportion_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_trawl_species_proportion_wt.png"))
+include_graphics(here("Figs/fig_trawl_proportion_cluster_wt.png"))
 ```  
 
 Survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawl clusters with no CPS). 
@@ -2609,10 +2651,10 @@ Finally, examine the a) distribution of 38-kHz integrated backscattering coeffic
 ```{r map-nasc-cufes-trawl}
 if (save.figs) {
   # Combine backscatter, CUFES, and trawl maps
-  nasc.cufes.trawl.plot      <- plot_grid(nasc.map, cufes.density.all, trawl.catch.plot,
+  nasc.cufes.trawl.plot      <- plot_grid(nasc.map, cufes.density.all, trawl.pie.cluster.wt,
                                      nrow = 1, labels = c("a)", "b)", "c)"))
   
-  nasc.cufes.trawl.plot.long <- plot_grid(nasc.map, cufes.density.all, trawl.catch.plot,
+  nasc.cufes.trawl.plot.long <- plot_grid(nasc.map, cufes.density.all, trawl.pie.cluster.wt,
                                      ncol = 1, labels = c("a)", "b)", "c)"))
   # Save maps
   ggsave(nasc.cufes.trawl.plot, 
@@ -2906,7 +2948,7 @@ catch.summ.num <- clf %>%
                           num.jack, num.her, na.rm = TRUE))
 
 # Calculate total CPS weight in each cluster
-haul.summ.wt <- catch %>% 
+cluster.summ.wt <- catch %>% 
   filter(scientificName %in% cps.spp) %>% 
   group_by(cluster) %>% 
   summarise(CPS.wg = sum(totalWeight))
@@ -2962,9 +3004,9 @@ write.csv(ts.proportions, file = here("Output/ts_proportions_raw.csv"),
 
 # Add cluster weights, numbers, and TS proportions
 clf <- clf %>% 
-  left_join(catch.summ.num, by = 'cluster') %>% 
-  left_join(haul.summ.wt,   by = 'cluster') %>% 
-  left_join(ts.proportions, by = 'cluster')
+  left_join(catch.summ.num,  by = 'cluster') %>% 
+  left_join(cluster.summ.wt, by = 'cluster') %>% 
+  left_join(ts.proportions,  by = 'cluster')
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
 clf$sigmaindiv.anch[clf$prop.anch == 0] <- 1
@@ -3003,7 +3045,7 @@ acoustic.pie.wg <- clf %>%
 
 if (save.figs) {
   # Create trawl figure
-  acoustic.pie.plot.indiv <- base.map +
+  acoustic.pie.indiv <- base.map +
     # Plot nasc data
     geom_point(data = nasc, aes(X, Y, group = transect.name),
                size = 0.5, colour = "gray50", alpha = 0.5) +
@@ -3013,6 +3055,9 @@ if (save.figs) {
                     cols = c("prop.anch","prop.jack","prop.her",
                              "prop.mack","prop.sar"),
                     color = 'black', alpha = 0.8) +
+    # Plot empty trawl locations
+    geom_point(data = cluster.zero, aes(X, Y),
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "P. herring", "J. mackerel",
@@ -3026,7 +3071,7 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Create trawl figure
-  acoustic.pie.plot.wg <- base.map +
+  acoustic.pie.wg <- base.map +
     # Plot nasc data
     geom_point(data = nasc, aes(X, Y, group = transect.name),
                size = 0.5, colour = "gray50", alpha = 0.5) +
@@ -3036,6 +3081,9 @@ if (save.figs) {
                     cols = c("prop.anch.wg","prop.jack.wg","prop.her.wg",
                              "prop.mack.wg","prop.sar.wg"),
                     color = 'black', alpha = 0.8) +
+    # Plot empty trawl locations
+    geom_point(data = cluster.zero, aes(X, Y),
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "P. herring", "J. mackerel",
@@ -3049,7 +3097,7 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine acoustic proportion maps
-  acoustic.pie.plot.comp <- plot_grid(trawl.catch.plot, acoustic.pie.plot.indiv, acoustic.pie.plot.wg,
+  acoustic.pie.plot.comp <- plot_grid(trawl.pie.cluster.wt, acoustic.pie.indiv, acoustic.pie.wg,
                                      nrow = 1, labels = c("a)", "b)", "c)"))
 
   # Save trawl species proportions plots
@@ -3057,7 +3105,7 @@ if (save.figs) {
          filename = here("Figs/fig_trawl_acoustic_proportion_comparison.png"),
          width = map.width*3, height = map.height)
   
-  save(acoustic.pie.plot.indiv, acoustic.pie.plot.wg, acoustic.pie.plot.comp,
+  save(acoustic.pie.indiv, acoustic.pie.wg, acoustic.pie.plot.comp,
        file = here("Output/acoustic_proportion_comp_map.Rdata"))
   
 } else {
@@ -3081,6 +3129,9 @@ acoustic.pie.plot.final <- base.map +
                   cols = c("prop.anch","prop.jack","prop.her",
                            "prop.mack","prop.sar"),
                   color = 'black', alpha = 0.8) +
+  # Plot empty trawl locations
+  geom_point(data = cluster.zero, aes(X, Y),
+             size = 3, shape = 21, fill = 'black', colour = 'white') +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "P. herring", "J. mackerel",
@@ -5116,11 +5167,12 @@ if (process.ctd) {
   # Load ctd.info.all
   load(here("Output/all_ctd_info.Rdata"))
 }
+# Project CTD info table
+ctd.info.all <- project_df(ctd.info.all, to = 3310)
+
 # Convert CTD dataframe so sf for mapping
 ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = 4326) %>% 
   mutate(cast.type = type)
-
-ctd.info.proj <- project_sf(ctd.info.sf, crs = crs.proj)
 ```
 
 ## Map CTD/UCTD cast locations  
@@ -5133,7 +5185,7 @@ if (save.figs) {
     # Plot vessel track
     geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
     # Plot CTD cast locations
-    geom_shadowtext(data = ctd.info.proj, aes(X, Y, label = cast.num, colour = type),
+    geom_shadowtext(data = ctd.info.all, aes(X, Y, label = cast.num, colour = type),
               size = 2, bg.colour = "white", fontface = "bold") + 
     scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
     coord_sf(crs = crs.proj,
@@ -5145,7 +5197,7 @@ if (save.figs) {
     # Plot vessel track
     geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
     # Plot CTD cast locations
-    geom_shadowtext(data = ctd.info.proj, aes(X, Y, label = transect, colour = type),
+    geom_shadowtext(data = ctd.info.all, aes(X, Y, label = transect, colour = type),
               size = 2, bg.colour = "white", fontface = "bold") + 
     scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
     coord_sf(crs = crs.proj,
@@ -5208,7 +5260,7 @@ ctd.sf <- ctd.info.all %>%
   st_as_sf(coords = c("long","lat"), crs = 4326) 
 
 # Convert haul catch to sf and create labels ----------------------------------
-cluster.catch.sf <- catch.pie %>%
+cluster.catch.sf <- cluster.pie %>%
   st_as_sf(coords = c("X","Y"), crs = crs.proj) %>%
   st_transform(crs = crs.geog) %>% 
   mutate(
@@ -5268,8 +5320,16 @@ cufes.neg.sf <- cufes %>%
 
 # Convert biomass density to sf ------------------------------
 nasc.density.sf <- nasc.density.plot.all %>% 
-  st_as_sf(coords = c("long", "lat"), crs = crs.geog)
-
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
+  mutate(
+    label = paste0('Species: ', scientificName, "; ", 
+                   'Transect: ', transect, "; ",
+                   'Density: ', signif(density, 2), ' t/sq.nmi'),
+    popup = paste0('<b>Species: </b>', scientificName,  '<br/>',
+                   '<b>Transect: </b>', transect, '<br/>',
+                   '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>')
+  )
+  
 # Read State Waters shapefiles -------------------------------
 ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
   st_transform(4326)
@@ -5321,10 +5381,10 @@ cufesPal <- colorFactor(cufes.colors, cufes.sf$Species)
 
 # Create color pallette for CPS species
 cpsPal <- colorFactor(
-  c(anchovy.color, jack.mack.color, jacksmelt.color,
-    pac.herring.color, pac.mack.color, sardine.color),
-  c("Engraulis mordax","Trachurus symmetricus","Atherinopsis californiensis",
-    "Clupea pallasii","Scomber japonicus","Sardinops sagax"))
+  c(jacksmelt.color, pac.herring.color, anchovy.color, 
+    sardine.color, pac.mack.color, jack.mack.color),
+  c("Atherinopsis californiensis", "Clupea pallasii", "Engraulis mordax", 
+    "Sardinops sagax", "Scomber japonicus", "Trachurus symmetricus"))
 
 # Create color pallette for planned transects
 txPal    <- colorFactor(c("red","blue","orange","green"), 
@@ -5413,55 +5473,60 @@ i.map <- leaflet() %>%
                    group = "Planned Transects (Ancillary)") %>%
   # Add nearshore stratum polygons
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Clupea pallasii"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
-              group = "Biomass (Herring)") %>%
+              weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+              fillOpacity = 0.50, group = "Biomass (Herring)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Engraulis mordax"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Biomass (Anchovy)") %>%
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+              fillOpacity = 0.50, group = "Biomass (Anchovy)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Sardinops sagax"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Biomass (Sardine)") %>%
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+              fillOpacity = 0.50, group = "Biomass (Sardine)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Scomber japonicus"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Biomass (P. mackerel)") %>%
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+              fillOpacity = 0.50, group = "Biomass (P. mackerel)") %>%
   addPolygons(data = filter(strata.nearshore.sub, scientificName == "Trachurus symmetricus"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#FF8C00",
-              group = "Biomass (J. mackerel)") %>%
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+              fillOpacity = 0.50, group = "Biomass (J. mackerel)") %>%
   # Add primary stratum polygons
   addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
               group = "Biomass (Herring)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414", 
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent", 
               group = "Biomass (Anchovy)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
               group = "Biomass (Sardine)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
               group = "Biomass (P. mackerel)") %>%
   addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414",
+              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
               group = "Biomass (J. mackerel)") %>%
   # Add biomass density
   addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Clupea pallasii"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                   label = ~label, popup = ~popup, 
                    group = "Biomass (Herring)") %>% 
   addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   label = ~label, popup = ~popup, 
                    fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
                    group = "Biomass (Anchovy)") %>% 
   addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Sardinops sagax"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   label = ~label, popup = ~popup, 
                    fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
                    group = "Biomass (Sardine)") %>% 
   addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Scomber japonicus"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   label = ~label, popup = ~popup, 
                    fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
                    group = "Biomass (P. mackerel)") %>% 
   addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Trachurus symmetricus"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   label = ~label, popup = ~popup, 
                    fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
                    group = "Biomass (J. mackerel)") %>% 
   # Add nav data
@@ -5483,15 +5548,6 @@ i.map <- leaflet() %>%
   addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
                    fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                    group = "CUFES (Negative)") %>%
-  # Add aerial survey data
-  addCircleMarkers(data = aerialData,
-                   radius = ~log(SardMetricTons), color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  sardine.color, label = ~SardMetricTons,
-                   group = "Aerial Data (Sardine)") %>%
-  addCircleMarkers(data = aerialData,
-                   radius = ~log(AnchMetricTons), color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  anchovy.color, label = ~AnchMetricTons,
-                   group = "Aerial Data (Anchovy)") %>%
   # Add CTD and UCTD data
   addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
                    weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type), 
@@ -5520,17 +5576,44 @@ i.map <- leaflet() %>%
   # Add backscatter outliers
   addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
              group = "Backscatter (Large)") %>%
-  # Add legends
+  # Add backscatter legend
   leaflet::addLegend("bottomleft", colors = nasc.colors.all,
                      values = sort(unique(nasc.plot.sf$bin.level)),
                      labels = nasc.labels.all,
                      title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
                      opacity = 1, group = "Backscatter-CPS") %>%
+  # Add CUFES legend
   leaflet::addLegend("bottomleft", colors = cufes.colors,
                      values = sort(unique(cufes.sf$Species)),
                      labels = cufes.spp.labels,
                      title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
                      opacity = 1, group = "CUFES Egg Density") %>%
+  # Add biomass density legend
+  leaflet::addLegend("bottomleft", colors = dens.colors,
+                     values = sort(unique(nasc.density.sf$bin.level)),
+                     labels = dens.labels,
+                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Biomass (Anchovy)") %>%
+  leaflet::addLegend("bottomleft", colors = dens.colors,
+                     values = sort(unique(nasc.density.sf$bin.level)),
+                     labels = dens.labels,
+                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Biomass (Sardine)") %>%
+  leaflet::addLegend("bottomleft", colors = dens.colors,
+                     values = sort(unique(nasc.density.sf$bin.level)),
+                     labels = dens.labels,
+                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Biomass (J. mackerel)") %>%
+  leaflet::addLegend("bottomleft", colors = dens.colors,
+                     values = sort(unique(nasc.density.sf$bin.level)),
+                     labels = dens.labels,
+                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Biomass (P. mackerel)") %>%
+  leaflet::addLegend("bottomleft", colors = dens.colors,
+                     values = sort(unique(nasc.density.sf$bin.level)),
+                     labels = dens.labels,
+                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                     opacity = 1, group = "Biomass (Herring)") %>%
   # Add scale bar
   addScaleBar(position = "bottomright") %>%
   # Add map coordinates
@@ -5551,7 +5634,7 @@ i.map <- leaflet() %>%
                       "CUFES Egg Density-Squid", "CUFES (Negative)",
                       "Biomass (Anchovy)", "Biomass (Sardine)",
                       "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
-                      "Biomass (Herring)", "Aerial Data (Sardine)", "Aerial Data (Anchovy)"),
+                      "Biomass (Herring)"),
     options = layersControlOptions(collapsed = F)) %>%  
   hideGroup(c(
     "Exclusive Economic Zones",
@@ -5561,8 +5644,7 @@ i.map <- leaflet() %>%
     "Planned Transects (Ancillary)",
     "Biomass (Anchovy)", "Biomass (Sardine)",
     "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
-    "Biomass (Herring)", "CTD Casts",
-    "Aerial Data (Sardine)", "Aerial Data (Anchovy)")) %>% 
+    "Biomass (Herring)", "CTD Casts")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
@@ -6573,7 +6655,6 @@ ggsave(biomass.histogram.survey.ns,
 include_graphics(here("Figs/fig_biomass_histogram_survey_nearshore.png"))
 ```
 
-
 ### Offshore strata
 If desired, estimate biomass in the offshore stratum.
 
@@ -7121,10 +7202,7 @@ nasc.density.ns <- nasc.nearshore.final %>%
   mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin),
          key       = paste(transect, int)) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-# Convert back to projected CRS for plotting
-nasc.density.ns <- project_sf(nasc.density.ns, crs = crs.proj)
+  project_df(to = crs.proj)
 
 # Create maps of nearshore biomass
 if (save.figs) {
