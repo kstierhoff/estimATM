@@ -9,10 +9,11 @@ cufes.spp.labels.all <- cufes.spp.labels[which(names(cufes.spp.labels) %in% uniq
 
 cufes.density.all <- base.map +
   # Plot transects data
-  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
   # Plot all cufes samples, including zeros
-  geom_sf(data = cufes.neg,
-          shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
+  geom_point(data = cufes.neg, aes(X, Y),
+             shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
   geom_point(data = cufes.plot,
              aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
@@ -28,10 +29,11 @@ cufes.density.all <- base.map +
 
 cufes.density.facet <- base.map +
   # Plot transects data
-  geom_sf(data = transects.sf, size = 0.25, colour = "gray50", alpha = 0.75) +
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
   # Plot all cufes samples, including zeros
-  geom_sf(data = cufes.neg,
-          shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
+  geom_point(data = cufes.neg, aes(X, Y),
+             shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
   geom_point(data = cufes.plot,
              aes(X, Y, size = bin, colour = Species), alpha = 0.6) +

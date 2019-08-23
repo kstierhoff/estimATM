@@ -8,9 +8,10 @@ nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 # Map backscatter
 nasc.map.cps <- base.map +
   # Plot transects data
-  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
   # plot ship track data
-  geom_sf(data = nav_sf, colour = "gray50", size = 0.5, alpha = 0.5) +
+  geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot NASC data
   geom_point(data = nasc.plot.cps, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
@@ -44,9 +45,10 @@ nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 # Map backscatter
 nasc.map.krill <- base.map +
   # Plot transects data
-  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
   # plot ship track data
-  geom_sf(data = nav_sf, colour = "gray50", size = 0.5, alpha = 0.5) +
+  geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot NASC data
   geom_point(data = nasc.plot.krill, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
@@ -81,9 +83,10 @@ cufes.spp.labels.all <- cufes.spp.labels[which(names(cufes.spp.labels) %in% uniq
 
 cufes.density.all <- base.map +
   # Plot transects data
-  geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
   # Plot all cufes samples, including zeros
-  geom_sf(data = cufes.neg,
+  geom_point(data = cufes.neg, aes(X, Y),
           shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
   geom_point(data = cufes.plot,
@@ -100,9 +103,10 @@ cufes.density.all <- base.map +
 
 cufes.density.facet <- base.map +
   # Plot transects data
-  geom_sf(data = transects.sf, size = 0.25, colour = "gray50", alpha = 0.75) +
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
   # Plot all cufes samples, including zeros
-  geom_sf(data = cufes.neg,
+  geom_point(data = cufes.neg, aes(X, Y),
           shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
   geom_point(data = cufes.plot,
@@ -131,42 +135,42 @@ ggsave(cufes.density.facet,
        width = map.width*3, height = map.height)
 
 # Map trawl species proportions -------------------------------------------------------
-# Calculate pie radius based on latitude range
-# Use backscatter data to resize map to survey progress
-pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale) 
-
 if (nrow(cluster.pos) > 0) {
   # Create trawl figure
   trawl.catch.plot <- base.map +
     # Plot transects data
-    geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("Anchovy","JackMack","Jacksmelt","PacHerring","PacMack","Sardine"),
                     color = 'black', alpha = 0.8) +
+    # Plot empty trawl locations
+    geom_point(data = cluster.zero, aes(X, Y),
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy","J. Mackerel","Jacksmelt","P. herring","P. mackerel","Sardine"),
                       values = c(anchovy.color,jack.mack.color,jacksmelt.color,
                                  pac.herring.color,pac.mack.color,sardine.color)) +
-    # Plot empty trawl locations
-    geom_point(data = cluster.zero, aes(X, Y),
-               size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawls") +
+    ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 } else {
   # Create trawl figure
   trawl.catch.plot <- base.map +
-    # Plot nasc data
-    geom_sf(data = transects.sf, size = 0.5, colour = "gray50", alpha = 0.75) +
+    # Plot transects data
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y), 
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawls") +
+    ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -174,7 +178,7 @@ if (nrow(cluster.pos) > 0) {
 
 # save trawl plot
 ggsave(trawl.catch.plot,
-       filename = here("Figs/fig_trawl_species_proportion_wt.png"),
+       filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
        width = map.width, height = map.height)
 
 # Combine all plots #####

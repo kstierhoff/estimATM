@@ -203,7 +203,9 @@ cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
       cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
     Duration = as.numeric(difftime(Stop, Start, units = "mins")),
     Year = year(Start),
-    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs)
+    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+  rename(lat = StartLatitude, long = StartLongitude) %>% 
+  project_df(to = crs.proj)
 
 # Close connection
 dbDisconnect(cufes.con)
@@ -216,16 +218,16 @@ write.csv(cufes.raw, file = here("Output/cufes_raw.csv"),
 cufes <- cufes.raw %>% 
   # Convert cufes to long format for plotting
   select(
-    SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, Duration, 
+    SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
     SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
     Comments) %>%
   gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
-         -StartLatitude, -StartLongitude, -Duration, -Comments) %>% 
+         -lat, -long, -X, -Y, -Duration, -Comments) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
          bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.raw, SampleNumber, Start, Stop))
+  left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
 
 # Save processed cufes to CSV
 write.csv(cufes, file = here("Output/cufes_proc.csv"), 
@@ -234,10 +236,12 @@ write.csv(cufes, file = here("Output/cufes_proc.csv"),
 # Prepare CUFES data for plotting ----------------------------------------------
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
-  mutate(bin.level = 1)
+  mutate(bin.level = 1) %>% 
+  select(X, Y, SampleNumber)
 
 # Identify bad CUFES samples
 cufes.bad <- filter(cufes.raw, Duration <= 0)
+
 save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
 
 # Remove bad samples from CUFES
@@ -253,45 +257,28 @@ cufes <- cufes %>%
          bin.level = as.numeric(bin))
 
 # Project CUFES data from CPS
-cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  st_transform(crs = crs.proj) %>% 
+cufes.plot <- cufes %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
   arrange(desc(Density))
 
-cufes.plot <- project_sf(cufes.plot, crs.proj)
-
 # Project CUFES data from squid
-cufes.plot.squid <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  st_transform(crs = crs.proj) %>% 
+cufes.plot.squid <- cufes %>% 
   filter(Density > 0, Species == "SquidEggs") %>% 
   arrange(desc(Density))
 
-cufes.plot.squid <- project_sf(cufes.plot.squid, crs.proj)
-
 # Project CUFES data from other fish eggs (mostly P. mackerel)
-cufes.plot.ofe <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  st_transform(crs = crs.proj) %>% 
+cufes.plot.ofe <- cufes %>% 
   filter(Density > 0, Species == "OtherFishEggs") %>%
   filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
                                 "S. japonicus"))) %>% 
   arrange(desc(Density))
-
-cufes.plot.ofe <- project_sf(cufes.plot.ofe, crs.proj)
-
-# Select CUFES sample with zero density for plotting
-cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
-  st_as_sf(coords = c("StartLongitude", "StartLatitude"), crs = crs.geog) %>% 
-  select(SampleNumber)
 ```  
 
 ```{r create-basemap,include=F}
 # Configure base map options -----------------
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog) 
-
-# Project sf
-locations <- project_sf(locations, crs.proj)
+  project_df(to = crs.proj)
 
 # Get state data
 states <- ne_states(country = 'United States of America', returnclass = 'sf')
@@ -370,8 +357,6 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 
 # Convert CUFES to sf; CRS - crs.geog
 cufes.sf <- cufes %>% 
-  rename(lat = StartLatitude,
-         long = StartLongitude) %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
   mutate(
     spp.label = case_when(
@@ -380,14 +365,11 @@ cufes.sf <- cufes %>%
       Species == "JackMackerelEggs"~ "Jack mackerel",
       TRUE ~ Species),
     label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1), "eggs m<sup>3</sup><br/>",
-                  Counts, "eggs in", round(Duration), "mins")) %>% 
+    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   arrange(desc(Density))
 
 cufes.squid.sf <- cufes %>% 
-  rename(lat = StartLatitude,
-         long = StartLongitude) %>% 
   filter(Density > 0, Species == "SquidEggs") %>%
   mutate(
     spp.label = case_when(
@@ -398,8 +380,6 @@ cufes.squid.sf <- cufes %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 cufes.ofe.sf <- cufes %>% 
-  rename(lat = StartLatitude,
-         long = StartLongitude) %>% 
   filter(Density > 0, Species == "OtherFishEggs") %>%
   filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
                                 "S. japonicus"))) %>%
@@ -413,8 +393,10 @@ cufes.ofe.sf <- cufes %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Convert negative CUFES samples to sf; CRS - crs.geog
-cufes.neg.sf <- cufes.neg %>% 
-  mutate(bin.level = 1)
+cufes.neg.sf <- filter(cufes.raw, AllEggs == 0) %>% 
+  mutate(bin.level = 1) %>% 
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
+  select(SampleNumber, bin.level)
 ```
 
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}

@@ -102,24 +102,24 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
-save.figs         <- T # Draw new figures and maps
-save.imap         <- T # Save Leaflet maps
-do.bootstrap      <- T # Generate bootstrap estimates
-download.hab      <- T # Download habitat map
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
+save.imap         <- F # Save Leaflet maps
+do.bootstrap      <- F # Generate bootstrap estimates
+download.hab      <- F # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
-# Often or usually F
-copy.bib          <- T # Copy bibliography files (requires connection to AST2)
-overwrite.files   <- T # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+# Often or usually FF
+copy.bib          <- F # Copy bibliography files (requires connection to AST2)
+overwrite.files   <- F # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
-process.cal       <- T # Process calibration results
+process.cal       <- F # Process calibration results
 process.ctd       <- T # Process CTD and UCTD casts
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
 
@@ -472,7 +472,6 @@ Map the planned compultory (black, solid lines) and adaptive (red, dashed lines)
 # Get map data -------------------------------
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
-  rename(long = lon) %>% 
   project_df(to = crs.proj)
 
 # Get land features --------------------------
@@ -529,7 +528,7 @@ map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$
 map.width  <- map.height*map.aspect
 
 # Create base map
-base.map <- get_basemap(nav.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
@@ -565,26 +564,25 @@ save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r map-survey-plan}
-# Map planned transects
-survey.plan <- base.map +    
-  # plot adaptive transects
-  geom_point(data = wpts, 
-            aes(X, Y, colour = Type), size = 1) +
-  geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
-          show.legend = "line") +
-  scale_colour_manual(name = "Type", values = c("Adaptive" = "red","Compulsory" = "blue",
-                                                "Offshore" = "green", "Nearshore" = "#F08C09",
-                                                "Transit" = "cyan")) +
-  scale_linetype_manual("Type", values = c(Adaptive = "dashed", Compulsory = "solid",
-                                           Offshore = "solid", Nearshore = "solid",
-                                           Transit = "dashed")) +
-  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+  # Map planned transects
+  survey.plan <- base.map +    
+    geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
+            show.legend = "line") +
+    scale_colour_manual("Type", 
+                        values = c(Adaptive = "red", Compulsory = "black",
+                                   Offshore = "green", Nearshore = "magenta",
+                                   transit = "orange")) +
+    scale_linetype_manual("Type", 
+                        values = c(Adaptive = "dashed", Compulsory = "solid",
+                                   Offshore = "dashed", Nearshore = "solid",
+                                   transit = "dashed")) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
-
-# save survey plan map
-ggsave(here("Figs/fig_survey_plan.png"), survey.plan, 
-       height = map.height, width = map.width)
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+ 
+  # save survey plan map
+  ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
+         height = map.height, width = map.width)
 
 if (survey.name %in% c("1707RL")) {
   # Set limit of Lisa Marie transects
@@ -1217,7 +1215,7 @@ if (save.figs) {
   # Map backscatter - label with transect name
   nasc.map.tx.name <- base.map +
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
+    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
     # Plot NASC data
     geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
                shape = 21, alpha = 0.75) +
@@ -1244,7 +1242,7 @@ if (save.figs) {
   # Map backscatter - label with transect number
   nasc.map.tx.num <- base.map +
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
+    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
     # Plot NASC data
     geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
                shape = 21, alpha = 0.75) +
@@ -1287,7 +1285,7 @@ if (save.figs) {
   # Map backscatter - no transect labels
   nasc.map <- base.map +
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
+    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
     # Plot NASC data
     geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
                shape = 21, alpha = 0.75) +
@@ -1563,7 +1561,7 @@ if (save.figs) {
   # Map trawl clusters -------------------------------------------------------
   trawl.cluster.plot <- base.map +
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = "gray50", size = 0.25, alpha = 0.5) +
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.25, alpha = 0.5) +
     # Plot acoustic transects
     geom_point(data = nasc.plot, aes(X, Y), 
                colour = "gray50", size = 0.5, alpha = 0.75) +
@@ -1707,8 +1705,10 @@ pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
 
 # Calculate pie radius of each pie, based on All CPS landings
 if (scale.pies) {
+  haul.pie$radius    <- pie.radius*haul.pie$bin
   cluster.pie$radius <- pie.radius*cluster.pie$bin
 } else {
+  haul.pie$radius    <- pie.radius
   cluster.pie$radius <- pie.radius
 }
 
@@ -1871,7 +1871,7 @@ if (save.figs) {
   # Map single species hauls
   haul.ts.map <- base.map + 
     # Plot vessel track
-    geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
+    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
     # Plot NASC data
     geom_path(data = nasc.plot, aes(X, Y, group = transect), 
               size = 0.5, alpha = 0.75) +
@@ -2010,8 +2010,10 @@ if (save.figs) {
   # Create trawl haul figure
   trawl.pie.haul.wt <- base.map +
     # Plot transects data
-    geom_point(data = nasc, aes(X, Y, group = transect.name),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = pie.radius),
                     cols = c("Anchovy", "JackMack", "Jacksmelt",
@@ -2027,7 +2029,7 @@ if (save.figs) {
     geom_point(data = haul.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawl Hauls") +
+    ggtitle("CPS Proportions in Trawl Hauls") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -2035,8 +2037,10 @@ if (save.figs) {
   # Create trawl cluster figure
   trawl.pie.cluster.wt <- base.map +
     # Plot transects data
-    geom_point(data = nasc, aes(X, Y, group = transect.name),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("Anchovy", "JackMack", "Jacksmelt",
@@ -2052,7 +2056,7 @@ if (save.figs) {
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawl Clusters") +
+    ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -2542,16 +2546,18 @@ if (get.db) {
   # Read CUFES data
   cufes.all <- cufes.all %>%
     collect() %>% 
-     mutate(
-    Start = case_when(
-      cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
-      cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
-    Stop = case_when(
-      cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
-      cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
-    Duration = as.numeric(difftime(Stop, Start, units = "mins")),
-    Year = year(Start),
-    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs)
+    mutate(
+      Start = case_when(
+        cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+        cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+      Stop = case_when(
+        cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+        cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
+      Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+      Year = year(Start),
+      AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+    rename(lat = StartLatitude, long = StartLongitude) %>% 
+    project_df(to = crs.proj)
   
   # Close connection
   dbDisconnect(cufes.con)  
@@ -2567,66 +2573,63 @@ if (get.db) {
 ## Process CUFES data
 
 ```{r process-cufes-data}
-# Format CUFES data
+# Convert cufes to long format for plotting
 cufes <- cufes.all %>% 
-  select(SampleNumber, Year, Ship, Cruise, lat = StartLatitude, long = StartLongitude, Duration, 
-         SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
-         Comments) %>%
+  select(
+    SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
+    SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+    Comments) %>%
   gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
-         -lat, -long, -Duration, -Comments) %>% 
+         -lat, -long, -X, -Y, -Duration, -Comments) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
          bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.all, SampleNumber, Start, Stop)) %>% 
-  filter(Cruise %in% cruise.name, Ship %in% cruise.ship, !is.na(Duration)) %>%
-  project_df(to = crs.proj)
-
-# cufes.proj <- project_sf(cufes, crs = crs.proj)
+  left_join(select(cufes.all, SampleNumber, Start, Stop)) 
 
 # Select CUFES sample with zero density for plotting
-cufes.neg <- filter(cufes.all, Cruise %in% cruise.name, Ship %in% cruise.ship, 
-                    AllEggs == 0, !is.na(Duration)) %>% 
-  rename(lat = StartLatitude, long = StartLongitude) %>% 
-  project_df(to = crs.proj)
-
-# cufes.neg.proj <- project_sf(cufes.neg, crs = crs.proj)  
+cufes.neg <- filter(cufes.all, AllEggs == 0) %>%
+  filter(Cruise %in% cruise.name, Ship %in% cruise.ship, 
+                    AllEggs == 0, !is.na(Duration)) %>%
+  mutate(bin.level = 1) %>% 
+  select(X, Y, SampleNumber)
 
 # Write CUFES data from current survey to CSV
 write.csv(cufes, file = here("Output/cufes_data.csv"), 
-          row.names = FALSE, 
-          quote = F)
+          row.names = FALSE, quote = F)
 ```  
 
 ## Map CUFES egg densities  
 
 ```{r map-cufes-egg-density}
 # Define plot levels for all species
-cufes.levels.all <- sort(unique(cufes$bin.level))
-cufes.labels.all <- cufes.labels[cufes.levels.all]
-cufes.sizes.all  <- cufes.sizes[cufes.levels.all]
+cufes.levels.all     <- cufes %>% distinct(bin.level)
+cufes.labels.all     <- cufes.labels[sort(cufes.levels.all$bin.level)]
+cufes.sizes.all      <- cufes.sizes[sort(cufes.levels.all$bin.level)]
+cufes.colors.all     <- cufes.colors[which(names(cufes.colors) %in% unique(cufes$Species))]
+cufes.spp.labels.all <- cufes.spp.labels[which(names(cufes.spp.labels) %in% unique(cufes$Species))]
 
 if (save.figs) {
   # Plot CUFES for sardine, anchovy, and jack mackerel -------------------------  
   cufes.density.all <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
     # Plot all cufes samples, including zeros
-    geom_point(data = cufes.neg,
-               aes(X, Y), shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
+    geom_point(data = cufes.neg, aes(X, Y),
+               shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
     # Plot only positive cufes samples
     geom_point(data = filter(cufes, Density > 0, Species %in% cufes.plot.spp),
                aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
     # Configure size and colour scales
     scale_size_manual(name = bquote(atop('Density','(eggs' ~m^-3*')')),
-                      values = cufes.sizes.all, 
-                      labels = cufes.labels.all) +
-    scale_colour_manual(name = 'Species', 
-                        values = cufes.colors, 
-                        labels = cufes.spp.labels) +
+                      values = cufes.sizes.all,labels = cufes.labels.all) +
+    scale_colour_manual(name = 'Species', values = cufes.colors.all, labels = cufes.spp.labels.all) +
     # Format axes and titles
     ggtitle("CUFES Egg Densities") +
-    coord_sf(crs = crs.proj, 
-         xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-         ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save cufes plot
   ggsave(cufes.density.all, 
@@ -3045,10 +3048,12 @@ acoustic.pie.wg <- clf %>%
 
 if (save.figs) {
   # Create trawl figure
-  acoustic.pie.indiv <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc, aes(X, Y, group = transect.name),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
+  acoustic.pie.map.indiv <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = acoustic.pie.indiv, 
                     aes(X, Y, group = cluster, r = pie.radius),
@@ -3071,10 +3076,12 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Create trawl figure
-  acoustic.pie.wg <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc, aes(X, Y, group = transect.name),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
+  acoustic.pie.map.wg <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = acoustic.pie.wg, 
                     aes(X, Y, group = cluster, r = pie.radius),
@@ -3097,12 +3104,13 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine acoustic proportion maps
-  acoustic.pie.plot.comp <- plot_grid(trawl.pie.cluster.wt, acoustic.pie.indiv, acoustic.pie.wg,
-                                     nrow = 1, labels = c("a)", "b)", "c)"))
+  acoustic.pie.plot.comp <- plot_grid(trawl.pie.cluster.wt, acoustic.pie.map.indiv, 
+                                      acoustic.pie.map.wg,
+                                      nrow = 1, labels = c("a)", "b)", "c)"))
 
   # Save trawl species proportions plots
   ggsave(acoustic.pie.plot.comp,
-         filename = here("Figs/fig_trawl_acoustic_proportion_comparison.png"),
+         filename = here("Figs/fig_trawl_proportion_comparison.png"),
          width = map.width*3, height = map.height)
   
   save(acoustic.pie.indiv, acoustic.pie.wg, acoustic.pie.plot.comp,
@@ -3112,17 +3120,19 @@ if (save.figs) {
   load(here("Output/acoustic_proportion_comp_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_trawl_acoustic_proportion_comparison.png"))
+include_graphics(here("Figs/fig_trawl_proportion_comparison.png"))
 ```
 
 ## Create final backscatter, CUFES, and acoustic proportion maps
 
 ```{r map-nasc-cufes-acoustic-proportion}
 # Create trawl figure
-acoustic.pie.plot.final <- base.map +
-  # Plot nasc data
-  geom_point(data = nasc, aes(X, Y, group = transect.name),
-             size = 0.5, colour = "gray50", alpha = 0.5) +
+acoustic.pie.map.final <- base.map +
+  # Plot transects data
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
+  # plot ship track data
+  geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot trawl pies
   geom_scatterpie(data = acoustic.pie.indiv, 
                   aes(X, Y, group = cluster, r = pie.radius),
@@ -3145,10 +3155,10 @@ acoustic.pie.plot.final <- base.map +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
 if (save.figs) {
-  nasc.cufes.prop.plot      <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.plot.final,
+  nasc.cufes.prop.plot      <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.map.final,
                                      nrow = 1, labels = c("a)", "b)", "c)"))
   
-  nasc.cufes.prop.plot.long <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.plot.final,
+  nasc.cufes.prop.plot.long <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.map.final,
                                      ncol = 1, labels = c("a)", "b)", "c)"))
   # Save maps
   ggsave(nasc.cufes.prop.plot, 
@@ -4771,7 +4781,7 @@ if (process.ctd) {
     filter(!cast %in% exclude.ctd)
 
   # Save results
-  save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc,
+  save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc, uctd.summ,
        file = here("Data/UCTD/uctd_data.Rdata"))
   }  
 } else {
@@ -6972,215 +6982,468 @@ L.abund.table <- abund.summ %>%
 save(L.abund.table, abund.summ, file = here("Output/abundance_table_all.Rdata"))
 ```
 
-## Results for anchovy (_Engraulis mordax_)  
+## Results for anchovy (_Engraulis mordax_)
+### Northern stock
 
-```{r BiomassDensAnchovy}
-include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))
+(ref:biom-dens-anch-n) Biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+
+```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for anchovy
+if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Biomass densities of anchovy (_Engraulis mordax_) per strata throughout the survey region estimated using the acoustic-trawl method. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.  
+(ref:l-disagg-anch-n) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the survey area.
 
-```{r RelativeLengthFreqAnchovy}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))
+```{r l-disagg-anch-n,fig.cap='(ref:l-disagg-anch-n)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for anchovy
+if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Standard length distributions of anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the density-weighted length distribution in each stratum and across all strata (i.e., for the entire survey).  
+(ref:l-freq-summ-anch-n) Abundance versus standard length ($L_S$, cm) for the northern stock of Northern Anchovy (_Engraulis mordax_).
 
-```{r LengthDisaggAbundAnchovy}
-include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))
-```
-
-Estimated length-disaggregated abundance (upper panel) and biomass (lower panel) of northern anchovy (_Engraulis mordax_) in the survey area. Labels above each panel represent the associated stock (i.e., sub-population, if applicable; else, "All"). _Note differences in y-axis scales by stock._  
-
-Abundance versus standard length (_SL_, cm) for northern anchovy (_Engraulis mordax_).  
-
-```{r LengthFreqSummaryAnch}
+```{r l-freq-summ-anch-n}
 # Print table for anchovy
 if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
-  abund.summ %>% 
-    filter(Species == "Engraulis mordax") %>% 
-    rename(Abundance = abundance) %>%
-    ungroup() %>% 
-    select(Stock,SL,Abundance) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
-    row_spec(0, align = c("c")) %>% 
-    collapse_rows(columns = 1) %>%
-    scroll_box(height = "500px")
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Engraulis mordax", Stock == "Northern") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-anch-n)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
 } else {
   print("No anchovy present.")
 }
 ```
 
-## Results for sardine (_Sardinops sagax_)
+### Central stock
 
-```{r BiomassDensSardine}
-include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))
+(ref:biom-dens-anch-c) Biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+
+```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for anchovy
+if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Biomass densities of sardine (_Sardinops sagax_) per strata throughout the survey region estimated using the acoustic-trawl method. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+(ref:l-disagg-anch-c) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the central stock of Northern Anchovy (_Engraulis mordax_) in the survey area.
 
-```{r RelativeLengthFreqSardine}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))
+```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for anchovy
+if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Standard length distributions of sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the density-weighted length distribution in each stratum and across all strata (i.e., for the entire survey).
+(ref:l-freq-summ-anch-c) Abundance versus standard length ($L_S$, cm) for the central stock of Northern Anchovy (_Engraulis mordax_).
 
-```{r LengthDisaggAbundSardine}
-include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))
+```{r l-freq-summ-anch-c}
+# Print table for anchovy
+if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Engraulis mordax", Stock == "Central") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-anch-n)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
+} else {
+  print("No anchovy present.")
+}
+```
+
+### All stocks
+
+(ref:rlf-anchovy) Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
+
+```{r rlf-anchovy,out.height='7in',fig.pos='H'}
+# Insert relative length frequency plot for anchovy
+if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))) {
+  include_graphics(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```  
 
-Estimated length-disaggregated abundance (upper panel) and biomass (lower panel) of Pacific sardine (_Sardinops sagax_) in the survey area. Labels above each panel represent the associated stock (i.e., sub-population, if applicable; else, "All"). _Note differences in y-axis scales by stock._    
+## Results for sardine (_Sardinops sagax_)
+### Northern stock
 
-Abundance versus standard length (_SL_, cm) for sardine (_Sardinops sagax_).  
+(ref:biom-dens-sar-n) Biomass densities of northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
-```{r LengthFreqSummarySar}
+```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for sardine
+if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+(ref:l-disagg-sar-n) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the survey area.
+
+```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for sardine
+if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+(ref:l-freq-summ-sar-n) Abundance versus standard length ($L_S$, cm) for the northern stock of Pacific Sardine (_Sardinops sagax_).
+
+```{r l-freq-summ-sar-n}
 # Print table for sardine
 if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
-  abund.summ %>% 
-    filter(Species == "Sardinops sagax") %>% 
-    rename(Abundance = abundance) %>%
-    ungroup() %>% 
-    select(Stock,SL,Abundance) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F) %>%
-    row_spec(0, align = c("c")) %>% 
-    collapse_rows(columns = 1) %>%
-    scroll_box(height = "500px")
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Sardinops sagax", Stock == "Northern") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-sar-n)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
 } else {
   print("No sardine present.")
 }
 ```
 
-## Results for jack mackerel (_Trachurus symmetricus_)
+### Southern stock
 
-```{r BiomassDensJackMack}
-include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))
-```
+(ref:biom-dens-sar-s) Biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
-Biomass densities of jack mackerel (_Trachurus symmetricus_) per strata throughout the survey region estimated using the acoustic-trawl method. The blue numbers represent the locations of trawl clusters with at least one jack mackerel. The gray line represents the vessel track.  
-
-```{r RelativeLengthFreqJackMack}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))
-```
-
-Standard length distributions of jack mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the density-weighted length distribution in each stratum and across all strata (i.e., for the entire survey).  
-
-```{r LengthDisaggAbundJackMack}
-include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))
-```
-
-Estimated length-disaggregated abundance (upper panel) and biomass (lower panel) of jack mackerel (_Trachurus symmetricus_) in the survey area. Labels above each panel represent the associated stock (i.e., sub-population, if applicable; else, "All").  
-
-Abundance versus standard length (_SL_, cm) for jack mackerel (_Trachurus symmetricus_).  
-
-```{r LengthFreqSummaryMack}
-# Print table for jack mackerel
-if ("Trachurus symmetricus" %in% unique(abund.summ$Species)) {
-  abund.summ %>% 
-    filter(Species == "Trachurus symmetricus") %>% 
-    rename(Abundance = abundance) %>%
-    ungroup() %>% 
-    select(Stock,SL,Abundance) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
-    row_spec(0, align = c("c")) %>% 
-    collapse_rows(columns = 1) %>%
-    scroll_box(height = "500px")
+```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for sardine
+if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))  
 } else {
-  print("No jack mackerel present.")
+  print("No data for this stock.")
 }
 ```
 
+(ref:l-disagg-sar-s) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the southern stock of Pacific Sardine (_Sardinops sagax_) in the survey area.
+
+```{r l-disagg-sar-s,fig.cap='(ref:l-disagg-sar-s)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for sardine
+if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+(ref:l-freq-summ-sar-s) Abundance versus standard length ($L_S$, cm) for the southern stock of Pacific Sardine (_Sardinops sagax_).
+
+```{r l-freq-summ-sar-s}
+# Print table for sardine
+if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Sardinops sagax", Stock == "Southern") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-sar-s)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
+} else {
+  print("No sardine present.")
+}
+```
+
+### All stocks
+
+(ref:rlf-sardine) Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
+
+```{r rlf-sardine,out.height='7in',fig.pos='H'}
+# Insert relative length frequency plot for sardine
+if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))) {
+  include_graphics(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))  
+} else {
+  print("No data for this stock.")
+}
+``` 
+
 ## Results for Pacific mackerel (_Scomber japonicus_)  
 
-```{r BiomassDensPacMack}
-include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))
+(ref:biom-dens-mack) Biomass densities of Pacific mackerel (_Scomber japonicus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel The gray line represents the vessel track.
+
+```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for P. mackerel
+if (file.exists(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Biomass densities of Pacific mackerel (_Scomber japonicus_) per strata throughout the survey region estimated using the acoustic-trawl method. The blue numbers represent the locations of trawl clusters with at least one mackerel. The gray line represents the vessel track.  
+(ref:l-disagg-mack) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Pacific mackerel (_Scomber japonicus_) in the survey area.
 
-```{r RelativeLengthFreqPacMack}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Scomber japonicus.png"))
+```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for P. mackerel
+if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Standard length distributions of Pacific mackerel (_Scomber japonicus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the density-weighted length distribution in each stratum and across all strata (i.e., for the entire survey).  
+(ref:l-freq-summ-mack) Abundance versus standard length ($L_S$, cm) for for Pacific mackerel (_Scomber japonicus_).
 
-```{r LengthDisaggAbundPacMack}
-include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))
-```
-
-Estimated length-disaggregated abundance (upper panel) and biomass (lower panel) of Pacific mackerel (_Scomber japonicus_) in the survey area. Labels above each panel represent the associated stock (i.e., sub-population, if applicable; else, "All").  
-
-Abundance versus standard length (_SL_, cm) for Pacific mackerel (_Scomber japonicus_).  
-
-```{r LengthFreqSummaryJack}
-# Print table for Pacific mackerel
-if ('Scomber japonicus' %in% unique(abund.summ$Species)) {
-  abund.summ %>% 
-    filter(Species == "Scomber japonicus") %>% 
-    rename(Abundance = abundance) %>%
-    ungroup() %>% 
-    select(Stock,SL,Abundance) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
-    row_spec(0, align = c("c")) %>% 
-    collapse_rows(columns = 1) %>%
-    scroll_box(height = "500px")
+```{r l-freq-summ-mack}
+# Print table for mack mackerel
+if ("Scomber japonicus" %in% unique(abund.summ$Species)) {
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Scomber japonicus", Stock == "All") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-mack)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
 } else {
   print("No Pacific mackerel present.")
 }
 ```
 
+## Results for Jack Mackerel (_Trachurus symmetricus_)
+
+(ref:biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one jack mackerel. The gray line represents the vessel track.
+
+```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for jack mackerel
+if (file.exists(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+(ref:l-disagg-jack) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Jack Mackerel (_Trachurus symmetricus_) in the survey area.
+
+```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for jack mackerel
+if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+(ref:l-freq-summ-jack) Abundance versus standard length ($L_S$, cm) for for Jack Mackerel (_Trachurus symmetricus_).
+
+```{r l-freq-summ-jack}
+# Print table for jack mackerel
+if ("Trachurus symmetricus" %in% unique(abund.summ$Species)) {
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Trachurus symmetricus", Stock == "All") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-jack)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
+} else {
+  print("No jack mackerel present.")
+}
+```
+
+(ref:rlf-jack) Standard length ($L_S$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
+
+```{r rlf-jack,out.height='7in',fig.pos='H'}
+# Insert relative length frequency plot for jack mackerel
+if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))) {
+  include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))  
+} else {
+  print("No data for this stock.")
+}
+``` 
+
 ## Results for Pacific herring (_Clupea pallasii_)
 
-```{r BiomassDensPacHerring}
-include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))
+(ref:biom-dens-her) Biomass densities of Pacific herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
+
+```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.height='8.35in',fig.pos='H'}
+# Insert biomass density plot for herring
+if (file.exists(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Biomass densities of Pacific herring (_Clupea pallasii_) per strata throughout the survey region estimated using the acoustic-trawl method. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.  
+(ref:l-disagg-her) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Pacific herring (_Clupea pallasii_) in the survey area.
 
-```{r RelativeLengthFreqPacHerring}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))
+```{r l-disagg-her,fig.cap='(ref:l-disagg-her)',out.height='6in',fig.pos='H'}
+# Insert disaggregated abundance plots for herring
+if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
-Standard length distributions of Pacific herring (_Clupea pallasii_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the density-weighted length distribution in each stratum and across all strata (i.e., for the entire survey).  
+(ref:l-freq-summ-her) Abundance versus standard length ($L_S$, cm) for for Pacific herring (_Clupea pallasii_).
 
-```{r LengthDisaggAbundPacHerring}
-include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))
-```
-
-Estimated length-disaggregated abundance (upper panel) and biomass (lower panel) of Pacific herring (_Clupea pallasii_) in the survey area. Labels above each panel represent the associated stock (i.e., sub-population, if applicable; else, "All").  
-
-Abundance versus standard length (_SL_, cm) for herring (_Clupea pallasii_).  
-
-```{r LengthFreqSummaryHer}
-# Print table for herring
+```{r l-freq-summ-her}
+# Print table for jack mackerel
 if ("Clupea pallasii" %in% unique(abund.summ$Species)) {
-  abund.summ %>% 
-    filter(Species == "Clupea pallasii") %>% 
-    rename(Abundance = abundance) %>%
-    ungroup() %>% 
-    select(Stock,SL,Abundance) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
-    row_spec(0, align = c("c")) %>% 
-    collapse_rows(columns = 1) %>%
-    scroll_box(height = "500px")
+  abund.summ.table <- abund.summ %>% 
+    filter(Species == "Clupea pallasii", Stock == "All") %>% 
+    select(Stock, SL, abundance) %>% 
+    rename(Abundance = abundance,
+           '$L_S$' = SL) %>%
+    ungroup()
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        # set_formatter(SL = function(x) sprintf("%.0f", x),
+        #               Abundance = function(x) sprintf("%.0f", x)) %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-her)') %>%
+        kable_styling(latex_options = c("striped","repeat_headers")) %>%
+        column_spec(1, italic = T) %>% 
+        collapse_rows(columns = c(1:2)) %>%
+        row_spec(0, align = c("c"))    
+    }
+  }
 } else {
   print("No herring present.")
 }
-```  
+```
+
+(ref:rlf-her) Standard length ($L_S$) frequency distributions of Pacific herring (_Clupea pallasii_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
+
+```{r rlf-her,out.height='7in',fig.pos='H'}
+# Insert relative length frequency plot for herring
+if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))) {
+  include_graphics(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
 
 # Map nearshore extrapolation
 

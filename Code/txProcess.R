@@ -163,7 +163,7 @@ crs.proj <- 3310 # Califoria Albers Equal Area
 locations <- filter(read.csv(here("Data/places.csv")), name %in% label.list) 
 
 locations.sf <- locations %>%
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog)
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Project sf
 locations.sf <- project_sf(locations.sf, crs.proj) %>% 

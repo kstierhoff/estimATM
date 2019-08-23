@@ -76,13 +76,13 @@ theme_set(theme_bw())
 # Processing instructions (T/F)
 copy.files      <- F # copy files from source
 download.maps   <- F # download habitat map
-save.figs       <- T # draw plots and maps, or use existing
+save.figs       <- F # draw plots and maps, or use existing
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 process.scs     <- F # process SCS logs, or load processed data
-get.nav         <- T # download nave data from ERDDAP
+get.nav         <- F # download nave data from ERDDAP
 process.csv     <- F # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
-process.cal     <- T # process calibration results from previous surveys for time series plots
+process.cal     <- F # process calibration results from previous surveys for time series plots
 process.zmux    <- F # process impedance data
 calc.raw.size   <- F # computer RAW file size, or use existing
 ```
@@ -393,16 +393,16 @@ if (get.nav) {
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
   
   # Cast nav to transects
-  nav.legs <- nav.sf %>% 
+  nav.paths.sf <- nav.sf %>% 
     group_by(leg) %>% 
     summarise(do_union = F) %>% 
     st_cast("LINESTRING")
   
   # Save results
-  save(nav, nav.sf, nav.legs, file = here("Data/Nav/nav_data.Rdata"))
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
-  load(here("Data/NAV/nav_data.Rdata"))
+  load(here("Data/Nav/nav_data.Rdata"))
 }
 
 # Read transect waypoints
@@ -429,6 +429,55 @@ write_csv(nav.gps, here("Output/nav.gps.csv"))
 # Get most recent vessel position for plotting
 nav.now <- tail(nav.sf, 1) %>% 
   mutate(label = paste("Last position:", datetime, "GMT"))
+```
+
+```{r create-basemap,include=F}
+# Configure base map options -----------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
+  project_df(to = crs.proj)
+
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav.paths.sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- transects.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.height <- 10
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+
+# Save the basemap
+ggsave(base.map,file = here("Figs/fig_basemap.png"), 
+       height = map.height, width = map.width)
+
+save(base.map, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r process-scs}
@@ -690,32 +739,52 @@ if (nrow(catch) > 0) {
 
 # Prepare catch data for plotting ----------------------------------------------
 # Select and rename trawl data for pie charts
-catch.pie <- cluster.summ.wt %>% 
+haul.pie <- haul.summ.wt %>% 
+  select(haul, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  project_df(to = crs.proj)
+
+cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+  project_df(to = crs.proj)
 
-# Project pie data
-catch.pie <- project_sf(catch.pie, crs.proj) 
-
-# Filter for positive trawls
-cluster.pos <- filter(catch.pie, AllCPS > 0) %>% 
+# Filter for positive hauls and clusters
+haul.pos <- filter(haul.pie, AllCPS > 0) %>% 
   arrange(desc(X))
 
-if (nrow(cluster.pos) > 0) {
-  # Substitute very small value for species with zero catch, just for pie charts
+cluster.pos <- filter(cluster.pie, AllCPS > 0) %>% 
+  arrange(desc(X))
+
+# Substitute very small value for species with zero catch, just for pie charts
+if (nrow(haul.pos) > 0) {
+  haul.pos <- haul.pos %>% 
+    replace(. == 0, 0.0000001) 
+  
   cluster.pos <- cluster.pos %>% 
     replace(. == 0, 0.0000001) 
 }
 
 # Filter for empty trawls
-cluster.zero <- filter(catch.pie, AllCPS == 0)
+haul.zero    <- filter(haul.pie, AllCPS == 0)
+
+cluster.zero <- filter(cluster.pie, AllCPS == 0)
+
+# Calculate pie radius based on latitude range
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
+
+# Calculate pie radius of each pie, based on All CPS landings
+if (scale.pies) {
+  haul.pie$radius    <- pie.radius*haul.pie$bin
+  cluster.pie$radius <- pie.radius*cluster.pie$bin
+} else {
+  haul.pie$radius    <- pie.radius
+  cluster.pie$radius <- pie.radius
+}
 
 # Convert haul data for plotting
 haul.catch <- haul.summ.wt %>% 
-  st_as_sf(coords = c("long", "lat"), crs = crs.geog) 
-
-haul.catch <- project_sf(haul.catch, crs = crs.proj)
+  project_df(to = crs.proj)
 
 # sum total weight of sardine, anchovy, and mackerel
 haul.Anchovy.kg    <- sum(haul.catch$Anchovy, na.rm = T)
@@ -751,7 +820,9 @@ cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
       cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
     Duration = as.numeric(difftime(Stop, Start, units = "mins")),
     Year = year(Start),
-    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs)
+    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+  rename(lat = StartLatitude, long = StartLongitude) %>% 
+  project_df(to = crs.proj)
 
 # Close connection
 dbDisconnect(cufes.con)
@@ -764,16 +835,16 @@ write.csv(cufes.raw, file = here("Output/cufes_raw.csv"),
 cufes <- cufes.raw %>% 
   # Convert cufes to long format for plotting
   select(
-    SampleNumber, Year, Ship, Cruise, StartLatitude, StartLongitude, Duration, 
+    SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
     SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
     Comments) %>%
   gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
-         -StartLatitude, -StartLongitude, -Duration, -Comments) %>% 
+         -lat, -long, -X, -Y, -Duration, -Comments) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
          bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.raw, SampleNumber, Start, Stop))
+  left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
 
 # Save processed cufes to CSV
 write.csv(cufes, file = here("Output/cufes_proc.csv"), 
@@ -782,10 +853,12 @@ write.csv(cufes, file = here("Output/cufes_proc.csv"),
 # Prepare CUFES data for plotting ----------------------------------------------
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
-  mutate(bin.level = 1)
+  mutate(bin.level = 1) %>% 
+  select(X, Y, SampleNumber)
 
 # Identify bad CUFES samples
 cufes.bad <- filter(cufes.raw, Duration <= 0)
+
 save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
 
 # Remove bad samples from CUFES
@@ -801,35 +874,21 @@ cufes <- cufes %>%
          bin.level = as.numeric(bin))
 
 # Project CUFES data from CPS
-cufes.plot <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  st_transform(crs = crs.proj) %>% 
+cufes.plot <- cufes %>% 
   filter(Density > 0, Species %in% cufes.plot.spp) %>%
   arrange(desc(Density))
 
-cufes.plot <- project_sf(cufes.plot, crs.proj)
-
 # Project CUFES data from squid
-cufes.plot.squid <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  st_transform(crs = crs.proj) %>% 
+cufes.plot.squid <- cufes %>% 
   filter(Density > 0, Species == "SquidEggs") %>% 
   arrange(desc(Density))
 
-cufes.plot.squid <- project_sf(cufes.plot.squid, crs.proj)
-
 # Project CUFES data from other fish eggs (mostly P. mackerel)
-cufes.plot.ofe <- st_as_sf(cufes, coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  st_transform(crs = crs.proj) %>% 
+cufes.plot.ofe <- cufes %>% 
   filter(Density > 0, Species == "OtherFishEggs") %>%
   filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
                                 "S. japonicus"))) %>% 
   arrange(desc(Density))
-
-cufes.plot.ofe <- project_sf(cufes.plot.ofe, crs.proj)
-
-# Select CUFES sample with zero density for plotting
-cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
-  st_as_sf(coords = c("StartLongitude","StartLatitude"), crs = crs.geog) %>% 
-  select(SampleNumber)
 ```  
 
 ```{r process-ctd-stations}
@@ -954,6 +1013,14 @@ nasc.cps.sf <- nasc.cps %>%
 
 nasc.plot.cps <- project_sf(nasc.cps.sf, crs.proj)
 
+# Convert acoustic transects to sf
+nasc.tx.sf <- st_as_sf(nasc.cps.sf, coords = c("long","lat"), crs = crs.geog) %>% 
+  select(transect) %>% 
+  group_by(transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  filter(!transect %in% tx.rm)
+
 # create acoustic transect labels
 nasc.tx.labels.cps <- nasc.cps %>%
   group_by(transect) %>%
@@ -1074,80 +1141,20 @@ nasc.plot.all   <- rbind(nasc.cps.sf, nasc.krill.sf) %>%
   filter(NASC >= 200)
 ```
 
-```{r create-basemap,include=F}
-# Configure base map options -----------------
-# Import landmarks
-locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog) 
-
-# Project sf
-locations <- project_sf(locations, crs.proj)
-
-# Get state data
-states <- ne_states(country = 'United States of America', returnclass = 'sf')
-ca     <- filter(states, name == "California")
-
-# Get countries
-countries <- ne_countries(scale = "large", returnclass = "sf") %>%
-  filter(subregion %in% c("Northern America","Central America"))
-
-# Read bathy contours shapefile 
-bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
-  st_transform(crs.geog) %>% 
-  rename(Depth = Contour)
-
-nav_sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(leg) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
-
-nasc.tx.sf <- st_as_sf(nasc.cps.sf, coords = c("long","lat"), crs = crs.geog) %>% 
-  select(transect) %>% 
-  group_by(transect) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING") %>% 
-  filter(!transect %in% tx.rm)
-
-# Set padding around data  
-if (resize.map) {
-  # Use nav data to resize map to survey progress
-  map.bounds <- nav_sf %>% 
-    st_transform(crs = crs.proj) %>%
-    st_bbox()  
-} else {
-  # Use nav data to resize map to survey progress
-  map.bounds <- transects.sf %>%
-    st_transform(crs = crs.proj) %>%
-    st_bbox()  
-}
-
-# Determine map aspect ratio and set height and width
-map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.height <- 10
-map.width  <- map.height*map.aspect
-
-# Create base map
-base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
-  # Add scalebar
-  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
-
-# Save the basemap
-ggsave(base.map,file = here("Figs/fig_basemap.png"), 
-       height = map.height, width = map.width)
-
-save(base.map, file = here("Data/Map/basemap.Rdata"))
-```
-
 ```{r plot-maps,include=F}
 if (save.figs) {
   # Map planned transects
   survey.plan <- base.map +    
-    # plot adaptive transects
-    geom_sf(data = transects.sf, aes(colour = Type), show.legend = "line") +
+    geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
+            show.legend = "line") +
     scale_colour_manual("Type", 
                         values = c(Adaptive = "red", Compulsory = "black",
                                    Offshore = "green", Nearshore = "magenta",
                                    transit = "orange")) +
+    scale_linetype_manual("Type", 
+                        values = c(Adaptive = "dashed", Compulsory = "solid",
+                                   Offshore = "dashed", Nearshore = "solid",
+                                   transit = "dashed")) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -1158,13 +1165,20 @@ if (save.figs) {
   
   # Plot Survey Track, Acoustic Transects, and Trawl Locations #####
   survey.track.map <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, aes(linetype = Type), colour = "gray70",
+            show.legend = "line") +
     # Plot ship track data
-    geom_sf(data = nav_sf, colour = "gray70", size = 0.5, alpha = 0.5) +
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot acoustic transects
     geom_sf(data = nasc.tx.sf, size = 1) +
     # Plot trawl transects
     geom_point(data = haul.catch, aes(X, Y),
-            shape = 21, colour = "black", fill = "white", size = 1.5) +
+               shape = 21, colour = "black", fill = "white", size = 1.5) +
+    scale_linetype_manual("Type", 
+                          values = c(Adaptive = "dashed", Compulsory = "solid",
+                                     Offshore = "dashed", Nearshore = "dotted",
+                                     transit = "dashed")) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -1175,10 +1189,17 @@ if (save.figs) {
   
   # Plot Side Station Sampling Locations #####
   survey.station.map <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, aes(linetype = Type), colour = "gray70",
+            show.legend = "line") +
     # plot ship track data
-    geom_sf(data = nav_sf, colour = "gray70", size = 0.5, alpha = 0.5) +
+    geom_sf(data = nav.paths.sf, colour = "gray70", size = 0.5, alpha = 0.5) +
     # plot acoustic transects
     geom_sf(data = nasc.tx.sf, size = 1) +
+    scale_linetype_manual("Type", 
+                          values = c(Adaptive = "dashed", Compulsory = "solid",
+                                     Offshore = "dashed", Nearshore = "dotted",
+                                     transit = "dashed")) +
     # plot station ops
     # geom_sf(data = pairovet.sta, #aes(Lon, Lat),
     #            shape = 25, size = 2, fill = "green", colour = "black") +
