@@ -173,23 +173,23 @@ nasc.interval          <-  100
 # Number of intervals over which to summarize NASC
 nasc.summ.interval     <- 2000/nasc.interval 
 # Echosounder type; e.g., EK60, EK80, other
-sounder.type           <- c(RL = "EK60",
+sounder.type           <- c(RL = "EK80",
                             LM = "EK60",
                             SD = "EK80") 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
   survey.dir           <- c(RL = "C:/SURVEY/1907RL",
-                            LM = "//swc-storage3-s/SURVEYS/20190613_LISA-MARIE_SummerCPS",
+                            LM = "C:/SURVEY/1907RL",
                             SD = "C:/SURVEY/1907RL")   
 } else {
   survey.dir           <- c(RL = "C:/SURVEY/1907RL",
-                            LM = "//swc-storage3-s/SURVEYS/20190613_LISA-MARIE_SummerCPS",
+                            LM = "C:/SURVEY/1907RL",
                             SD = "C:/SURVEY/1907RL")
 }
 # Backscatter data (within survey.dir, typically; a vector of file paths)
 nasc.dir               <- c(RL = "PROCESSED/EV/CSV/LASKER",
-                            LM = "PROCESSED/EV/CSV",
+                            LM = "PROCESSED/EV/CSV/LISA_MARIE",
                             SD = "PROCESSED/EV/CSV/SAILDRONE") 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
@@ -225,7 +225,7 @@ tx.char.pattern        <- c(RL = "[^0-9]",
                             LM = "[^0-9]",
                             SD = "[^0-9]") 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL = F,
+strip.tx.nums          <- c(RL = T,
                             LM = F,
                             SD = F) 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)

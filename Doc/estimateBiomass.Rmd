@@ -170,26 +170,32 @@ if (copy.files) {
   # Copy trawl Access database
   haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
                         regexp = trawl.db.access)
+  
   file_copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
   
   # Copy CUFES files
   cufes.file <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
                            regex = cufes.db.sqlite)
+  
   file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
   
   # Copy CSV files for CPS
-  csv.files.cps <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
-                                    nasc.dir[survey.vessel.primary]), 
-                          regex = nasc.pattern.cps[survey.vessel.primary])
-  file_copy(csv.files.cps, here("Data/Backscatter", survey.vessel.primary), 
-            overwrite = overwrite.csv)
-  
-  # Copy CSV files for Krill
-  csv.files.krill <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
-                                    nasc.dir[survey.vessel.primary]), 
-                          regex = nasc.pattern.krill[survey.vessel.primary])
-  file_copy(csv.files.krill, here("Data/Backscatter", survey.vessel.primary), 
-            overwrite = overwrite.csv)
+  for (d in nasc.vessels) {
+    csv.files.cps <- dir_ls(file.path(survey.dir[d], 
+                                      nasc.dir[d]), 
+                            regex = nasc.pattern.cps[d])
+    
+    file_copy(csv.files.cps, here("Data/Backscatter", d), 
+              overwrite = overwrite.csv)  
+    
+    # Copy CSV files for Krill
+    csv.files.krill <- dir_ls(file.path(survey.dir[d], 
+                                        nasc.dir[d]), 
+                              regex = nasc.pattern.krill[d])
+    
+    file_copy(csv.files.krill, here("Data/Backscatter", d), 
+              overwrite = overwrite.csv)
+  }
   
   # Copy UCTD data ------------------------------------
   # Location of header files on survey directory
@@ -679,7 +685,7 @@ if (process.csv) {
            file = here("Data/Backscatter", i, 
                        paste("nasc_vessel_", i, "_RAW.Rdata", sep = "")))
       
-      processed.csv.vessel <- unique(nasc.vessel$filename)
+      processed.csv.vessel <- sort(unique(nasc.vessel$filename))
       
       # Save original transect name before modifying
       # Convert date and time to POSIXct
@@ -873,6 +879,13 @@ if (process.csv) {
         }
       }
       
+      # # Remove first and last interval from Lisa Marie data for 1907RL
+      # if (survey.name == "1907RL" & i == "LM") {
+      #   nasc.vessel2 <- nasc.vessel %>% 
+      #     group_by(transect.orig) %>% 
+      #     slice(2:n() - 1)
+      # }
+      
       # Save processed CSV data from each survey vessel
       save(nasc.vessel, file = here("Data/Backscatter", i, 
                                     paste0("nasc_vessel_", i, ".Rdata")))
@@ -882,7 +895,7 @@ if (process.csv) {
       
       # Combine processed.csv.vessel
       if (exists("processed.csv")) {
-        processed.csv <- c(processed.csv, processed.csv.vessel)
+        processed.csv <- sort(c(processed.csv, processed.csv.vessel))
       } else {
         processed.csv <- processed.csv.vessel
       }
