@@ -1,0 +1,241 @@
+---
+title: "plotCSV: Explore Echoview Processing Results"
+author: "SWFSC Advanced Survey Technologies Group"
+date: 'Last updated: `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`'
+output:
+  bookdown::html_document2:
+    toc: no
+    toc_float: no
+    number_sections: no
+css: css/ast.css
+---
+
+```{r setup,echo=F,message=F,warning=F,error=F,include=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,here,sf,knitr,fs,leaflet,leaflet.extras,bookdown,
+               leafem,mapview)
+
+# Install and load required packages from Github -------------------------------
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+if (is.null(doc.type)) {
+  doc.type <- "html"
+}
+
+# global knitr chunk options
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE, 
+  fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
+)
+```
+
+Files listed below are processed and plotted at any time, but ideally prior to being processed using plotBio, estimateBiomass, etc. 
+
+```{r list-files, echo=TRUE}
+# List full file paths
+csv.paths <- c("C:/SURVEY/1907RL/PROCESSED/EV/CSV/LASKER/1907RL_015-1_CPS-Final 38 kHz CPS.csv",
+               "C:/SURVEY/1907RL/PROCESSED/EV/CSV/LASKER/1907RL_016-1_CPS-Final 38 kHz CPS.csv",
+               "C:/SURVEY/1907RL/PROCESSED/EV/CSV/LASKER/1907RL_017_CPS-Final 38 kHz CPS.csv",
+               "C:/SURVEY/1907RL/PROCESSED/EV/CSV/LASKER/1907RL_018_CPS-Final 38 kHz CPS.csv",
+               "C:/SURVEY/1907RL/PROCESSED/EV/CSV/LASKER/1907RL_019_CPS-Final 38 kHz CPS.csv",
+               "C:/SURVEY/1907RL/PROCESSED/EV/CSV/LASKER/1907RL_020_CPS-Final 38 kHz CPS.csv")
+```
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r plot-settings}
+# NASC
+# For legend objects
+nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000)
+nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
+                        "5000-20,000", "20,000-50,000", ">50,000")
+nasc.scale         <- 0.7 # Scale percentage (smaller for larger scale)
+nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
+nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
+                        "#FF0000", "#FFC0CB", "#FFFFFF")
+```
+
+```{r process-csv-cps, include=FALSE}
+# Create data frame for results
+nasc <- data.frame()
+
+# Configure progress bar
+pb <- winProgressBar(title = "CSV File Processing Progress - CPS", 
+                     label = "0% done", min = 0, max = 100, initial = 0)
+
+# Process all .CSV files
+for (i in 1:length(csv.paths)) {
+  # Process i-th file
+  nasc <- bind_rows(nasc, extract_csv(csv.paths[i]))
+  
+  # Update the progress bar
+  info <- sprintf("%d%% done", round((i / length(csv.paths)) * 100))
+  setWinProgressBar(pb, round((i / length(csv.paths)) * 100), label = info)
+}
+close(pb)
+
+# Calculate summary interval
+nasc <- nasc %>%
+  mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                   labels = F, include.lowest = T))
+
+# Save results
+save(nasc, file = here("Output/nasc_plotNASC.Rdata"))
+write.csv(nasc, file = here("Output/nasc_plotNASC.csv"), row.names = F, quote = F)
+
+# Get intervals with bad lat/long values
+bad.nasc <- filter(nasc, lat == 999, long == 999)
+
+# average NASC.70 data over new intervals or number of intervals in a 2 km radius
+nasc.summ <- nasc %>%
+  filter(lat != 999, long != 999) %>% 
+  group_by(transect, int) %>%
+  summarise(
+    bins    = length(int),
+    bin.mid = as.integer(round(bins / 2)),
+    lat     = lat[1],
+    long    = long[1],
+    NASC    = mean(NASC.70)
+  )
+
+# Average cps.nasc over defined interval
+# Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
+nasc.sf <- nasc %>%
+  filter(lat != 999, long != 999) %>%
+  select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
+  group_by(filename, transect, int) %>% 
+  summarise(
+    lat   = lat[1],
+    long  = long[1],
+    NASC  = mean(cps.nasc),
+    label = paste0('Transect: ', transect[1], "; ",
+                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
+                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
+  # Create bins for defining point size in NASC plots
+  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
+         bin.level =  as.numeric(bin)) %>% 
+  filter(!is.na(bin)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+nasc.plot <- project_sf(nasc.sf, crs.proj)
+```
+
+```{r find-big-nasc}
+# Select top 200 nasc values and look for outliers
+big.nasc <- nasc %>%
+  arrange(desc(NASC)) %>%
+  mutate(NASC  = NASC/19,
+         rank  = seq(n()),
+         label = paste0('Transect: ', transect, 
+                        ' - Distance: ', round(dist_m), " m"),
+         popup = paste0('<b>Transect: </b>', transect, '<br/>', 
+                        '<b>Time: </b>', min(datetime), "-", max(datetime), ' UTC<br/>',
+                        '<b>Distance: </b>', round(dist_m), ' m<br/>',
+                        '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
+  top_n(100, NASC) %>% 
+  select(rank, NASC, label, popup, type, datetime, dist_m, lat, long) 
+
+# Save NASC outliers
+save(big.nasc, file = here("Output/nasc_big_plotNASC.Rdata"))
+```
+
+```{r get-spatial-files,include=F}
+# Create spatial objects -------------------------------------------
+# Convert NASC data to sf; CRS = crs.geog (WGS84)
+big.nasc.sf <- big.nasc %>% 
+  top_n(5, NASC) %>%
+  mutate(popup = paste(label, ": ", round(NASC),
+                       " m<sup>2</sup> nmi<sup>-2</sup>",
+                       sep = "")) %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+```
+
+```{r create-leaflet-map, out.width="100%", out.height="8in"}
+# Leaflet options
+# https://rstudio.github.io/leaflet/
+
+# Info on tile caching
+# https://bhaskarvk.github.io/leaflet.extras/reference/TileCaching.html
+
+# Set padding around data  
+imap.bounds <- map_bounds(nasc$lat, nasc$long, 0.1) 
+
+# Select plot levels for backscatter data
+nasc.levels.all <- sort(unique(nasc.plot$bin.level))
+nasc.labels.all <- nasc.labels[sort(nasc.levels.all)]
+nasc.sizes.all  <- nasc.sizes[sort(nasc.levels.all)]
+nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
+
+# Create color palette for NASC
+nascPal <- colorFactor(nasc.colors.all, nasc.levels.all)
+
+# Plotting preferences -------------------------------------------------------
+# Leaflet tile options; set both to T if caching
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
+
+# Create leaflet map
+i.map <- leaflet() %>% 
+  # Enable tile caching
+  enableTileCaching() %>% 
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.OceanBasemap, 
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  # Add backscatter data
+  addCircleMarkers(data = filter(nasc.sf, NASC < 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#000414", 
+                   label = ~label, popup = ~popup, 
+                   group = "Backscatter (Small)") %>%
+  addCircleMarkers(data = filter(nasc.sf, NASC >= 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup,
+                   group = "Backscatter") %>%
+  # Add legends
+  addLegend("bottomleft", colors = nasc.colors.all, 
+            values = sort(unique(nasc.cps.sf$bin.level)),
+            labels = nasc.labels.all, 
+            title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
+            opacity = 1, group = "Backscatter") %>% 
+  # Add scale bar
+  addScaleBar(position = "bottomright") %>%
+  # Add map coordinates
+  addMouseCoordinates() %>% 
+  # Add measurement tool
+  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+             position = "topleft") %>% 
+  # Add layer controls
+  addLayersControl(
+    overlayGroups = c("Backscatter", "Backscatter (Small)"),
+    options = layersControlOptions(collapsed = F)) %>%  
+  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+```
+
+```{r plot-leaflet-map, echo=F, out.height="8in", out.width="100%"}
+# Display map
+i.map
+```
