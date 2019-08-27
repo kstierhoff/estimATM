@@ -5,7 +5,7 @@
 output: 
   bookdown::pdf_document2:
     includes: 
-      in_header: yaml/header_1907RL.tex
+      in_header: yaml/header.tex
     toc: yes
     toc_depth: 3
     number_sections: yes
@@ -120,7 +120,7 @@ load(here("Output/cal_output_table.Rdata"))
 ```  
 
 \newpage
-<!-- \SetWatermarkText{DRAFT} -->
+\SetWatermarkText{DRAFT}
 
 # Executive Summary {-}
 
@@ -141,8 +141,6 @@ The estimated biomass of Jack Mackerel was `r prettyNum(be.all$Biomass[be.all$Sp
 The estimated biomass of Pacific Herring was `r prettyNum(be.all$Biomass[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%). Pacific Herring ranged from approximately Cape Scott, BC to Coos Bay and $L_F$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Clupea pallasii']` to `r length.summ$L.max[length.summ$scientificName == 'Clupea pallasii']` cm with modes at ~7 and 14 cm.  
 
 To investigate the potential biomass of CPS in areas where neither _`r survey.vessel`_ nor the USV could safely navigate, acoustically sampled biomass along the easternmost portions of transects were extrapolated to the 5-m isobath in the unsampled nearshore areas (**Appendix \@ref(appendix-nearshore-biomass)**). 
-
-<!-- The biomass of CPS was also estimated in an offshore stratum comprised of seven transects that extended west of the core sampling areas as part of the marine mammal and turtle sampling (**Appendix \@ref(appendix-offshore-biomass)**). -->
 
 \newpage
 
@@ -654,7 +652,6 @@ The transects were used as sampling units [@Simmonds1996]. Because each species 
 (ref:trawl-cluster-map) a) Polygons enclosing 100-m acoustic intervals assigned to each trawl cluster, and b) the proportion (by weight) of CPS in each trawl cluster. The numbers inside each polygon in panel a) are the cluster numbers, which are located at the average latitude and longitude of all trawls in that cluster. Black points in panel b) indicate trawl clusters with no CPS present.
 
 ```{r trawl-cluster-map,fig.cap='(ref:trawl-cluster-map)',out.width='4.5in',fig.pos='H'}
-# Insert trawl cluster map
 include_graphics(here("Figs/fig_nasc_cluster_trawl_proportion.png"))
 ```  
 
@@ -722,6 +719,7 @@ dist.summ <- nasc.summ %>%
   mutate(vessel = case_when(
     str_detect(transect.name, "RL") ~ "RL",
     str_detect(transect.name, "SD") ~ "SD",
+    str_detect(transect.name, "LM") ~ "LM",
     TRUE ~ "Other")) %>% 
   group_by(vessel) %>% 
   summarise(distance = round(sum(distance)))
@@ -759,7 +757,6 @@ Jack Mackerel comprised the greatest proportion of catch in trawl samples betwee
 (ref:nasc-cufes-trawl) Spatial distributions of: a) 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for Northern Anchovy, Pacific Sardine, and Jack Mackerel; and c) acoustic proportions of CPS in trawl clusters (black points indicate trawl clusters with no CPS).
 
 ```{r nasc-cufes-trawl, fig.cap='(ref:nasc-cufes-trawl)',out.width='8.5in',fig.pos='H'}
-# Insert NascCufesTrawl Map
 include_graphics(here("Figs/fig_nasc_cufes_trawl_proportion.png"))
 ```  
 
@@ -769,7 +766,6 @@ include_graphics(here("Figs/fig_nasc_cufes_trawl_proportion.png"))
 (ref:nasc-saildrone) Spatial distributions of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS in the nearshore region sampled by both _`r survey.vessel`_ and the USV (SD-1024). Although the USV transects extended 4 nmi offshore, only acoustic samples from outside the area sampled by _`r survey.vessel`_ are shown.
 
 ```{r nasc-saildrone, fig.cap='(ref:nasc-saildrone)',out.height='8in',fig.pos='H',eval=FALSE}
-# Insert Nasc Map - Saildrone only
 include_graphics(here("Figs/fig_nasc_summary_map_saildrone.png"))
 ``` 
 
@@ -863,6 +859,8 @@ if (nrow(be.table.sub) != 0) {
       # row_spec(be.stratum.all, bold = T, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ```
 
@@ -925,6 +923,8 @@ if (nrow(be.table.sub) != 0) {
       # row_spec(be.stratum.all, bold = T, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ```  
 
@@ -1003,8 +1003,11 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
 (ref:biom-dens-anch-n) Biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
 ```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for anchovy
-include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1012,8 +1015,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png")
 (ref:l-disagg-anch-n) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the survey area.
 
 ```{r l-disagg-anch-n,fig.cap='(ref:l-disagg-anch-n)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for anchovy
-include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))
+if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1021,8 +1027,11 @@ include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))
 (ref:biom-dens-anch-c) Biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
 ```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for anchovy
-include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1030,8 +1039,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))
 (ref:l-disagg-anch-c) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the central stock of Northern Anchovy (_Engraulis mordax_) in the survey area.
 
 ```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for anchovy
-include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))
+if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage  
@@ -1226,8 +1238,11 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
 (ref:biom-dens-sar-n) Biomass densities of the northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
 ```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for sardine
-include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1235,8 +1250,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))
 (ref:l-disagg-sar-n) Estimated abundance (upper panel) and biomass (lower panel) versus standard length ($L_S$, cm) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the survey area.
 
 ```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for sardine
-include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))
+if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1244,8 +1262,11 @@ include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))
 (ref:biom-dens-sar-s) Biomass densities of the southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
 ```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for sardine
-include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1253,8 +1274,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))
 (ref:l-disagg-sar-s) Estimated abundance (upper panel) and biomass (lower panel) versus standard length ($L_S$, cm) for the southern stock of Pacific Sardine (_Sardinops sagax_) in the survey area.
 
 ```{r l-disagg-sar-s,fig.cap='(ref:l-disagg-sar-s)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for sardine
-include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))
+if (file.exists(here("Figs/fig_L_disagg_Sardionops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage
@@ -1354,8 +1378,11 @@ if ("Scomber japonicus" %in% unique(abund.summ$Species)) {
 (ref:biom-dens-mack) Biomass densities of the Pacific Mackerel (_Scomber japonicus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one Pacific Mackerel. The gray line represents the vessel track.
 
 ```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for mackerel
-include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage  
@@ -1363,8 +1390,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))
 (ref:l-disagg-mack) Estimated abundance (upper panel) and biomass (lower panel) versus fork length ($L_F$, cm) for Pacific Mackerel (_Scomber japonicus_) in the survey area.
 
 ```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for mackerel
-include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))
+if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage
@@ -1464,8 +1494,11 @@ if ("Trachurus symmetricus" %in% unique(abund.summ$Species)) {
 (ref:biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one Jack Mackerel. The gray line represents the vessel track.
 
 ```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for anchovy
-include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage  
@@ -1473,8 +1506,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png")
 (ref:l-disagg-jack) Estimated abundance (upper panel) and biomass (lower panel) versus fork length ($L_F$, cm) for Jack Mackerel (_Trachurus symmetricus_) in the survey area.
 
 ```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for Jack Mackerel
-include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))
+if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage
@@ -1574,8 +1610,11 @@ if ("Clupea pallasii" %in% unique(abund.summ$Species)) {
 (ref:biom-dens-her) Biomass densities of Pacific Herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
 
 ```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for anchovy
-include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))
+if (file.exists(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage  
@@ -1583,8 +1622,11 @@ include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))
 (ref:l-disagg-her) Estimated abundance (upper panel) and biomass (lower panel) versus fork length ($L_F$, cm) for Pacific Herring (_Clupea pallasii_) in the survey area.
 
 ```{r l-disagg-her,fig.cap='(ref:l-disagg-her)',out.height='6in',fig.pos='H'}
-# Insert disaggregated abundance plots for herring
-include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))
+if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))  
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 ```{r biomass-ts-sardine,fig.cap='(ref:biomass-ts-sardine)',out.width='6in',fig.pos='H',eval=F}
@@ -1663,7 +1705,6 @@ Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis 
 (ref:rlf-anchovy) Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
 ```{r rlf-anchovy,out.height='7in',fig.pos='H'}
-# Insert relative length frequency plot for anchovy
 include_graphics(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))
 ```  
 
@@ -1675,7 +1716,6 @@ Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops s
 (ref:rlf-sardine) Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
 ```{r rlf-sardine,out.height='8in',fig.pos='H'}
-# Insert relative length frequency plot for sardine
 include_graphics(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))
 ```  
 
@@ -1687,7 +1727,6 @@ Fork length ($L_F$) frequency distributions of Pacific Mackerel (_Scomber japoni
 (ref:rlf-mack) Fork length ($L_F$) frequency distributions of Pacific Mackerel (_Scomber japonicus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
 ```{r rlf-mack,out.height='8in',fig.pos='H'}
-# Insert relative length frequency plot for mackerel
 include_graphics(here("Figs/fig_cluster_relative_length_frequency_Scomber japonicus.png"))
 ```  
 
@@ -1699,7 +1738,6 @@ Fork length ($L_F$) frequency distributions of Jack Mackerel (_Trachurus symmetr
 (ref:rlf-jack) Fork length ($L_F$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
 ```{r rlf-jack,out.height='8in',fig.pos='H'}
-# Insert relative length frequency plot for Jack Mackerel
 include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))
 ```  
 
@@ -1711,7 +1749,6 @@ Fork length ($L_F$) frequency distributions of Pacific Herring (_Clupea pallasii
 (ref:rlf-herring) Fork length ($L_F$) frequency distributions of Pacific Herring (_Clupea pallasii_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
 ```{r rlf-herring,out.width='6in',fig.pos='H'}
-# Insert relative length frequency plot for herring
 include_graphics(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))
 ```  
 
@@ -1727,7 +1764,6 @@ Due to the shallow seabed and other nearshore hazards to navigation, acoustic sa
 (ref:nearshore-estimation) Example biomass densities of the `r tolower(stock.ns)` stock of `r spp.common.ns` (_`r spp.ns`_) in stratum `r strata.ns` throughout the offshore survey region (gray points); the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points); and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r nearshore-estimation,fig.cap='(ref:nearshore-estimation)',out.height='5.35in',fig.pos='H', eval=T}
-# Insert length-age key for sardine
 include_graphics(here("Figs/fig_nasc_nearshore_example.png"))
 ```  
 
@@ -1844,8 +1880,11 @@ if (nrow(be.table.sub) != 0) {
 (ref:ns-biom-dens-anch-n) Biomass densities of the northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-anch-n,fig.cap='(ref:ns-biom-dens-anch-n)',out.height='8in',fig.pos='H'}
-# Insert biomass density plot for anchovy
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 \newpage  
@@ -1853,8 +1892,11 @@ include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern
 (ref:ns-biom-dens-anch-c) Biomass densities of the central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-anch-c,fig.cap='(ref:ns-biom-dens-anch-c)',out.width='6in',fig.pos='H'}
-# Insert biomass density plot for anchovy
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage
@@ -1966,8 +2008,11 @@ if (nrow(be.table.sub) != 0) {
 (ref:ns-biom-dens-sar-n) Biomass densities of the northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-sar-n,fig.cap='(ref:ns-biom-dens-sar-n)',out.height='8in',fig.pos='H'}
-# Insert biomass density plot for sardine
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage
@@ -1975,8 +2020,11 @@ include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.
 (ref:ns-biom-dens-sar-s) Biomass densities of the southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-sar-s,fig.cap='(ref:ns-biom-dens-sar-s)',out.width='7in',fig.pos='H'}
-# Insert biomass density plot for sardine
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage
@@ -2036,8 +2084,11 @@ if (nrow(be.table.sub) != 0) {
 (ref:ns-biom-dens-mack) Biomass densities of Pacific Mackerel (_Scomber japonicus_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-mack,fig.cap='(ref:ns-biom-dens-mack)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for P. mackerel
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage
@@ -2097,8 +2148,11 @@ if (nrow(be.table.sub) != 0) {
 (ref:ns-biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-jack,fig.cap='(ref:ns-biom-dens-jack)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for Jack Mackerel
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```
 
 \newpage
@@ -2158,8 +2212,11 @@ if (nrow(be.table.sub) != 0) {
 (ref:ns-biom-dens-her) Biomass densities of Pacific Herring (_Clupea pallasii_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
 ```{r ns-biom-dens-her,fig.cap='(ref:ns-biom-dens-her)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for herring
-include_graphics(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))
+} else {
+  print("No results for this species/stock.")
+}
 ```  
 
 <!-- ## Discussion {#appendix-nearshore-biomass-discussion}   -->
