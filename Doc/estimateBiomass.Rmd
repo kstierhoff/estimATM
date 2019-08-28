@@ -102,25 +102,25 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
-save.figs         <- T # Draw new figures and maps
-save.imap         <- T # Save Leaflet maps
-do.bootstrap      <- T # Generate bootstrap estimates
-download.hab      <- T # Download habitat map
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
+save.imap         <- F # Save Leaflet maps
+do.bootstrap      <- F # Generate bootstrap estimates
+download.hab      <- F # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 # Often or usually F
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
-overwrite.files   <- T # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+overwrite.files   <- F # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
-process.cal       <- T # Process calibration results
-process.ctd       <- T # Process CTD and UCTD casts
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
 ```  
 
@@ -213,18 +213,19 @@ if (copy.files) {
 
 ```{r download-habitat-maps}
 if (download.hab) {
-  # If survey is ongoing, use today's date to get habitat maps
   if (date(erddap.survey.end) > date(now())) {
-    erddap.survey.end <- date(now()) - days(2)
-  } 
-  # Calculate the number of days in the survey
-  hab.days <- floor((ymd(erddap.survey.end) - ymd(erddap.survey.start))/3)
-  
+    hab.days <- floor(((date(now()) - days(2)) - ymd(erddap.survey.start))/3)
+    hab.date.end   <- format((date(now()) - days(2)), "%Y%m%d")
+  } else {
+    # Calculate the number of days in the survey
+    hab.days <- floor((ymd(erddap.survey.end) - ymd(erddap.survey.start))/3)
+    hab.date.end   <- format(ymd(erddap.survey.end), "%Y%m%d")
+  }
+
   # Format survey start date for downloading sardine potential habitat maps
   hab.date.start <- format(ymd(erddap.survey.start), "%Y%m%d")
   hab.date.mid1  <- format(ymd(erddap.survey.start) + hab.days, "%Y%m%d")
   hab.date.mid2  <- format(ymd(erddap.survey.start) + hab.days*2, "%Y%m%d")
-  hab.date.end   <- format(ymd(erddap.survey.end), "%Y%m%d")
   
   # Create URLs for downloading downloading sardine potential habitat maps
   hab.url.start <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
@@ -651,7 +652,7 @@ if (process.csv) {
         # Update the progress bar
         pb.prog <- round(ii/length(nasc.files)*100)
         info <- sprintf("%d%% done", pb.prog)
-        setTkProgressBar(pb, pb.prog, sprintf("CSV processing (%s)", info), info)
+        setTkProgressBar(pb, pb.prog, sprintf("CSV processing - %s (%s)", i, info), info)
       }
       
       # Close progress bar
@@ -758,12 +759,12 @@ if (process.csv) {
       
       # Remove letters from transect names
       if (strip.tx.chars[i]) {
-        nasc.vessel$transect.name <- gsub(tx.char.pattern[i], "", nasc.vessel$transect.name)  
+        nasc.vessel$transect <- gsub(tx.char.pattern[i], "", nasc.vessel$transect)  
       }
       
       # Remove numbers from transect names
       if (strip.tx.nums[i]) {
-        nasc.vessel$transect.name <- gsub(tx.num.pattern[i], "", nasc.vessel$transect.name)  
+        nasc.vessel$transect <- gsub(tx.num.pattern[i], "", nasc.vessel$transect)
       }
       
       # Indentify acoustic transects to include in processing, based on length
@@ -855,14 +856,7 @@ if (process.csv) {
           nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
         }
       }
-      
-      # # Remove first and last interval from Lisa Marie data for 1907RL
-      # if (survey.name == "1907RL" & i == "LM") {
-      #   nasc.vessel2 <- nasc.vessel %>% 
-      #     group_by(transect.orig) %>% 
-      #     slice(2:n() - 1)
-      # }
-      
+
       # Save processed CSV data from each survey vessel
       save(nasc.vessel, file = here("Data/Backscatter", i, 
                                     paste0("nasc_vessel_", i, ".Rdata")))
@@ -1496,6 +1490,7 @@ Data for each trawl are summarized to identify trawl hauls with potential proble
 ```{r trawl-haul-summary, collapse=TRUE}
 # Create and format haul summary table
 haul %>% 
+  replace_na(list(trawlPerformance = "Unknown")) %>% 
   select(-notes, -stopLatDecimal, -stopLongDecimal, -haulBackTime) %>% 
   mutate(equilibriumTime = format(equilibriumTime, "%m/%d/%Y %H:%M"),
          duration = cell_spec(
@@ -1503,7 +1498,7 @@ haul %>%
            background = ifelse(duration >= 30,"white","orange")),
          trawlPerformance = cell_spec(
            trawlPerformance, knitr.format, color = "black",
-           background = ifelse(trawlPerformance != "poor","white","yellow"))) %>% 
+           background = ifelse(!trawlPerformance %in% c(trawl.performance, "Unknown"),"white","yellow"))) %>% 
   kable(format = knitr.format,booktabs = TRUE, escape = F) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
                 full_width = F) %>%
@@ -2319,7 +2314,7 @@ save(length.summ, file = here("Output/length_summary_all.Rdata"))
 
 The subsampled weight from the **Catch** table (`subSampleWtkg`) should equal the summed weight of subsampled individuals in the **Specimen** table (`totalWtSpecimens`)(i.e., `diffWt` == 0), and the subsample count from the **Catch** table (`subSampleCount`) should equal the number of subsampled individuals in the **Specimen** table (`totalCtSpecimens`)(i.e., `diffCt` == 0). Hauls with unequal values are in **bold**;  count differences are highlighted in yellow and weight differences are highlighted in orange. Hauls with missing specimen lengths our counts are highlighted in red. Hauls where binned lengths were present are highlighted in green.
 
-```{r CompareTrawlCatch}
+```{r catch-comparison}
 # Summarize individual weights for comparison with total weight in the catch table
 summ.lengths <- lengths %>% 
   group_by(scientificName, haul) %>% 
@@ -2383,6 +2378,50 @@ catch.comp.errors <- catch.comp %>%
 # Save output to CSV
 if (nrow(catch.comp.errors) > 0) {
   write.csv(catch.comp.errors,file = here("Output/catch_comparison_errors.csv"),quote = F,row.names = F)
+}
+```
+
+This table includes only those hauls where `diffWt` and `diffCt` are not equal to zero.
+
+```{r catch-comparison-errors}
+# Filter hauls with diffCt or diffWt != zero
+catch.comp.errors <- catch.comp %>% 
+  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) 
+
+# Save output to CSV
+if (nrow(catch.comp.errors) > 0) {
+  write.csv(catch.comp.errors, file = here("Output/catch_comparison_errors.csv"),
+            quote = FALSE, row.names = FALSE)
+  
+  # Display results
+  catch.comp %>% 
+    filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
+    mutate(
+      totalWtSpecimens = cell_spec(round(totalWtSpecimens, digits = 4),
+                                   knitr.format, color = "black",
+                                   background = ifelse(is.na(totalWtSpecimens), "red", "white")),
+      totalCtSpecimens = cell_spec(round(totalCtSpecimens, digits = 4),
+                                   knitr.format,color = "black",
+                                   background = ifelse(is.na(totalCtSpecimens), "red", "white")),
+      diffWt           = cell_spec(round(diffWt, digits = 4),
+                                   knitr.format, color = "black",
+                                   background = ifelse(diffWt == 0, "white", "orange")),
+      diffCt           = cell_spec(diffCt, knitr.format, color = "black",
+                                   background = ifelse(diffCt == 0, "white", "yellow")),
+      binnedLengths    = cell_spec(binnedLengths, knitr.format, color = "black",
+                                   background = ifelse(binnedLengths == 0, "white", "green"))) %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+          align = c("c","l",rep("r",ncol(catch.comp) - 2)),
+          digits = c(0,0,3,3,4,0,0,0,0),
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+    column_spec(1, italic = TRUE) %>%
+    row_spec(0, align = c("c")) %>%
+    collapse_rows(columns = 1) %>% 
+    scroll_box(height = "250px") 
+  
+} else {
+  print("Hooray, no (obvious) errors!")
 }
 ```
 
@@ -4792,8 +4831,9 @@ uctd.table <- uctd.summ %>%
 
 # Print table
 uctd.table %>% 
- mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                              background = ifelse(Lag <= 30,"white","orange"))) %>% 
+  filter(!is.na(Lag)) %>% 
+  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
+                         background = ifelse(Lag <= 30,"white","orange"))) %>% 
   kable(format = knitr.format,booktabs = TRUE, escape = F,
         digits = c(0,0,0,4,4,0,0,0,0),
         align = c("c","l","c","r","r","r","r","c","r")) %>% 
@@ -5112,15 +5152,17 @@ include_graphics(here("Figs/fig_ctd_cast_plots.png"))
 ## Combine CTD/UCTD cast data
 
 ```{r combine-cast-data}
-# Combine all CTD and UCTD cast data in one data frame
-ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts)
-
 # Combine all CTD and UCTD cast info in one data frame
 ctd.info.all <- all.ctd.hdr %>% 
   bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
   mutate(type = case_when(
     str_detect(cast, "UCTD") ~ "UCTD",
-    TRUE ~ "CTD"))
+    TRUE ~ "CTD")) %>% 
+  filter(!is.na(lat), !is.na(long))
+
+# Combine all CTD and UCTD cast data in one data frame
+ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>% 
+  filter(cast %in% ctd.info.all$cast)
 
 # Save to CSV file
 write.csv(ctd.data.all, file = here("Output/all_ctd_data.csv"), 
@@ -6977,8 +7019,7 @@ save(L.abund.table, abund.summ, file = here("Output/abundance_table_all.Rdata"))
 
 (ref:biom-dens-anch-n) Biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
-```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.height='8.35in',fig.pos='H'}
-# Insert biomass density plot for anchovy
+```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.height='100%',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))  
 } else {
@@ -6988,7 +7029,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))
 
 (ref:l-disagg-anch-n) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the survey area.
 
-```{r l-disagg-anch-n,fig.cap='(ref:l-disagg-anch-n)',out.height='6in',fig.pos='H'}
+```{r l-disagg-anch-n,fig.cap='(ref:l-disagg-anch-n)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for anchovy
 if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))  
@@ -7036,7 +7077,7 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
 
 (ref:biom-dens-anch-c) Biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
-```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.height='8.35in',fig.pos='H'}
+```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for anchovy
 if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))  
@@ -7047,7 +7088,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png")))
 
 (ref:l-disagg-anch-c) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the central stock of Northern Anchovy (_Engraulis mordax_) in the survey area.
 
-```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.height='6in',fig.pos='H'}
+```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for anchovy
 if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
@@ -7095,7 +7136,7 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
 
 (ref:rlf-anchovy) Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
-```{r rlf-anchovy,out.height='7in',fig.pos='H'}
+```{r rlf-anchovy,out.height='100%',fig.pos='H'}
 # Insert relative length frequency plot for anchovy
 if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))) {
   include_graphics(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))  
@@ -7109,7 +7150,7 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Engraulis morda
 
 (ref:biom-dens-sar-n) Biomass densities of northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
-```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.height='8.35in',fig.pos='H'}
+```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for sardine
 if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))  
@@ -7120,7 +7161,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png")))
 
 (ref:l-disagg-sar-n) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the survey area.
 
-```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.height='6in',fig.pos='H'}
+```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for sardine
 if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
@@ -7168,7 +7209,7 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
 
 (ref:biom-dens-sar-s) Biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
-```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.height='8.35in',fig.pos='H'}
+```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for sardine
 if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))  
@@ -7179,7 +7220,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png")))
 
 (ref:l-disagg-sar-s) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the southern stock of Pacific Sardine (_Sardinops sagax_) in the survey area.
 
-```{r l-disagg-sar-s,fig.cap='(ref:l-disagg-sar-s)',out.height='6in',fig.pos='H'}
+```{r l-disagg-sar-s,fig.cap='(ref:l-disagg-sar-s)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for sardine
 if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))  
@@ -7227,7 +7268,7 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
 
 (ref:rlf-sardine) Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
-```{r rlf-sardine,out.height='7in',fig.pos='H'}
+```{r rlf-sardine,out.height='100%',fig.pos='H'}
 # Insert relative length frequency plot for sardine
 if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))) {
   include_graphics(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))  
@@ -7240,7 +7281,7 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax
 
 (ref:biom-dens-mack) Biomass densities of Pacific mackerel (_Scomber japonicus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel The gray line represents the vessel track.
 
-```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.height='8.35in',fig.pos='H'}
+```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for P. mackerel
 if (file.exists(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))  
@@ -7251,7 +7292,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))) {
 
 (ref:l-disagg-mack) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Pacific mackerel (_Scomber japonicus_) in the survey area.
 
-```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.height='6in',fig.pos='H'}
+```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for P. mackerel
 if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
@@ -7295,11 +7336,22 @@ if ("Scomber japonicus" %in% unique(abund.summ$Species)) {
 }
 ```
 
+(ref:rlf-mack) Fork length ($L_F$) frequency distributions of Pacific Mackerel (_Scomber japonicus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
+
+```{r rlf-mack,out.height='100%',fig.pos='H'}
+# Insert relative length frequency plot for anchovy
+if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Scomber japonicus.png"))) {
+  include_graphics(here("Figs/fig_cluster_relative_length_frequency_Scomber japonicus.png"))  
+} else {
+  print("No data for this stock.")
+}
+``` 
+
 ## Results for Jack Mackerel (_Trachurus symmetricus_)
 
 (ref:biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one jack mackerel. The gray line represents the vessel track.
 
-```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.height='8.35in',fig.pos='H'}
+```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for jack mackerel
 if (file.exists(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))  
@@ -7310,7 +7362,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))
 
 (ref:l-disagg-jack) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Jack Mackerel (_Trachurus symmetricus_) in the survey area.
 
-```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.height='6in',fig.pos='H'}
+```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for jack mackerel
 if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
@@ -7354,9 +7406,9 @@ if ("Trachurus symmetricus" %in% unique(abund.summ$Species)) {
 }
 ```
 
-(ref:rlf-jack) Standard length ($L_S$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
+(ref:rlf-jack) Fork length ($L_F$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
-```{r rlf-jack,out.height='7in',fig.pos='H'}
+```{r rlf-jack,out.height='100%',fig.pos='H'}
 # Insert relative length frequency plot for jack mackerel
 if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))) {
   include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))  
@@ -7369,7 +7421,7 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Trachurus symme
 
 (ref:biom-dens-her) Biomass densities of Pacific herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
 
-```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.height='8.35in',fig.pos='H'}
+```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for herring
 if (file.exists(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))  
@@ -7380,7 +7432,7 @@ if (file.exists(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))) {
 
 (ref:l-disagg-her) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Pacific herring (_Clupea pallasii_) in the survey area.
 
-```{r l-disagg-her,fig.cap='(ref:l-disagg-her)',out.height='6in',fig.pos='H'}
+```{r l-disagg-her,fig.cap='(ref:l-disagg-her)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for herring
 if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
   include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))  
@@ -7426,7 +7478,7 @@ if ("Clupea pallasii" %in% unique(abund.summ$Species)) {
 
 (ref:rlf-her) Standard length ($L_S$) frequency distributions of Pacific herring (_Clupea pallasii_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum and across all strata (i.e., for the entire survey).
 
-```{r rlf-her,out.height='7in',fig.pos='H'}
+```{r rlf-her,out.height='100%',fig.pos='H'}
 # Insert relative length frequency plot for herring
 if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))) {
   include_graphics(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))  
@@ -7437,7 +7489,7 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii
 
 # Map nearshore extrapolation
 
-```{r map-biomass-density-nearshore}
+```{r map-biomass-density-nearshore,out.height='100%'}
 # Calculate nearshore biomass density for plotting
 nasc.density.ns <- nasc.nearshore.final %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
@@ -7462,8 +7514,92 @@ nasc.density.ns <- nasc.nearshore.final %>%
 if (save.figs) {
   source(here("Code", paste0("map_nearshore_biomass_", survey.name, ".R")))  
 }
+```
 
-include_graphics(here("Figs/fig_nasc_nearshore_example.png"))
+## Results for anchovy (_Engraulis mordax_)
+### Northern stock
+
+(ref:biom-dens-anch-n-ns) Extrapolated nearshore biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+
+```{r biom-dens-anch-n-ns,fig.cap='(ref:biom-dens-anch-n-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+### Central stock
+
+(ref:biom-dens-anch-c-ns) Extrapolated nearshore biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+
+```{r biom-dens-anch-c-ns,fig.cap='(ref:biom-dens-anch-c-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+## Results for sardine (_Sardinops sagax_)
+### Northern stock
+
+(ref:biom-dens-sar-n-ns) Extrapolated nearshore biomass densities of northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+
+```{r biom-dens-sar-n-ns,fig.cap='(ref:biom-dens-sar-n-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+### Southern stock
+
+(ref:biom-dens-sar-s-ns) Extrapolated nearshore biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+
+```{r biom-dens-sar-s-ns,fig.cap='(ref:biom-dens-sar-s-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+## Results for Pacific mackerel (_Scomber japonicus_)
+
+(ref:biom-dens-mack-ns) Extrapolated nearshore biomass densities of Pacific mackerel (_Scomber japonicus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel. The gray line represents the vessel track.
+
+```{r biom-dens-mack-ns,fig.cap='(ref:biom-dens-mack-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+## Results for jack mackerel (_Trachurus symmetricus_)
+
+(ref:biom-dens-jack-ns) Extrapolated nearshore biomass densities of jack mackerel (_Trachurus symmetricus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one jack mackerel. The gray line represents the vessel track.
+
+```{r biom-dens-jack-ns,fig.cap='(ref:biom-dens-jack-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))  
+} else {
+  print("No data for this stock.")
+}
+```
+
+## Results for Pacific herring (_Clupea pallasii_)
+
+(ref:biom-dens-her-ns) Extrapolated nearshore biomass densities of Pacific herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
+
+```{r biom-dens-her-ns,fig.cap='(ref:biom-dens-her-ns)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))  
+} else {
+  print("No data for this stock.")
+}
 ```
 
 # Appendices
