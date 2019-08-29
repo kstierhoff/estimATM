@@ -1992,82 +1992,31 @@ A map showing trawl clusters assigned to 100-m acoustic transect intervals. Clus
 ```{r map-trawl-species-proportions}
 # Map trawl species proportions -------------------------------------------------------
 if (save.figs) {
-  # Create trawl haul figure
-  trawl.pie.haul.wt <- base.map +
-    # Plot transects data
-    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
-            alpha = 0.75, linetype = "dashed") +
-    # plot ship track data
-    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = pie.radius),
-                    cols = c("Anchovy", "JackMack", "Jacksmelt",
-                             "PacHerring", "PacMack", "Sardine"),
-                    color = 'black', alpha = 0.8) +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty cluster locations
-    geom_point(data = haul.zero, aes(X, Y),
-               size = 3, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    ggtitle("CPS Proportions in Trawl Hauls") +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  # Create trawl haul and cluster proportion figures
+  source(here("Code/plot_haul_proportion_wt.R"))
+  source(here("Code/plot_cluster_proportion_wt.R"))
   
-  # Create trawl cluster figure
-  trawl.pie.cluster.wt <- base.map +
-    # Plot transects data
-    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
-            alpha = 0.75, linetype = "dashed") +
-    # plot ship track data
-    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("Anchovy", "JackMack", "Jacksmelt",
-                             "PacHerring", "PacMack", "Sardine"),
-                    color = 'black', alpha = 0.8) +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty cluster locations
-    geom_point(data = cluster.zero, aes(X, Y),
-               size = 3, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    ggtitle("CPS Proportions in Trawl Clusters") +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-  
-  # Combine nasc.cluster.plot and trawl.proportion.plot for report
+  # Combine nasc.cluster.plot and trawl.pie.cluster.wt for report
   nasc.trawl.plot <- plot_grid(nasc.cluster.plot, trawl.pie.cluster.wt,
-                                     nrow = 1, labels = c("a)", "b)"))
-  
-  # Save trawl species proportions plot
-  ggsave(trawl.pie.haul.wt,
-         filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
-         width = map.width, height = map.height)
-  
-  ggsave(trawl.pie.cluster.wt,
-         filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
-         width = map.width, height = map.height)
+                               nrow = 1, labels = c("a)", "b)"))
   
   ggsave(nasc.trawl.plot,
-         filename = here("Figs/fig_nasc_trawl_proportion.png"),
+         filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
          width = map.width*2, height = map.height)
   
-  save(trawl.pie.cluster.wt,
+  save(trawl.pie.cluster.wt, trawl.pie.cluster.wt, nasc.trawl.plot,
        file = here("Output/trawl_species_proportion_map.Rdata"))
   
-  save(nasc.trawl.plot,
-       file = here("Output/nasc_cluster_trawl_prop_map.Rdata"))
+  # Save trawl species proportions plot
+  # ggsave(trawl.pie.haul.wt,
+  #        filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
+  #        width = map.width, height = map.height)
+  # 
+  # ggsave(trawl.pie.cluster.wt,
+  #        filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
+  #        width = map.width, height = map.height)
+  # save(nasc.trawl.plot,
+  #      file = here("Output/nasc_cluster_trawl_prop_map.Rdata"))
 } else {
   load(here("Output/trawl_species_proportion_map.Rdata"))
 }

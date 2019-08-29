@@ -13,7 +13,7 @@ cufes.density.all <- base.map +
           alpha = 0.75, linetype = "dashed") +
   # Plot all cufes samples, including zeros
   geom_point(data = cufes.neg, aes(X, Y),
-             shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
+          shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
   geom_point(data = cufes.plot,
              aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
@@ -33,7 +33,7 @@ cufes.density.facet <- base.map +
           alpha = 0.75, linetype = "dashed") +
   # Plot all cufes samples, including zeros
   geom_point(data = cufes.neg, aes(X, Y),
-             shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
+          shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
   # Plot only positive cufes samples
   geom_point(data = cufes.plot,
              aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
