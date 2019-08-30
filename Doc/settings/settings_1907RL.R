@@ -253,9 +253,9 @@ tx.num.pattern         <- c(RL = "-\\d{1}",
                             LM = "-\\d{1}",
                             SD = "-\\d{1}") 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL = F,
-                            LM = F,
-                            SD = F) 
+use.tx.number          <- c(RL = T,
+                            LM = T,
+                            SD = T) 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
                             LM = NA,

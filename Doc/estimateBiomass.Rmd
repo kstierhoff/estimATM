@@ -102,25 +102,25 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected loops, usually T
-get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
-save.figs         <- T # Draw new figures and maps
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
-do.bootstrap      <- T # Generate bootstrap estimates
-download.hab      <- T # Download habitat map
+do.bootstrap      <- F # Generate bootstrap estimates
+download.hab      <- F # Download habitat map
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 # Often or usually F
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
-overwrite.files   <- T # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+overwrite.files   <- F # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
-process.cal       <- T # Process calibration results
-process.ctd       <- T # Process CTD and UCTD casts
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
 ```  
 
@@ -902,31 +902,41 @@ if (survey.name == "1807RL") {
 tx.order <- data.frame()
 
 for (i in nasc.vessels) {
-  # Calculate transect order per vessel
-  tx.order.temp <- nasc %>%
-    # filter(vessel.name == as.character(i)) %>% 
-    filter(str_detect(vessel.name, i)) %>% 
-    group_by(transect.name) %>% 
-    summarise(max.lat  = max(lat),
-              min.long = max(long)) %>% 
-    mutate(rank.lat  = rank(max.lat), 
-           rank.long = rev(rank(min.long)), 
-           diff      = rank.lat - rank.long) %>% 
-    arrange(rank.lat)
+  if (use.tx.number[i]) {
+    # Calculate transect order per vessel
+    tx.order.temp <- nasc %>%
+      filter(str_detect(vessel.name, i)) %>% 
+      group_by(transect.name) %>% 
+      summarise(max.lat  = max(lat),
+                min.long = max(long)) %>% 
+      mutate(rank.lat  = rank(max.lat), 
+             rank.long = rev(rank(min.long)), 
+             diff      = rank.lat - rank.long,
+             transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
+             rank.final = rank(transect.num)) %>% 
+      arrange(rank.final)
+  } else {
+    # Calculate transect order per vessel
+    tx.order.temp <- nasc %>%
+      filter(str_detect(vessel.name, i)) %>% 
+      group_by(transect.name) %>% 
+      summarise(max.lat  = max(lat),
+                min.long = max(long)) %>% 
+      mutate(rank.lat  = rank(max.lat), 
+             rank.long = rev(rank(min.long)), 
+             diff      = rank.lat - rank.long,
+             transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
+             rank.final = rank.lat) %>% 
+      arrange(rank.final)
+  }
   
   # Assign transect order based on rank latitude
   if (nrow(tx.order) == 0) {
     # If the first vessel, create transects from 0 to number of transects
-    tx.order.temp$transect <- tx.order.temp$rank.lat
+    tx.order.temp$transect <- tx.order.temp$rank.final
   } else {
     # If not the first vessel, add rank latitude to largest existing transect number
-    tx.order.temp$transect <- tx.order.temp$rank.lat + max(tx.order$transect)
-  }
-  
-  # Assign numeric transects in order from S to N
-  if (use.tx.number[i]) {
-    tx.order.temp <- tx.order.temp %>% 
-      mutate(transect = as.numeric(str_extract(transect.name,"[[:digit:]]+")))
+    tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order$transect)
   }
   
   # Combine results from all vessels
@@ -1269,33 +1279,31 @@ if (save.figs) {
   # Create object for plotting sA
   # CONSIDER REPLACING NASC PLOT WITH NASC.PLOT.CPS THROUGHOUT
   nasc.plot.cps <- nasc.plot
+  
+  # Create final backscatter summary map
+  source(here("Code/plot_sA_CPS.R"))
 
-  # Map backscatter - no transect labels
-  nasc.map <- base.map +
-    # Plot vessel track
-    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
-    # Plot NASC data
-    geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
-               shape = 21, alpha = 0.75) +
-    # Configure size and colour scales
-    scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
-                      values = nasc.sizes.all,labels = nasc.labels.all) +
-    scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
-                      values = nasc.colors.all, labels = nasc.labels.all) +
-    scale_colour_discrete(name = "Vessel") +
-    # Configure legend guides
-    guides(fill = guide_legend(), size = guide_legend()) +
-    # Plot title
-    ggtitle("CPS Backscatter") +
-    coord_sf(crs = crs.proj,
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-  
-  # Save nasc plot
-  ggsave(nasc.map, filename = here("Figs/fig_nasc_summary_map.png"), 
-         width = map.width, height = map.height) 
-  
-  save(nasc.map, file = here("Output/nasc_plot_fig.Rdata"))
+  # # Map backscatter - no transect labels
+  # nasc.map <- base.map +
+  #   # Plot vessel track
+  #   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
+  #   # Plot NASC data
+  #   geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
+  #              shape = 21, alpha = 0.75) +
+  #   # Configure size and colour scales
+  #   scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+  #                     values = nasc.sizes.all,labels = nasc.labels.all) +
+  #   scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+  #                     values = nasc.colors.all, labels = nasc.labels.all) +
+  #   scale_colour_discrete(name = "Vessel") +
+  #   # Configure legend guides
+  #   guides(fill = guide_legend(), size = guide_legend()) +
+  #   # Plot title
+  #   ggtitle("CPS Backscatter") +
+  #   coord_sf(crs = crs.proj,
+  #          xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+  #          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+
   
   # Map backscatter - Lisa Marie region only  
   if (survey.name %in% c("1707RL")) {
@@ -1333,7 +1341,7 @@ if (save.figs) {
   }
 }
 
-load(here("Output/nasc_plot_fig.Rdata"))
+load(here("Output/nasc_plot_cps.Rdata"))
 
 include_graphics(here("Figs/fig_nasc_summary_map_tx.png"))
 ```  
@@ -1850,12 +1858,6 @@ haul.ts <- haul %>%
 # Export haul data for single-target TS esimation
 write_csv(haul.ts, here("Output/single_species_hauls.csv"), na = "")
 
-# # Convert to spatial
-# haul.ts <- haul.ts %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
-# 
-# haul.ts <- project_sf(haul.ts, crs = crs.proj)
-
 if (save.figs) {
   # Map single species hauls
   haul.ts.map <- base.map + 
@@ -1941,11 +1943,6 @@ nasc <- bind_cols(nasc, cluster.distance)
 ## Map trawl cluster polygons around acoustic backscatter  
 
 ```{r map-acoustic-trawl-clusters}
-# # Convert nasc to sf and project
-# nasc.sf <- st_as_sf(nasc, coords = c("long","lat"), crs = crs.geog)
-# 
-# nasc.proj <- project_sf(nasc.sf, crs = crs.proj)
-
 if (save.figs) {
   # Create hulls around positive clusters
   nasc.super.clusters <- plyr::ddply(nasc, "cluster", find_hull) %>% 
@@ -1991,9 +1988,11 @@ include_graphics(here("Figs/fig_nasc_cluster_map.png"))
 
 A map showing trawl clusters assigned to 100-m acoustic transect intervals. Cluster numbers in **bold** are CPS-positive clusters.
 
-## Map trawl-cluster species proportions by weight  
+## Map trawl-cluster species proportions by weight 
 
-```{r map-trawl-species-proportions}
+(ref:trawl-species-proportions) Survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawl clusters with no CPS).
+
+```{r map-trawl-species-proportions,fig.cap='(ref:trawl-species-proportions)'}
 # Map trawl species proportions -------------------------------------------------------
 if (save.figs) {
   # Create trawl haul and cluster proportion figures
@@ -2001,34 +2000,22 @@ if (save.figs) {
   source(here("Code/plot_cluster_proportion_wt.R"))
   
   # Combine nasc.cluster.plot and trawl.pie.cluster.wt for report
-  nasc.trawl.plot <- plot_grid(nasc.cluster.plot, trawl.pie.cluster.wt,
+  nasc.trawl.cluster.wt <- plot_grid(nasc.cluster.plot, trawl.pie.cluster.wt,
                                nrow = 1, labels = c("a)", "b)"))
   
-  ggsave(nasc.trawl.plot,
-         filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
+  ggsave(nasc.trawl.cluster.wt,
+         filename = here("Figs/fig_nasc_trawl_cluster_wt.png"),
          width = map.width*2, height = map.height)
   
-  save(trawl.pie.cluster.wt, trawl.pie.cluster.wt, nasc.trawl.plot,
+  save(trawl.pie.cluster.wt, trawl.pie.cluster.wt, nasc.trawl.cluster.wt,
        file = here("Output/trawl_species_proportion_map.Rdata"))
   
-  # Save trawl species proportions plot
-  # ggsave(trawl.pie.haul.wt,
-  #        filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
-  #        width = map.width, height = map.height)
-  # 
-  # ggsave(trawl.pie.cluster.wt,
-  #        filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
-  #        width = map.width, height = map.height)
-  # save(nasc.trawl.plot,
-  #      file = here("Output/nasc_cluster_trawl_prop_map.Rdata"))
 } else {
   load(here("Output/trawl_species_proportion_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_trawl_proportion_cluster_wt.png"))
+include_graphics(here("Figs/fig_nasc_trawl_cluster_wt.png"))
 ```  
-
-Survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawl clusters with no CPS). 
 
 ## Process trawl length data  
 
@@ -2404,7 +2391,9 @@ if (nrow(length.outliers) == 0) {
 
 ### Compare L-W relationships between current and past surveys  
 
-```{r plot-lw-data}
+(ref:lw-plot) Length-weight relationships from the current survey [pink (female), blue (male), and green (unknown) points] and all previous surveys in the same season (gray points). Dashed lines represent the modeled (linear model with bias correction) relationships between length and weight for each species during the survey season. Large red and blue points indicate individuals where length or weight (typically individuals with binned lengths) were missing, respectively. Those missing values were estimated using the relationship between length and weight for each species.
+
+```{r plot-lw-data,fig.cap='(ref:lw-plot)'}
 # Plot L/W data from past and current survey -----------------------------------
 lw.plot <- ggplot() + 
   # Plot L/W data from all years/surveys
@@ -2473,8 +2462,6 @@ ggsave(lw.plot.leg, filename = here("Figs/fig_LW_plots_leg.png"),
 # Add L/W plot
 include_graphics(here("Figs/fig_LW_plots.png"))
 ```
-
-Length-weight relationships from the current survey [pink (female), blue (male), and green (unknown) points] and all previous surveys in the same season (gray points). Dashed lines represent the modeled (linear model with bias correction) relationships between length and weight for each species during the survey season. Large red and blue points indicate individuals where length or weight (typically individuals with binned lengths) were missing, respectively. Those missing values were estimated using the relationship between length and weight for each species.  
 
 The conversions are done using the following equations and the coefficients in the table below:  
 
@@ -2569,6 +2556,11 @@ cufes <- cufes.all %>%
          bin.level = as.numeric(bin)) %>% 
   left_join(select(cufes.all, SampleNumber, Start, Stop)) 
 
+# Select CUFES data from CPS
+cufes.plot <- cufes %>% 
+  filter(Density > 0, Species %in% cufes.plot.spp) %>%
+  arrange(desc(Density))
+
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.all, AllEggs == 0) %>%
   filter(Cruise %in% cruise.name, Ship %in% cruise.ship, 
@@ -2576,85 +2568,61 @@ cufes.neg <- filter(cufes.all, AllEggs == 0) %>%
   mutate(bin.level = 1) %>% 
   select(X, Y, SampleNumber)
 
+# Identify bad CUFES samples
+cufes.bad <- filter(cufes.all, Duration <= 0)
+
+save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
+
 # Write CUFES data from current survey to CSV
 write.csv(cufes, file = here("Output/cufes_data.csv"), 
           row.names = FALSE, quote = F)
 ```  
 
-## Map CUFES egg densities  
+## Map CUFES egg densities 
 
-```{r map-cufes-egg-density}
-# Define plot levels for all species
-cufes.levels.all     <- cufes %>% distinct(bin.level)
-cufes.labels.all     <- cufes.labels[sort(cufes.levels.all$bin.level)]
-cufes.sizes.all      <- cufes.sizes[sort(cufes.levels.all$bin.level)]
-cufes.colors.all     <- cufes.colors[which(names(cufes.colors) %in% unique(cufes$Species))]
-cufes.spp.labels.all <- cufes.spp.labels[which(names(cufes.spp.labels) %in% unique(cufes$Species))]
+(ref:cufes-egg-densities) Egg densities (eggs m^-3^) for anchovy, jack mackerel, and sardine from the CUFES. Crosses indicate CUFES samples with no eggs from any CPS species. Point size indicates egg density and point color indicates species.
 
+```{r map-cufes-egg-density,fig.cap='(ref:cufes-egg-densities)'}
 if (save.figs) {
   # Plot CUFES for sardine, anchovy, and jack mackerel -------------------------  
-  cufes.density.all <- base.map +
-    # Plot transects data
-    geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
-            alpha = 0.75, linetype = "dashed") +
-    # Plot all cufes samples, including zeros
-    geom_point(data = cufes.neg, aes(X, Y),
-               shape = 3, size = 0.5, colour = 'black', alpha = 0.5) +
-    # Plot only positive cufes samples
-    geom_point(data = filter(cufes, Density > 0, Species %in% cufes.plot.spp),
-               aes(X, Y, size = bin, colour = Species), alpha = 0.6) +
-    # Configure size and colour scales
-    scale_size_manual(name = bquote(atop('Density','(eggs' ~m^-3*')')),
-                      values = cufes.sizes.all,labels = cufes.labels.all) +
-    scale_colour_manual(name = 'Species', values = cufes.colors.all, labels = cufes.spp.labels.all) +
-    # Format axes and titles
-    ggtitle("CUFES Egg Densities") +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  source(here("Code/plot_CUFES.R"))
   
-  # Save cufes plot
-  ggsave(cufes.density.all, 
-         filename = here("Figs/fig_cufes_egg_density.png"),
-         width = map.width, height = map.height)
-  
-  save(cufes.density.all, 
-       file = here("Output/cufes_egg_density_map.Rdata"))
+  save(cufes.density.all, cufes.density.facet,
+       file = here("Output/cufes_egg_density_maps.Rdata"))
   
 } else {
-  load(here("Output/cufes_egg_density_map.Rdata"))
+  load(here("Output/cufes_egg_density_maps.Rdata"))
 }
 
 include_graphics(here("Figs/fig_cufes_egg_density.png"))
 ```  
 
-Egg densities (eggs m^-3^) for anchovy, jack mackerel, and sardine from the CUFES. Crosses indicate CUFES samples with no eggs from any CPS species. Point size indicates egg density and point color indicates species.  
-
 ## Combine backscatter, CUFES, and species proportion plots  
-Finally, examine the a) distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; and c) proportions of CPS species in trawl clusters (by weight, black points indicate trawls with no CPS).  
 
-```{r map-nasc-cufes-trawl}
+(ref:nasc-cufes-trawl-wt) The a) distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; and c) proportions of CPS species in trawl clusters (by weight, black points indicate trawls with no CPS).  
+
+```{r nasc-cufes-trawl-wt,fig.cap='(ref:nasc-cufes-trawl-wt)'}
 if (save.figs) {
   # Combine backscatter, CUFES, and trawl maps
-  nasc.cufes.trawl.plot      <- plot_grid(nasc.map, cufes.density.all, trawl.pie.cluster.wt,
+  nasc.cufes.trawl.plot      <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
                                      nrow = 1, labels = c("a)", "b)", "c)"))
   
-  nasc.cufes.trawl.plot.long <- plot_grid(nasc.map, cufes.density.all, trawl.pie.cluster.wt,
+  nasc.cufes.trawl.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
                                      ncol = 1, labels = c("a)", "b)", "c)"))
   # Save maps
   ggsave(nasc.cufes.trawl.plot, 
-         filename = here("Figs/fig_nasc_cufes_trawl.png"),
+         filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
          width = map.width*3, height = map.height)
   
   ggsave(nasc.cufes.trawl.plot.long, 
-         filename = here("Figs/fig_nasc_cufes_trawl_long.png"),
+         filename = here("Figs/fig_nasc_cufes_haul_wt_long.png"),
          width = map.width, height = map.height*3)
   
   save(nasc.cufes.trawl.plot, nasc.cufes.trawl.plot.long, 
        file = here("Output/nasc_cufes_trawl_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_nasc_cufes_trawl_long.png"))
+include_graphics(here("Figs/fig_nasc_cufes_haul_wt_long.png"))
 ```
 
 # Calculate target strengths (TS) from lengths 
@@ -3016,13 +2984,13 @@ CPS catch in each trawl cluster is mapped by a) proportion of total weight, b) a
 
 ```{r map-acoustic-proportions}
 # Get acoustic proportions for mapping
-acoustic.pie.indiv <- clf %>%
+acoustic.prop.indiv <- clf %>%
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
          prop.mack, prop.sar) %>% 
   replace(is.na(.), 0) %>% 
   project_df(to = crs.proj)
 
-acoustic.pie.wg <- clf %>%
+acoustic.prop.wg <- clf %>%
   select(cluster, lat, long, prop.anch.wg, prop.jack.wg, prop.her.wg,
          prop.mack.wg, prop.sar.wg) %>% 
   replace(is.na(.), 0) %>% 
@@ -3030,14 +2998,14 @@ acoustic.pie.wg <- clf %>%
 
 if (save.figs) {
   # Create trawl figure
-  acoustic.pie.map.indiv <- base.map +
+  acoustic.prop.cluster.indiv <- base.map +
     # Plot transects data
     geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
             alpha = 0.75, linetype = "dashed") +
     # plot ship track data
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = acoustic.pie.indiv, 
+    geom_scatterpie(data = acoustic.prop.indiv, 
                     aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("prop.anch","prop.jack","prop.her",
                              "prop.mack","prop.sar"),
@@ -3058,14 +3026,14 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Create trawl figure
-  acoustic.pie.map.wg <- base.map +
+  acoustic.prop.cluster.wg <- base.map +
     # Plot transects data
     geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
             alpha = 0.75, linetype = "dashed") +
     # plot ship track data
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = acoustic.pie.wg, 
+    geom_scatterpie(data = acoustic.prop.wg, 
                     aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("prop.anch.wg","prop.jack.wg","prop.her.wg",
                              "prop.mack.wg","prop.sar.wg"),
@@ -3086,37 +3054,36 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine acoustic proportion maps
-  acoustic.pie.plot.comp <- plot_grid(trawl.pie.cluster.wt, acoustic.pie.map.indiv, 
-                                      acoustic.pie.map.wg,
-                                      nrow = 1, labels = c("a)", "b)", "c)"))
+  acoustic.prop.comparison <- plot_grid(acoustic.prop.cluster.indiv, acoustic.prop.cluster.wg,
+                                      nrow = 1, labels = c("a)", "b)"))
 
   # Save trawl species proportions plots
-  ggsave(acoustic.pie.plot.comp,
-         filename = here("Figs/fig_trawl_proportion_comparison.png"),
-         width = map.width*3, height = map.height)
+  ggsave(acoustic.prop.comparison,
+         filename = here("Figs/fig_acoustic_proportion_comparison.png"),
+         width = map.width*2, height = map.height)
   
-  save(acoustic.pie.indiv, acoustic.pie.wg, acoustic.pie.plot.comp,
+  save(acoustic.prop.cluster.indiv, acoustic.prop.cluster.wg,
        file = here("Output/acoustic_proportion_comp_map.Rdata"))
   
 } else {
   load(here("Output/acoustic_proportion_comp_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_trawl_proportion_comparison.png"))
+include_graphics(here("Figs/fig_acoustic_proportion_comparison.png"))
 ```
 
 ## Create final backscatter, CUFES, and acoustic proportion maps
 
 ```{r map-nasc-cufes-acoustic-proportion}
 # Create trawl figure
-acoustic.pie.map.final <- base.map +
+acoustic.prop.cluster.final <- base.map +
   # Plot transects data
   geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
           alpha = 0.75, linetype = "dashed") +
   # plot ship track data
   geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot trawl pies
-  geom_scatterpie(data = acoustic.pie.indiv, 
+  geom_scatterpie(data = acoustic.prop.indiv, 
                   aes(X, Y, group = cluster, r = pie.radius),
                   cols = c("prop.anch","prop.jack","prop.her",
                            "prop.mack","prop.sar"),
@@ -3137,25 +3104,25 @@ acoustic.pie.map.final <- base.map +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
 if (save.figs) {
-  nasc.cufes.prop.plot      <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.map.final,
+  nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
                                      nrow = 1, labels = c("a)", "b)", "c)"))
   
-  nasc.cufes.prop.plot.long <- plot_grid(nasc.map, cufes.density.all, acoustic.pie.map.final,
+  nasc.cufes.prop.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
                                      ncol = 1, labels = c("a)", "b)", "c)"))
   # Save maps
   ggsave(nasc.cufes.prop.plot, 
-         filename = here("Figs/fig_nasc_cufes_trawl_proportion.png"),
+         filename = here("Figs/fig_nasc_cufes_acoustic_cluster.png"),
          width = map.width*3, height = map.height)
   
   ggsave(nasc.cufes.prop.plot.long, 
-         filename = here("Figs/fig_nasc_cufes_trawl_proportion_long.png"),
+         filename = here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"),
          width = map.width, height = map.height*3)
   
   save(nasc.cufes.prop.plot, nasc.cufes.prop.plot.long, 
        file = here("Output/nasc_cufes_prop_map.Rdata"))
 }
 
-include_graphics(here("Figs/fig_nasc_cufes_trawl_proportion_long.png"))
+include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"))
 ```
 
 ## Create final cluster-length-frequency files
@@ -3422,10 +3389,11 @@ pos.clusters <- n.summ.haul %>%
       scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))
 ```  
 
-## Examine distances between acoustic intervals and positve trawl clusters  
-Frequency (top) and cumulative density (bottom) of positive 100 m-long acoustic intervals (i.e., intervals with CPS backscatter present) versus distance to the nearest positive trawl cluster.  
+## Examine distances between acoustic intervals and positve trawl clusters 
 
-```{r frequency-by-cluster-distance}
+(ref:frequency-by-cluster-distance) Frequency (top) and cumulative density (bottom) of positive 100 m-long acoustic intervals (i.e., intervals with CPS backscatter present) versus distance to the nearest positive trawl cluster.
+
+```{r frequency-by-cluster-distance,fig.cap='(ref:frequency-by-cluster-distance)'}
 # Summarize acoustic density by species and distance from nearest trawl cluster
 # Compute distance between NASC intervals and positive trawl clusters
 nasc.clust.hist <- nasc %>% 
@@ -3476,9 +3444,10 @@ include_graphics(here("Figs/fig_cluster_interval_distance_histogram.png"))
 ```  
 
 ## Examine cumulative acoustic biomass by distance to nearest positive trawl cluster  
-Total (top) and cumulative (bottom) acoustic biomass versus distance to the nearest positive trawl cluster. 
 
-```{r biomass-by-cluster-distance}
+(ref:biomass-by-cluster-distance) Total (top) and cumulative (bottom) acoustic biomass versus distance to the nearest positive trawl cluster.
+
+```{r biomass-by-cluster-distance,fig.cap='(ref:biomass-by-cluster-distance)'}
 # Compute acoustic biomass for each interval versus distance to positive clusters
 nasc.clust.biom <- nasc.clust.hist %>% 
   mutate(
@@ -3806,9 +3775,11 @@ strata.summ %>%
 ```  
 
 ## Plot biomass density by transect  
-View results of strata definition algorithm compated to transect spacing, biomass density, etc.  
+View results of strata definition algorithm compated to transect spacing, biomass density, etc.
 
-```{r plot-biomass-density-transect}
+(ref:stratification-biomass-density) Biomass density (log(t + 1) nmi^-2^) versus latitude (easternmost portion of each transect) and strata used to estimate biomass and abundance (shaded regions; outline indicates stratum number) for each species and survey vessel (labels above plots; e.g., SH = _Bell M. Shimada_, RL = _Reuben Lasker_, LM = _Lisa Marie_). Blue number labels correspond to the transect numbers with positive biomass (log(t + 1) > 0.01) to facilitate discrimination of stratum breaks. Point fills indicate transect spacing (i.e., the shortest distance between the midpoint of each transect and midpoint of all other transects, in nmi), which is used to define different sampling strata, for example when adaptive sampling occurs. Dashed lines indicate prominent biogeographic landmarks that delineate stock boundaries (e.g., Cape Mendocino for the central and nothern stocks of Northern anchovy and Pt. Conception for the northern and southern stocks of Pacific sardine).
+
+```{r stratification-biomass-density,fig.cap='(ref:stratification-biomass-density)'}
 # Create data frame with relevant landmarks
 landmarks <- data.frame(
   name = c("Pt. Conception", "Cape Mendocino", "Cape Flattery"),
@@ -4005,8 +3976,6 @@ if (nrow(strata.summ.rm) > 0) {
 # Add plot by latitude
 include_graphics(here("Figs/fig_biomass_density_transect_lat.png"))
 ```  
-
-Biomass density (log(t + 1) nmi^-2^) versus latitude (easternmost portion of each transect) and strata used to estimate biomass and abundance (shaded regions; outline indicates stratum number) for each species and survey vessel (labels above plots; e.g., SH = _Bell M. Shimada_, RL = _Reuben Lasker_, LM = _Lisa Marie_). Blue number labels correspond to the transect numbers with positive biomass (log(t + 1) > 0.01) to facilitate discrimination of stratum breaks. Point fills indicate transect spacing (i.e., the shortest distance between the midpoint of each transect and midpoint of all other transects, in nmi), which is used to define different sampling strata, for example when adaptive sampling occurs. Dashed lines indicate prominent biogeographic landmarks that delineate stock boundaries (e.g., Cape Mendocino for the central and nothern stocks of Northern anchovy and Pt. Conception for the northern and southern stocks of Pacific sardine).  
 
 ## Define stratum polygons and compute area  
 
@@ -4306,18 +4275,6 @@ for (i in unique(strata.final$scientificName)) {
     ns.lat.upper <- nearshore.points$lat[st_nearest_feature(ns.bound.upper, nearshore.points.sf)]
     ns.lat.lower <- nearshore.points$lat[st_nearest_feature(ns.bound.lower, nearshore.points.sf)]
     
-    # if (st_nearest_feature(ns.bound.upper, nearshore.points.sf) < 5) {
-    #   ns.lat.upper <- nearshore.points$lat[1] 
-    # } else {
-    #   ns.lat.upper <- nearshore.points$lat[st_nearest_feature(ns.bound.upper, nearshore.points.sf) - 5]
-    # }
-    # 
-    # if (st_nearest_feature(ns.bound.lower, nearshore.points.sf) + 5 > nrow(nearshore.points.sf)) {
-    #   ns.lat.lower <- nearshore.points$lat[nrow(nearshore.points.sf)] 
-    # } else {
-    #   ns.lat.lower <- nearshore.points$lat[st_nearest_feature(ns.bound.lower, nearshore.points.sf) + 5]
-    # }
-    
     # Combine with the points from the 5 m isobath
     nearshore.poly.j <- nearshore.points %>% 
       filter(between(lat, ns.lat.lower, ns.lat.upper)) %>%
@@ -4333,11 +4290,7 @@ for (i in unique(strata.final$scientificName)) {
       st_cast("POLYGON") %>% 
       mutate(scientificName = i) %>% 
       st_make_valid()
-    
-    # ns.poly.j.tmp <- st_difference(nearshore.poly.j, sd.mask)
-    # 
-    # mapview(nearshore.poly.j) + mapview(sd.mask, color = "yellow")
-    
+
     # Combine with other polygons ----------------------------------------
     if (exists("strata.primary")) {
       strata.primary <- rbind(strata.primary, primary.poly.j)
@@ -4490,20 +4443,22 @@ write.csv(strata.summ.nearshore,
 
 ## Map final stratum polygons  
 
-Map final stratum polygons for each species relative to the relative acoustic backscatter for each species.  
+Map final stratum polygons for each species and the acoustic backscatter for each species relative to backscatter from all species.  
 
-```{r map-final-stratum-polygons}
+(ref:map-final-stratum-polygons) Final strata used to compute abundance and biomass for each species, total acoustic backscatter (black points), and acoustic backscatter attributed to each species (red points).
+
+```{r map-final-stratum-polygons,fig.cap='(ref:map-final-stratum-polygons)'}
 if (save.figs) {
   # Add strata polygons to acoustic proportions map
   map.stratum.all <- base.map + 
-    # Plot final strata
-    geom_sf(data = strata.primary, aes(colour = factor(stratum), 
-                                          fill = stock), alpha = 0.5) +
     # Plot proportion of backscatter from each species present
     geom_point(data = nasc.prop.all, aes(X, Y, size = cps.nasc), 
                colour = "gray20", show.legend = F) +
     geom_point(data = filter(nasc.prop.spp, nasc > 0),
                aes(X, Y, size = nasc), colour = "red", show.legend = F) +
+    # Plot final strata
+    geom_sf(data = strata.primary, aes(colour = factor(stratum), 
+                                          fill = stock), alpha = 0.5) +
     scale_colour_discrete("Stratum") +
     scale_fill_manual("Stock", 
                       values = c("All" = "yellow", "Central" = "green", 
@@ -4518,14 +4473,12 @@ if (save.figs) {
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save figure
-  ggsave(here("Figs/fig_acoustic_strata.png"), map.stratum.all,
+  ggsave(here("Figs/fig_nasc_acoustic_proportions_strata.png"), map.stratum.all,
          width = map.width*2.6, height = map.height*1.5)
 }
 
-include_graphics(here("Figs/fig_acoustic_strata.png"))
+include_graphics(here("Figs/fig_nasc_acoustic_proportions_strata.png"))
 ```  
-
-Maps showing acoustic sampling strata used to compute abundance and biomass for each species. 
 
 ```{r map-biomass-density}
 # Convet nasc.density to sf and project
@@ -4595,7 +4548,7 @@ if (save.figs) {
       
       # Save figures
       ggsave(biomass.dens, 
-             filename = paste(here("Figs/fig_biomass_dens_map_"), i, "-", j, ".png",sep = ""),
+             filename = paste(here("Figs/fig_biomass_dens_"), i, "-", j, ".png",sep = ""),
              width  = map.width,height = map.height)
       
       # Save plot to list
@@ -4604,11 +4557,11 @@ if (save.figs) {
   }
   
   # Save map objects
-  save(biomass.dens.figs, file = here("Output/biomass_dens_map_all.Rdata")) 
+  save(biomass.dens.figs, file = here("Output/biomass_dens_maps_all.Rdata")) 
   save(nasc.density.plot.all, file = here("Output/nasc_density_plot_all.Rdata"))
   
 } else {
-  load(here("Output/biomass_dens_map_all.Rdata"))
+  load(here("Output/biomass_dens_maps_all.Rdata"))
   load(here("Output/nasc_density_plot_all.Rdata"))
 }
 
@@ -4621,7 +4574,7 @@ for (i in cps.spp) {
       annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
       theme_bw()  
     ggsave(biomass.dens.temp, 
-           filename = paste(here("Figs/fig_biomass_dens_map_"), i, ".png", sep = ""))
+           filename = paste(here("Figs/fig_biomass_dens_"), i, ".png", sep = ""))
   }
 }
 ```
@@ -5354,8 +5307,7 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
   st_transform(4326)
 ```
 
-```{r interactive-data-explorer, echo=FALSE, eval=FALSE}
-# RESUME HERE -------------------------------------------------------------------
+```{r interactive-data-explorer, echo=FALSE}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
 
@@ -6711,7 +6663,7 @@ include_graphics(here("Figs/fig_bootrap_function_comparison.png"))
 # Create final Figures and Tables  
 The remaining figures and tables are meant to reproduce those presented in [@Zwolinski2017].  
 
-Maps of biomass density by species and strata are equivalent to **Figure 2** in [@Zwolinski2017]. Maps for each species are saved in `Figs`; e.g.,  `fig_biomass_dens_map_Engraulis mordax.png`.  
+Maps of biomass density by species and strata are equivalent to **Figure 2** in [@Zwolinski2017]. Maps for each species are saved in `Figs`; e.g.,  `fig_biomass_dens_Engraulis mordax.png`.  
 
 Plots of standard-length distributions of each species per stratum and nighttime trawl cluster (panel labels), the number of individuals caught, and their percentage contribution to the density-weighted length distribution in the respective stratum are equivalent to **Figure 3** in [@Zwolinski2017].  
 
@@ -6973,8 +6925,8 @@ save(L.abund.table, abund.summ, file = here("Output/abundance_table_all.Rdata"))
 (ref:biom-dens-anch-n) Biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
 ```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Northern.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7032,8 +6984,8 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
 
 ```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for anchovy
-if (file.exists(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Engraulis mordax-Central.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7105,8 +7057,8 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Engraulis morda
 
 ```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for sardine
-if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Northern.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7164,8 +7116,8 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
 
 ```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for sardine
-if (file.exists(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Sardinops sagax-Southern.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7236,8 +7188,8 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax
 
 ```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for P. mackerel
-if (file.exists(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Scomber japonicus-All.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7306,8 +7258,8 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Scomber japonic
 
 ```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for jack mackerel
-if (file.exists(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Trachurus symmetricus-All.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7376,8 +7328,8 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Trachurus symme
 
 ```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for herring
-if (file.exists(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_map_Clupea pallasii-All.png"))  
+if (file.exists(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))  
 } else {
   print("No data for this stock.")
 }
