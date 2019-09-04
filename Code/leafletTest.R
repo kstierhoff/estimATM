@@ -5,16 +5,25 @@ leaflet() %>%
   addProviderTiles(providers$Esri.OceanBasemap, 
                    options = tileOptions(useCache = useCachedTile,
                                          crossOrigin = useCrossOrigin)) %>%
-  addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
-              weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414", 
-              group = "Stratum (Anchovy)") %>% 
-  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level),
-                   group = "Backscatter-CPS") #%>%
-  # addCircleMarkers(data = nasc.plot, 
+  # addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
+  #             weight = 2, fillColor =  ~cpsPal(scientificName), color = "#000414", 
+  #             group = "Stratum (Anchovy)") %>% 
+  # addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
   #                  radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-  #                  fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+  #                  fillOpacity = 0.75, fillColor =  ~nascPal(bin.level),
+  #                  group = "Backscatter-CPS") 
+  addPolygons(data = nasc.super.clusters, 
+              weight = 2, fillColor =  "transparent", color = "#000414", 
+              label = ~label, popup = ~popup,
+              group = "Stratum (Anchovy)") %>% 
+  addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+                   opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                   popup = ~popup, label = ~label,
+                   group =  "Trawls")
+
+# addCircleMarkers(data = nasc.plot, 
+#                  radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+#                  fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
   #                  label = ~label, popup = ~popup,
   #                group = "Backscatter-CPS") %>%
   # addLegend("bottomleft", colors = nasc.colors.all,

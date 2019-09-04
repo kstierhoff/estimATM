@@ -102,21 +102,21 @@ Options in this section control the execution of various code chunks. All chunks
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
 # Run only selected lFops, usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
-get.nav           <- F # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
+get.db            <- T # Download data from databases (fast; generally TRUE)
+get.nav           <- T # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
+copy.files        <- T # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 save.imap         <- T # Save Leaflet maps
 do.bootstrap      <- T # Generate bootstrap estimates
-download.hab      <- F # Download habitat map
+download.hab      <- T # Download habitat map
 
 # Sometimes F
-overwrite.files   <- F # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
-process.cal       <- F # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
+overwrite.files   <- T # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+process.cal       <- T # Process calibration results
+process.ctd       <- T # Process CTD and UCTD casts
 
 # Usually F
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
@@ -1945,15 +1945,17 @@ nasc <- bind_cols(nasc, cluster.distance)
 ## Map trawl cluster polygons around acoustic backscatter  
 
 ```{r map-acoustic-trawl-clusters}
+# Create hulls around positive clusters
+nasc.super.clusters <- plyr::ddply(nasc, "cluster", find_hull) %>% 
+  select(long, lat, cluster) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(cluster) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("POLYGON") %>% 
+  mutate(label = paste("Cluster", cluster),
+         popup = paste("Cluster", cluster))
+
 if (save.figs) {
-  # Create hulls around positive clusters
-  nasc.super.clusters <- plyr::ddply(nasc, "cluster", find_hull) %>% 
-    select(long, lat, cluster) %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    group_by(cluster) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("POLYGON")
-  
   # Map trawl clusters -------------------------------------------------------
   nasc.cluster.plot <- base.map +
     # Plot nasc data
@@ -5522,6 +5524,11 @@ i.map <- leaflet() %>%
                    opacity = 0.8, fillOpacity = 1, fillColor =  "white",
                    popup = ~popup, label = ~label,
                    group =  "Trawls") %>%
+  # Add NASC super clusters
+  addPolygons(data = nasc.super.clusters, 
+            weight = 2, fillColor =  "transparent", color = "#000414", 
+            label = ~label, popup = ~popup,
+            group = "Trawl Cluster Polygons") %>% 
   addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
   # Add backscatter outliers
   addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
@@ -5577,7 +5584,8 @@ i.map <- leaflet() %>%
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
-                      "Vessel Track", "Vessel Positions", "Trawls", "CTD Casts",
+                      "Vessel Track", "Vessel Positions", "Trawls", 
+                      "Trawl Cluster Polygons", "CTD Casts",
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
                       "Backscatter-Krill", "Backscatter (Large)",
                       "CUFES Egg Density", "CUFES Egg Density-Other",
@@ -5591,7 +5599,7 @@ i.map <- leaflet() %>%
     "Backscatter (Large)", "Backscatter-Krill", 
     "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
     "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
-    "Planned Transects (Ancillary)",
+    "Planned Transects (Ancillary)", "Trawl Cluster Polygons",
     "Biomass (Anchovy)", "Biomass (Sardine)",
     "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
     "Biomass (Herring)", "CTD Casts")) %>% 
