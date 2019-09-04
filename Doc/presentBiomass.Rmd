@@ -1,0 +1,641 @@
+---
+title:  "Distribution, biomass, and demography of coastal pelagic fishes in the California Current Ecosystem based on acoustic-trawl sampling"
+author: "David A. Demer, Kevin L. Stierhoff, and Juan P. Zwolinski"
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
+output: 
+  powerpoint_presentation:
+    reference_doc: template/slide_template_Rmarkdown.pptx
+---
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
+               png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
+               mapview)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# set system time zone to GMT
+Sys.setenv(tz = "GMT")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# global pander options
+panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
+panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+
+# output options
+png.res       <- 150 # dpi for saved PNG images (to reduce file size while at sea)
+```
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Survey information file -------------------------------------------------------
+settings.files <- dir(here("Doc/settings"))
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+```{r load-output}
+# Load biomass estimate tables
+load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
+load(here("Output/biomass_bootstrap_estimates_final_nearshore.Rdata"))
+# Get survey estiamtes for all strata
+be.all    <- filter(be, Stratum == "All")
+be.all.ns <- filter(be.ns, Stratum == "All")
+
+# Load abundance and length summaries
+load(here("Output/length_summary_all.Rdata"))
+load(here("Output/length_frequency_summary.Rdata"))
+load(here("Output/abundance_table_all.Rdata"))
+# Summarise length-disaggregated abundances to describe length ranges
+length.summ <- abund.summ %>% 
+  filter(biomass != 0) %>% 
+  group_by(scientificName = Species, stock = Stock) %>% 
+  summarise(L.min = min(TL),
+            L.max = max(TL))
+
+# Load trawl information
+load(here("Output/haul_info.Rdata"))
+load(here("Output/catch_info.Rdata"))
+load(here("Output/species_codes.Rdata"))
+# Load NASC summary
+load(here("Output/nasc_summ.Rdata"))
+# Load transect spacing
+load(here("Output/transect_spacing.Rdata"))
+# Load calibration results
+# load(paste(here("Output/Calibration"), "/", survey.vessel.primary, "/", "cal_output_table.Rdata", sep = ""))
+``` 
+
+```{r biomass-table-all,results='asis'}
+# Configure bootstrap estimate table
+be.table <- be  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI(Lower)"      = lower.ci.B,
+         "CI(Upper)"      = upper.ci.B) %>% 
+  select(-SD)
+
+be.table.ns <- be.ns  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI(Lower)"      = lower.ci.B,
+         "CI(Upper)"      = upper.ci.B) %>% 
+  select(-SD) 
+```  
+
+```{r}
+# Summarise survey distance (nmi) by vessel
+dist.summ <- nasc.summ %>%
+  mutate(vessel = case_when(
+    str_detect(transect.name, "RL") ~ "RL",
+    str_detect(transect.name, "SD") ~ "SD",
+    TRUE ~ "Other")) %>% 
+  group_by(vessel) %>% 
+  summarise(distance = round(sum(distance)))
+```
+
+# Background
+
+## Pacific Sardine | Spring and summer habitat distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+- Spring (shaded) and summer (hatched) potential habitat
+- Spring (dotted) and summer (dashed) 0.2 mg m^-3^ chl-a isoline
+
+:::
+
+::: {.column width="60%"}
+![](../Images/img_survey_region.png){width=100%}
+:::
+::::::
+
+## Pacific Sardine | Potential habitat
+
+![](../Figs/fig_habitat_map.png){width=100%}
+
+# Methods
+
+## Survey Plan
+
+![](../Figs/fig_survey_plan.png){width=100%}
+
+## Target strength calculations
+
+The following equations for $TS_{38\mathrm{kHz}}$ were used in this analysis:  
+
+<br>
+
+$\text{P. Sardine: } TS_{\mathrm{38kHz}} = -14.90 \times (\log_{10} (L_T) - 13.21$
+
+$\text{P. Herring: }TS_{\mathrm{38kHz}} = -11.97 \times (\log_{10} (L_T) - 11.58561$
+
+$\text{N. Anchovy: }TS_{\mathrm{38kHz}} = -13.87 \times (\log_{10} (L_T) - 11.797$
+
+$\text{Mackerels: } TS_{\mathrm{38kHz}} = -15.44 \times (\log_{10} (L_T) - 7.75$  
+
+<br>
+
+where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.
+
+## Post-stratification
+
+![](../Figs/fig_biomass_density_transect_lat.png)
+
+## Post-stratification
+
+![](../Figs/fig_nasc_trawl_cluster_wt.png){width=100%}
+
+## Backscatter, Eggs, and Acoustic Proportion
+
+![](../Figs/fig_nasc_cufes_acoustic_cluster.png){width=100%}
+
+# Results
+
+## Sampling Effort
+
+```{r}
+survey.das <- n_distinct(c(unique(date(nasc.summ$start)),unique(date(nasc.summ$end))))
+```
+
+- `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`
+- `r sum(str_detect(nasc.summ$transect.name, "SD"))` transects
+- `r dist.summ$distance[dist.summ$vessel == "SD"]` nmi
+
+# All CPS
+## All CPS | All Strata
+
+```{r biomass-all-strata}
+num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)")
+
+regulartable(be.table) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## All CPS | Summary
+
+```{r biomass-summary}
+be.table.sub <- be.table %>% 
+  filter(Number == "All") %>% 
+  select(-Number)
+
+regulartable(be.table.sub) %>%
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+# Northern Anchovy (_Engraulis mordax_)
+## N. Anchovy | Northern stock
+
+```{r biomass-anch-n}
+be.table.sub <- be.table %>% 
+  filter(Name == "Engraulis mordax", Stock == "Northern") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## NS N. Anchovy | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Engraulis mordax-Northern.png){width=100%}
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Engraulis mordax-Northern.png){width=100%}
+:::
+::::::
+
+## N. Anchovy | Central stock
+
+```{r biomass-anch-c}
+be.table.sub <- be.table %>% 
+  filter(Name == "Engraulis mordax", Stock == "Central") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## CS N. Anchovy | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Engraulis mordax-Central.png){width=100%}
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Engraulis mordax-Central.png){width=100%}
+:::
+::::::
+
+## N. Anchovy | % Biomass by Cluster & Length
+
+![](../Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png)
+
+# Pacific Sardine (_Sardinops sagax_)
+## P. Sardine | Northern stock
+
+```{r biomass-sar-n}
+be.table.sub <- be.table %>% 
+  filter(Name == "Sardinops sagax", Stock == "Northern") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## NS P. Sardine | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Sardinops sagax-Northern.png){width=100%}
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Sardinops sagax-Northern.png){width=100%}
+:::
+::::::
+
+## P. Sardine | Southern stock
+
+```{r biomass-sar-s}
+be.table.sub <- be.table %>% 
+  filter(Name == "Sardinops sagax", Stock == "Southern") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+
+## SS P. Sardine | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Sardinops sagax-Southern.png){width=100%}
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Sardinops sagax-Southern.png){width=100%}
+:::
+::::::
+
+## Pacific Sardine | % Biomass by Cluster & Length
+
+![](../Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png)
+
+# Pacific Mackerel (_Scomber japonicus_)
+
+## Pacific Mackerel
+
+```{r biomass-mack}
+be.table.sub <- be.table %>% 
+  filter(Name == "Scomber japonicus", Stock == "All") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## Pacific Mackerel | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Scomber japonicus-All.png){width=100%}
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Scomber japonicus-All.png){width=100%}
+:::
+::::::
+
+## Pacific Mackerel | % Biomass by Cluster & Length
+
+![](../Figs/fig_cluster_relative_length_frequency_Scomber japonicus.png)
+
+# Jack Mackerel (_Trachurus symmetricus_)
+
+## Jack Mackerel
+
+```{r biomass-jack}
+be.table.sub <- be.table %>% 
+  filter(Name == "Trachurus symmetricus", Stock == "All") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## Jack Mackerel | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Trachurus symmetricus-All.png){width=100%}
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Trachurus symmetricus-All.png){width=100%}
+:::
+::::::
+
+## Jack Mackerel | % Biomass by Cluster & Length
+
+![](../Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png)
+
+# Pacific Herring (_Clupea pallasii_)
+
+## Pacific Herring
+
+```{r biomass-her}
+be.table.sub <- be.table %>% 
+  filter(Name == "Clupea pallasii", Stock == "All") 
+
+regulartable(be.table.sub) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## Pacific Herring | Biomass and length distribution
+
+:::::: {.columns}
+::: {.column width="40%"}
+
+![](../Figs/fig_biomass_dens_Clupea pallasii-All.png){width=100%}
+
+## Pacific Herring | % Biomass by Cluster & Length
+
+![](../Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png)
+
+:::
+
+::: {.column width="60%"}
+![](../Figs/fig_L_disagg_Clupea pallasii-All.png){width=100%}
+:::
+::::::
+
+## Useful resources
+
+Flextable 
+https://davidgohel.github.io/flextable/articles/overview.html
+
+Rmarkdown in PowerPoint Slides
+https://bookdown.org/yihui/rmarkdown/powerpoint-presentation.html
