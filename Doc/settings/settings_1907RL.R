@@ -263,7 +263,11 @@ tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
 # Minimum acoustic transect length (nmi)
 min.tx.length          <- c(RL = 3,
                             LM = 1,
-                            SD = 1)  
+                            SD = 1)
+# Define transect spacing bins and values (nmi) used to characterize transect spacing
+tx.spacing.bins <- c(0, 6, 15, 35, 50)
+tx.spacing.dist <- c(5, 10, 20, 40)
+
 # SCS data
 scs.source             <- "ELG" # "CSV" or "ELG"
 # CUFES database

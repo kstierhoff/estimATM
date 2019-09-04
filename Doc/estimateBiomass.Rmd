@@ -101,22 +101,22 @@ Options in this section control the execution of various code chunks. All chunks
 
 ```{r processing-controls,echo=TRUE}
 # Set processing loop controls (T/F) -------------------------------------------------------
-# Run only selected loops, usually T
-get.db            <- T # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
+# Run only selected lFops, usually T
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 save.imap         <- T # Save Leaflet maps
 do.bootstrap      <- T # Generate bootstrap estimates
-download.hab      <- T # Download habitat map
+download.hab      <- F # Download habitat map
 
 # Sometimes F
-overwrite.files   <- T # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.cal       <- T # Process calibration results
-process.ctd       <- T # Process CTD and UCTD casts
+overwrite.files   <- F # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
 
 # Usually F
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
@@ -3535,8 +3535,9 @@ for (i in unique(tx.mid$transect)) {
 
 # Bin transects by spacing
 tx.nn <- tx.nn %>% 
-  mutate(dist.bin = cut(tx.nn$min.dist,c(0, 6, 15, 35, 50)),
-         dist.cum = cumsum(min.dist)) %>% 
+  mutate(dist.bin = cut(tx.nn$min.dist, tx.spacing.bins),
+         spacing  = tx.spacing.dist[as.numeric(dist.bin)],
+         dist.cum = cumsum(spacing)) %>% 
   arrange(transect)
 
 # Save nearest neighbor distance info
@@ -3994,7 +3995,7 @@ tx.ends <- nasc %>%
     lat.o  = lat[which.min(long)],
     long.o = min(long)
   ) %>% 
-  left_join(select(tx.nn, transect.name, spacing = min.dist)) %>% 
+  left_join(select(tx.nn, transect.name, spacing)) %>% 
   mutate(
     brg = swfscMisc::bearing(lat.i, long.i,
                              lat.o, long.o)[1])
