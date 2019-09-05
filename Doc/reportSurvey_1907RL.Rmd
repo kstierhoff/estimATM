@@ -74,16 +74,16 @@ theme_set(theme_bw())
 
 ```{r controls, echo=F, error=F, message=F, warning=F}
 # Processing instructions (T/F)
-copy.files      <- T # copy files from source
-copy.bib        <- T # copy files from source
-overwrite.csv   <- T # overwrite CSV files when copying
-overwrite.files <- T # overwrite files when copying
+copy.files      <- F # copy files from source
+copy.bib        <- F # copy files from source
+overwrite.csv   <- F # overwrite CSV files when copying
+overwrite.files <- F # overwrite files when copying
 download.maps   <- F # download habitat map
-save.figs       <- T # draw plots and maps, or use existing
+save.figs       <- F # draw plots and maps, or use existing
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 process.scs     <- F # process SCS logs, or load processed data
-get.nav         <- T # download nave data from ERDDAP
-process.csv     <- T # process CSV files from Echoview
+get.nav         <- F # download nave data from ERDDAP
+process.csv     <- F # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal     <- F # process calibration results from previous surveys for time series plots
 process.zmux    <- F # process impedance data
@@ -250,16 +250,12 @@ param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"),
 bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
 
 # add a column with parameter units
-param.units <- as.data.frame(c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+param.units <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
                                "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
                                "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
 
 # add a column with beam model units
-bm.units <- as.data.frame(c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
-
-# add label for first column
-names(param.units) <- "Units"
-names(bm.units)    <- "Units"
+bm.units <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
 
 # add units to output and arrange columns
 param.output <- bind_cols(param.output, param.units) %>% 
@@ -280,6 +276,33 @@ save(all.output,
 
 write.csv(all.output,
           file = here("Output/cal_output_table.csv"), 
+          quote = F, row.names = F)
+```
+
+```{r process-cal-lisa-marie}
+# Create a column with beam model units
+bm.units.lm <- data.frame(Units = c("dB re 1","dB re 1","","deg","deg","deg","deg"))
+
+# Combine and format calibration results
+all.output.lm <- tibble::tribble(
+  ~" ", ~"Excursion 1", ~"Excursion 2", ~"Combined (EK80)", ~"Combined (Echoview)",
+  "On-axis Gain ($G_0$)", 22.1, 21.95, 21.94, 22,
+  "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)", -0.46, -0.02, -0.48, -0.27,
+  "RMS", 0.36, 0.27, 0.08, 0.18,
+  "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)", 7.33, 6.47, 6.96, 6.99,
+  "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)", 7.21, 6.48, 6.97, 6.97,
+  "Angle Offset Along. ($\\alpha_{0}$)", 0.02, -0.06, 0, 0.01,
+  "Angle Offset Athw. ($\\beta_{0}$)", 0.29, -0.28, 0.01, 0.01,
+  ) %>% 
+  bind_cols(bm.units.lm) %>% 
+  select(1, Units, everything())
+
+# save output to .Rdata and CSV
+save(all.output.lm,
+     file = here("Output/cal_output_table_LisaMarie.Rdata"))
+
+write.csv(all.output.lm,
+          file = here("Output/cal_output_table_LisaMarie.csv"), 
           quote = F, row.names = F)
 ```
 
@@ -1490,7 +1513,17 @@ WBT information, configuration settings, and beam model results following calibr
 
 **It could be useful to state that the transducer appeared to have been dysfunctional during calibration, with the center-board retracted, but may have been functional during the survey, with the center-board extended. If the latter case is supported by the impedance measurements made during the survey, then presenting the last known good calibration for that transducer could be useful to someone wanting to use those data (with caveats).**  
 
-(ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80). **Update calibration results!**
+Calibration results for _Lisa Marie_ are presented in **Appendix \@ref(appendix-calibration-lisa-marie)**.  
+
+(ref:cal-map) Map of the calibration location (yellow diamond) near `r cal.loc`. The red box in the inset indicates the location and extent of the main map.
+
+```{r cal-map,fig.cap='(ref:cal-map)',out.width = '5in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_cal_map.png"))
+``` 
+
+\newpage  
+
+(ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80). **Modify 18 kHz results!**
 
 ```{r cal-results,results='asis'}
 if (doc.type == "docx") {
@@ -1505,13 +1538,7 @@ if (doc.type == "docx") {
     row_spec(18, hline_after = T) %>% 
     add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
 }
-```  
-
-(ref:cal-map) Map of the calibration location (yellow diamond) near `r cal.loc`. The red box in the inset indicates the location and extent of the main map.
-
-```{r cal-map,fig.cap='(ref:cal-map)',out.width = '5in',fig.align='center',fig.pos='H',eval=F}
-include_graphics(here("Figs/fig_cal_map.png"))
-``` 
+```
 
 \newpage  
 
@@ -1541,27 +1568,30 @@ include_graphics(here("Figs/fig_cal_time_series_combo.png"))
 ### Acoustic and trawl sampling {#results-acoustic-trawl-sampling}
 The survey spanned an area from approximately `r survey.landmark.n`, to `r survey.landmark.s` (**Fig. \@ref(fig:cruise-track)**), with `r nrow(nasc.summ)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ$distance))` nmi, and `r nrow(trawl.summ)` Nordic trawls.  
 
+#### NOAA Ship sampling
 **Leg I**  
 On 13 June, _`r survey.vessel`_ departed from the Exploratorium (Pier 15) in San Francisco, CA at ~1800 (all times GMT) and began the transit to northern Vancouver Island. Throughout the transit, sampling was conducted during the day with CUFES, EK60s, EK80s, ME70, MS70 and SX90. On 17 June, _`r survey.vessel`_ arrived at the first offshore station off Cape Scott, British Columbia at ~1230 to begin acoustic sampling along Transect 129. On 01 July, acoustic sampling ceased after the completion of Transect 84 off Newport, OR. On 2 July, _`r survey.vessel`_ arrived at the Marine Operations-Pacific (MOC-P) Pier in Newport, OR at ~2100 to complete Leg I.  
 
-During Leg I, _`r survey.vessel`_ coordinated sampling with F/V _Lisa Marie_, which conducted acoustic and purse seine sampling in shallow, nearshore (within ~ 5 nmi) waters between Cape Flattery, WA and **XXXX**, OR. On 21 June, Greg Shaughnessy from **[affiliation]** embarked _`r survey.vessel`_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with her echosounder before rejoining _`r survey.vessel`_. On **XX** June, Mr. Shaughnessy disembarked _`r survey.vessel`_ for _Lisa Marie_ and returned to port in Westport, WA.
-
 **Leg II**  
-On 8 July, _`r survey.vessel`_ departed from MOC-P Pier in Newport, OR at ~0000. Acoustic sampling resumed at ~0145 on 8 July along Transect 083 south of Newport, OR. On 24 July, acoustic sampling ceased after the completion of Transect **XX** off **[LANDMARK]**. On 25 July, _`r survey.vessel`_ arrived at the Pier 30/32 in San Francisco, CA at **~[HHMM]** to complete Leg II.  
-
-During Leg II, _`r survey.vessel`_ coordinated sampling 
-
+On 8 July, _`r survey.vessel`_ departed from MOC-P Pier in Newport, OR at ~0000. Acoustic sampling resumed at ~0145 on 8 July along Transect 083 south of Newport, OR. On 24 July, acoustic sampling ceased after the completion of Transect 50 off Albion, CA. On 25 July, _`r survey.vessel`_ arrived at the Pier 30/32 in San Francisco, CA at ~1300 to complete Leg II.  
 
 **Leg III**  
 
-**UPDATE (Murfin/Sessions).**
+On 30 July, _`r survey.vessel`_ departed from Pier 30/32 in San Francisco, CA at ~1300 and transited to transect 049 north of the Point Arena lighthouse. Trawling was conducted the evening of 30 July prior to beginning the acoustic sampling on transect 049 on 31 July. Intermittent malfunctions of the trawl winches resulted in reduced trawl sampling from 1-2 August. More severe malfunctions of the trawl winches prohibited trawling between 3 and 6 August. On 6 August, the trawl winch was repaired and normal sampling resumed. On 16 August, acoustic sampling ceased after the completion of transect 023 off Morro Bay. On 17 August, _`r survey.vessel`_ arrived at the 10th Avenue Marine Terminal in San Diego, CA at ~1400 to complete Leg III.  
 
 **Leg IV**
 
-**UPDATE (Mau/Zwolinski).** 
+On 22 August, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in San Diego, CA at ~1500 and performed training on the ship’s dynamic-positioning system in San Diego Harbor until ~2000.  We then transited to transect 19 off Pismo Beach. On 23 August, at ~1700, _`r survey.vessel`_ deployed a benthic acoustic lander off Point Conception, then resumed acoustic sampling along transect 019 at ~1800. On 1 September, the fog horn was repaired using parts received from ashore via _`r survey.vessel`_'s skiff. At ~1500 on 1 September, the UCTD probe was lost when a small vessel running parallel to the ship made a sharp turn across the stern and severed the line. On 09 September, acoustic sampling ceased after the completion of transect 001 off San Diego and _`r survey.vessel`_ arrived at the 10th Avenue Marine Terminal in San Diego, CA at **~HHMM** to complete the survey.
 
-**Unmanned Surface Vehicle Sampling**
+#### Unmanned Surface Vehicle sampling
 
+Between **X and Y**, one unmanned surface vehicle (USV; Saildrone, Inc.) surveyed nearshore transects ~5 nmi-long spaced ~5 nmi-apart between Cape Flattery, WA and San Francisco. Between **X and Y**, two USVs surveyed ~100 nmi-long offshore extensions of _`r survey.vessel`_'s compulsory transects spaced ~80 nmi-apart between Florence, OR and Pt. Conception, and ~40 nmi-apart between Pt. Conception and San Diego.
+
+#### Industry vessel sampling  
+
+During Leg I, _`r survey.vessel`_ coordinated sampling with F/V _Lisa Marie_, which conducted acoustic and purse seine sampling in shallow, nearshore waters (within ~ 5 nmi of the coast) between Cape Flattery, WA and the OR/CA border. Aboard _Lisa Marie_, SWFSC’s split-beam echosounder (Simrad EK60 GPT) was connected to the vessel's 38 kHz transducer (Simrad ES38-B), which was calibrated while on anchor in Grays Harbor (46.9236, -124.1181) on 8 May. Transmit pulses from the echosounder and sonar were not synchronized. From 20 June to 1 July, _Lisa Marie_ conducted echosounder-sonar transects between the eastern ends of _`r survey.vessel`_’s acoustic transects and shore. Each day, approximately **2** purse seine sets were conducted to provide information about size and species composition. All specimens were frozen and later processed by the Washington Department of Fish and Wildlife (WA-DFW). On 21 June, Greg Shaughnessy of Ocean Gold Seafoods embarked _`r survey.vessel`_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with her echosounder before rejoining _`r survey.vessel`_. At ~1900 on 25 June, Mr. Shaughnessy disembarked and was put ashore in Westport, WA via _`r survey.vessel`_'s skiff.
+
+During Leg IV, _`r survey.vessel`_ coordinated sampling with F/V _Long Beach Carnage_, which conducted acoustic and purse seine sampling in shallow, nearshore waters (within ~ 5 nmi of the coast) in the Southern CA Bight between Pt. Conception and San Diego and around the northern Channel Islands. Aboard _Long Beach Carnage_, the SWFSC's multi-frequency EK60 GPTs (70, 120, 200, and 333 kHz; Simrad) were configured with the SWFSC's split-beam multi-frequency transducer array (MTA4, ES38-12, ES70-7C, ES120-7C and ES200-7C; Simrad) mounted on the bottom of a pole. The transducers were calibrated on 18 May in the SWFSC's Ocean Technology Development Tank. Transmit pulses from the echosounder and sonar were not synchronized. From 26 August to **6** September, _Long Beach Carnage_ conducted echosounder-sonar transects between the eastern ends of _`r survey.vessel`_’s acoustic transects and shore. Each day, approximately **2** purse seine sets were conducted to provide information about size and species composition. **All specimens were [DESCRIBE SAMPLE PROCESSING PROCEURES, IF ANY].**  
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}
 A total of `r nrow(ctd.sta)` CTD casts and `r nrow(bongo.sta)` bongo tows were conducted throughout the survey. In addition, `r nrow(uctd.sta)` UCTD casts were conducted and `r nrow(cufes.raw)` CUFES samples were collected underway. The locations of CTD and UCTD stations are shown in **Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**.  
@@ -1754,3 +1784,23 @@ if (doc.type == "docx") {
 
 \elandscape
 \newpage
+
+# Echosounder calibration results - _Lisa Marie_ {#appendix-calibration-lisa-marie}
+
+Simrad EK60 general purpose transceiver (GPT) beam model results following calibration. Calibration parameters were derived using the following methods: (1) the two excursions processed separately using the EK80 software, (2) both excursions combined and processed using the EK80 software, and (3) both excursions combined and processed using Echoview and Matlab. Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the GPT-control software (Simrad EK80).  
+
+```{r cal-results-lisa-marie,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output.lm)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output.lm, format = knitr.format, 
+        align = c("l","l", rep("c",ncol(all.output.lm) - 2)),
+        booktabs = T, escape = F, linesep = "") %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("scale_down","hold_position")) %>% 
+    # row_spec(18, hline_after = T) %>% 
+    add_header_above(c(" " = 2, "Method" = ncol(all.output.lm) - 2))
+}
+```
