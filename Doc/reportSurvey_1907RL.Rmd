@@ -74,13 +74,16 @@ theme_set(theme_bw())
 
 ```{r controls, echo=F, error=F, message=F, warning=F}
 # Processing instructions (T/F)
-copy.files      <- F # copy files from source
+copy.files      <- T # copy files from source
+copy.bib        <- T # copy files from source
+overwrite.csv   <- T # overwrite CSV files when copying
+overwrite.files <- T # overwrite files when copying
 download.maps   <- F # download habitat map
-save.figs       <- F # draw plots and maps, or use existing
+save.figs       <- T # draw plots and maps, or use existing
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 process.scs     <- F # process SCS logs, or load processed data
-get.nav         <- F # download nave data from ERDDAP
-process.csv     <- F # process CSV files from Echoview
+get.nav         <- T # download nave data from ERDDAP
+process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal     <- F # process calibration results from previous surveys for time series plots
 process.zmux    <- F # process impedance data
@@ -88,12 +91,37 @@ calc.raw.size   <- F # computer RAW file size, or use existing
 ```
 
 ```{r copy-bib,include=F}
-if (copy.files) {
+if (copy.bib) {
   # Update bibliography and CSL
   file.copy("//swc-storage1/ast1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
             "csl", overwrite = T)
   file.copy("//swc-storage1/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
             "bib", overwrite = T)
+}
+```
+
+```{r copy-files, include=F}
+if (copy.files) {
+  # Create data directories
+  dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
+  dir_create(here("Data/Backscatter", nasc.vessels))
+  
+  # Copy trawl Access database
+  haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                        regexp = trawl.db.access)
+  file_copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
+  
+  # Copy CUFES files
+  cufes.file <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
+                           regex = cufes.db.sqlite)
+  file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
+  
+  # Copy CSV files for CPS
+  csv.files.cps <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
+                                    nasc.dir[survey.vessel.primary]), 
+                          regex = nasc.pattern.cps[survey.vessel.primary])
+  file_copy(csv.files.cps, here("Data/Backscatter", survey.vessel.primary), 
+            overwrite = overwrite.csv)
 }
 ```
 
@@ -1192,24 +1220,21 @@ if (save.figs) {
     # Plot transects data
     geom_sf(data = transects.sf, aes(linetype = Type), colour = "gray70",
             show.legend = "line") +
-    # plot ship track data
+    # Plot ship track data
     geom_sf(data = nav.paths.sf, colour = "gray70", size = 0.5, alpha = 0.5) +
-    # plot acoustic transects
+    # Plot acoustic transects
     geom_sf(data = nasc.tx.sf, size = 1) +
     scale_linetype_manual("Type", 
                           values = c(Adaptive = "dashed", Compulsory = "solid",
                                      Offshore = "dashed", Nearshore = "dotted",
                                      transit = "dashed")) +
-    # plot station ops
-    # geom_sf(data = pairovet.sta, #aes(Lon, Lat),
-    #            shape = 25, size = 2, fill = "green", colour = "black") +
-    geom_sf(data = bongo.sta, #aes(Lon, Lat), 
+    geom_sf(data = bongo.sta, 
                shape = 24, size = 1.5, fill = "orange", colour = "black") +
     geom_sf(data = ctd.sta, 
             shape = 21, size = 1, fill = "red", colour = "black") +
     geom_sf(data = uctd.sta, 
             shape = 21, size = 1, fill = "red", colour = "black") +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+    coord_sf(crs = crs.proj,
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
@@ -1218,10 +1243,8 @@ if (save.figs) {
   
   # Create final backscatter summary map
   source(here("Code/plot_sA_CPS.R"))
-  # Create final backscatter summary map
-  source(here("Code/plot_CUFES.R"))
   # Create final CUFES egg density map
-  source(here("Code/plot_sA_CPS.R"))
+  source(here("Code/plot_CUFES.R"))
   # Create trawl haul and cluster proportion figures
   source(here("Code/plot_haul_proportion_wt.R"))
   
@@ -1233,9 +1256,6 @@ if (save.figs) {
   ggsave(nasc.cufes.trawl.plot, 
          filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
          width = map.width*3, height = map.height)
-  
-  save(trawl.pie.cluster.wt, trawl.pie.cluster.wt, nasc.trawl.cluster.wt,
-       file = here("Output/trawl_species_proportion_map.Rdata"))
   
   # Create calibration site maps #####  
   # Put calibration location lat/lon in a df, for point plot
