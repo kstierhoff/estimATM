@@ -269,7 +269,9 @@ tx.spacing.bins <- c(0, 6, 15, 35, 50)
 tx.spacing.dist <- c(5, 10, 20, 40)
 
 # SCS data
-scs.source             <- "ELG" # "CSV" or "ELG"
+scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
+scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
+
 # CUFES database
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")

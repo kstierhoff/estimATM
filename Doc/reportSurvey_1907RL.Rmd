@@ -544,7 +544,7 @@ if (process.scs) {
       select(Date, Time, Button, Notes = notes.hdr, 
              Lat = gps.lat.hdr, Lon = gps.lon.hdr)
       
-  } else {
+  } else if (scs.source == "ELG") {
     # Process bridge event data 
     bridge.events <- list.files(here("Data/SCS"), pattern = "MOA Snap.*elg",
                                 full.names = T, recursive = T)
@@ -558,6 +558,26 @@ if (process.scs) {
       
       bridge.snap <- bind_rows(bridge.snap, bridge.snap.tmp)
     }
+  } else if (scs.source == "XLSX") {
+    # Process bridge event data #####
+    bridge.events <- dir_ls(here("Data/SCS"), regexp = scs.pattern)
+    
+    bridge.snap <- tibble()
+    
+    for (b in bridge.events) {
+      tmp <- read_xlsx(bridge.events[b]) %>% 
+        select(Date, Time, Button, Notes = notes.hdr, 
+               Lat = gps.lat.hdr, Lon = gps.lon.hdr) 
+        
+        bridge.snap <- bind_rows(bridge.snap, tmp)
+    }
+    
+    # Import from CSV
+    bridge.snap <- fs::path(here("Data/SCS")) %>% 
+      dir_ls(regexp = scs.pattern) %>% 
+      map_df(read_csv) %>% 
+      select(Date, Time, Button, Notes = notes.hdr, 
+             Lat = gps.lat.hdr, Lon = gps.lon.hdr) 
   }
   
   # Format data
