@@ -1,0 +1,397 @@
+---
+title: "Saildrone overlap"
+author: "Kevin Stierhoff"
+date: "11/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,lubridate,here,fs,sf,mapview,DT)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# Get nav from ERDDAP
+get.nav    <- F
+get.nav.sd <- T
+
+# Other settings
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+```{r user-input,echo=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+
+# Load Lasker NASC data and Saildrone nav
+
+```{r load-nasc}
+# Load backscatter data
+load(here("Data/Backscatter/nasc_all.Rdata"))
+
+# Remove bad intervals
+nasc <- nasc %>% 
+  filter(lat != 999, long != 999)
+```
+
+
+```{r process-nav}
+if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time))
+  } else {
+    nav.lag <- 24
+  }
+  
+  if (nav.lag >= 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      sep = ""))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                                    row.names = NULL, skip = 0))
+    names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = long - 360,
+             SOG      = SOG * 1.94384,
+             datetime = ymd_hms(time),
+             SST      = na_if(SST, NaN),
+             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(lat, min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
+  }
+  
+  # Convert nav to spatial
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  # Cast nav to transects
+  nav.paths.sf <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
+} else {
+  # Load nav data
+  load(here::here("Data/Nav/nav_data.Rdata"))
+}
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                       'Distance:', distance, 'nmi<br/>')
+  )
+
+# Create gps.csv file from nav to replace missing data in Echoview
+nav.gps <- nav %>% 
+      mutate(GPS_date = format(datetime, format = "%F"),
+             GPS_time = format(datetime, format = "%T")) %>% 
+      select(GPS_date, GPS_time, latitude = lat, longitude = long)
+
+write_csv(nav.gps, here("Output/nav.gps.csv"))
+
+# Get most recent vessel position for plotting
+nav.now <- tail(nav.sf, 1) %>% 
+  mutate(label = paste("Last position:", datetime, "UTC"),
+         popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
+                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav.paths.sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- transects.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+```
+
+```{r get-saildrone-nav}
+if (get.nav.sd) {
+   # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data_saildrone.Rdata"))) {
+    load(here("Data/Nav/nav_data_saildrone.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start.sd <- paste0(format(max(date(nav.sd$time)), ""), "T00%3A00%3A00Z")
+  } else {
+    nav.lag.sd <- 24
+  }
+  
+  if (get.nav) {
+    # Update only every 24 h to reduce processing time, especially at sea
+    if (nav.lag.sd >= 24) {
+      # Generate ERDDAP URL
+      saildroneURL <- URLencode(paste0(
+        erddap.url.sd, ".csv0?", erddap.vars.sd,
+        "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
+      
+      # Download and parse ERDDAP nav data
+      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = F, 
+                                         colClasses = erddap.classes.sd, 
+                                         row.names = NULL, skip = 0))
+      names(nav.temp.sd) <- erddap.headers.sd
+      
+      # Filter to remove bad SST values
+      nav.temp.sd <- nav.temp.sd %>% 
+        mutate(datetime = ymd_hms(time)) %>%
+        filter(!is.nan(lat), !is.nan(long)) %>%
+        filter(long != 0, lat != 0)
+      
+      # Append new nav data
+      if (exists("nav.sd")) {
+        nav.sd <- bind_rows(nav.sd, nav.temp.sd) %>% 
+          distinct()
+      } else {
+        nav.sd <- nav.temp.sd
+      }
+    }
+    
+    # Convert saildrone nav to spatial
+    nav.sd.sf <- st_as_sf(nav.sd, coords = c("long","lat"), crs = crs.geog)
+    
+    # Get most recent vessel position for plotting
+    nav.now.sd <- nav.sd.sf %>% 
+      group_by(saildrone) %>% 
+      slice(n()) %>% 
+      mutate(label = paste("Saildrone", saildrone, "Last position:", datetime, "UTC"),
+             popup = paste0('<b>Saildrone: </b>', saildrone, '<br/>',
+                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
+    
+    # Convert saildrone nav to spatial
+    nav.sd.paths.sf <- nav.sd.sf %>% 
+      group_by(saildrone) %>% 
+      summarise(do_union = F) %>% 
+      st_cast("LINESTRING") %>% 
+      mutate(tracklength = st_length(.))
+
+    # Save nav data
+    save(nav.sd, nav.sd.sf, nav.sd.paths.sf, nav.now.sd, 
+         file = here("Data/Nav/nav_data_saildrone.Rdata"))
+    
+    # Create gps.csv files from ERDDAP data
+    for (i in unique(nav.sd$saildrone)) {
+      saildrone.gps <- filter(nav.sd, saildrone == i) %>% 
+        mutate(GPS_date = format(datetime, format = "%F"),
+               GPS_time = format(datetime, format = "%T")) %>% 
+        select(GPS_date, GPS_time, latitude = lat, longitude = long)
+      
+      write_csv(saildrone.gps, here("Output", paste(i, "_erddap.gps.csv", sep = "")))
+    }
+  } else {
+    # Load nav data
+    load(here::here("Data/Nav/nav_data_saildrone.Rdata"))
+  }
+}
+```
+
+```{r load-data}
+# Export Saildrone nav as gps.csv for Echoview processing
+for (i in unique(nav.sd$saildrone)) {
+  gps.tmp <- filter(nav.sd, saildrone == i) %>% 
+    mutate(GPS_fix = seq(1,n()),
+           GPS_date = format(datetime, format = "%D"),
+           GPS_time = format(datetime, format = "%T")) %>% 
+    select(GPS_fix, GPS_date, GPS_time, Latitude = lat, Longitude = long)
+  
+  write_csv(gps.tmp, here("Output", paste0("saildrone_", i,".gps.csv")))
+}
+```
+
+# Convert Lasker data to spatial and buffer
+
+```{r process-lasker}
+# Convert Lasker transects to lines
+tx.lines <- nasc %>% 
+  arrange(vessel.name, long) %>% 
+  st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
+  group_by(transect.name) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  filter(str_detect(transect.name, "RL"))
+
+# Buffer lines by 3 nmi
+tx.buffer <- transects.sf %>% 
+  st_buffer(dist = 3/60)
+
+# # View result of buffering
+# mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
+#   mapview(tx.lines, color = "black", legend = FALSE)
+```
+
+# Downsample Saildrone nav and convert to spatial
+
+```{r process-saildrone}
+# Create saildrone lines
+sd.lines <- nav.sd %>% 
+  st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+  group_by(saildrone) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+  
+
+# Convert Saildrone points to sf and downsample
+sd.sf <- nav.sd %>% 
+  mutate(datetime = ymd_hms(time),
+         date = date(datetime),
+         hour = hour(datetime)) %>% 
+  group_by(saildrone, date, hour) %>% 
+  slice(1) %>% 
+  st_as_sf(coords = c("long","lat"), crs = 4326)
+
+# View Saildrone transects relative to transect buffers
+mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) +
+  mapview(sd.lines)
+```
+
+# Plot all Saildrone transects
+
+```{r map-saildrone-all}
+# mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
+#   mapview(sd.lines, zcol = "saildrone") +
+#   mapview(sd.sf, zcol = "saildrone")
+```
+
+# Intersect Saildrone with planned transect buffers
+
+```{r intersect-nav}
+# Get intersection of Saildrone and Lasker nav
+sd.intersection <- sd.sf %>% 
+  st_intersection(filter(tx.buffer, Type == "Offshore"))
+
+# mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
+#   # mapview(sd.lines, zcol = "saildrone") +
+#   mapview(sd.intersection, zcol = "saildrone")
+```
+
+# Summarize intersecting Saildrone data
+
+```{r summarize-saildrone}
+# sd.int.summary <- sd.intersection %>% 
+#   group_by(saildrone, label) %>% 
+#   summarise(
+#     n = n(),
+#     min.date = min(datetime),
+#     max.date = max(datetime),
+#     duration = difftime(max.date, min.date, units = "hours")
+#   ) %>% 
+#   st_set_geometry(NULL)
+# 
+# sd.intersection <- sd.intersection %>% 
+#   left_join(select(sd.int.summary, saildrone, label, min.date)) %>% 
+#   mutate(time.diff = difftime(datetime, min.date, units = "hours")) %>% 
+#   filter(as.numeric(time.diff) <= 100) %>% 
+#   arrange(saildrone, datetime)
+
+
+# Summarise resulting data
+sd.summary <- sd.intersection %>% 
+  filter(saildrone %in% c(1045, 1046)) %>% 
+  group_by(saildrone, label) %>% 
+  summarise(
+    n = n(),
+    min.date = min(datetime),
+    max.date = max(datetime),
+    duration = difftime(max.date, min.date, units = "hours")
+  ) %>% 
+  mutate(min.date = format(min.date, "%F %T", tz = "UTC"),
+         max.date = format(max.date, "%F %T", tz = "UTC")) %>% 
+  arrange(desc(label)) %>% 
+  st_set_geometry(NULL)
+
+# View all data
+# DT::datatable(sd.summary)
+```
+
+# Filter Saildrone data
+
+```{r filter-saildrone}
+sd.final <- sd.summary %>% 
+  filter(n > 3)
+
+DT::datatable(sd.final)
+```
+
+# Intersect filtered Saildrone with planned transect buffers
+
+```{r intersect-nav-final,out.height='10in',out.width='100%'}
+sd.int.final <- filter(sd.intersection, saildrone %in% c(1045, 1046))
+
+mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
+  # mapview(sd.lines, zcol = "saildrone") +
+  mapview(sd.int.final, zcol = "saildrone")
+```
+
+
+
+
