@@ -184,7 +184,7 @@ if (get.bathy) {
 }
 ```
 
-```{r}
+```{r summarize-results}
 # Summarize NASC by date and lat/long
 nav.sun <- nav %>% 
   mutate(date = date(datetime)) %>% 
@@ -241,7 +241,10 @@ nav.depth <- get.depth(noaa.bathy, nav$long, nav$lat, locator = F, distance = T)
   mutate(day_night = case_when(
     period == "sunrise" ~ "Day",
     period == "sunset"  ~ "Night")) %>%
-  mutate(pings = 60*(750/abs(depth))) %>% # Compute time interval
+  mutate(pings = case_when(
+    abs(depth) < 100              ~ 60*(750/abs(100)),
+    between(abs(depth), 100, 750) ~ 60*(750/abs(depth)),
+    abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
   project_df(to = crs.proj)
 
 # Summarise distance by day/night and depth
@@ -250,10 +253,10 @@ nav.summ <- nav.depth %>%
   filter(!is.nan(dist)) %>% 
   group_by(depth_bin, day_night) %>% 
   summarise(
-    dist_km    = round(sum(dist)),
-    pings_ek80 = sum(pings)) %>% 
+    dist_km  = round(sum(dist)),
+    pings_ek = round(sum(pings))) %>% 
   mutate(
-    dist_nmi   = round(dist_km * 0.539957)) %>% 
+    dist_nmi = round(dist_km * 0.539957)) %>% 
   select(depth_bin:dist_km, dist_nmi, everything())
 
 # Write results to file
