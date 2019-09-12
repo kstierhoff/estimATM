@@ -1,5 +1,5 @@
 ---
-title: "Acoustic Line Kilometers-Summer 2018 Saildrone (1807RL)"
+title: "Acoustic Line Kilometers-Summer 2019 Lasker (1907RL)"
 author: "Kevin L. Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
 css: css/ast.css
@@ -15,8 +15,8 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf,
-               mapview,mapdata,photobiology,ggmap,knitr,DT,bookdown,
-               rnaturalearth,ggspatial)
+               mapview,mapdata,photobiology,ggmap,knitr,bookdown,
+               rnaturalearth,ggspatial,kableExtra)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -26,6 +26,17 @@ pacman::p_load_gh("kstierhoff/atm")
 # rnaturalearth data
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
 
 # knitr options
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, error = FALSE, warning = FALSE,
@@ -49,7 +60,8 @@ source(here("Doc/settings", prj.settings))
 
 ```{r user-input}
 # Set processing controls -------------------------------------------------
-get.nav    <- T # Download nav data from ERDDAP
+save.figs  <- F # Create new figures
+get.nav    <- F # Download nav data from ERDDAP
 get.bathy  <- F # Extract ETOPO1 bathymetry data in the survey footprint
 resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
@@ -234,18 +246,19 @@ nav.depth <- get.depth(noaa.bathy, nav$long, nav$lat, locator = F, distance = T)
          id = cut(as.numeric(datetime), as.numeric(nav.daynight$time),
                   include.lowest = T, labels = F),
          depth_bin = case_when(
-           depth_bin == 1 ~ ">200m",
-           depth_bin == 2 ~ "< 200 m")) %>%
+           depth_bin == 1 ~ "Deep (>200 m)",
+           depth_bin == 2 ~ "Shallow (<200 m)")) %>%
   filter(!is.na(depth_bin)) %>%
   left_join(select(nav.daynight, id, period)) %>%
   mutate(day_night = case_when(
     period == "sunrise" ~ "Day",
     period == "sunset"  ~ "Night")) %>%
   mutate(pings = case_when(
-    abs(depth) < 100              ~ 60*(750/abs(100)),
-    between(abs(depth), 100, 750) ~ 60*(750/abs(depth)),
+    abs(depth) < 250              ~ 60*(750/abs(250)),
+    between(abs(depth), 250, 750) ~ 60*(750/abs(depth)),
     abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
-  project_df(to = crs.proj)
+  project_df(to = crs.proj) %>% 
+  arrange(desc(day_night), datetime)
 
 # Summarise distance by day/night and depth
 # Number of pings per km were estimated as ...
@@ -265,8 +278,20 @@ write_csv(nav.summ, paste0(here("Output"), "/", survey.name, "_LineKilometers_",
 
 # Summarize effort by depth and day/night
 
+Total transit distance (km and nmi) and number of pings emitted from the multifrequency echosounders are summarized by period (day or night, based on daily sunrise and sunset time at the vessel's location) and seabed depth (greater or less than 200 m). Number of pings are estimated every 1 minute based on the seabed depth (m), where the number of pings per second is equal to 750/depth. Deeper than 750 m, the ping rate is assume to be 1 ping per second (pps). A maximum ping rate of be 3 pps is assume for depths shallower than 250 m.  
+
 ```{r effort-summary}
-datatable(nav.summ)
+nav.summ %>% 
+  rename(Depth            = depth_bin,
+         Period           = day_night,
+         "Distance (km)"  = dist_km,
+         "Distance (nmi)" = dist_nmi,
+         Pings            = pings_ek) %>%  
+  kable(format = knitr.format, booktabs = TRUE, escape = F,
+        align = c("c")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = F) %>%
+  row_spec(0, align = c("c"))
 ```
 
 ```{r create-basemap,include=F}
@@ -298,45 +323,45 @@ base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.b
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
-# Save the basemap
-ggsave(base.map, file = here("Figs/fig_basemap.png"), 
-       height = map.height, width = map.width)
-
-save(base.map, file = here("Data/Map/basemap.Rdata"))
+if (save.figs) {
+  save(base.map, file = here("Data/Map/basemap.Rdata"))  
+}
 ```
 
 # Map vessel nav by depth and day/night
 
 ```{r map-daynight-bathy}
-# Map results by depth bin
-bathy.plot <- base.map + 
-  geom_point(data = nav.depth, aes(X, Y, colour = depth_bin), size = 0.5) +
-  scale_colour_manual(name = "Depth", values = c("#40C270","#1C1C8A")) +
-  theme(legend.position      = c(0,0),
-        legend.justification = c(0,0),
-        legend.background    = element_blank(),
-        legend.key           = element_blank()) +
-  ggtitle("Vessel nav by depth") 
-
-# Map results by day/night
-daynight.plot <- base.map + 
-  geom_point(data = nav.depth, aes(X, Y, colour = day_night), size = 0.5) +
-  scale_colour_manual(name = "Time of day", values = c("yellow", "black")) +
-  theme(legend.position      = c(0,0),
-        legend.justification = c(0,0),
-        legend.background    = element_blank(),
-        legend.key           = element_blank()) +
-  ggtitle("Vessel nav by day/night")
-
-# Combine plots
-bathy.photo.plot <- plot_grid(bathy.plot, 
-                              daynight.plot, 
-                              nrow = 1, align = "v")
-
-# Save combo plot
-ggsave(bathy.photo.plot, 
-       filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_day_", survey.vessel, ".png"),
-       height = map.height, width = map.width*2)
+if (save.figs) {
+  # Map results by depth bin
+  bathy.plot <- base.map + 
+    geom_point(data = nav.depth, aes(X, Y, colour = depth_bin), size = 0.5) +
+    scale_colour_manual(name = "Depth", values = c("#40C270","#1C1C8A")) +
+    theme(legend.position      = c(0,0),
+          legend.justification = c(0,0),
+          legend.background    = element_blank(),
+          legend.key           = element_blank()) +
+    ggtitle("Vessel nav by depth") 
+  
+  # Map results by day/night
+  daynight.plot <- base.map + 
+    geom_point(data = nav.depth, aes(X, Y, colour = day_night), size = 0.5) +
+    scale_colour_manual(name = "Time of day", values = c("#F09F43","#211D1D")) +
+    theme(legend.position      = c(0,0),
+          legend.justification = c(0,0),
+          legend.background    = element_blank(),
+          legend.key           = element_blank()) +
+    ggtitle("Vessel nav by day/night")
+  
+  # Combine plots
+  bathy.photo.plot <- plot_grid(bathy.plot, 
+                                daynight.plot, 
+                                nrow = 1, align = "v")
+  
+  # Save combo plot
+  ggsave(bathy.photo.plot, 
+         filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_day_", survey.vessel, ".png"),
+         height = map.height, width = map.width*2)
+}
 
 include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_", survey.vessel, ".png"))
 ```
@@ -344,21 +369,23 @@ include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_", surve
 # Map vessel nav by depth (daytime only)
 
 ```{r map-daytime-bathy}
-# Map only daytime nav by depth
-day.plot <- base.map + 
-  geom_point(data = filter(nav.depth, day_night == "Day"), 
-             aes(X, Y, colour = depth_bin), size = 0.5) +
-  scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
-  theme(legend.position      = c(0,0),
-        legend.justification = c(0,0),
-        legend.background    = element_blank(),
-        legend.key           = element_blank()) +
-  ggtitle("Daytime vessel nav by depth")
-
-# Save daytime only plot
-ggsave(day.plot, 
-       filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_", survey.vessel, ".png"),
-       height = map.height, width = map.width)
+if (save.figs) {
+  # Map only daytime nav by depth
+  day.plot <- base.map + 
+    geom_point(data = filter(nav.depth, day_night == "Day"), 
+               aes(X, Y, colour = depth_bin), size = 0.5) +
+    scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
+    theme(legend.position      = c(0,0),
+          legend.justification = c(0,0),
+          legend.background    = element_blank(),
+          legend.key           = element_blank()) +
+    ggtitle("Daytime vessel nav by depth")
+  
+  # Save daytime only plot
+  ggsave(day.plot, 
+         filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_", survey.vessel, ".png"),
+         height = map.height, width = map.width)
+}
 
 include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_", survey.vessel, ".png"))
 ```
