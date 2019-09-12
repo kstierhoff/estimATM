@@ -33,6 +33,10 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 ```
 
 ```{r user-input,echo=FALSE}
+# Saildrone numbers to include
+saildrone.list <- c(1045, 1046, 1047)
+type.list <- c("Offshore", "Nearshore")
+
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(), "/")))
 
@@ -134,7 +138,7 @@ wpts.sf <- wpts %>%
   )
 
 transects.sf <- wpts.sf %>% 
-  group_by(Type, Transect) %>% 
+  group_by(Type, Transect, Region) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   ungroup() %>% 
@@ -327,7 +331,7 @@ mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) +
 ```{r intersect-nav}
 # Get intersection of Saildrone and Lasker nav
 sd.intersection <- sd.sf %>% 
-  st_intersection(filter(tx.buffer, Type == "Offshore"))
+  st_intersection(filter(tx.buffer, Type %in% type.list))
 
 # mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
 #   # mapview(sd.lines, zcol = "saildrone") +
@@ -356,7 +360,7 @@ sd.intersection <- sd.sf %>%
 
 # Summarise resulting data
 sd.summary <- sd.intersection %>% 
-  filter(saildrone %in% c(1045, 1046)) %>% 
+  filter(saildrone %in% saildrone.list) %>% 
   group_by(saildrone, label) %>% 
   summarise(
     n = n(),
@@ -385,9 +389,9 @@ DT::datatable(sd.final)
 # Intersect filtered Saildrone with planned transect buffers
 
 ```{r intersect-nav-final,out.height='10in',out.width='100%'}
-sd.int.final <- filter(sd.intersection, saildrone %in% c(1045, 1046))
+sd.int.final <- filter(sd.intersection, saildrone %in% saildrone.list)
 
-mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
+mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
   # mapview(sd.lines, zcol = "saildrone") +
   mapview(sd.int.final, zcol = "saildrone")
 ```
