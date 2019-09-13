@@ -40,10 +40,6 @@ if (doc.type == "latex") {
 } else {
   knitr.format <- "html" 
 }
-
-# Select tile to use for Leaflet map
-# Some good options include CartoDB.Positron, Stamen.Terrain, Esri.WorldImagery
-leaflet.tile <- "Stamen.Terrain" 
 ```
 
 ```{r project-info}
@@ -387,9 +383,18 @@ cluster.mid <- haul.mid %>%
   summarise(
     lat  = mean(lat),
     long = mean(long))
+
+# Create haul paths from starts and ends
+haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
 ```
 
-```{r FilterTrawlData}
+```{r filter-trawl-data}
 if (do.spatial) {
   # Find hauls in CA waters
   haul.ca <- haul.mid %>% 
@@ -411,7 +416,7 @@ haul.out <- haul.mid %>%
   filter(!haul %in% haul.ca$haul)
 ```
 
-```{r CaHaulsMap, eval=F}
+```{r ca-hauls-map, eval=F}
 # Add CA state waters layer
 base.map + 
   geom_sf(data = ca_waters, colour = "red", fill = NA) +
@@ -421,7 +426,7 @@ base.map +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 ```
 
-```{r ExtractCaCatch}
+```{r extract-catch}
 catch.ca <- catch.all %>% 
   filter(haul %in% haul.ca$haul) %>% 
   # left_join(select(haul.ca, key, date_time)) %>% 
@@ -460,37 +465,49 @@ write_csv(catch.table, here("Output/catch_table_Project8.csv"), na = "")
 # Interactive trawl plot
 A map showing all trawl hauls (black points), trawls in CA State waters (red points), and trawls occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection.  
 
-```{r CatchMapLeaflet}
+```{r catch-map-leaflet}
 # Configure palette for MPAs
 factpal <- colorFactor(topo.colors(10), ca_mpas$MPA)
 
 # Create leaflet map
 if (nrow(haul.mpa) > 0) {
   leaflet() %>% 
-    addProviderTiles(leaflet.tile) %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
     addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
     addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
                 label = ~htmlEscape(MPA)) %>% 
-    addCircleMarkers(data = haul.out, radius = 3, color = "gray50", stroke = FALSE, fillOpacity = 0.75,
-                     label = ~htmlEscape(haul)) %>% 
-    addCircleMarkers(data = haul.ca,  radius = 5, color = "red", stroke = FALSE, fillOpacity = 0.75,
-                     label = ~htmlEscape(haul)) %>% 
-    addMarkers(data = haul.mpa, popup = ~haul, label = ~htmlEscape(haul))  
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.ca, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>%
+    addMarkers(data = haul.mpa, label = ~paste("Haul:", haul), popup = ~paste("Haul:", haul))  
 } else {
   leaflet() %>% 
-    addProviderTiles(leaflet.tile) %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
     addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
     addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
                 label = ~htmlEscape(MPA)) %>% 
-    addCircleMarkers(data = haul.out, radius = 3, color = "gray50", stroke = FALSE, fillOpacity = 0.75,
-                     label = ~htmlEscape(haul)) %>% 
-    addCircleMarkers(data = haul.ca,  radius = 5, color = "red", stroke = FALSE, fillOpacity = 0.75,
-                     label = ~htmlEscape(haul)) 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.ca, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul))  
 }
 
 ```
 
-```{r ExtractCaNetTows,eval=FALSE}
+```{r extract-ca-net-tows,eval=FALSE}
 if (get.db) {
   # Define connection to CalCOFI database
   odbc_channel <- RODBC::odbcConnect("CalCOFI")
@@ -596,7 +613,7 @@ write_csv(tow.table, here("Output/tow_table_Project9.csv"), na = "")
 <!-- # Interactive plankton tow plot -->
 <!-- A map showing all plankton tows (black points), tows in CA State waters (red points), and tows occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection. -->
 
-```{r TowMapLeaflet,eval=FALSE}
+```{r tow-leaflet-map,eval=FALSE}
 # Remove tows outside of CA waters
 tows.out <- filter(tows, !key %in% tows.ca$key)
 
