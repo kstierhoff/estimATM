@@ -106,20 +106,20 @@ get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
-save.imap         <- T # Save Leaflet maps
-do.bootstrap      <- F # Generate bootstrap estimates
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
+save.imap         <- F # Save Leaflet maps
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 
 # Sometimes F
-overwrite.files   <- F # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
+overwrite.files   <- T # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.cal       <- F # Process calibration results
-process.ctd       <- T # Process CTD and UCTD casts
+process.ctd       <- F # Process CTD and UCTD casts
 
 # Usually F
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -550,25 +550,25 @@ save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r map-survey-plan}
-  # Map planned transects
-  survey.plan <- base.map +    
-    geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
-            show.legend = "line") +
-    scale_colour_manual("Type", 
-                        values = c(Adaptive = "red", Compulsory = "black",
-                                   Offshore = "green", Nearshore = "magenta",
-                                   transit = "orange")) +
-    scale_linetype_manual("Type", 
+# Map planned transects
+survey.plan <- base.map +    
+  geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
+          show.legend = "line") +
+  scale_colour_manual("Type", 
+                      values = c(Adaptive = "red", Compulsory = "black",
+                                 Offshore = "green", Nearshore = "magenta",
+                                 transit = "orange")) +
+  scale_linetype_manual("Type", 
                         values = c(Adaptive = "dashed", Compulsory = "solid",
                                    Offshore = "dashed", Nearshore = "solid",
                                    transit = "dashed")) +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
- 
-  # save survey plan map
-  ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
-         height = map.height, width = map.width)
+
+# save survey plan map
+ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
+       height = map.height, width = map.width)
 
 if (survey.name %in% c("1707RL")) {
   # Set limit of Lisa Marie transects
@@ -631,12 +631,22 @@ if (process.csv) {
     
     if (!process.csv.all) {
       # List only new CSV files
-      nasc.files <- nasc.files[!nasc.files %in% processed.csv]  
+      nasc.files <- nasc.files[!nasc.files %in% processed.csv]
+      
+      # Load already processed vessel NASC data
+      load(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.Rdata")))
+      
+    } else {
+      nasc.vessel <- data.frame()
     }
     
+    # Create or load vessel nasc data
     if (length(nasc.files) > 0) {
-      # Create data frame for each vessel
-      nasc.vessel <- data.frame()
+      # if (file.exists(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.Rdata")))) {
+      #   
+      # } else {
+      #   nasc.vessel <- data.frame()  
+      # }
       
       # Configure progress bar
       pb <- tkProgressBar("R Progress Bar", "CSV File Processing", 0, 100, 0)
@@ -663,7 +673,7 @@ if (process.csv) {
       # Save/load nasc.vessel (for debugging)
       save(nasc.vessel, 
            file = here("Data/Backscatter", i, 
-                       paste("nasc_vessel_", i, "_RAW.Rdata", sep = "")))
+                       paste0("nasc_vessel_", i, "_RAW.Rdata")))
       
       processed.csv.vessel <- sort(unique(nasc.vessel$filename))
       
@@ -769,31 +779,6 @@ if (process.csv) {
         nasc.vessel$transect <- gsub(tx.num.pattern[i], "", nasc.vessel$transect)
       }
       
-      # Indentify acoustic transects to include in processing, based on length
-      tx.include <- nasc.vessel %>% 
-        group_by(transect) %>% 
-        summarise(L = length(Interval)/10*0.539957) %>%
-        arrange(L) %>% 
-        filter(L > min.tx.length[i]) 
-      
-      # Remove backscatter data from short transects
-      nasc.vessel <- nasc.vessel %>% 
-        filter(transect %in% tx.include$transect)
-
-      # Create new interval for summarizing and plotting backscatter 
-      # and add vessel abbreviation to transect name
-      nasc.vessel <- nasc.vessel %>% 
-        mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
-                                       nasc.summ.interval),
-                         labels = F, include.lowest = TRUE),
-               transect.name = paste(vessel.name, transect))
-      
-      # Filter NASC per vessel -------------------------------------------------
-      # Manually remove individual transects
-      if (!is.na(tx.rm[i])) {
-        nasc.vessel <- filter(nasc.vessel, !transect.orig %in% unlist(tx.rm[i])) 
-      }
-      
       # Remove transit data
       if (rm.transit[i]) {
         nasc.vessel <- nasc.vessel %>% 
@@ -819,6 +804,22 @@ if (process.csv) {
           filter(str_detect(transect.orig, nasc.pattern.offshore[i], negate = TRUE)) 
       }
       
+      # Remove offshore transects data
+      if (rm.inshore[i]) {
+        # Filter based on offshore pattern
+        nasc.inshore <- nasc.vessel %>% 
+          filter(str_detect(transect.orig, nasc.pattern.inshore[i])) 
+        
+        # Save processed CSV data from each survey vessel
+        save(nasc.inshore, 
+             file = here("Data/Backscatter", i, 
+                         paste0("nasc_vessel_", i, "_inshore.Rdata")))
+        
+        # Filter offshore transects
+        nasc.vessel <- nasc.vessel %>% 
+          filter(str_detect(transect.orig, nasc.pattern.inshore[i], negate = TRUE)) 
+      }
+      
       # Remove nearshore transects data
       if (rm.nearshore[i]) {
         nasc.nearshore <- nasc.vessel %>% 
@@ -833,6 +834,31 @@ if (process.csv) {
         nasc.vessel <- nasc.vessel %>% 
           filter(str_detect(transect.orig, nasc.pattern.nearshore[i], negate = TRUE)) %>% 
           filter(str_detect(tolower(filename), "nearshore", negate = TRUE))
+      }
+      
+      # Indentify acoustic transects to include in processing, based on length
+      tx.include <- nasc.vessel %>% 
+        group_by(transect) %>% 
+        summarise(L = length(Interval)/10*0.539957) %>%
+        arrange(L) %>% 
+        filter(L > min.tx.length[i]) 
+      
+      # Remove backscatter data from short transects
+      nasc.vessel <- nasc.vessel %>% 
+        filter(transect %in% tx.include$transect)
+
+      # Create new interval for summarizing and plotting backscatter 
+      # and add vessel abbreviation to transect name
+      nasc.vessel <- nasc.vessel %>% 
+        mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
+                                       nasc.summ.interval),
+                         labels = F, include.lowest = TRUE),
+               transect.name = paste(vessel.name, transect))
+      
+      # Filter NASC per vessel -------------------------------------------------
+      # Manually remove individual transects
+      if (!is.na(tx.rm[i])) {
+        nasc.vessel <- filter(nasc.vessel, !transect.orig %in% unlist(tx.rm[i])) 
       }
       
       # Set stop integration depth
@@ -886,7 +912,8 @@ if (process.csv) {
 }
 
 # Get intervals with bad lat/long values
-bad.nasc <- filter(nasc, lat == 999, long == 999)
+bad.nasc <- filter(nasc, lat == 999, long == 999) %>% 
+  arrange(filename, datetime)
 
 write_csv(bad.nasc, here("Output/nasc_bad.csv"))
 
@@ -942,7 +969,7 @@ for (i in nasc.vessels) {
   }
   
   # Combine results from all vessels
-  tx.order <- bind_rows(tx.order,tx.order.temp) %>% 
+  tx.order <- bind_rows(tx.order, tx.order.temp) %>% 
     arrange(transect)
 }
 
@@ -6622,7 +6649,7 @@ If desired, estimate biomass in the offshore stratum.
 
 ```{r biomass-bootstrap-estimates-final-offshore}
 if (estimate.offshore) {
-  source(here("Code/estimate_offshore_biomass.R"))
+  source(here("Code/estimateOffshore.R"))
 }
 ```
 

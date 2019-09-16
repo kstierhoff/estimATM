@@ -3,6 +3,12 @@
 # If area sampled offshore of the primary sampling design, estimate biomass
 load(here("Output", paste("nasc_vessel_", "RL", "_offshore.Rdata", sep = "")))
 
+# List offshore backscatter files
+offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
+                         regexp = "offshore.Rdata")
+
+load(offshore.files[1])
+
 # Define cps.nasc for offshore backscatter
 nasc.offshore <- nasc.offshore %>%
   mutate(cps.nasc = NASC.50,

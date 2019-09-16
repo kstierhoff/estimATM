@@ -167,103 +167,135 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
-nasc.vessels           <- c("RL","LM", "SD") 
+nasc.vessels           <- c("RL","LM", "SD", "LBC") 
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
 # Number of intervals over which to summarize NASC
 nasc.summ.interval     <- 2000/nasc.interval 
 # Echosounder type; e.g., EK60, EK80, other
-sounder.type           <- c(RL = "EK80",
-                            LM = "EK60",
-                            SD = "EK80") 
+sounder.type           <- c(RL  = "EK80",
+                            LM  = "EK60",
+                            SD  = "EK80",
+                            LBC = "EK60") 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
-  survey.dir           <- c(RL = "C:/SURVEY/1907RL",
-                            LM = "C:/SURVEY/1907RL",
-                            SD = "C:/SURVEY/1907RL")   
+  survey.dir           <- c(RL  = "C:/SURVEY/1907RL",
+                            LM  = "C:/SURVEY/1907RL",
+                            SD  = "C:/SURVEY/1907RL",
+                            LBC = "C:/SURVEY/1907RL")   
 } else {
-  survey.dir           <- c(RL = "C:/SURVEY/1907RL",
-                            LM = "C:/SURVEY/1907RL",
-                            SD = "C:/SURVEY/1907RL")
+  survey.dir           <- c(RL  = "C:/SURVEY/1907RL",
+                            LM  = "C:/SURVEY/1907RL",
+                            SD  = "C:/SURVEY/1907RL",
+                            LBC = "C:/SURVEY/1907RL")
 }
 # Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.dir               <- c(RL = "PROCESSED/EV/CSV/LASKER",
-                            LM = "PROCESSED/EV/CSV/LISA_MARIE",
-                            SD = "PROCESSED/EV/CSV/SAILDRONE") 
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+                            LM  = "PROCESSED/EV/CSV/LISA_MARIE",
+                            SD  = "PROCESSED/EV/CSV/SAILDRONE",
+                            LBC = "PROCESSED/EV/CSV/CARNAGE") 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL = "*Final 38 kHz CPS.csv",
-                            LM = "*CPS-Final CPS.csv",
-                            SD = "*CPS-Final CPS.csv")
+nasc.pattern.cps       <- c(RL  = "*Final 38 kHz CPS.csv",
+                            LM  = "*CPS-Final CPS.csv",
+                            SD  = "*CPS-Final CPS.csv",
+                            LBC = "*Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL = "*Juan Krill Final 120.csv",
-                            LM = "*Juan Krill Final 120.csv",
-                            SD = "*Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "*Juan Krill Final 120.csv",
+                            LM  = "*Juan Krill Final 120.csv",
+                            SD  = "*Juan Krill Final 120.csv",
+                            LBC = "*Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
-nasc.pattern.nearshore <- c(RL = "\\d{3}N",
-                            LM = "\\d{3}N",
-                            SD = "\\d{3}N")
+nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
+                            LM  = "\\d{3}N",
+                            SD  = "\\d{3}N",
+                            LBC = "\\d{3}N")
 # Regex pattern for identifying offshore transects
-nasc.pattern.offshore  <- c(RL = "\\d{3}O",
-                            LM = "\\d{3}O",
-                            SD = "\\d{3}O")
+nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
+                            LM  = "\\d{3}O",
+                            SD  = "\\d{3}O",
+                            LBC = "\\d{3}O")
+# Regex pattern for identifying offshore transects
+nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
+                            LM  = "\\d{3}I",
+                            SD  = "\\d{3}I",
+                            LBC = "\\d{3}I")
 # Regex pattern for identifying transits
-nasc.pattern.transit   <- c(RL = "\\d{3}T",
-                            LM = "\\d{3}T",
-                            SD = "\\d{3}T")
+nasc.pattern.transit   <- c(RL  = "\\d{3}T",
+                            LM  = "\\d{3}T",
+                            SD  = "\\d{3}T",
+                            LBC = "\\d{3}T")
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL = F,
-                            LM = F,
-                            SD = F) 
+source.cps.nasc        <- c(RL  = F,
+                            LM  = F,
+                            SD  = F,
+                            LBC = F) 
 # File containing CPS nasc from CTD app
-data.cps.nasc          <- c(RL = here("Data/CPS_NASC/cps_nasc_1907RL.csv"),
-                            LM = NA,
-                            SD = NA) 
+data.cps.nasc          <- c(RL  = here("Data/CPS_NASC/cps_nasc_1907RL.csv"),
+                            LM  = NA,
+                            SD  = NA,
+                            LBC = NA) 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL = "[^0-9]",
-                            LM = "[^0-9]",
-                            SD = "[^0-9]") 
+tx.char.pattern        <- c(RL  = "[^0-9]",
+                            LM  = "[^0-9]",
+                            SD  = "[^0-9]",
+                            LBC = "[^0-9]") 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL = T,
-                            LM = F,
-                            SD = F) 
+strip.tx.nums          <- c(RL  = T,
+                            LM  = F,
+                            SD  = F,
+                            LBC = F) 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL = F,
-                            LM = F,
-                            SD = F) 
+strip.tx.chars         <- c(RL  = F,
+                            LM  = F,
+                            SD  = F,
+                            LBC = F) 
 # If T, removes transects with names including "transit"
-rm.transit             <- c(RL = F,
-                            LM = F,
-                            SD = F) 
+rm.transit             <- c(RL  = F,
+                            LM  = F,
+                            SD  = F,
+                            LBC = F) 
 # If T, removes transects with names including "offshore"
-rm.offshore            <- c(RL = T,
-                            LM = F,
-                            SD = F) 
+rm.offshore            <- c(RL  = T,
+                            LM  = T,
+                            SD  = F,
+                            LBC = T)
+# If T, removes transects with names including "inshore"
+rm.inshore             <- c(RL  = T,
+                            LM  = T,
+                            SD  = T,
+                            LBC = T)
 # If T, removes transects with names including "nearshore"
-rm.nearshore           <- c(RL = T,
-                            LM = F,
-                            SD = F) 
+rm.nearshore           <- c(RL  = T,
+                            LM  = F,
+                            SD  = F,
+                            LBC = F) 
 # If T, subtracts NASC.5 from cps.nasc
-rm.surface             <- c(RL = F,
-                            LM = F,
-                            SD = F) 
+rm.surface             <- c(RL  = F,
+                            LM  = F,
+                            SD  = F,
+                            LBC = F) 
 # regex for matching number pattern
-tx.num.pattern         <- c(RL = "-\\d{1}",
-                            LM = "-\\d{1}",
-                            SD = "-\\d{1}") 
+tx.num.pattern         <- c(RL  = "-\\d{1}",
+                            LM  = "-\\d{1}",
+                            SD  = "-\\d{1}",
+                            LBC = "-\\d{1}") 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL = T,
-                            LM = T,
-                            SD = T) 
+use.tx.number          <- c(RL  = T,
+                            LM  = T,
+                            SD  = T,
+                            LBC = T) 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
-                            LM = NA,
-                            SD = NA) 
+                            LM  = NA,
+                            SD  = NA,
+                            LBC = NA) 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL = 3,
-                            LM = 1,
-                            SD = 1)
+min.tx.length          <- c(RL  = 3,
+                            LM  = 1,
+                            SD  = 1,
+                            LBC = 1)
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
 tx.spacing.bins <- c(0, 6, 15, 35, 50)
 tx.spacing.dist <- c(5, 10, 20, 40)
@@ -339,131 +371,7 @@ stratify.manually <- FALSE
 #   data.frame(
 #     scientificName = "Clupea pallasii", 
 #     stratum = 1,
-#     transect = 60:64),
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 2,
-#     transect = 66:99),
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 3,
-#     transect = 100:107),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 1,
-#     transect = 1:16),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 2,
-#     transect = 17:19),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 3,
-#     transect = 20:39),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 4,
-#     transect = 67:90),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 5,
-#     transect = 94:96),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 6,
-#     transect = 98:101),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 7,
-#     transect = 111:149),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 1,
-#     transect = 2:16),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 2,
-#     transect = 23:34),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 3,
-#     transect = 50:85),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 4,
-#     transect = 94:96),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 5,
-#     transect = 98:101),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 6,
-#     transect = 125:127),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 7,
-#     transect = 136:139),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 1,
-#     transect = 2:16),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 2,
-#     transect = 20:28),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 3,
-#     transect = 50:72),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 4,
-#     transect = 74:86),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 5,
-#     transect = 94:96),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 6,
-#     transect = 97:101),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 1,
-#     transect = 1:16),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 2,
-#     transect = 20:33),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 3,
-#     transect = 38:40),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 4,
-#     transect = 41:46),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 5,
-#     transect = 47:85),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 6,
-#     transect = 87:96),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 7,
-#     transect = 97:99),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 8,
-#     transect = 124:129),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 9,
-#     transect = 136:139)
+#     transect = 60:64)
 # )
 # 
 # # Offshore strata
@@ -471,27 +379,7 @@ stratify.manually <- FALSE
 #   data.frame(
 #     scientificName = "Clupea pallasii", 
 #     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 1,
-#     transect = 1:3),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 2,
-#     transect = 4:8),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 1,
-#     transect = 1:8),
+#     transect = 1:8)
 # )
 
 # Stock boundaries --------------------------------------------------------
