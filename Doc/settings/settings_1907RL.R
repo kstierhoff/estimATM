@@ -168,6 +168,8 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 # Backscatter data info
 # Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
 nasc.vessels           <- c("RL","LM", "SD", "LBC") 
+nasc.vessels.offshore  <- c("RL","SD")
+
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
 # Number of intervals over which to summarize NASC
@@ -260,12 +262,12 @@ rm.transit             <- c(RL  = F,
 rm.offshore            <- c(RL  = T,
                             LM  = T,
                             SD  = F,
-                            LBC = T)
+                            LBC = F)
 # If T, removes transects with names including "inshore"
-rm.inshore             <- c(RL  = T,
+rm.inshore             <- c(RL  = F,
                             LM  = T,
                             SD  = T,
-                            LBC = T)
+                            LBC = F)
 # If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL  = T,
                             LM  = F,
@@ -297,8 +299,8 @@ min.tx.length          <- c(RL  = 3,
                             SD  = 1,
                             LBC = 1)
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0, 6, 15, 35, 50)
-tx.spacing.dist <- c(5, 10, 20, 40)
+tx.spacing.bins <- c(0, 6, 15, 35, 50, 100)
+tx.spacing.dist <- c(5, 10, 20, 40, 80)
 
 # SCS data
 scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"

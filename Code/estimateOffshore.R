@@ -1,24 +1,35 @@
-
 # Estimate offshore biomass -----------------------------------------------
-# If area sampled offshore of the primary sampling design, estimate biomass
-load(here("Output", paste("nasc_vessel_", "RL", "_offshore.Rdata", sep = "")))
-
 # List offshore backscatter files
 offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
-                         regexp = "offshore.Rdata")
+                         regexp = "offshore.rds")
 
-load(offshore.files[1])
+# Import all offshore backscatter data
+for (o in offshore.files) {
+  if (exists("nasc.offshore")) {
+    nasc.offshore <- bind_rows(nasc.offshore, readRDS(offshore.files[o]))
+  } else {
+    nasc.offshore <- readRDS(offshore.files[o])
+  }
+}
 
-# Define cps.nasc for offshore backscatter
-nasc.offshore <- nasc.offshore %>%
-  mutate(cps.nasc = NASC.50,
-         transect =  as.numeric(as.factor(nasc.offshore$transect.orig)),
-         stratum  = 1)
+# nasc.offshore$transect <- gsub("O", "", nasc.vessel$transect)
+
+# Remove vessels not to be included in the offshore biomass estimates
+nasc.offshore <- nasc.offshore %>% 
+  filter(vessel.name %in% nasc.vessels.offshore) %>%
+  mutate(
+    transect = str_replace(transect, "O", ""),
+    transect.name = paste(vessel.name, transect),
+    cps.nasc      = NASC.50,
+    stratum       = 1,
+    int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
+                            nasc.summ.interval),
+              labels = F, include.lowest = TRUE))
 
 # Summarise nasc for plotting ---------------------------------------------
 nasc.plot.os <- nasc.offshore %>% 
-  select(filename, transect.name, transect, int, lat, long, cps.nasc) %>% 
-  group_by(filename, transect.name, transect, int) %>% 
+  select(filename, transect, transect.name, int, lat, long, cps.nasc) %>% 
+  group_by(filename, transect, int) %>% 
   summarise(
     lat  = lat[1],
     long = long[1],
@@ -26,9 +37,8 @@ nasc.plot.os <- nasc.offshore %>%
   # Create bins for defining point size in NASC plots%>% 
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
          bin.level =  as.numeric(bin)) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-nasc.plot.proj <- project_sf(nasc.plot, crs = crs.proj)
+  ungroup() %>% 
+  project_df(to = crs.proj)
 
 # Assign backscatter to trawl clusters ------------------------------------
 # Create varialble for nearest cluster and minumum distance
@@ -61,27 +71,29 @@ close(pb)
 save(cluster.distance.os, file = here("Output/nasc_cluster_distance_offshore.Rdata"))
 
 # Add cluster distances to nasc
-nasc.offshore <- bind_cols(nasc.offshore, cluster.distance.os)
+nasc.offshore <- bind_cols(nasc.offshore, cluster.distance.os) %>% 
+  project_df(to = crs.proj)
 
-# Convert nasc to sf and project
-nasc.os.sf <- st_as_sf(nasc.offshore, coords = c("long","lat"), crs = crs.geog)
-
-nasc.os.proj <- project_sf(nasc.os.sf, crs = crs.proj)
+nasc.offshore.summ <- nasc.offshore %>% 
+  group_by(cluster) %>% 
+  tally() %>% 
+  filter(n >= 4)
 
 # Map trawl clusters -------------------------------------------------------
+# Create hulls around positive clusters
+nasc.super.clusters.os <- nasc.offshore %>% 
+  filter(cluster %in% nasc.offshore.summ$cluster) %>% 
+  plyr::ddply("cluster", find_hull) %>% 
+  select(long, lat, cluster) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(cluster) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("POLYGON")
 
 if (save.figs) {
-  # Create hulls around positive clusters
-  nasc.super.clusters.os <- plyr::ddply(nasc.offshore, "cluster", find_hull) %>% 
-    select(long, lat, cluster) %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    group_by(cluster) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("POLYGON")
-  
   nasc.cluster.plot.os <- base.map +
     # Plot nasc data
-    geom_point(data = nasc.os.proj, aes(X, Y, colour = factor(cluster)),
+    geom_point(data = nasc.offshore, aes(X, Y, colour = factor(cluster)),
                show.legend = FALSE) +
     # Plot convex hull around NASC clusters
     geom_sf(data = nasc.super.clusters.os, aes(fill = factor(cluster)),
@@ -89,10 +101,10 @@ if (save.figs) {
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
     # Plot cluster midpoints
-    geom_text(data = cluster.locs.proj, aes(X, Y, label = cluster),
+    geom_text(data = cluster.mid, aes(X, Y, label = cluster),
               colour = 'gray20', size = 2) +
     # Plot positive trawl cluster midpoints
-    geom_shadowtext(data = filter(cluster.locs.proj, cluster %in% super.clusters$cluster), 
+    geom_shadowtext(data = filter(cluster.mid, cluster %in% super.clusters$cluster), 
                     aes(X, Y, label = cluster), 
                     size = 2, colour = "black", bg.colour = "white") +
     # Plot panel label
@@ -111,43 +123,26 @@ if (save.figs) {
 
 # Map trawl species proportions -------------------------------------------------------
 # Select and rename trawl data for pie charts
-catch.pie.os <- cluster.summ.wt %>% 
-  select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
-  filter(cluster %in% unique(nasc.os.proj$cluster)) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+cluster.pie.os <- cluster.pie %>% 
+  filter(cluster %in% unique(nasc.offshore.summ$cluster)) 
 
-# Replace NA values with minute value for proper pie plotting
-catch.pie.os[is.na(catch.pie) == TRUE] <- 0
-
-# Bin catch by All CPS landing, for scaling pie radius   
-catch.pie.os <- catch.pie.os %>% 
-  mutate(bin = cut(AllCPS, catch.breaks, include.lowest = TRUE, labels = F))
-
-# Calculate pie radius of each pie, based on All CPS landings
-if (scale.pies == TRUE) {
-  catch.pie$radius <- pie.radius*catch.pie$bin
-} else{
-  catch.pie$radius <- pie.radius
-}
-
-# Project catch pie data
-catch.pie.os.proj <- project_sf(catch.pie.os, crs = crs.proj)
-
-# Filter for positive trawls
-cluster.pos.os <- filter(catch.pie.os.proj, AllCPS > 0)
+cluster.pos.os <- filter(cluster.pie.os, AllCPS > 0) %>% 
+  arrange(desc(X))
 
 # Substitute very small value for species with zero catch, just for pie charts
-cluster.pos.os[cluster.pos.os == 0] <- 0.0000001
+if (nrow(cluster.pos.os) > 0) {
+  cluster.pos.os <- cluster.pos.os %>% 
+    replace(. == 0, 0.0000001) 
+}
 
 # Filter for empty trawls
-cluster.zero.os <- filter(catch.pie.os.proj, AllCPS == 0)
+cluster.zero.os <- filter(cluster.pie.os, AllCPS == 0)
 
 if (save.figs) {
   # Create trawl figure
   trawl.catch.plot.os <- base.map +
     # Plot nasc data
-    geom_point(data = nasc.os.proj, aes(X, Y, group = transect.name),
+    geom_point(data = nasc.offshore, aes(X, Y, group = transect),
                size = 0.5, colour = "gray50", alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = cluster.pos.os, 
@@ -171,45 +166,29 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.plot.os <- plot_grid(nasc.cluster.plot.os, trawl.catch.plot.os,
+  nasc.trawl.cluster.wt.os <- plot_grid(nasc.cluster.plot.os, trawl.catch.plot.os,
                                nrow = 1, labels = c("a)", "b)"))
   
-  # Save trawl species proportions plot
-  ggsave(trawl.catch.plot.os,
-         filename = here("Figs/fig_trawl_species_proportion_map_offshore.png"),
-         width = map.width,height = map.height)
-  
-  ggsave(nasc.trawl.plot.os,
-         filename = here("Figs/fig_nasc_cluster_trawl_prop_map_offshore.png"),
+  ggsave(nasc.trawl.cluster.wt.os,
+         filename = here("Figs/fig_nasc_trawl_cluster_wt_offshore.png"),
          width = map.width*2, height = map.height)
-  
-  save(trawl.catch.plot.os,
-       file = here("Output/trawl_species_proportion_map.Rdata"))
-  
-  save(nasc.trawl.plot.os,
-       file = here("Output/nasc_cluster_trawl_prop_map.Rdata"))
 }
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
 nasc.offshore <- nasc.offshore %>% 
-  left_join(select(clf, -lat, -long), by = c("cluster" = "cluster"))
-
+  left_join(select(clf, -lat, -long, -X, -Y), by = c("cluster" = "cluster"))
 
 # Save results
 save(nasc.offshore, file = here("Output/cps_nasc_prop_offshore.Rdata"))
 
 # Apportion offshore backscatter ------------------------------------------
-
 # Create data frame for plotting acoustic proportions by species
 nasc.prop.all.os <- nasc.offshore %>%
   mutate(`Engraulis mordax`      = cps.nasc*prop.anch,
          `Sardinops sagax`       = cps.nasc*prop.sar,
          `Trachurus symmetricus` = cps.nasc*prop.jack,
          `Scomber japonicus`     = cps.nasc*prop.mack,
-         `Clupea pallasii`       = cps.nasc*prop.her) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-nasc.prop.all.os <- project_sf(nasc.prop.all.os, crs = crs.proj)
+         `Clupea pallasii`       = cps.nasc*prop.her) 
 
 # Prepare nasc.prop.all for facet plotting
 nasc.prop.spp.os <- nasc.prop.all.os %>% 
@@ -235,7 +214,7 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save map
-  ggsave(here("Figs/fig_acoustic_proportions_map_offshore.png"), map.prop.all.os,
+  ggsave(here("Figs/fig_nasc_acoustic_proportions_offshore.png"), map.prop.all.os,
          width = map.width*3, height = map.height*2)
   
   # Save plot objects
@@ -244,7 +223,6 @@ if (save.figs) {
   # Load plot objects
   load(here("Output/acoustic_proportion_maps.Rdata"))
 }
-
 
 # Calculate offshore acoustic biomass density -----------------------------
 nasc.offshore <- nasc.offshore %>% 
@@ -258,8 +236,8 @@ nasc.offshore <- nasc.offshore %>%
 # Format for plotting
 nasc.density.os <- nasc.offshore %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
-         sar.dens, transect, int, cluster) %>% 
-  group_by(transect, int) %>% 
+         sar.dens, transect, transect.name, int, cluster) %>% 
+  group_by(transect, transect.name, int) %>% 
   summarise(
     lat = lat[1],
     long = long[1],
@@ -268,17 +246,17 @@ nasc.density.os <- nasc.offshore %>%
     `Trachurus symmetricus` = mean(jack.dens),
     `Scomber japonicus`     = mean(mack.dens),
     `Sardinops sagax`       = mean(sar.dens)) %>% 
-  gather(scientificName, density, -transect, -int, -lat, -long) %>% 
+  gather(scientificName, density, -transect, -transect.name, -int, -lat, -long) %>% 
   mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin))
 
 # Summarise biomass density by transect and species
 nasc.density.summ.os <- nasc.density.os %>% 
-  group_by(scientificName, transect) %>% 
+  group_by(scientificName, transect, transect.name) %>% 
   summarise(density = sum(density)) %>% 
   filter(scientificName %in% unique(lengths$scientificName)) %>% 
-  left_join(select(tx.labels.tmp, -end.lat, -end.long, -brg)) %>% 
-  left_join(select(tx.nn.os, transect, vessel.name, dist.cum, dist.bin)) %>% 
+  left_join(select(tx.labels.tmp, transect.name, start.lat, start.long)) %>% 
+  # left_join(select(tx.nn.os, transect, vessel.name, dist.cum, dist.bin)) %>% 
   mutate(positive = density > 0)
 
 # Save biomass density data
@@ -305,11 +283,11 @@ tx.nn.os <- data.frame()
 
 for (i in unique(tx.mid.os$transect)) {
   # Get the mid lat/long for each transect
-  tx.i      <- filter(tx.mid.os, transect == i)
+  tx.nn.i      <- filter(tx.mid.os, transect == i)
   # Get NASC data for all other transects
-  nasc.temp <- filter(tx.mid.os, transect != i, vessel.name %in% tx.i$vessel.name)
+  nasc.temp <- filter(tx.mid.os, transect != i, vessel.name %in% tx.nn.i$vessel.name)
   # Calculate distance between transect midpoint and all other NASC values
-  nn.dist   <- swfscMisc::distance(tx.i$lat, tx.i$long,
+  nn.dist   <- swfscMisc::distance(tx.nn.i$lat, tx.nn.i$long,
                                    nasc.temp$lat, nasc.temp$long)
   # Get the transect info and spacing based on shortest distance
   nn.tx     <- nasc.temp$transect[which.min(nn.dist)]
@@ -317,21 +295,27 @@ for (i in unique(tx.mid.os$transect)) {
   nn.lat    <- nasc.temp$lat[which.min(nn.dist)]
   nn.long   <- nasc.temp$long[which.min(nn.dist)]
   # Add to results
-  tx.nn.os  <- bind_rows(tx.nn.os, 
-                         data.frame(tx.i, nn.tx, min.dist, nn.lat, nn.long))
+  tx.nn.os     <- bind_rows(tx.nn.os, 
+                         data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long))
 }
+
 # Bin transects by spacing
 tx.nn.os <- tx.nn.os %>% 
-  mutate(dist.bin = cut(tx.nn.os$min.dist,c(0, 6, 15, 35, 50,1000)),
-         dist.cum = cumsum(min.dist)) %>% 
+  mutate(dist.bin = cut(tx.nn.os$min.dist, tx.spacing.bins),
+         spacing  = tx.spacing.dist[as.numeric(dist.bin)],
+         dist.cum = cumsum(spacing)) %>% 
   arrange(transect)
 
 # Save nearest neighbor distance info
 save(tx.nn.os, file = here("Output/transect_spacing_offshore.Rdata"))
 
+# Summarise biomass density by transect and species
+nasc.density.summ.os <- nasc.density.summ.os %>% 
+  left_join(select(tx.nn.os, transect.name, dist.cum, dist.bin))
+
 # Draw pseudo-transects --------------------------------------------------------
 # Get transect ends, calculate bearing, and add transect spacing
-tx.ends <- nasc.offshore %>% 
+tx.ends.os <- nasc.offshore %>% 
   group_by(transect.name, transect, vessel.name) %>% 
   summarise(
     lat.i  = lat[which.max(long)],
@@ -339,14 +323,13 @@ tx.ends <- nasc.offshore %>%
     lat.o  = lat[which.min(long)],
     long.o = min(long)
   ) %>% 
-  left_join(select(tx.nn.os, transect.name, spacing = min.dist)) %>% 
+  left_join(select(tx.nn.os, transect.name, spacing)) %>% 
   mutate(
     brg = swfscMisc::bearing(lat.i, long.i,
                              lat.o, long.o)[1])
 
 # Get original inshore transect ends -------------------------------------------
-# Select original inshore waypoints
-tx.i <- tx.ends %>% 
+tx.i.os <- tx.ends.os %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
   mutate(
@@ -356,7 +339,7 @@ tx.i <- tx.ends %>%
 
 # Get N and S inshore waypoints ------------------------------------------------
 # Calculate inshore/north transects
-tx.i.n <- tx.ends %>% 
+tx.i.n.os <- tx.ends.os %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
   mutate(
@@ -367,7 +350,7 @@ tx.i.n <- tx.ends %>%
     order = 1)
 
 # Calculate inshore/south transects
-tx.i.s <- tx.ends %>% 
+tx.i.s.os <- tx.ends.os %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
   mutate(
@@ -378,13 +361,13 @@ tx.i.s <- tx.ends %>%
     order = 3)
 
 # Combine all inshore transects
-tx.i <- tx.i %>%
-  bind_rows(tx.i.n) %>%
-  bind_rows(tx.i.s) %>%
+tx.i.os <- tx.i.os %>%
+  bind_rows(tx.i.n.os) %>%
+  bind_rows(tx.i.s.os) %>%
   arrange(transect, desc(order))
 
 # Get original offshore transect ends ------------------------------------------
-tx.o <- tx.ends %>% 
+tx.o.os <- tx.ends.os %>% 
   select(-lat.i, -long.i) %>% 
   rename(lat = lat.o, long = long.o) %>% 
   mutate(
@@ -394,7 +377,7 @@ tx.o <- tx.ends %>%
 
 # Get N and S offshore waypoints -----------------------------------------------
 # Calculate offshore/north transects
-tx.o.n <- tx.ends %>% 
+tx.o.n.os <- tx.ends.os %>% 
   select(-lat.i, -long.i) %>% 
   rename(lat = lat.o, long = long.o) %>% 
   mutate(
@@ -404,36 +387,26 @@ tx.o.n <- tx.ends %>%
     loc = "offshore",
     order = 3)
 
-# Calculate offshore/south transects
-tx.o.s <- tx.ends %>% 
-  select(-lat.i, -long.i) %>% 
-  rename(lat = lat.o, long = long.o) %>% 
+# Calculate inshore/south transects
+tx.i.s.os <- tx.ends.os %>% 
+  select(-lat.o, -long.o) %>% 
+  rename(lat = lat.i, long = long.i) %>% 
   mutate(
     lat  = destination(lat, long, brg - 90, spacing/2, units = "nm")["lat"],
     long = destination(lat, long, brg - 90, spacing/2, units = "nm")["lon"],
     grp = "south",
-    loc = "offshore",
-    order = 1)
+    loc = "inshore",
+    order = 3)
 
-tx.o.final <- data.frame()
-
-for (v in unique(tx.o$vessel.name)) {
-  if (v == "SD1024") {
-    tx.o.tmp <- filter(tx.o, vessel.name == v)
-  } else {
-    tx.o.tmp <- filter(tx.o, vessel.name == v) %>% 
-      bind_rows(filter(tx.o.n, vessel.name == v)) %>% 
-      bind_rows(filter(tx.o.s, vessel.name == v))
-  }
-  tx.o.final <- bind_rows(tx.o.final, tx.o.tmp)
-}
-
-tx.o <- tx.o.final %>% 
+# Combine all offshore transects
+tx.o.final.os <- tx.o.os %>% 
+  bind_rows(filter(tx.o.n.os)) %>% 
+  bind_rows(filter(tx.o.s.os)) %>% 
   arrange(desc(transect), desc(order))
 
 # Assemble the final data frame with all waypoints -----------------------------
-strata.points.os <- tx.i %>% 
-  bind_rows(tx.o)   %>%
+strata.points.os <- tx.i.os %>% 
+  bind_rows(tx.o.final.os)   %>%
   mutate(key = paste(transect.name, grp)) 
 
 # Convert to points
@@ -441,7 +414,8 @@ strata.points.os.sf <- st_as_sf(strata.points.os, coords = c("long","lat"), crs 
 
 # Create polygons
 strata.super.polygons.os <- strata.points.os.sf %>% 
-  group_by(vessel.name) %>% 
+  ungroup() %>% 
+  # group_by(vessel.name) %>% 
   summarise(do_union = F) %>% 
   st_cast("POLYGON") %>% 
   st_make_valid() %>% 
@@ -457,6 +431,96 @@ tx.lines.os.sf <- strata.points.os.sf %>%
 
 # Create stratum polygons -------------------------------------------------
 if (exists("strata.offshore")) rm(strata.offshore)
+
+# # Define sampling strata
+# if (stratify.manually) {
+#   # Use manually defined strata
+#   strata.final <- strata.manual %>% 
+#     mutate(stratum.orig = stratum)
+# } else {
+#   # Define strata automatically
+#   strata.final.os <- data.frame()
+#   
+#   # Define strata boundaries and transects for each species
+#   for (i in unique(nasc.density.summ$scientificName)) {
+#     # Select positive transects and calculate differences between transect numbers
+#     # diffs >= 2 define stratum breaks
+#     temp.spp <- filter(nasc.density.summ.os, scientificName == i) %>% 
+#       filter(positive == TRUE) %>% 
+#       mutate(diff = c(1, diff(transect))) %>% 
+#       ungroup()
+#     
+#     if (nrow(temp.spp) > 0) {
+#       # Find the start of each positive stratum
+#       spp.starts <- temp.spp %>% 
+#         filter(diff > max.diff) 
+#       
+#       # If the start of the stratum == 1, stratum start is 1, else min transect number
+#       survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
+#       
+#       # A vector of stratum starts
+#       stratum.start <- c(survey.start, spp.starts$transect - 1)
+#       
+#       # If the end of the stratum is the last transect in the survey, 
+#       # select the last, else the last transect + 1
+#       survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
+#                            max(nasc.density.summ$transect),
+#                            max(temp.spp$transect) + 1)
+#       
+#       # A vector of stratum ends
+#       stratum.end <- c(temp.spp$transect[which(temp.spp$diff > max.diff) - 1] + 1, 
+#                        survey.end)
+#       
+#       # Combine starts and ends in to a data frame for plotting and generating stratum vectors
+#       strata.spp <- data.frame(scientificName = i, 
+#                                stratum = seq(1,length(stratum.start)),
+#                                start = stratum.start,
+#                                end = stratum.end) %>% 
+#         mutate(n.tx = end - start + 1)
+#       
+#       # Create stratum vectors
+#       strata.df <- data.frame()
+#       for (j in 1:nrow(strata.spp)) {
+#         # Create a vector of transects from start to end
+#         transect <- seq(strata.spp$start[j],strata.spp$end[j])
+#         
+#         # Combine results
+#         strata.df <- bind_rows(strata.df, 
+#                                data.frame(scientificName = i, 
+#                                           stratum = j,
+#                                           transect))
+#       }
+#       
+#       # Add vessel name and distance bin to strata.df for final cuts
+#       strata.df <- strata.df %>% 
+#         left_join(filter(select(nasc.density.summ, transect, vessel.name, dist.bin), 
+#                          scientificName == i)) %>% 
+#         mutate(stratum.key = factor(paste(stratum,vessel.name,dist.bin))) 
+#       
+#       # Summarise strata by key, remove strata with less than 3 transects, 
+#       # and reassign stratum numbers
+#       strata.df.summ <- strata.df %>% 
+#         group_by(stratum.key) %>% 
+#         summarise(n.tx = n()) %>% 
+#         filter(n.tx >= nTx.min) %>% 
+#         mutate(stratum = seq(1, n()))
+#       
+#       # Remove strata with less than minimum number of transects
+#       strata.df <- strata.df %>% 
+#         rename(stratum.orig = stratum) %>% 
+#         filter(stratum.key %in% strata.df.summ$stratum.key) %>% 
+#         left_join(select(strata.df.summ, stratum.key, stratum))
+#       
+#       # Combine with stratum vectors for other species
+#       strata.final <- bind_rows(strata.final, strata.df)
+#     }
+#   }
+# }
+# 
+# # Add start latitude and longitude to strata table
+# strata.final <- strata.final %>% 
+#   left_join(select(tx.labels.tmp, -end.lat, -end.long, -brg)) %>% 
+#   filter(!is.na(vessel.name))
 
 # Create final strata and calculate area
 # Create df for transect-level stock info
