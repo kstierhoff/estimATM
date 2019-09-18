@@ -385,24 +385,24 @@ tx.o.n.os <- tx.ends.os %>%
     long = destination(lat, long, brg + 90, spacing/2, units = "nm")["lon"],
     grp = "north",
     loc = "offshore",
-    order = 3)
+    order = 1)
 
 # Calculate inshore/south transects
-tx.i.s.os <- tx.ends.os %>% 
-  select(-lat.o, -long.o) %>% 
-  rename(lat = lat.i, long = long.i) %>% 
+tx.o.s.os <- tx.ends.os %>% 
+  select(-lat.i, -long.i) %>% 
+  rename(lat = lat.o, long = long.o) %>% 
   mutate(
     lat  = destination(lat, long, brg - 90, spacing/2, units = "nm")["lat"],
     long = destination(lat, long, brg - 90, spacing/2, units = "nm")["lon"],
     grp = "south",
-    loc = "inshore",
+    loc = "offshore",
     order = 3)
 
 # Combine all offshore transects
 tx.o.final.os <- tx.o.os %>% 
   bind_rows(filter(tx.o.n.os)) %>% 
   bind_rows(filter(tx.o.s.os)) %>% 
-  arrange(desc(transect), desc(order))
+  arrange(desc(transect), order)
 
 # Assemble the final data frame with all waypoints -----------------------------
 strata.points.os <- tx.i.os %>% 
