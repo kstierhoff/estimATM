@@ -5703,11 +5703,11 @@ for (i in unique(strata.final$scientificName)) {
   nasc.summ.strata <- bind_rows(nasc.summ.strata, 
                                 nasc.temp.summ)
   
-  # Create data frame with stratum and area (m^2)
-  stratum.info <- strata.primary %>% 
-    filter(scientificName == i) %>% 
+  # Create data frame with stratum and area (m^2)  
+  stratum.info <- strata.primary %>%
+    filter(scientificName == i) %>%
     select(stratum, area) %>%
-    mutate(area = as.numeric(area)) %>% 
+    mutate(area = as.numeric(area)) %>%
     st_set_geometry(NULL)
   
   stratum.info.nearshore <- strata.nearshore %>% 
@@ -6259,7 +6259,7 @@ if (do.bootstrap) {
   stratum.summary.ns <- data.frame()
   # Configure progress bar
   pb1 <- tkProgressBar("R Progress Bar", 
-                       "Multiple Bootstrap Estimation - Species", 0, 100, 0)
+                       "Multiple Bootstrap Estimation (Nearshore) - Species", 0, 100, 0)
   spp.counter <- 1
   
   for (i in unique(strata.nearshore$scientificName)) {
@@ -6646,6 +6646,50 @@ if (estimate.offshore) {
   source(here("Code/estimateOffshore.R"))
 }
 ```
+
+```{r biomass-point-estimates-final-offshore}
+if (exists("pe.os")) {
+  # Print point estimate table
+  pe.os %>%
+    rename(Biomass = biomass.mean.point) %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = F,
+          align = c("l","c","r","r","r"),
+          digits = c(0),
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    column_spec(1, italic = TRUE) %>% 
+    row_spec(0, align = c("c")) %>%
+    collapse_rows(columns = c(1))
+}
+```
+
+
+```{r biomass-bootstrap-estimates-final-offshore}
+if (exists("be.os")) {
+  # Print bootstrap estimate table
+  be.os %>% 
+    rename(Number               = Stratum,
+           Transects            = nTransects,
+           Clusters             = nClusters,
+           Individuals          = nIndiv,
+           "Point esimate"      = Biomass,
+           SD                   = biomass.sd,
+           CV                   = biomass.cv,
+           "Lower CI$_{95\\%}$" = lower.ci.B,
+           "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+    kable(format = knitr.format, booktabs = TRUE,escape = F,
+          align = c("l","c",rep("r",ncol(be.os) - 2)),
+          digits = c(0),
+          format.args = list(big.mark = ",")) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    column_spec(1, italic = TRUE) %>%
+    row_spec(0, align = c("c")) %>%
+    # row_spec(be.stratum.all, bold = TRUE, color = "black", background = "#c1c2cc") %>% 
+    collapse_rows(columns = c(1:2)) %>%
+    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+}
+```
+
 
 ### Estimation QA/QC
 Compare biomass estimates from bootstrap function used to calculate length-disaggregated biomass and abundance estimates based on acoustic density by number and weight. 
