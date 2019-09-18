@@ -429,107 +429,218 @@ tx.lines.os.sf <- strata.points.os.sf %>%
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
 
-# Create stratum polygons -------------------------------------------------
-if (exists("strata.offshore")) rm(strata.offshore)
+# Determine transect order by min latitude/longitude
+tx.order.os <- data.frame()
 
-# # Define sampling strata
-# if (stratify.manually) {
-#   # Use manually defined strata
-#   strata.final <- strata.manual %>% 
-#     mutate(stratum.orig = stratum)
-# } else {
-#   # Define strata automatically
-#   strata.final.os <- data.frame()
-#   
-#   # Define strata boundaries and transects for each species
-#   for (i in unique(nasc.density.summ$scientificName)) {
-#     # Select positive transects and calculate differences between transect numbers
-#     # diffs >= 2 define stratum breaks
-#     temp.spp <- filter(nasc.density.summ.os, scientificName == i) %>% 
-#       filter(positive == TRUE) %>% 
-#       mutate(diff = c(1, diff(transect))) %>% 
-#       ungroup()
-#     
-#     if (nrow(temp.spp) > 0) {
-#       # Find the start of each positive stratum
-#       spp.starts <- temp.spp %>% 
-#         filter(diff > max.diff) 
-#       
-#       # If the start of the stratum == 1, stratum start is 1, else min transect number
-#       survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
-#       
-#       # A vector of stratum starts
-#       stratum.start <- c(survey.start, spp.starts$transect - 1)
-#       
-#       # If the end of the stratum is the last transect in the survey, 
-#       # select the last, else the last transect + 1
-#       survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
-#                            max(nasc.density.summ$transect),
-#                            max(temp.spp$transect) + 1)
-#       
-#       # A vector of stratum ends
-#       stratum.end <- c(temp.spp$transect[which(temp.spp$diff > max.diff) - 1] + 1, 
-#                        survey.end)
-#       
-#       # Combine starts and ends in to a data frame for plotting and generating stratum vectors
-#       strata.spp <- data.frame(scientificName = i, 
-#                                stratum = seq(1,length(stratum.start)),
-#                                start = stratum.start,
-#                                end = stratum.end) %>% 
-#         mutate(n.tx = end - start + 1)
-#       
-#       # Create stratum vectors
-#       strata.df <- data.frame()
-#       for (j in 1:nrow(strata.spp)) {
-#         # Create a vector of transects from start to end
-#         transect <- seq(strata.spp$start[j],strata.spp$end[j])
-#         
-#         # Combine results
-#         strata.df <- bind_rows(strata.df, 
-#                                data.frame(scientificName = i, 
-#                                           stratum = j,
-#                                           transect))
-#       }
-#       
-#       # Add vessel name and distance bin to strata.df for final cuts
-#       strata.df <- strata.df %>% 
-#         left_join(filter(select(nasc.density.summ, transect, vessel.name, dist.bin), 
-#                          scientificName == i)) %>% 
-#         mutate(stratum.key = factor(paste(stratum,vessel.name,dist.bin))) 
-#       
-#       # Summarise strata by key, remove strata with less than 3 transects, 
-#       # and reassign stratum numbers
-#       strata.df.summ <- strata.df %>% 
-#         group_by(stratum.key) %>% 
-#         summarise(n.tx = n()) %>% 
-#         filter(n.tx >= nTx.min) %>% 
-#         mutate(stratum = seq(1, n()))
-#       
-#       # Remove strata with less than minimum number of transects
-#       strata.df <- strata.df %>% 
-#         rename(stratum.orig = stratum) %>% 
-#         filter(stratum.key %in% strata.df.summ$stratum.key) %>% 
-#         left_join(select(strata.df.summ, stratum.key, stratum))
-#       
-#       # Combine with stratum vectors for other species
-#       strata.final <- bind_rows(strata.final, strata.df)
-#     }
-#   }
-# }
-# 
-# # Add start latitude and longitude to strata table
-# strata.final <- strata.final %>% 
-#   left_join(select(tx.labels.tmp, -end.lat, -end.long, -brg)) %>% 
-#   filter(!is.na(vessel.name))
+use.nums <- TRUE
+
+if (use.nums) {
+  # Calculate transect order per vessel
+  tx.order.temp <- nasc.offshore %>%
+    # filter(str_detect(vessel.name, i)) %>% 
+    group_by(transect.name) %>% 
+    summarise(max.lat  = max(lat),
+              min.long = max(long)) %>% 
+    mutate(rank.lat  = rank(max.lat), 
+           rank.long = rev(rank(min.long)), 
+           diff      = rank.lat - rank.long,
+           transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
+           rank.final = rank(transect.num)) %>% 
+    arrange(rank.final)
+} else {
+  # Calculate transect order per vessel
+  tx.order.temp <- nasc.offshore %>%
+    # filter(str_detect(vessel.name, i)) %>% 
+    group_by(transect.name) %>% 
+    summarise(max.lat  = max(lat),
+              min.long = max(long)) %>% 
+    mutate(rank.lat  = rank(max.lat), 
+           rank.long = rev(rank(min.long)), 
+           diff      = rank.lat - rank.long,
+           transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
+           rank.final = rank.lat) %>% 
+    arrange(rank.final)
+}
+
+# Assign transect order based on rank latitude
+if (nrow(tx.order.os) == 0) {
+  # If the first vessel, create transects from 0 to number of transects
+  tx.order.temp$transect <- tx.order.temp$rank.final
+} else {
+  # If not the first vessel, add rank latitude to largest existing transect number
+  tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.os$transect)
+}
+
+# Combine results from all vessels
+tx.order.os <- bind_rows(tx.order.os, tx.order.temp) %>% 
+  arrange(transect)
+
+# Add transect numbers to NASC data frame
+nasc.offshore <- left_join(select(nasc.offshore, -transect), 
+                           select(tx.order.os, transect.name, transect))
+
+# Add transect numbers to NASC density summary data frame
+nasc.density.summ.os <- nasc.density.summ.os %>% 
+  ungroup() %>% 
+  select(-transect) %>% 
+  left_join(select(tx.order.os, transect.name, transect))
+
+nasc.density.os <- nasc.density.os %>% 
+  ungroup() %>% 
+  select(-transect) %>% 
+  left_join(select(tx.order.os, transect.name, transect))
+
+# Add transect numbers to strata points data frame
+strata.points.os <- strata.points.os %>% 
+  ungroup() %>% 
+  select(-transect) %>% 
+  left_join(select(tx.order.os, transect.name, transect))
+
+# Offshore strata
+strata.manual.os <- bind_rows(
+  data.frame(
+    scientificName = "Clupea pallasii",
+    stratum = 1,
+    transect = 1:n_distinct(nasc.offshore$transect)),
+  data.frame(
+    scientificName = "Engraulis mordax",
+    stratum = 1,
+    transect = 1:n_distinct(nasc.offshore$transect)),
+  data.frame(
+    scientificName = "Sardinops sagax",
+    stratum = 1,
+    transect = 1:n_distinct(nasc.offshore$transect)),
+  data.frame(
+    scientificName = "Scomber japonicus",
+    stratum = 1,
+    transect = 1:n_distinct(nasc.offshore$transect)),
+  data.frame(
+    scientificName = "Trachurus symmetricus",
+    stratum = 1,
+    transect = 1:n_distinct(nasc.offshore$transect))
+)
+
+# Create stratum polygons -------------------------------------------------
+# Define sampling strata
+if (stratify.manually.os) {
+  # Use manually defined strata
+  strata.final.os <- strata.manual.os %>%
+    mutate(stratum.orig = stratum)
+  
+} else {
+  # Define strata automatically
+  strata.final.os <- data.frame()
+
+  # Define strata boundaries and transects for each species
+  for (i in unique(nasc.density.summ.os$scientificName)) {
+    # Select positive transects and calculate differences between transect numbers
+    # diffs >= 2 define stratum breaks
+    temp.spp <- filter(nasc.density.summ.os, scientificName == i) %>%
+      filter(positive == TRUE) %>%
+      mutate(diff = c(1, diff(transect))) %>%
+      ungroup()
+
+    if (nrow(temp.spp) > 0) {
+      # Find the start of each positive stratum
+      spp.starts <- temp.spp %>%
+        filter(diff > max.diff)
+
+      # If the start of the stratum == 1, stratum start is 1, else min transect number
+      survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
+
+      # A vector of stratum starts
+      stratum.start <- c(survey.start, spp.starts$transect - 1)
+
+      # If the end of the stratum is the last transect in the survey,
+      # select the last, else the last transect + 1
+      survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
+                           max(nasc.density.summ$transect),
+                           max(temp.spp$transect) + 1)
+
+      # A vector of stratum ends
+      stratum.end <- c(temp.spp$transect[which(temp.spp$diff > max.diff) - 1] + 1,
+                       survey.end)
+
+      # Combine starts and ends in to a data frame for plotting and generating stratum vectors
+      strata.spp <- data.frame(scientificName = i,
+                               stratum = seq(1,length(stratum.start)),
+                               start = stratum.start,
+                               end = stratum.end) %>%
+        mutate(n.tx = end - start + 1)
+
+      # Create stratum vectors
+      strata.df <- data.frame()
+      
+      for (j in 1:nrow(strata.spp)) {
+        # Create a vector of transects from start to end
+        transect <- seq(strata.spp$start[j],strata.spp$end[j])
+
+        # Combine results
+        strata.df <- bind_rows(strata.df,
+                               data.frame(scientificName = i,
+                                          stratum = j,
+                                          transect))
+      }
+
+      # Add vessel name and distance bin to strata.df for final cuts
+      strata.df <- strata.df %>%
+        left_join(filter(select(nasc.density.summ.os, scientificName, transect, dist.bin),
+                         scientificName == i)) %>%
+        mutate(stratum.key = factor(paste(stratum, dist.bin)))
+
+      # Summarise strata by key, remove strata with less than 3 transects,
+      # and reassign stratum numbers
+      strata.df.summ <- strata.df %>%
+        group_by(stratum.key) %>%
+        summarise(n.tx = n()) %>%
+        filter(n.tx >= nTx.min) %>%
+        mutate(stratum = seq(1, n()))
+
+      # Remove strata with less than minimum number of transects
+      strata.df <- strata.df %>%
+        rename(stratum.orig = stratum) %>%
+        filter(stratum.key %in% strata.df.summ$stratum.key) %>%
+        left_join(select(strata.df.summ, stratum.key, stratum))
+
+      # Combine with stratum vectors for other species
+      strata.final.os <- bind_rows(strata.final.os, strata.df)
+    }
+  }
+}
+
+# Create acoustic transect labels for offshore maps
+tx.labels.os <- nasc.offshore %>% 
+  group_by(transect) %>% 
+  summarise(
+    vessel.name = vessel.name[1],
+    transect.name = transect.name[1],
+    start.lat = lat[which.max(long)],
+    start.long = max(long),
+    end.lat = lat[which.min(long)],
+    end.long = min(long),
+    brg = 90 - swfscMisc::bearing(end.lat, end.long, start.lat, start.long)[1])
+
+# Add start latitude and longitude to strata table
+strata.final.os <- strata.final.os %>%
+  left_join(select(tx.labels.os, -end.lat, -end.long, -brg)) %>%
+  filter(!is.na(vessel.name))
 
 # Create final strata and calculate area
 # Create df for transect-level stock info
 nasc.stock.os <- data.frame()
+# 
+# strata.final.os <- strata.manual.os %>% 
+#   mutate(stratum.orig = stratum)
 
-strata.final.os <- strata.manual.os %>% 
-  mutate(stratum.orig = stratum)
+# Summarise NASC to get species present
+offshore.spp <- nasc.prop.spp.os %>% 
+  filter(nasc > 0) %>% 
+  group_by(scientificName) %>% 
+  tally()
 
-for (i in unique(strata.final$scientificName)) {
+if (exists("strata.offshore")) rm(strata.offshore)
+
+for (i in unique(offshore.spp$scientificName)) {
   # Select each strata per species
   strata.sub <- filter(strata.final.os, scientificName == i) %>% 
     select(transect, stratum)  
@@ -542,7 +653,7 @@ for (i in unique(strata.final$scientificName)) {
       i == "Engraulis mordax" & stratum == 2 ~ "Northern",
       i == "Engraulis mordax" & stratum == 1 ~ "Central",
       i == "Sardinops sagax"  & stratum == 1  ~ "Northern",
-      # i == "Sardinops sagax"  & stratum == 1  ~ "Southern",
+      i == "Sardinops sagax"  & stratum == 1  ~ "Southern",
       i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
       scientificName = i) %>% 
     select(transect, stock, scientificName) %>% 
@@ -605,8 +716,8 @@ save(strata.offshore,
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
 # Summarise strata transects
 strata.summ.os <- strata.final.os %>% 
-  mutate(vessel.name = "RL") %>% 
-  group_by(vessel.name, scientificName, stratum) %>% 
+  # mutate(vessel.name = "RL") %>% 
+  group_by(scientificName, stratum) %>% 
   summarise(
     start     = min(transect),
     end       = max(transect)) %>% 
@@ -617,9 +728,7 @@ strata.offshore <- strata.offshore %>%
   st_difference(st_union(bathy_5m_poly)) %>% 
   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
   ungroup() %>% 
-  mutate(area = st_area(.)) %>% 
-  left_join(select(strata.summ, 
-                   scientificName, stratum, vessel.name))
+  mutate(area = st_area(.)) 
 
 # Save clipped primary polygons
 save(strata.offshore, 
@@ -657,13 +766,13 @@ if (save.figs) {
     geom_sf(data = strata.offshore, aes(colour = factor(stratum), 
                                        fill = stock), alpha = 0.5) +
     # Plot proportion of backscatter from each species present
-    geom_point(data = nasc.prop.all.os, aes(X, Y, size = cps.nasc),
+    geom_point(data = nasc.prop.all.os, aes(X, Y, size = cps.nasc), 
                colour = "gray20", show.legend = F) +
     geom_point(data = filter(nasc.prop.spp.os, nasc > 0),
                aes(X, Y, size = nasc), colour = "red", show.legend = F) +
     scale_colour_discrete("Stratum") +
-    scale_fill_manual("Stock",
-                      values = c("All" = "yellow", "Central" = "green",
+    scale_fill_manual("Stock", 
+                      values = c("All" = "yellow", "Central" = "green", 
                                  "Northern" = "blue", "Southern" = "orange")) +
     # Facet by species
     facet_wrap(~scientificName, nrow = 2) +
@@ -675,14 +784,13 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save figure
-  ggsave(here("Figs/fig_acoustic_strata_map_offshore.png"), map.stratum.all.os,
+  ggsave(here("Figs/fig_nasc_acoustic_proportions_strata_offshore.png"), map.stratum.all.os,
          width = map.width*2.6, height = map.height*1.5)
 }
 
 # Convet nasc.density to sf and project
-nasc.density.os <- st_as_sf(nasc.density.os, coords = c("long","lat"), crs = crs.geog)
-
-nasc.density.os <- project_sf(nasc.density.os, crs = crs.proj)
+nasc.density.os <- ungroup(nasc.density.os) %>% 
+  project_df(to = crs.proj)
 
 # Summarize positive clusters to filter clusters from removed strata
 pos.cluster.summ <- pos.clusters %>% 
@@ -690,14 +798,16 @@ pos.cluster.summ <- pos.clusters %>%
   summarise(nIndiv = sum(num)) %>% 
   filter(nIndiv >= nIndiv.min)
 
-pos.clusters.os <- pos.clusters %>% 
-  left_join(cluster.mid) %>% 
-  mutate(stock = case_when(
-    scientificName == "Engraulis mordax" & lat >= stock.break.anch ~ "Northern",
-    scientificName == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
-    scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
-    scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
-    scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))
+pos.clusters.os <- pos.clusters
+
+# pos.clusters.os <- pos.clusters %>% 
+#   left_join(cluster.mid) %>% 
+#   mutate(stock = case_when(
+#     scientificName == "Engraulis mordax" & lat >= stock.break.anch ~ "Northern",
+#     scientificName == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
+#     scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
+#     scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
+#     scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))
 
 nasc.os.clusters <- sort(unique(nasc.offshore$cluster))
 
@@ -718,9 +828,8 @@ if (save.figs) {
       pos.cluster.txt <- pos.clusters.os %>% 
         filter(scientificName == i, stock == j,
                cluster %in% nasc.os.clusters) %>% 
-        st_as_sf(coords = c("long","lat"), crs = crs.geog)
-      
-      pos.cluster.txt <- project_sf(pos.cluster.txt, crs = crs.proj)
+        ungroup() %>% 
+        project_df(to = crs.proj)
       
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens.os <- base.map +
@@ -728,10 +837,10 @@ if (save.figs) {
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
         # Plot vessel track
-        geom_sf(data = nav.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+        geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
         # Plot zero nasc data
-        geom_point(data = filter(nasc.os.proj, cps.nasc == 0), aes(X, Y),
-                   colour = 'gray50',size = 0.15, alpha = 0.5) +
+        geom_point(data = filter(nasc.offshore, cps.nasc == 0), aes(X, Y),
+                   colour = 'gray50', size = 0.15, alpha = 0.5) +
         # Plot NASC data
         geom_point(data = nasc.density.plot.os, aes(X, Y, size = bin, fill = bin),
                    shape = 21, alpha = 0.75) +
@@ -752,7 +861,7 @@ if (save.figs) {
       
       # Save figures
       ggsave(biomass.dens.os, 
-             filename = paste(here("Figs/fig_biomass_dens_offshore_map_"), i, "-", j, ".png",sep = ""),
+             filename = paste(here("Figs/fig_biomass_dens_offshore_"), i, "-", j, ".png",sep = ""),
              width  = map.width,height = map.height)
       
       # Save plot to list
@@ -767,14 +876,14 @@ if (save.figs) {
 
 # Create blank plots for missing species
 for (i in cps.spp) {
-  if (is.null(biomass.dens.figs[[i]])) {
+  if (is.null(biomass.dens.figs.os[[i]])) {
     df <- data.frame()
     biomass.dens.temp <- ggplot(df) + geom_point() + 
       xlim(0,10) + ylim(0,10) + 
       annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
       theme_bw()  
     ggsave(biomass.dens.temp, 
-           filename = paste(here("Figs/fig_biomass_dens_offshore_map_"), i, ".png", sep = ""))
+           filename = paste(here("Figs/fig_biomass_dens_offshore_"), i, ".png", sep = ""))
   }
 }
 

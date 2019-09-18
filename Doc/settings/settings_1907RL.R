@@ -366,6 +366,7 @@ nClusters.min <- 2
 
 # Use manually defined strata?
 stratify.manually <- FALSE
+stratify.manually.os <- FALSE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects
@@ -379,7 +380,23 @@ stratify.manually <- FALSE
 # # Offshore strata
 # strata.manual.os <- bind_rows(
 #   data.frame(
-#     scientificName = "Clupea pallasii", 
+#     scientificName = "Clupea pallasii",
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Engraulis mordax",
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Sardinops sagax",
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Scomber japonicus",
+#     stratum = 1,
+#     transect = 1:8),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus",
 #     stratum = 1,
 #     transect = 1:8)
 # )
