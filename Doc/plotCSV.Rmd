@@ -16,7 +16,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,here,sf,knitr,fs,leaflet,leaflet.extras,bookdown,
-               leafem,mapview)
+               leafem,mapview,htmltools)
 
 # Install and load required packages from Github -------------------------------
 # atm
@@ -34,19 +34,22 @@ knitr::opts_chunk$set(
   echo = FALSE, warning = FALSE, message = FALSE, 
   fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
 )
+
+# Controls
+process.csv <- FALSE
 ```
 
 Files listed below are processed and plotted at any time, but ideally prior to being processed using plotBio, estimateBiomass, etc. 
 
 ```{r list-files, echo=TRUE}
 # List full file paths
+csv.paths <- dir_ls("C:/SURVEY/1907RL/PROCESSED/EV/CSV/CARNAGE", regexp = "*.csv")
+```
+```{r}
 # csv.paths <- c("//swc-storage3-s/AST3/SURVEYS/20190619_CARNAGE_SummerCPS/PROCESSED/EV/CSV/1907LBC_001-Final 38 kHz CPS.csv")
 
 # csv.paths <- dir_ls("//swc-storage3-s/AST3/SURVEYS/20190619_CARNAGE_SummerCPS/PROCESSED/EV/CSV",
 #                     regexp = "*.csv")
-
-csv.paths <- dir_ls("C:/SURVEY/1907RL/PROCESSED/EV/CSV/CARNAGE",
-                    regexp = "*.csv")
 ```
 
 ```{r user-input}
@@ -74,32 +77,36 @@ nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00",
 ```
 
 ```{r process-csv-cps, include=FALSE}
-# Create data frame for results
-nasc <- data.frame()
-
-# Configure progress bar
-pb <- winProgressBar(title = "CSV File Processing Progress - CPS", 
-                     label = "0% done", min = 0, max = 100, initial = 0)
-
-# Process all .CSV files
-for (i in 1:length(csv.paths)) {
-  # Process i-th file
-  nasc <- bind_rows(nasc, extract_csv(csv.paths[i]))
+if (process.csv) {
+  # Create data frame for results
+  nasc <- data.frame()
   
-  # Update the progress bar
-  info <- sprintf("%d%% done", round((i / length(csv.paths)) * 100))
-  setWinProgressBar(pb, round((i / length(csv.paths)) * 100), label = info)
+  # Configure progress bar
+  pb <- winProgressBar(title = "CSV File Processing Progress - CPS", 
+                       label = "0% done", min = 0, max = 100, initial = 0)
+  
+  # Process all .CSV files
+  for (i in 1:length(csv.paths)) {
+    # Process i-th file
+    nasc <- bind_rows(nasc, extract_csv(csv.paths[i]))
+    
+    # Update the progress bar
+    info <- sprintf("%d%% done", round((i / length(csv.paths)) * 100))
+    setWinProgressBar(pb, round((i / length(csv.paths)) * 100), label = info)
+  }
+  close(pb)
+  
+  # Calculate summary interval
+  nasc <- nasc %>%
+    mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                     labels = F, include.lowest = T))
+  
+  # Save results
+  save(nasc, file = here("Output/nasc_plotCSV.Rdata"))
+  write.csv(nasc, file = here("Output/nasc_plotCSV.csv"), row.names = F, quote = F)
+} else {
+  load(here("Output/nasc_plotCSV.Rdata"))
 }
-close(pb)
-
-# Calculate summary interval
-nasc <- nasc %>%
-  mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                   labels = F, include.lowest = T))
-
-# Save results
-save(nasc, file = here("Output/nasc_plotNASC.Rdata"))
-write.csv(nasc, file = here("Output/nasc_plotNASC.csv"), row.names = F, quote = F)
 
 # Get intervals with bad lat/long values
 bad.nasc <- filter(nasc, lat == 999, long == 999)
@@ -138,7 +145,14 @@ nasc.sf <- nasc %>%
   filter(!is.na(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
+
 nasc.plot <- project_sf(nasc.sf, crs.proj)
+
+nasc.paths <- nasc %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") 
 ```
 
 ```{r find-big-nasc}
@@ -171,12 +185,46 @@ big.nasc.sf <- big.nasc %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 ```
 
+```{r load-nav-data}
+load(here("Data/Nav/nav_data.Rdata"))
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename)) %>% 
+  rename(lat = Latitude, long = Longitude) %>% 
+  project_df(to = crs.proj)
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+   mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+# Create transect lines from waypoint files and add line bearing
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.),
+         label    = paste("Transect", Transect),
+         popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                       'Distance:', distance, 'nmi<br/>')) 
+```
+
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
 
 # Info on tile caching
 # https://bhaskarvk.github.io/leaflet.extras/reference/TileCaching.html
+
+# Create color pallette for planned transects
+txPal    <- colorFactor(c("red","blue","orange","green"), 
+                        c("Adaptive","Compulsory","Nearshore","Offshore"))
 
 # Set padding around data  
 imap.bounds <- map_bounds(nasc$lat, nasc$long, 0.1) 
@@ -203,7 +251,36 @@ i.map <- leaflet() %>%
   addProviderTiles(providers$Esri.OceanBasemap, 
                    options = tileOptions(useCache = useCachedTile,
                                          crossOrigin = useCrossOrigin)) %>%
+  # Add core planned transects
+  addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
+               group = "Planned Transects (Core)") %>%
+  addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Core)") %>%
+  # Add ancillary planned transects 
+  addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)), 
+               popup = ~popup,
+               group = "Planned Transects (Ancillary)") %>%
+  addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Ancillary)") %>%
+  # Add nav data
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") %>%
   # Add backscatter data
+  addPolylines(data = nasc.paths, color = "#000414", weight = 3, 
+               label = ~transect, group = "Vessel Track") %>%
   addCircleMarkers(data = filter(nasc.sf, NASC < 200), 
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  "#000414", 
@@ -223,15 +300,17 @@ i.map <- leaflet() %>%
   # Add scale bar
   addScaleBar(position = "bottomright") %>%
   # Add map coordinates
-  addMouseCoordinates() %>% 
+  leafem::addMouseCoordinates() %>% 
   # Add measurement tool
   addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
              primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
              position = "topleft") %>% 
   # Add layer controls
   addLayersControl(
-    overlayGroups = c("Backscatter", "Backscatter (Small)"),
+    overlayGroups = c("Backscatter", "Backscatter (Small)", "Vessel Track",
+                      "Planned Transects (Core)", "Planned Transects (Ancillary)"),
     options = layersControlOptions(collapsed = F)) %>%  
+  hideGroup(c("Planned Transects (Core)", "Planned Transects (Ancillary)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 ```
