@@ -229,10 +229,10 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LBC = "\\d{3}T")
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = F,
-                            LM  = F,
-                            SD  = F,
-                            LBC = F) 
+source.cps.nasc        <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            SD  = FALSE,
+                            LBC = FALSE) 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/CPS_NASC/cps_nasc_1907RL.csv"),
                             LM  = NA,
@@ -244,50 +244,50 @@ tx.char.pattern        <- c(RL  = "[^0-9]",
                             SD  = "[^0-9]",
                             LBC = "[^0-9]") 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL  = T,
-                            LM  = F,
-                            SD  = F,
-                            LBC = F) 
+strip.tx.nums          <- c(RL  = TRUE,
+                            LM  = FALSE,
+                            SD  = FALSE,
+                            LBC = FALSE) 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = F,
-                            LM  = F,
-                            SD  = F,
-                            LBC = F) 
+strip.tx.chars         <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            SD  = TRUE,
+                            LBC = TRUE) 
 # If T, removes transects with names including "transit"
-rm.transit             <- c(RL  = F,
-                            LM  = F,
-                            SD  = F,
-                            LBC = F) 
+rm.transit             <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            SD  = TRUE,
+                            LBC = TRUE) 
 # If T, removes transects with names including "offshore"
-rm.offshore            <- c(RL  = T,
-                            LM  = T,
-                            SD  = F,
-                            LBC = F)
+rm.offshore            <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            SD  = TRUE,
+                            LBC = TRUE)
 # If T, removes transects with names including "inshore"
-rm.inshore             <- c(RL  = F,
-                            LM  = T,
-                            SD  = T,
-                            LBC = F)
+rm.inshore             <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            SD  = TRUE,
+                            LBC = TRUE)
 # If T, removes transects with names including "nearshore"
-rm.nearshore           <- c(RL  = T,
-                            LM  = F,
-                            SD  = F,
-                            LBC = F) 
+rm.nearshore           <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            SD  = TRUE,
+                            LBC = TRUE) 
 # If T, subtracts NASC.5 from cps.nasc
-rm.surface             <- c(RL  = F,
-                            LM  = F,
-                            SD  = F,
-                            LBC = F) 
+rm.surface             <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            SD  = FALSE,
+                            LBC = FALSE) 
 # regex for matching number pattern
 tx.num.pattern         <- c(RL  = "-\\d{1}",
                             LM  = "-\\d{1}",
                             SD  = "-\\d{1}",
                             LBC = "-\\d{1}") 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL  = T,
-                            LM  = T,
-                            SD  = T,
-                            LBC = T) 
+use.tx.number          <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            SD  = TRUE,
+                            LBC = TRUE) 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
                             LM  = NA,
