@@ -94,7 +94,7 @@ This report presents results from the **`r survey.name.long` (`r survey.name`)**
 The results were generated using R and Rstudio:  
 
 * `r session.info[["platform"]]$version` 
-* Last run: `r session.info[[ess.csv.all"platform"]]$date`
+* Last run: `r session.info[["platform"]]$date`
 
 ## Processing loop controls
 Options in this section control the execution of various code chunks. All chunks should be run (i.e., controls  <- `T`) the first time to copy all necessary data files, import data from databases, generate maps and figures, estimate abundance and biomass, etc. Subsequent processing may be sped-up by setting some controls to `F` if source data or analyses have not changed (e.g., if only changes to a figure have been made).
@@ -117,9 +117,10 @@ overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
+estimate.os       <- T # Estimate biomass in the offshore strata
+estimate.ns       <- F # Estimate biomass in the nearshore strata
 
-# Usually F
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -6559,6 +6560,12 @@ save(be.survey.ns, file = here("Output/biomass_bootstrap_estimates_survey_nearsh
 ### Nearshore strata  
 Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS by stratum and within the entire survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.
 
+```{r estimate-nearshore-biomass}
+if (estimate.ns) {
+  source(here("Code/estimateNearshore.R"))
+}
+```
+
 ```{r biomass-bootstrap-estimates-final-nearshore}
 # Combine stratum and survey estimates
 be.ns <- be.stratum.ns %>% 
@@ -6679,8 +6686,8 @@ include_graphics(here("Figs/fig_biomass_histogram_survey_nearshore.png"))
 ### Offshore strata
 If desired, estimate biomass in the offshore stratum.
 
-```{r biomass-bootstrap-estimates-final-offshore}
-if (estimate.offshore) {
+```{r estimate-offshore-biomass}
+if (estimate.os) {
   source(here("Code/estimateOffshore.R"))
 }
 ```
@@ -6700,7 +6707,6 @@ if (exists("pe.os")) {
     collapse_rows(columns = c(1))
 }
 ```
-
 
 ```{r biomass-bootstrap-estimates-final-offshore}
 if (exists("be.os")) {
@@ -6727,7 +6733,6 @@ if (exists("be.os")) {
     add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
 }
 ```
-
 
 ### Estimation QA/QC
 Compare biomass estimates from bootstrap function used to calculate length-disaggregated biomass and abundance estimates based on acoustic density by number and weight. 
