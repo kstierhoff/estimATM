@@ -55,7 +55,7 @@ nasc.map.ns <- base.map +
 
 # Save figures
 ggsave(nasc.map.ns, 
-       filename = here("Figs/fig_nasc_nearshore_example.png"),
+       filename = here("Figs/fig_nasc_nse_example.png"),
        width  = map.width*1.5, height = map.height*.75)
 
 
@@ -153,7 +153,7 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final, 
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.6, height = map.height*.75)
 
 # Northern anchovy-Central -------------------------------------------------------------
@@ -249,7 +249,7 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final, 
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*.75, height = map.height*.75)
 
 # Pacific sardine-Northern -------------------------------------------------------------
@@ -345,7 +345,7 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final, 
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.5, height = map.height*.75)
 
 # Pacific sardine-Southern -------------------------------------------------------------
@@ -441,7 +441,7 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final,
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.1, height = map.height*.75)
 
 # Pacific mackerel-All ---------------------------------------------------------
@@ -533,7 +533,7 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final, 
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.5, height = map.height*.75)
 
 # Jack mackerel-All ---------------------------------------------------------
@@ -629,7 +629,7 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final, 
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*2.2, height = map.height*.75)
 
 # Pacific herring-All ---------------------------------------------------------
@@ -725,5 +725,5 @@ nearshore.map.final <- ggdraw() +
 
 # Save combined maps
 ggsave(nearshore.map.final, 
-       filename = paste(here("Figs/fig_biomass_dens_nearshore_"), i, "-", j, ".png",sep = ""),
+       filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*.75, height = map.height*.75)

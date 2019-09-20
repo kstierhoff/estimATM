@@ -166,9 +166,10 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
-# Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
+# Survey vesslels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM", "SD", "LBC") 
 nasc.vessels.offshore  <- c("RL","SD")
+nasc.vessels.nearshore <- c("LBC","LM","SD")
 
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
@@ -198,10 +199,10 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             SD  = "PROCESSED/EV/CSV/SAILDRONE",
                             LBC = "PROCESSED/EV/CSV/CARNAGE") 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "*Final 38 kHz CPS.csv",
-                            LM  = "*CPS-Final CPS.csv",
-                            SD  = "*CPS-Final CPS.csv",
-                            LBC = "*Final 38 kHz CPS.csv")
+nasc.pattern.cps       <- c(RL  = "-Final 38 kHz CPS.csv",
+                            LM  = "_CPS-Final CPS.csv",
+                            SD  = "_CPS-Final CPS.csv",
+                            LBC = "-Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Juan Krill Final 120.csv",
                             LM  = "*Juan Krill Final 120.csv",
@@ -249,10 +250,10 @@ strip.tx.nums          <- c(RL  = TRUE,
                             SD  = FALSE,
                             LBC = FALSE) 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = TRUE,
-                            LBC = TRUE) 
+strip.tx.chars         <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            SD  = FALSE,
+                            LBC = FALSE) 
 # If T, removes transects with names including "transit"
 rm.transit             <- c(RL  = TRUE,
                             LM  = TRUE,

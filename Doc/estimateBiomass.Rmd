@@ -105,7 +105,7 @@ Options in this section control the execution of various code chunks. All chunks
 get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
+copy.files        <- F # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
@@ -115,12 +115,12 @@ download.hab      <- F # Download habitat map
 # Sometimes F
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.cal       <- F # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
+process.cal       <- T # Process calibration results
+process.ctd       <- T # Process CTD and UCTD casts
 estimate.os       <- T # Estimate biomass in the offshore strata
 estimate.ns       <- F # Estimate biomass in the nearshore strata
 
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -477,7 +477,7 @@ bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>%
 
 # Read isoline
 bathy_5m_line <- st_read(here("Data/GIS/bathy_us_wc_5m.shp")) %>% 
-  st_transform(4326) %>% 
+  st_transform(crs.geog) %>% 
   rename(Depth = CONTOUR)
 
 # Read 5m bathymetry points shapefile
@@ -611,16 +611,20 @@ For each .CSV file produced during Echoview processing, data within each `r bin.
 For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 50 m depth (NASC.50) is used. Transect names are extracted from .CSV file names, hort transects are excluded, and transect numbers are assigned.
 
 ```{r process-backscatter}
+#rm(processed.csv)
 if (process.csv) {
-  # Load already processed CSV files 
-  if (file.exists(here("Output/processed_csv.Rdata"))) {
-    # Load already processed CSV files
-    load(here("Output/processed_csv.Rdata"))
-  }
-
   if (process.csv.all) {
+    # Create new data frame for backscatter data
     nasc <- data.frame() 
+    
   } else {
+    # Load already processed CSV files 
+    if (file.exists(here("Output/processed_csv.Rdata"))) {
+      load(here("Output/processed_csv.Rdata"))
+      
+    }
+    
+    # Load already processed backscatter data
     load(here("Data/Backscatter/nasc_all.Rdata"))
   }
   
@@ -655,7 +659,8 @@ if (process.csv) {
         # Extract vessel nasc
         nasc.vessel.temp <- extract_csv(nasc.files[ii]) %>% 
           mutate(vessel.name = i,
-                 sounder = sounder.type[i])
+                 sounder = sounder.type[i],
+                 transect = str_replace(transect, nasc.pattern.cps[i],""))
         
         # Combine results
         nasc.vessel <- bind_rows(nasc.vessel, nasc.vessel.temp)
@@ -675,6 +680,19 @@ if (process.csv) {
                        paste0("nasc_vessel_", i, "_RAW.rds")))
       
       processed.csv.vessel <- sort(unique(nasc.vessel$filename))
+      
+      # Get intervals with bad lat/long values
+      bad.nasc <- filter(nasc.vessel, lat == 999, long == 999) %>% 
+        arrange(filename, datetime)
+      
+      if (nrow(bad.nasc) > 0) {
+        write_csv(bad.nasc, here("Data/Backscatter", i, 
+                       paste0("nasc_vessel_", i, "_Bad.csv")))  
+      }
+      
+      # Remove bad intervals
+      nasc.vessel <- nasc.vessel %>% 
+        filter(lat != 999, long != 999)
       
       # Save original transect name before modifying
       # Convert date and time to POSIXct
@@ -696,7 +714,7 @@ if (process.csv) {
         
         nasc.vessel.sf <- nasc.vessel %>% 
           select(id, long, lat, vessel.name) %>% 
-          st_as_sf(coords = c("long","lat"), crs = 4326)  
+          st_as_sf(coords = c("long","lat"), crs = crs.geog)  
 
         # Buffer planned Saildrone transects to assign transect numbers
         sd.buffer <- transects.sf %>% 
@@ -748,7 +766,7 @@ if (process.csv) {
             sd.nasc.filter <- read_csv(here("Data/Backscatter", sd.nasc.name)) %>% 
               filter(valid == 1) %>% 
               select(datetime, long, lat) %>% 
-              st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+              st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
               st_intersection(sd.buffer) %>% 
               st_set_geometry(NULL) %>% 
               arrange(datetime)
@@ -932,22 +950,6 @@ if (process.csv) {
   load(here("Data/Backscatter/nasc_all.Rdata"))
 }
 
-# Get intervals with bad lat/long values
-bad.nasc <- filter(nasc, lat == 999, long == 999) %>% 
-  arrange(filename, datetime)
-
-write_csv(bad.nasc, here("Output/nasc_bad.csv"))
-
-# Remove bad intervals
-nasc <- nasc %>% 
-  filter(lat != 999, long != 999)
-
-# Manually remove transect for 1807RL
-if (survey.name == "1807RL") {
-  nasc <- nasc %>% 
-    filter(filename != "1807RL_029_CPS-Final 38 kHz CPS.csv")
-}
-
 # Determine transect order by min latitude/longitude
 tx.order <- data.frame()
 
@@ -1009,7 +1011,7 @@ if (prj.name %in% c("1807RL")) {
   
   # Subset Saildrone backscatter and remove overlap with Lasker
   nasc.sd.sub <- filter(nasc, vessel.name == "SD1024") %>% 
-    st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
     st_difference(filter(survey.polygons, vessel.name == "RL"))
   
   nasc.sd <- nasc %>% 
@@ -1052,15 +1054,6 @@ nasc %>%
                                             unique(.y$vessel.name), "_Leg", 
                                             unique(.y$leg), ".csv")),
                          row.names = FALSE))
-```
-
-```{r filter-saildrone-nav,eval=FALSE}
-# # Add COG and HDG to Saildrone NASC from ERDDAP nav
-# if ("SD" %in% nasc.vessels & prj.name != "1807RL-Saildrone") {
-#   nasc <- nasc %>% 
-#     mutate(time.align = align.time(datetime, 60)) %>% 
-#     left_join(select(nav.sd, vessel.name, time.align, COG, HDG))  
-# }
 ```
 
 ## Examine backscatter data for outliers  
@@ -1333,28 +1326,6 @@ if (save.figs) {
   # Create final backscatter summary map
   source(here("Code/plot_sA_CPS.R"))
 
-  # # Map backscatter - no transect labels
-  # nasc.map <- base.map +
-  #   # Plot vessel track
-  #   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
-  #   # Plot NASC data
-  #   geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
-  #              shape = 21, alpha = 0.75) +
-  #   # Configure size and colour scales
-  #   scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
-  #                     values = nasc.sizes.all,labels = nasc.labels.all) +
-  #   scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
-  #                     values = nasc.colors.all, labels = nasc.labels.all) +
-  #   scale_colour_discrete(name = "Vessel") +
-  #   # Configure legend guides
-  #   guides(fill = guide_legend(), size = guide_legend()) +
-  #   # Plot title
-  #   ggtitle("CPS Backscatter") +
-  #   coord_sf(crs = crs.proj,
-  #          xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-  #          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-
-  
   # Map backscatter - Lisa Marie region only  
   if (survey.name %in% c("1707RL")) {
     # Map backscatter - no transect labels
@@ -1894,9 +1865,6 @@ Trawl hauls where a single species makes up $\geq$ 80% of the catch (by weight) 
 # Summarize hauls with single species CPS catch for target strength estimation
 # Calculate total sample weight for each CPS species
 catch.ts <- catch %>% 
-  # left_join(select(spp.codes, species, scientificName, commonName)) %>%
-  # filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-  #          netSampleType == 'codend' & scientificName %in% cps.spp) %>% 
   mutate(totalSampleWeight = subSampleWtkg + remainingSubSampleWtkg) 
 
 # Calculate total CPS weight per
@@ -3815,9 +3783,6 @@ save(strata.final, strata.summ, strata.summ.rm,
      file = here("Output/strata_info.Rdata"))
 
 # Write results to .csv file
-# write.csv(strata.manual, file = here("Output/strata_manual.csv"), 
-#           quote = F,row.names = F)
-
 write.csv(strata.final, file  = here("Output/strata_final.csv"),  
           quote = F,row.names = F)
 
@@ -4164,7 +4129,7 @@ strata.points <- tx.i %>%
   mutate(key = paste(transect.name, grp)) 
 
 # Convert to points
-strata.points.sf <- st_as_sf(strata.points, coords = c("long","lat"), crs = 4326) 
+strata.points.sf <- st_as_sf(strata.points, coords = c("long","lat"), crs = crs.geog) 
 
 # Create polygons
 strata.super.polygons <- strata.points.sf %>% 
@@ -4236,7 +4201,7 @@ tx.c <- tx.c %>%
 nearshore.points <- read.csv(here("Data/GIS/isobath_5m_final.csv")) %>%
   mutate(order = seq(1, n()))
 
-nearshore.points.sf <- st_as_sf(nearshore.points, coords = c("long","lat"), crs = 4326)
+nearshore.points.sf <- st_as_sf(nearshore.points, coords = c("long","lat"), crs = crs.geog)
 
 # Ensure strata objects do not exist
 if (exists("strata.primary")) rm(strata.primary)
@@ -4300,7 +4265,7 @@ for (i in unique(strata.final$scientificName)) {
       bind_rows(primary.poly.j.s) %>%
       bind_rows(primary.poly.j.i) %>%
       bind_rows(primary.poly.j.n) %>% 
-      st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
       group_by(stratum, stock) %>% 
       summarise(do_union = F) %>% 
       st_cast("POLYGON") %>% 
@@ -4329,7 +4294,7 @@ for (i in unique(strata.final$scientificName)) {
              loc = "nearshore",
              stock = unique(primary.poly.temp$stock)) %>% 
       bind_rows(clip.temp) %>% 
-      st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
       group_by(stratum, stock) %>% 
       summarise(do_union = F) %>% 
       st_cast("POLYGON") %>% 
@@ -4337,8 +4302,8 @@ for (i in unique(strata.final$scientificName)) {
       st_make_valid()
     
     # Find nearest point on the 5 m isobath
-    ns.bound.lower <- st_as_sf(primary.poly.j.s, coords = c("long","lat"), crs = 4326)
-    ns.bound.upper <- st_as_sf(primary.poly.j.n, coords = c("long","lat"), crs = 4326)
+    ns.bound.lower <- st_as_sf(primary.poly.j.s, coords = c("long","lat"), crs = crs.geog)
+    ns.bound.upper <- st_as_sf(primary.poly.j.n, coords = c("long","lat"), crs = crs.geog)
     
     # Get the latitude of the nearest points on the 5 m isobath, +/- 50 points
     ns.lat.upper <- nearshore.points$lat[st_nearest_feature(ns.bound.upper, nearshore.points.sf)]
@@ -4353,7 +4318,7 @@ for (i in unique(strata.final$scientificName)) {
              loc = "nearshore",
              stock = unique(primary.poly.temp$stock)) %>% 
       bind_rows(nearshore.temp) %>% 
-      st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
       group_by(stratum, stock) %>% 
       summarise(do_union = F) %>% 
       st_cast("POLYGON") %>% 
@@ -5188,7 +5153,7 @@ if (process.ctd) {
 ctd.info.all <- project_df(ctd.info.all, to = 3310)
 
 # Convert CTD dataframe so sf for mapping
-ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = 4326) %>% 
+ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = crs.geog) %>% 
   mutate(cast.type = type)
 ```
 
@@ -5278,7 +5243,7 @@ ctd.sf <- ctd.info.all %>%
                        'Transect name:', transect.name, '<br/>',
                        'Max. depth:', max.depth, 'm<br/>')) %>% 
   select(name, lat, long, max.depth, type, label, popup) %>% 
-  st_as_sf(coords = c("long","lat"), crs = 4326) 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 # Convert haul catch to sf and create labels ----------------------------------
 cluster.catch.sf <- cluster.pie %>%
@@ -5287,7 +5252,6 @@ cluster.catch.sf <- cluster.pie %>%
 
 # Add cluster species composition labels and popups ---------------------------
 nasc.super.clusters <- nasc.super.clusters %>% 
-  select(-label, -popup) %>% 
   left_join(select(cluster.pie, cluster, label, popup))
 
 # Convert CUFES data to sf -----------------------------------
@@ -5349,14 +5313,14 @@ nasc.density.sf <- nasc.density.plot.all %>%
   
 # Read State Waters shapefiles -------------------------------
 ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
-  st_transform(4326)
+  st_transform(crs.geog)
 
 or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>% 
-  st_transform(4326)
+  st_transform(crs.geog)
 
 # Read CA MPAs shapefile --------------------------------------
 ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
-  st_transform(4326) %>% 
+  st_transform(crs.geog) %>% 
   mutate(MPA = paste(NAME, Type))
 
 or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>% 
@@ -5365,15 +5329,15 @@ or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>%
 # Read CA MPAs shapefile --------------------------------------
 nms <- st_read(here("Data/GIS/national_marine_sanctuaries.shp")) %>% 
   filter(REGION == "West Coast") %>% 
-  st_transform(4326)
+  st_transform(crs.geog)
 
 # Read EEZ shapefiles -----------------------------------------
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
-  st_transform(4326)
+  st_transform(crs.geog)
 eez_can <- st_read(here("Data/GIS/eez_canada.shp")) %>% 
-  st_transform(4326)
+  st_transform(crs.geog)
 eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
-  st_transform(4326)
+  st_transform(crs.geog)
 ```
 
 ```{r interactive-data-explorer, echo=FALSE}
@@ -5713,10 +5677,10 @@ Point estimates of biomass (tons, t) for each CPS species by sampling stratum an
 save(nasc, file = here("Output/nasc_final.Rdata"))
 
 # Create new list for computing biomass estimates
-point.estimates           <- data.frame()
-point.estimates.nearshore <- data.frame()
-nasc.nearshore.final      <- data.frame()
-nasc.summ.strata          <- data.frame()
+point.estimates      <- data.frame()
+point.estimates.nse  <- data.frame()
+nasc.nearshore.final <- data.frame()
+nasc.summ.strata     <- data.frame()
 
 # Calculate point estimates for each species
 for (i in unique(strata.final$scientificName)) {
@@ -5769,24 +5733,24 @@ for (i in unique(strata.final$scientificName)) {
                                data.frame(scientificName = i,
                                           estimate_point(nasc.temp, stratum.info, species = i)))
   
-  point.estimates.nearshore <- bind_rows(point.estimates.nearshore,
-                               data.frame(scientificName = i,
-                                          estimate_point(nasc.nearshore, stratum.info.nearshore, species = i)))
+  point.estimates.nse <- bind_rows(point.estimates.nse,
+                                   data.frame(scientificName = i,
+                                              estimate_point(nasc.nearshore, stratum.info.nearshore, species = i)))
 }
 
 # Save results
 save(point.estimates, 
      file = here("Output/biomass_point_estimates.Rdata")) 
 
-save(point.estimates.nearshore, 
-     file = here("Output/biomass_point_estimates_nearshore.Rdata"))
+save(point.estimates.nse, 
+     file = here("Output/biomass_point_estimates_nse.Rdata"))
 
 # Save strata nasc summaries to CSV
 write_csv(nasc.summ.strata, here("Output/nasc_strata_summary.csv"))
 
 # Add stock designations to point estimates
-point.estimates           <- left_join(point.estimates, strata.summ.primary)
-point.estimates.nearshore <- left_join(point.estimates.nearshore, strata.summ.nearshore)
+point.estimates     <- left_join(point.estimates, strata.summ.primary)
+point.estimates.nse <- left_join(point.estimates.nse, strata.summ.nearshore)
 
 # Summarize point estimates (by stocks)
 pe <- point.estimates %>%
@@ -5829,16 +5793,16 @@ pe %>%
 save(nasc.nearshore.final, file = here("Output/nasc_nearshore_final.Rdata"))
 ```
 
-### Nearshore strata
+### Nearshore extrapolation
 
 ```{r biomass-point-estimates-inshore}
 # Summarize point estimates (by stocks)
-pe.ns <- point.estimates.nearshore %>%
+pe.nse <- point.estimates.nse %>%
   group_by(scientificName, stock) %>%
   summarise(
     area    = sum(area),
     biomass.total = sum(biomass.total)) %>%
-  bind_rows(point.estimates.nearshore) %>%
+  bind_rows(point.estimates.nse) %>%
   mutate(area = area * 2.915533e-07) %>%
   arrange(scientificName, stock, stratum) %>%
   replace_na(list(stratum = "All")) %>%
@@ -5851,11 +5815,11 @@ pe.ns <- point.estimates.nearshore %>%
     biomass.mean.point = biomass.total)
 
 # Save point estimates
-save(pe.ns, file = here("Output/biomass_point_estimates_ns_final.Rdata"))
-write_csv(pe.ns, here("Output/biomass_point_estimates_ns_final.csv"))
+save(pe.nse, file = here("Output/biomass_point_estimates_nse_final.Rdata"))
+write_csv(pe.nse, here("Output/biomass_point_estimates_nse_final.csv"))
 
 # Format point estimates table
-pe.ns %>%
+pe.nse %>%
   rename(Biomass = biomass.mean.point) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = F,
         align = c("l","c","r","r","r"),
@@ -6032,13 +5996,7 @@ if (do.bootstrap) {
   }
   # Close the species counter
   close(pb1)
-  
-  # Replace NaNs in abundance summaries with zeros
-  # abundance.estimates[atm:::is.nan.df(abundance.estimates)] <- 0
-  # abundance.estimates[is.nan(abundance.estimates)] <- 0
-  # 
-  # abundance.estimates <- abundance.estimates %>% 
-  #   replace(is.nan(.), 0)
+
   
   # Save bootstrap results
   save(bootstrap.estimates, abundance.estimates, survey.summary, 
@@ -6168,7 +6126,7 @@ Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence inte
 be <- be.stratum %>% 
   bind_rows(be.survey) %>% 
   arrange(Species, Stock, Stratum) %>% 
-  replace_na(list(Stratum = "All",pct.tot.B = 100)) %>% # Replace NAs with "All"
+  replace_na(list(Stratum = "All",pct.tot.B = 100)) %>% 
   left_join(select(pe, -Area)) %>%
   rename(Biomass = biomass.mean.point) %>% 
   mutate(biomass.cv = (biomass.sd / Biomass)*100) %>% 
@@ -6287,15 +6245,15 @@ Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by spe
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
   # Create data frame for biomass estimates
-  bootstrap.estimates.ns <- data.frame()
+  bootstrap.estimates.nse <- data.frame()
   # Create data frame for abundance estimates by length
-  abundance.estimates.ns <- data.frame()
+  abundance.estimates.nse <- data.frame()
   # Create data frame for stratum summaries
-  survey.summary.ns <- data.frame()
+  survey.summary.nse <- data.frame()
   # Create data frame for catch summaries
-  catch.summary.ns <- data.frame()
+  catch.summary.nse <- data.frame()
   # Create data frame for stratum summaries
-  stratum.summary.ns <- data.frame()
+  stratum.summary.nse <- data.frame()
   # Configure progress bar
   pb1 <- tkProgressBar("R Progress Bar", 
                        "Multiple Bootstrap Estimation (Nearshore) - Species", 0, 100, 0)
@@ -6392,7 +6350,7 @@ if (do.bootstrap) {
       boot.temp <- data.frame(Species = i, Stratum = j, Area = stratum.area,
                               Sample = seq(1,boot.num), boot.df[2:nrow(boot.df), ])
       # Combine results
-      bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
+      bootstrap.estimates.nse <- bind_rows(bootstrap.estimates.nse, boot.temp)
       
       # Calculate abundance by length class using bootstrap function ----
       abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], j, 
@@ -6403,7 +6361,7 @@ if (do.bootstrap) {
       abundance.temp <- data.frame(Species = i, Stratum = j,
                                    SL = L.vec, freq = abund.vec)
       # Combine results
-      abundance.estimates.ns <- bind_rows(abundance.estimates.ns, abundance.temp)
+      abundance.estimates.nse <- bind_rows(abundance.estimates.nse, abundance.temp)
       
       # Update the progress bar
       pb.prog2 <- round(stratum.counter/n_distinct(nasc.nearshore$stratum)*100)
@@ -6425,23 +6383,23 @@ if (do.bootstrap) {
     # Update the species counter
     spp.counter     <- spp.counter + 1
     # Combine survey summary by species
-    survey.summary.ns  <- bind_rows(survey.summary.ns, survey.summ.temp)
+    survey.summary.nse  <- bind_rows(survey.summary.nse, survey.summ.temp)
     # Combine survey summary by species
-    catch.summary.ns   <- bind_rows(catch.summary.ns, catch.summ.temp)
+    catch.summary.nse   <- bind_rows(catch.summary.nse, catch.summ.temp)
     # Combine stratum summary
-    stratum.summary.ns <- bind_rows(stratum.summary.ns, pos.cluster.spp)
+    stratum.summary.nse <- bind_rows(stratum.summary.nse, pos.cluster.spp)
   }
   
   # Close the species counter
   close(pb1)
   
   # # Replace NaNs in abundance summaries with zeros
-  # abundance.estimates.ns[atm:::is.nan.df(abundance.estimates.ns)] <- 0
-  # abundance.estimates.ns[is.nan(abundance.estimates.ns)] <- 0
+  # abundance.estimates.nse[atm:::is.nan.df(abundance.estimates.nse)] <- 0
+  # abundance.estimates.nse[is.nan(abundance.estimates.nse)] <- 0
   
   # Save bootstrap results
-  save(bootstrap.estimates.ns, abundance.estimates.ns, survey.summary.ns, 
-       catch.summary.ns, stratum.summary.ns,
+  save(bootstrap.estimates.nse, abundance.estimates.nse, survey.summary.nse, 
+       catch.summary.nse, stratum.summary.nse,
        file = (here("Output/biomass_bootstrap_est_nearshore.Rdata")))
 } else{
   # Save bootstrap results
@@ -6449,12 +6407,12 @@ if (do.bootstrap) {
 }
 
 # Rename scientificName column
-catch.summary.ns <- catch.summary.ns %>% 
+catch.summary.nse <- catch.summary.nse %>% 
   left_join(strata.summ.nearshore) %>%
   rename(Stock = stock)
 
 # Summarise abundance across strata
-abund.summ.ns <- abundance.estimates.ns %>%
+abund.summ.nse <- abundance.estimates.nse %>%
   left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
                                           "Stratum" = "stratum")) %>%
   group_by(Species, Stock = stock, SL) %>% 
@@ -6464,18 +6422,18 @@ abund.summ.ns <- abundance.estimates.ns %>%
 # Calculate estimated biomass from from TL and estimated.wg --------------------
 # CURRENTLY USING ESTIMATED.WG ESTIMATED FROM TOTAL LENGTH
 # MUST UPDATE TO USE ESTIMATED.WG FROM STANDARD LENGTH
-abund.summ.ns <- abund.summ.ns %>% 
+abund.summ.nse <- abund.summ.nse %>% 
   mutate(estimated.wg = estimate_ts(Species, TL)$estimated.wg,
          biomass      = abundance * estimated.wg)
 
 # Add stock designations to bootstrap estimates
-bootstrap.estimates.ns <- bootstrap.estimates.ns %>% 
+bootstrap.estimates.nse <- bootstrap.estimates.nse %>% 
   left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
                                           "Stratum" = "stratum")) %>% 
   rename(Stock = stock)
 
 # Summarize results from bootstrap per species and stratum
-be.stratum.ns <- bootstrap.estimates.ns %>% 
+be.stratum.nse <- bootstrap.estimates.nse %>% 
   group_by(Species, Stock, Stratum) %>% 
   summarise(
     n.samples         = n(),
@@ -6489,8 +6447,8 @@ be.stratum.ns <- bootstrap.estimates.ns %>%
     lower.ci.B        = quantile(biomass,probs = 0.025)*10^3,
     upper.ci.B        = quantile(biomass,probs = 0.975)*10^3) %>% 
   mutate(pct.tot.B    = biomass.mean.boot/sum(biomass.mean.boot)*100) %>%
-  left_join(survey.summary.ns, by = c("Species","Stratum")) %>%
-  left_join(catch.summary.ns,  by = c("Species" = "scientificName",
+  left_join(survey.summary.nse, by = c("Species","Stratum")) %>%
+  left_join(catch.summary.nse,  by = c("Species" = "scientificName",
                                       "Stratum" = "stratum", "Stock")) %>% 
   arrange(Species, Stratum) %>%
   select(
@@ -6498,42 +6456,42 @@ be.stratum.ns <- bootstrap.estimates.ns %>%
     biomass.mean.boot, lower.ci.B, upper.ci.B, biomass.sd, pct.tot.B)
 
 # Save results
-save(be.stratum.ns, 
+save(be.stratum.nse, 
      file = here("Output/biomass_bootstrap_estimates_stratum_nearshore.Rdata"))
 
 # Add stock designations to stratum summary
-stratum.summary.ns <- stratum.summary.ns %>% 
+stratum.summary.nse <- stratum.summary.nse %>% 
   left_join(strata.summ.nearshore) %>% 
   rename(Stock = stock)
 
 # Summarize clusters for each species for entire survey
-cluster.summary.total.ns <- stratum.summary.ns %>%
+cluster.summary.total.nse <- stratum.summary.nse %>%
   group_by(scientificName, Stock) %>% 
   summarise(nClusters = n_distinct(cluster)) %>% 
   rename(Species = scientificName)
 
 # Summarize sampling for entire survey
-survey.summary.total.ns <- survey.summary.ns %>% 
+survey.summary.total.nse <- survey.summary.nse %>% 
   group_by(Species, Stock = stock) %>% 
   summarise(
     Strata     = n(),
     nTransects = sum(nTransects),
     Distance   = sum(Distance)) %>% 
-  left_join(cluster.summary.total.ns)
+  left_join(cluster.summary.total.nse)
 
 # Summarise catch for entire survey
-catch.summary.total.ns <- catch.summary.ns %>% 
+catch.summary.total.nse <- catch.summary.nse %>% 
   group_by(Species = scientificName, Stock) %>% 
   summarise(nIndiv = sum(nIndiv))
 
 # Summarize results from bootstrap per species across all samples
-be.sample.ns <- bootstrap.estimates.ns %>% 
+be.sample.nse <- bootstrap.estimates.nse %>% 
   group_by(Species, Stock, Sample) %>% 
   summarise(area    = sum(Area)*2.915533e-07,
             biomass = sum(biomass))
 
 # Summarize results from bootstrap per species across all strata
-be.survey.ns <- be.sample.ns %>%
+be.survey.nse <- be.sample.nse %>%
   group_by(Species, Stock) %>%
   summarise(
     Area = area[1],
@@ -6541,8 +6499,8 @@ be.survey.ns <- be.sample.ns %>%
     biomass.sd = sd(biomass) * 10^3,
     lower.ci.B = quantile(biomass, probs = 0.025) * 10^3,
     upper.ci.B = quantile(biomass, probs = 0.975) * 10^3) %>%
-  left_join(survey.summary.total.ns) %>%
-  left_join(catch.summary.total.ns) %>%
+  left_join(survey.summary.total.nse) %>%
+  left_join(catch.summary.total.nse) %>%
   arrange(Species) %>%
   select(
     Species, Stock, Area, nTransects, Distance, nClusters, nIndiv, 
@@ -6550,48 +6508,42 @@ be.survey.ns <- be.sample.ns %>%
   )
 
 # Save results
-write.csv(be.survey.ns, 
+write.csv(be.survey.nse, 
           file  = here("Output/biomass_bootstrap_estimates_survey_nearshore.csv"),
           quote = F,row.names = F)
 
-save(be.survey.ns, file = here("Output/biomass_bootstrap_estimates_survey_nearshore.Rdata"))
+save(be.survey.nse, file = here("Output/biomass_bootstrap_estimates_survey_nearshore.Rdata"))
 ```
 
-### Nearshore strata  
-Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS by stratum and within the entire survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.
+### Nearshore Extrapolation  
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS by stratum extrapolated to the unsampled nearshore area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.
 
-```{r estimate-nearshore-biomass}
-if (estimate.ns) {
-  source(here("Code/estimateNearshore.R"))
-}
-```
-
-```{r biomass-bootstrap-estimates-final-nearshore}
+```{r biomass-bootstrap-estimates-final-nse}
 # Combine stratum and survey estimates
-be.ns <- be.stratum.ns %>% 
-  bind_rows(be.survey.ns) %>% 
+be.nse <- be.stratum.nse %>% 
+  bind_rows(be.survey.nse) %>% 
   arrange(Species, Stock, Stratum) %>% 
   replace_na(list(Stratum = "All", pct.tot.B = 100)) %>% # Replace NAs with "All"
-  left_join(select(pe.ns, -Area)) %>%
+  left_join(select(pe.nse, -Area)) %>%
   rename(Biomass = biomass.mean.point) %>% 
   mutate(biomass.cv = (biomass.sd / Biomass)*100) %>% 
   select(Species, Stock, Stratum, Area, nTransects, Distance, nClusters, nIndiv,
          Biomass, lower.ci.B, upper.ci.B, biomass.sd, biomass.cv)
 
-be.ns[atm:::is.nan.df(be.ns)] <- NA
+be.nse[atm:::is.nan.df(be.nse)] <- NA
 
 # Save results
-write.csv(be.ns,
-          file = here("Output/biomass_bootstrap_estimates_final_nearshore.csv"),
+write.csv(be.nse,
+          file = here("Output/biomass_bootstrap_estimates_final_nse.csv"),
           quote = F, row.names = F)
-save(be.ns, 
-     file = here("Output/biomass_bootstrap_estimates_final_nearshore.Rdata"))
+save(be.nse, 
+     file = here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 
 # Get rows with estimates from all strata
-be.stratum.all.ns <- which(be.ns$Stratum == "All")
+be.stratum.all.nse <- which(be.nse$Stratum == "All")
 
 # Print bootstrap estimate table
-be.ns %>% 
+be.nse %>% 
   rename(Number               = Stratum,
          Transects            = nTransects,
          Clusters             = nClusters,
@@ -6602,7 +6554,7 @@ be.ns %>%
          "Lower CI$_{95\\%}$" = lower.ci.B,
          "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = F,
-        align = c("l","c",rep("r",ncol(be.ns) - 2)),
+        align = c("l","c",rep("r",ncol(be.nse) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
@@ -6615,9 +6567,9 @@ be.ns %>%
 
 Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.  
 
-```{r biomass-bootstrap-estimates-totals-only-nearshore}
+```{r biomass-bootstrap-estimates-totals-only-nse}
 # Print bootstrap estimate table
-be.ns %>% 
+be.nse %>% 
   filter(Stratum == "All") %>% 
   rename(Number               = Stratum,
          Transects            = nTransects,
@@ -6629,7 +6581,7 @@ be.ns %>%
          "Lower CI$_{95\\%}$" = lower.ci.B,
          "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = F,
-        align = c("l","c",rep("r",ncol(be.ns) - 2)),
+        align = c("l","c",rep("r",ncol(be.nse) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
@@ -6639,10 +6591,10 @@ be.ns %>%
   add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
 ``` 
 
-```{r biomass-bootstrap-histograms-stratum-nearshore}
+```{r biomass-bootstrap-histograms-stratum-nse}
 # Bootstrap estimates of biomass by species and stratum
-biomass.histogram.stratum.ns <- 
-  ggplot(bootstrap.estimates.ns, aes(biomass*1e3, group = factor(Stratum), fill = factor(Stratum))) + 
+biomass.histogram.stratum.nse <- 
+  ggplot(bootstrap.estimates.nse, aes(biomass*1e3, group = factor(Stratum), fill = factor(Stratum))) + 
   geom_histogram(position = 'identity', alpha = 0.75) + facet_wrap(~Species, scales = 'free_x') + 
   ylab("Count") + xlab(expression(Biomass~(t))) +
   scale_fill_discrete("Stratum") +
@@ -6652,21 +6604,21 @@ biomass.histogram.stratum.ns <-
         strip.text.x = element_text(face = "italic"))
 
 # Save plot
-ggsave(biomass.histogram.stratum.ns, filename = here("Figs/fig_biomass_histogram_stratum_nearshore.png"),
+ggsave(biomass.histogram.stratum.nse, filename = here("Figs/fig_biomass_histogram_stratum_nse.png"),
        height = 8, width = 14)
 
-include_graphics(here("Figs/fig_biomass_histogram_stratum_nearshore.png"))
+include_graphics(here("Figs/fig_biomass_histogram_stratum_nse.png"))
 ```  
 
 Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species and stratum (**Note: differences in x-axis limits**).  
 
 ```{r biomass-bootstrap-estimates-survey-ns}
 # Bootstrap estimates of biomass by species
-biomass.histogram.survey.ns <- ggplot(be.sample.ns, aes(biomass*1e3, fill = Stock)) + 
+biomass.histogram.survey.nse <- ggplot(be.sample.nse, aes(biomass*1e3, fill = Stock)) + 
   geom_histogram(alpha = 0.75) + facet_wrap(Species ~ Stock, scales = "free") + 
-  geom_vline(data = filter(pe.ns, Stratum == "All"),aes(xintercept = biomass.mean.point)) +
-  geom_vline(data = be.survey.ns, aes(xintercept = lower.ci.B), linetype = 'dashed') +
-  geom_vline(data = be.survey.ns, aes(xintercept = upper.ci.B), linetype = 'dashed') +
+  geom_vline(data = filter(pe.nse, Stratum == "All"),aes(xintercept = biomass.mean.point)) +
+  geom_vline(data = be.survey.nse, aes(xintercept = lower.ci.B), linetype = 'dashed') +
+  geom_vline(data = be.survey.nse, aes(xintercept = upper.ci.B), linetype = 'dashed') +
   scale_y_continuous(expand = c(0,0)) +
   scale_fill_manual(values = c(All = "gray50", Central = "orange", 
                                Northern = "navyblue", Southern = "firebrick")) +
@@ -6676,15 +6628,23 @@ biomass.histogram.survey.ns <- ggplot(be.sample.ns, aes(biomass*1e3, fill = Stoc
         strip.text.x = element_text(face = "bold.italic"))
 
 # Save figure
-ggsave(biomass.histogram.survey.ns,
-       filename = here("Figs/fig_biomass_histogram_survey_nearshore.png"),
+ggsave(biomass.histogram.survey.nse,
+       filename = here("Figs/fig_biomass_histogram_survey_nse.png"),
        height = 8, width = 14)
 
-include_graphics(here("Figs/fig_biomass_histogram_survey_nearshore.png"))
+include_graphics(here("Figs/fig_biomass_histogram_survey_nse.png"))
+```
+
+### Nearshore strata
+If desired, estimate biomass in the nearshore strata.
+```{r estimate-nearshore-biomass}
+if (estimate.ns) {
+  source(here("Code/estimateNearshore.R"))
+}
 ```
 
 ### Offshore strata
-If desired, estimate biomass in the offshore stratum.
+If desired, estimate biomass in the offshore strata.
 
 ```{r estimate-offshore-biomass}
 if (estimate.os) {
@@ -7519,7 +7479,7 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii
 
 ```{r map-biomass-density-nearshore,out.height='100%'}
 # Calculate nearshore biomass density for plotting
-nasc.density.ns <- nasc.nearshore.final %>%
+nasc.density.nse <- nasc.nearshore.final %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
          sar.dens, transect, int) %>% 
   group_by(transect, int) %>% 
@@ -7540,18 +7500,18 @@ nasc.density.ns <- nasc.nearshore.final %>%
 
 # Create maps of nearshore biomass
 if (save.figs) {
-  source(here("Code", paste0("map_nearshore_biomass_", survey.name, ".R")))  
+  source(here("Code", paste0("mapNearshoreBiomass_", survey.name, ".R")))  
 }
 ```
 
 ## Results for anchovy (_Engraulis mordax_)
 ### Northern stock
 
-(ref:biom-dens-anch-n-ns) Extrapolated nearshore biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+(ref:biom-dens-anch-n-nse) Extrapolated nearshore biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
-```{r biom-dens-anch-n-ns,fig.cap='(ref:biom-dens-anch-n-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.png"))  
+```{r biom-dens-anch-n-nse,fig.cap='(ref:biom-dens-anch-n-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Northern.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7559,11 +7519,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Northern.
 
 ### Central stock
 
-(ref:biom-dens-anch-c-ns) Extrapolated nearshore biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+(ref:biom-dens-anch-c-nse) Extrapolated nearshore biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
-```{r biom-dens-anch-c-ns,fig.cap='(ref:biom-dens-anch-c-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.png"))  
+```{r biom-dens-anch-c-nse,fig.cap='(ref:biom-dens-anch-c-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Central.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7572,11 +7532,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nearshore_Engraulis mordax-Central.p
 ## Results for sardine (_Sardinops sagax_)
 ### Northern stock
 
-(ref:biom-dens-sar-n-ns) Extrapolated nearshore biomass densities of northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+(ref:biom-dens-sar-n-nse) Extrapolated nearshore biomass densities of northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
-```{r biom-dens-sar-n-ns,fig.cap='(ref:biom-dens-sar-n-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.png"))  
+```{r biom-dens-sar-n-nse,fig.cap='(ref:biom-dens-sar-n-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Northern.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7584,11 +7544,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Northern.p
 
 ### Southern stock
 
-(ref:biom-dens-sar-s-ns) Extrapolated nearshore biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+(ref:biom-dens-sar-s-nse) Extrapolated nearshore biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
-```{r biom-dens-sar-s-ns,fig.cap='(ref:biom-dens-sar-s-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.png"))  
+```{r biom-dens-sar-s-nse,fig.cap='(ref:biom-dens-sar-s-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Southern.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7596,11 +7556,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nearshore_Sardinops sagax-Southern.p
 
 ## Results for Pacific mackerel (_Scomber japonicus_)
 
-(ref:biom-dens-mack-ns) Extrapolated nearshore biomass densities of Pacific mackerel (_Scomber japonicus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel. The gray line represents the vessel track.
+(ref:biom-dens-mack-nse) Extrapolated nearshore biomass densities of Pacific mackerel (_Scomber japonicus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel. The gray line represents the vessel track.
 
-```{r biom-dens-mack-ns,fig.cap='(ref:biom-dens-mack-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"))  
+```{r biom-dens-mack-nse,fig.cap='(ref:biom-dens-mack-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Scomber japonicus-All.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7608,11 +7568,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nearshore_Scomber japonicus-All.png"
 
 ## Results for jack mackerel (_Trachurus symmetricus_)
 
-(ref:biom-dens-jack-ns) Extrapolated nearshore biomass densities of jack mackerel (_Trachurus symmetricus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one jack mackerel. The gray line represents the vessel track.
+(ref:biom-dens-jack-nse) Extrapolated nearshore biomass densities of jack mackerel (_Trachurus symmetricus_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one jack mackerel. The gray line represents the vessel track.
 
-```{r biom-dens-jack-ns,fig.cap='(ref:biom-dens-jack-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.png"))  
+```{r biom-dens-jack-nse,fig.cap='(ref:biom-dens-jack-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Trachurus symmetricus-All.png"))  
 } else {
   print("No data for this stock.")
 }
@@ -7620,11 +7580,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nearshore_Trachurus symmetricus-All.
 
 ## Results for Pacific herring (_Clupea pallasii_)
 
-(ref:biom-dens-her-ns) Extrapolated nearshore biomass densities of Pacific herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
+(ref:biom-dens-her-nse) Extrapolated nearshore biomass densities of Pacific herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
 
-```{r biom-dens-her-ns,fig.cap='(ref:biom-dens-her-ns)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_nearshore_Clupea pallasii-All.png"))  
+```{r biom-dens-her-nse,fig.cap='(ref:biom-dens-her-nse)',out.height='100%',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_nse_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_nse_Clupea pallasii-All.png"))  
 } else {
   print("No data for this stock.")
 }

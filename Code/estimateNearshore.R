@@ -1,24 +1,24 @@
-# Estimate offshore biomass -----------------------------------------------
-# List offshore backscatter files
-offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
-                         regexp = "offshore.rds")
+# Estimate nearshore biomass -----------------------------------------------
+# List nearshore backscatter files
+nearshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
+                         regexp = "nearshore.rds")
 
 # Import all offshore backscatter data
-for (o in offshore.files) {
-  if (exists("nasc.offshore")) {
-    nasc.offshore <- bind_rows(nasc.offshore, readRDS(offshore.files[o]))
+for (o in nearshore.files) {
+  if (exists("nasc.nearshore")) {
+    nasc.nearshore <- bind_rows(nasc.nearshore, readRDS(nearshore.files[o]))
   } else {
-    nasc.offshore <- readRDS(offshore.files[o])
+    nasc.nearshore <- readRDS(nearshore.files[o])
   }
 }
 
-# nasc.offshore$transect <- gsub("O", "", nasc.vessel$transect)
+# nasc.nearshore$transect <- gsub("O", "", nasc.vessel$transect)
 
 # Remove vessels not to be included in the offshore biomass estimates
-nasc.offshore <- nasc.offshore %>% 
-  filter(vessel.name %in% nasc.vessels.offshore) %>%
+nasc.nearshore <- nasc.nearshore %>% 
+  filter(vessel.name %in% nasc.vessels.nearshore) %>%
   mutate(
-    transect = str_replace(transect, "O", ""),
+    transect = str_replace(transect, "N", ""),
     transect.name = paste(vessel.name, transect),
     cps.nasc      = NASC.50,
     stratum       = 1,
@@ -27,7 +27,7 @@ nasc.offshore <- nasc.offshore %>%
               labels = F, include.lowest = TRUE))
 
 # Summarise nasc for plotting ---------------------------------------------
-nasc.plot.os <- nasc.offshore %>% 
+nasc.plot.ns <- nasc.nearshore %>% 
   select(filename, transect, transect.name, int, lat, long, cps.nasc) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
@@ -42,24 +42,24 @@ nasc.plot.os <- nasc.offshore %>%
 
 # Assign backscatter to trawl clusters ------------------------------------
 # Create varialble for nearest cluster and minumum distance
-cluster.distance.os <- data.frame(cluster = rep(NA, nrow(nasc.offshore)),
-                                  cluster.distance = rep(NA, nrow(nasc.offshore)))
+cluster.distance.ns <- data.frame(cluster = rep(NA, nrow(nasc.nearshore)),
+                                  cluster.distance = rep(NA, nrow(nasc.nearshore)))
 # Configure progress bar
 pb <- tkProgressBar("R Progress Bar", "Cluster Assignment", 0, 100, 0)
 
 # Assign trawl clusters
-for (i in 1:nrow(nasc.offshore)) {
+for (i in 1:nrow(nasc.nearshore)) {
   # Calculate distance between each NASC interval and all trawl clusters
-  temp.distance <- distance(nasc.offshore$lat[i], nasc.offshore$long[i], 
+  temp.distance <- distance(nasc.nearshore$lat[i], nasc.nearshore$long[i], 
                             super.clusters$lat, super.clusters$long, 
                             units = "nm")
   
   # Assign cluster with minimum distance to NASC interval
-  cluster.distance.os$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
-  cluster.distance.os$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
+  cluster.distance.ns$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
+  cluster.distance.ns$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
   
   # Update progress bar
-  pb.prog <- round(i/nrow(nasc.offshore)*100)
+  pb.prog <- round(i/nrow(nasc.nearshore)*100)
   info <- sprintf("%d%% done", pb.prog)
   setTkProgressBar(pb, pb.prog, sprintf("Cluster Assignment (%s)", info), info)
 }
@@ -68,21 +68,21 @@ for (i in 1:nrow(nasc.offshore)) {
 close(pb)
 
 # Save nasc cluster vector
-save(cluster.distance.os, file = here("Output/nasc_cluster_distance_offshore.Rdata"))
+save(cluster.distance.ns, file = here("Output/nasc_cluster_distance_nearshore.Rdata"))
 
 # Add cluster distances to nasc
-nasc.offshore <- bind_cols(nasc.offshore, cluster.distance.os) %>% 
+nasc.nearshore <- bind_cols(nasc.nearshore, cluster.distance.ns) %>% 
   project_df(to = crs.proj)
 
-nasc.offshore.summ <- nasc.offshore %>% 
+nasc.nearshore.summ <- nasc.nearshore %>% 
   group_by(cluster) %>% 
   tally() %>% 
   filter(n >= 4)
 
 # Map trawl clusters -------------------------------------------------------
 # Create hulls around positive clusters
-nasc.super.clusters.os <- nasc.offshore %>% 
-  filter(cluster %in% nasc.offshore.summ$cluster) %>% 
+nasc.super.clusters.ns <- nasc.nearshore %>% 
+  filter(cluster %in% nasc.nearshore.summ$cluster) %>% 
   plyr::ddply("cluster", find_hull) %>% 
   select(long, lat, cluster) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
@@ -91,12 +91,12 @@ nasc.super.clusters.os <- nasc.offshore %>%
   st_cast("POLYGON")
 
 if (save.figs) {
-  nasc.cluster.plot.os <- base.map +
+  nasc.cluster.plot.ns <- base.map +
     # Plot nasc data
-    geom_point(data = nasc.offshore, aes(X, Y, colour = factor(cluster)),
+    geom_point(data = nasc.nearshore, aes(X, Y, colour = factor(cluster)),
                show.legend = FALSE) +
     # Plot convex hull around NASC clusters
-    geom_sf(data = nasc.super.clusters.os, aes(fill = factor(cluster)),
+    geom_sf(data = nasc.super.clusters.ns, aes(fill = factor(cluster)),
             colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
@@ -108,44 +108,44 @@ if (save.figs) {
                     aes(X, Y, label = cluster), 
                     size = 2, colour = "black", bg.colour = "white") +
     # Plot panel label
-    ggtitle("Integrated NASC Clusters-Offshore") +
+    ggtitle("Integrated NASC Clusters-Nearshore") +
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # save trawl plot
-  ggsave(nasc.cluster.plot.os,
-         filename = here("Figs/fig_nasc_cluster_map_os.png"),
+  ggsave(nasc.cluster.plot.ns,
+         filename = here("Figs/fig_nasc_cluster_map_ns.png"),
          width = map.width, height = map.height)
   
-  save(nasc.cluster.plot.os, file = here("Output/nasc_cluster_plot_offshore.Rdata"))
+  save(nasc.cluster.plot.ns, file = here("Output/nasc_cluster_plot_ns.Rdata"))
 }
 
 # Map trawl species proportions -------------------------------------------------------
 # Select and rename trawl data for pie charts
-cluster.pie.os <- cluster.pie %>% 
-  filter(cluster %in% unique(nasc.offshore.summ$cluster)) 
+cluster.pie.ns <- cluster.pie %>% 
+  filter(cluster %in% unique(nasc.nearshore.summ$cluster)) 
 
-cluster.pos.os <- filter(cluster.pie.os, AllCPS > 0) %>% 
+cluster.pos.ns <- filter(cluster.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
 # Substitute very small value for species with zero catch, just for pie charts
-if (nrow(cluster.pos.os) > 0) {
-  cluster.pos.os <- cluster.pos.os %>% 
+if (nrow(cluster.pos.ns) > 0) {
+  cluster.pos.ns <- cluster.pos.ns %>% 
     replace(. == 0, 0.0000001) 
 }
 
 # Filter for empty trawls
-cluster.zero.os <- filter(cluster.pie.os, AllCPS == 0)
+cluster.zero.ns <- filter(cluster.pie.ns, AllCPS == 0)
 
 if (save.figs) {
   # Create trawl figure
-  trawl.catch.plot.os <- base.map +
+  trawl.catch.plot.ns <- base.map +
     # Plot nasc data
-    geom_point(data = nasc.offshore, aes(X, Y, group = transect),
+    geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
                size = 0.5, colour = "gray50", alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = cluster.pos.os, 
+    geom_scatterpie(data = cluster.pos.ns, 
                     aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("Anchovy","JackMack","Jacksmelt",
                              "PacHerring","PacMack","Sardine"),
@@ -157,7 +157,7 @@ if (save.figs) {
                       values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                  pac.herring.color, pac.mack.color, sardine.color)) +
     # Plot empty trawl locations
-    geom_point(data = cluster.zero.os, aes(X, Y), 
+    geom_point(data = cluster.zero.ns, aes(X, Y), 
                size = 2, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
     ggtitle("CPS Species Proportions in Trawls") +
@@ -166,24 +166,24 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.cluster.wt.os <- plot_grid(nasc.cluster.plot.os, trawl.catch.plot.os,
+  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, trawl.catch.plot.ns,
                                nrow = 1, labels = c("a)", "b)"))
   
-  ggsave(nasc.trawl.cluster.wt.os,
-         filename = here("Figs/fig_nasc_trawl_cluster_wt_os.png"),
+  ggsave(nasc.trawl.cluster.wt.ns,
+         filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
 }
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
-nasc.offshore <- nasc.offshore %>% 
+nasc.nearshore <- nasc.nearshore %>% 
   left_join(select(clf, -lat, -long, -X, -Y), by = c("cluster" = "cluster"))
 
 # Save results
-save(nasc.offshore, file = here("Output/cps_nasc_prop_offshore.Rdata"))
+save(nasc.nearshore, file = here("Output/cps_nasc_prop_ns.Rdata"))
 
 # Apportion offshore backscatter ------------------------------------------
 # Create data frame for plotting acoustic proportions by species
-nasc.prop.all.os <- nasc.offshore %>%
+nasc.prop.all.ns <- nasc.nearshore %>%
   mutate(`Engraulis mordax`      = cps.nasc*prop.anch,
          `Sardinops sagax`       = cps.nasc*prop.sar,
          `Trachurus symmetricus` = cps.nasc*prop.jack,
@@ -191,19 +191,19 @@ nasc.prop.all.os <- nasc.offshore %>%
          `Clupea pallasii`       = cps.nasc*prop.her) 
 
 # Prepare nasc.prop.all for facet plotting
-nasc.prop.spp.os <- nasc.prop.all.os %>% 
+nasc.prop.spp.ns <- nasc.prop.all.ns %>% 
   select(X, Y, `Engraulis mordax`, `Sardinops sagax`, `Trachurus symmetricus`,
          `Scomber japonicus`, `Clupea pallasii`) %>% 
   gather(scientificName, nasc, -X, -Y)
 
 if (save.figs) {
   # Create a base map with relative CPS backscatter
-  map.prop.all.os <- base.map + 
+  map.prop.all.ns <- base.map + 
     # Plot backscatter for all CPS nasc
-    geom_point(data = nasc.prop.all.os, aes(X, Y, size = cps.nasc), 
+    geom_point(data = nasc.prop.all.ns, aes(X, Y, size = cps.nasc), 
                colour = "gray20") +
     # Plot proportion of backscatter from each species present
-    geom_point(data = filter(nasc.prop.spp.os, nasc > 0),
+    geom_point(data = filter(nasc.prop.spp.ns, nasc > 0),
                aes(X, Y, size = nasc), colour = "red") +
     # Facet by species
     facet_wrap(~scientificName, nrow = 2) +
@@ -214,18 +214,18 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save map
-  ggsave(here("Figs/fig_nasc_acoustic_proportions_os.png"), map.prop.all.os,
+  ggsave(here("Figs/fig_nasc_acoustic_proportions_ns.png"), map.prop.all.ns,
          width = map.width*3, height = map.height*2)
   
   # Save plot objects
-  save(map.prop.all, file = here("Output/acoustic_proportion_maps_os.Rdata"))
+  save(map.prop.all, file = here("Output/acoustic_proportion_maps_ns.Rdata"))
 } else {
   # Load plot objects
-  load(here("Output/acoustic_proportion_maps_os.Rdata"))
+  load(here("Output/acoustic_proportion_maps_ns.Rdata"))
 }
 
 # Calculate offshore acoustic biomass density -----------------------------
-nasc.offshore <- nasc.offshore %>% 
+nasc.nearshore <- nasc.nearshore %>% 
   mutate( 
     anch.dens = cps.nasc*prop.anch / (4*pi*sigmawg.anch) / 1000,
     her.dens  = cps.nasc*prop.her  / (4*pi*sigmawg.her)  / 1000,
@@ -234,7 +234,7 @@ nasc.offshore <- nasc.offshore %>%
     sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000)
 
 # Format for plotting
-nasc.density.os <- nasc.offshore %>%
+nasc.density.ns <- nasc.nearshore %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
          sar.dens, transect, transect.name, int, cluster) %>% 
   group_by(transect, transect.name, int) %>% 
@@ -251,65 +251,65 @@ nasc.density.os <- nasc.offshore %>%
          bin.level = as.numeric(bin))
 
 # Create acoustic transect labels for maps
-tx.labels.tmp.os <- nasc.offshore %>% 
+tx.labels.tmp.ns <- nasc.nearshore %>% 
   ungroup() %>%
-  group_by(transect) %>%
+  group_by(transect.name) %>%
   summarise(
     vessel.name = vessel.name[1],
-    transect.name = transect.name[1],
+    transect = transect.name[1],
     start.lat = lat[which.max(long)],
     start.long = max(long),
     end.lat = lat[which.min(long)],
     end.long = min(long),
     brg = 90 - swfscMisc::bearing(end.lat,end.long,start.lat,start.long)[1])
 
-tx.end.labels.os <- tx.labels.tmp.os %>% 
+tx.end.labels.ns <- tx.labels.tmp.ns %>% 
   filter(start.lat < 48.54116) %>% 
   select(vessel.name, transect, transect.name, lat = end.lat, long = end.long, brg) 
 
-tx.start.labels.os <- tx.labels.tmp.os %>% 
+tx.start.labels.ns <- tx.labels.tmp.ns %>% 
   filter(start.lat >= 48.54116) %>% 
   select(vessel.name, transect, transect.name, lat = start.lat, long = start.long, brg) %>% 
-  rbind(tx.end.labels.os)
+  rbind(tx.end.labels.ns)
 
-tx.labels.os <- project_df(tx.start.labels.os, to = crs.proj)
+tx.labels.ns <- project_df(tx.start.labels.ns, to = crs.proj)
 
 # Summarise biomass density by transect and species
-nasc.density.summ.os <- nasc.density.os %>% 
+nasc.density.summ.ns <- nasc.density.ns %>% 
   group_by(scientificName, transect, transect.name) %>% 
   summarise(density = sum(density)) %>% 
   filter(scientificName %in% unique(lengths$scientificName)) %>% 
-  left_join(select(tx.labels.tmp.os, transect.name, start.lat, start.long)) %>% 
-  # left_join(select(tx.nn.os, transect, vessel.name, dist.cum, dist.bin)) %>% 
+  left_join(select(tx.labels.tmp.ns, transect.name, start.lat, start.long)) %>% 
+  # left_join(select(tx.nn.ns, transect, vessel.name, dist.cum, dist.bin)) %>% 
   mutate(positive = density > 0)
 
 # Save biomass density data
-save(nasc.density.os, nasc.density.summ.os, 
-     file = here("Output/nasc_biomass_density_offshore.Rdata"))
+save(nasc.density.ns, nasc.density.summ.ns, 
+     file = here("Output/nasc_biomass_density_ns.Rdata"))
 
 # Select legend objects 
-dens.levels.all.os <- sort(unique(nasc.density.os$bin.level))
-dens.labels.all.os <- dens.labels[dens.levels.all.os]
-dens.sizes.all.os  <- dens.sizes[dens.levels.all.os]
-dens.colors.all.os <- dens.colors[dens.levels.all.os]
+dens.levels.all.ns <- sort(unique(nasc.density.ns$bin.level))
+dens.labels.all.ns <- dens.labels[dens.levels.all.ns]
+dens.sizes.all.ns  <- dens.sizes[dens.levels.all.ns]
+dens.colors.all.ns <- dens.colors[dens.levels.all.ns]
 
 # Stratify ----------------------------------------------------------------
 # Get transect spacing for plotting --------------------------
 # Get the midpoint (mean) lat/long of each transect
-tx.mid.os <- nasc.offshore %>% 
+tx.mid.ns <- nasc.nearshore %>% 
   group_by(vessel.name, transect, transect.name) %>% 
   summarise(
     lat  = mean(lat, na.rm = TRUE),
     long = mean(long, na.rm = TRUE))
 
 # Create a data frame for results
-tx.nn.os <- data.frame()
+tx.nn.ns <- data.frame()
 
-for (i in unique(tx.mid.os$transect)) {
+for (i in unique(tx.mid.ns$transect)) {
   # Get the mid lat/long for each transect
-  tx.nn.i      <- filter(tx.mid.os, transect == i)
+  tx.nn.i      <- filter(tx.mid.ns, transect == i)
   # Get NASC data for all other transects
-  nasc.temp <- filter(tx.mid.os, transect != i, vessel.name %in% tx.nn.i$vessel.name)
+  nasc.temp <- filter(tx.mid.ns, transect != i, vessel.name %in% tx.nn.i$vessel.name)
   # Calculate distance between transect midpoint and all other NASC values
   nn.dist   <- swfscMisc::distance(tx.nn.i$lat, tx.nn.i$long,
                                    nasc.temp$lat, nasc.temp$long)
@@ -319,27 +319,32 @@ for (i in unique(tx.mid.os$transect)) {
   nn.lat    <- nasc.temp$lat[which.min(nn.dist)]
   nn.long   <- nasc.temp$long[which.min(nn.dist)]
   # Add to results
-  tx.nn.os     <- bind_rows(tx.nn.os, 
+  tx.nn.ns     <- bind_rows(tx.nn.ns, 
                          data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long))
 }
 
 # Bin transects by spacing
-tx.nn.os <- tx.nn.os %>% 
-  mutate(dist.bin = cut(tx.nn.os$min.dist, tx.spacing.bins),
+tx.nn.ns <- tx.nn.ns %>% 
+  mutate(dist.bin = cut(tx.nn.ns$min.dist, tx.spacing.bins),
          spacing  = tx.spacing.dist[as.numeric(dist.bin)],
          dist.cum = cumsum(spacing)) %>% 
   arrange(transect)
 
 # Save nearest neighbor distance info
-save(tx.nn.os, file = here("Output/transect_spacing_offshore.Rdata"))
+save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
 
 # Summarise biomass density by transect and species
-nasc.density.summ.os <- nasc.density.summ.os %>% 
-  left_join(select(tx.nn.os, transect.name, dist.cum, dist.bin))
+nasc.density.summ.ns <- nasc.density.summ.ns %>% 
+  left_join(select(tx.nn.ns, transect.name, dist.cum, dist.bin))
 
 # Draw pseudo-transects --------------------------------------------------------
 # Get transect ends, calculate bearing, and add transect spacing
-tx.ends.os <- nasc.offshore %>% 
+
+# DEFINE METHOD OF DRAWING PSEUDO-TRANSECTS
+# USE SQUARE ENDS FOR TYPICAL TRANSECTS
+# USE CONNECTING ENDS FOR TRANSECTS AROUND ISLANDS
+
+tx.ends.ns <- nasc.nearshore %>% 
   group_by(transect.name, transect, vessel.name) %>% 
   summarise(
     lat.i  = lat[which.max(long)],
@@ -347,13 +352,13 @@ tx.ends.os <- nasc.offshore %>%
     lat.o  = lat[which.min(long)],
     long.o = min(long)
   ) %>% 
-  left_join(select(tx.nn.os, transect.name, spacing)) %>% 
+  left_join(select(tx.nn.ns, transect.name, spacing)) %>% 
   mutate(
     brg = swfscMisc::bearing(lat.i, long.i,
                              lat.o, long.o)[1])
 
 # Get original inshore transect ends -------------------------------------------
-tx.i.os <- tx.ends.os %>% 
+tx.i.ns <- tx.ends.ns %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
   mutate(
@@ -363,7 +368,7 @@ tx.i.os <- tx.ends.os %>%
 
 # Get N and S inshore waypoints ------------------------------------------------
 # Calculate inshore/north transects
-tx.i.n.os <- tx.ends.os %>% 
+tx.i.n.ns <- tx.ends.ns %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
   mutate(
@@ -374,7 +379,7 @@ tx.i.n.os <- tx.ends.os %>%
     order = 1)
 
 # Calculate inshore/south transects
-tx.i.s.os <- tx.ends.os %>% 
+tx.i.s.ns <- tx.ends.ns %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
   mutate(
@@ -385,13 +390,13 @@ tx.i.s.os <- tx.ends.os %>%
     order = 3)
 
 # Combine all inshore transects
-tx.i.os <- tx.i.os %>%
-  bind_rows(tx.i.n.os) %>%
-  bind_rows(tx.i.s.os) %>%
+tx.i.ns <- tx.i.ns %>%
+  bind_rows(tx.i.n.ns) %>%
+  bind_rows(tx.i.s.ns) %>%
   arrange(transect, desc(order))
 
 # Get original offshore transect ends ------------------------------------------
-tx.o.os <- tx.ends.os %>% 
+tx.o.ns <- tx.ends.ns %>% 
   select(-lat.i, -long.i) %>% 
   rename(lat = lat.o, long = long.o) %>% 
   mutate(
@@ -401,7 +406,7 @@ tx.o.os <- tx.ends.os %>%
 
 # Get N and S offshore waypoints -----------------------------------------------
 # Calculate offshore/north transects
-tx.o.n.os <- tx.ends.os %>% 
+tx.o.n.ns <- tx.ends.ns %>% 
   select(-lat.i, -long.i) %>% 
   rename(lat = lat.o, long = long.o) %>% 
   mutate(
@@ -412,7 +417,7 @@ tx.o.n.os <- tx.ends.os %>%
     order = 1)
 
 # Calculate inshore/south transects
-tx.o.s.os <- tx.ends.os %>% 
+tx.o.s.ns <- tx.ends.ns %>% 
   select(-lat.i, -long.i) %>% 
   rename(lat = lat.o, long = long.o) %>% 
   mutate(
@@ -423,21 +428,21 @@ tx.o.s.os <- tx.ends.os %>%
     order = 3)
 
 # Combine all offshore transects
-tx.o.final.os <- tx.o.os %>% 
-  bind_rows(filter(tx.o.n.os)) %>% 
-  bind_rows(filter(tx.o.s.os)) %>% 
+tx.o.final.ns <- tx.o.ns %>% 
+  bind_rows(filter(tx.o.n.ns)) %>% 
+  bind_rows(filter(tx.o.s.ns)) %>% 
   arrange(desc(transect), order)
 
 # Assemble the final data frame with all waypoints -----------------------------
-strata.points.os <- tx.i.os %>% 
-  bind_rows(tx.o.final.os)   %>%
+strata.points.ns <- tx.i.ns %>% 
+  bind_rows(tx.o.final.ns)   %>%
   mutate(key = paste(transect.name, grp)) 
 
 # Convert to points
-strata.points.os.sf <- st_as_sf(strata.points.os, coords = c("long","lat"), crs = 4326) 
+strata.points.ns.sf <- st_as_sf(strata.points.ns, coords = c("long","lat"), crs = 4326) 
 
 # Create polygons
-strata.super.polygons.os <- strata.points.os.sf %>% 
+strata.super.polygons.ns <- strata.points.ns.sf %>% 
   ungroup() %>% 
   # group_by(vessel.name) %>% 
   summarise(do_union = F) %>% 
@@ -448,19 +453,19 @@ strata.super.polygons.os <- strata.points.os.sf %>%
   mutate(area = st_area(.))
 
 # Convert to lines
-tx.lines.os.sf <- strata.points.os.sf %>% 
+tx.lines.ns.sf <- strata.points.ns.sf %>% 
   group_by(transect, grp) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
 
 # Determine transect order by min latitude/longitude
-tx.order.os <- data.frame()
+tx.order.ns <- data.frame()
 
 use.nums <- TRUE
 
 if (use.nums) {
   # Calculate transect order per vessel
-  tx.order.temp <- nasc.offshore %>%
+  tx.order.temp <- nasc.nearshore %>%
     # filter(str_detect(vessel.name, i)) %>% 
     group_by(transect.name) %>% 
     summarise(max.lat  = max(lat),
@@ -473,7 +478,7 @@ if (use.nums) {
     arrange(rank.final)
 } else {
   # Calculate transect order per vessel
-  tx.order.temp <- nasc.offshore %>%
+  tx.order.temp <- nasc.nearshore %>%
     # filter(str_detect(vessel.name, i)) %>% 
     group_by(transect.name) %>% 
     summarise(max.lat  = max(lat),
@@ -487,79 +492,79 @@ if (use.nums) {
 }
 
 # Assign transect order based on rank latitude
-if (nrow(tx.order.os) == 0) {
+if (nrow(tx.order.ns) == 0) {
   # If the first vessel, create transects from 0 to number of transects
   tx.order.temp$transect <- tx.order.temp$rank.final
 } else {
   # If not the first vessel, add rank latitude to largest existing transect number
-  tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.os$transect)
+  tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.ns$transect)
 }
 
 # Combine results from all vessels
-tx.order.os <- bind_rows(tx.order.os, tx.order.temp) %>% 
+tx.order.ns <- bind_rows(tx.order.ns, tx.order.temp) %>% 
   arrange(transect)
 
 # Add transect numbers to NASC data frame
-nasc.offshore <- left_join(select(nasc.offshore, -transect), 
-                           select(tx.order.os, transect.name, transect))
+nasc.nearshore <- left_join(select(nasc.nearshore, -transect), 
+                           select(tx.order.ns, transect.name, transect))
 
 # Add transect numbers to NASC density summary data frame
-nasc.density.summ.os <- nasc.density.summ.os %>% 
+nasc.density.summ.ns <- nasc.density.summ.ns %>% 
   ungroup() %>% 
   select(-transect) %>% 
-  left_join(select(tx.order.os, transect.name, transect))
+  left_join(select(tx.order.ns, transect.name, transect))
 
-nasc.density.os <- nasc.density.os %>% 
+nasc.density.ns <- nasc.density.ns %>% 
   ungroup() %>% 
   select(-transect) %>% 
-  left_join(select(tx.order.os, transect.name, transect))
+  left_join(select(tx.order.ns, transect.name, transect))
 
 # Add transect numbers to strata points data frame
-strata.points.os <- strata.points.os %>% 
+strata.points.ns <- strata.points.ns %>% 
   ungroup() %>% 
   select(-transect) %>% 
-  left_join(select(tx.order.os, transect.name, transect))
+  left_join(select(tx.order.ns, transect.name, transect))
 
 # Offshore strata
-strata.manual.os <- bind_rows(
+strata.manual.ns <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii",
     stratum = 1,
-    transect = 1:n_distinct(nasc.offshore$transect)),
+    transect = 1:n_distinct(nasc.nearshore$transect)),
   data.frame(
     scientificName = "Engraulis mordax",
     stratum = 1,
-    transect = 1:n_distinct(nasc.offshore$transect)),
+    transect = 1:n_distinct(nasc.nearshore$transect)),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 1,
-    transect = 1:n_distinct(nasc.offshore$transect)),
+    transect = 1:n_distinct(nasc.nearshore$transect)),
   data.frame(
     scientificName = "Scomber japonicus",
     stratum = 1,
-    transect = 1:n_distinct(nasc.offshore$transect)),
+    transect = 1:n_distinct(nasc.nearshore$transect)),
   data.frame(
     scientificName = "Trachurus symmetricus",
     stratum = 1,
-    transect = 1:n_distinct(nasc.offshore$transect))
+    transect = 1:n_distinct(nasc.nearshore$transect))
 )
 
 # Create stratum polygons -------------------------------------------------
 # Define sampling strata
-if (stratify.manually.os) {
+if (stratify.manually.ns) {
   # Use manually defined strata
-  strata.final.os <- strata.manual.os %>%
+  strata.final.ns <- strata.manual.ns %>%
     mutate(stratum.orig = stratum)
   
 } else {
   # Define strata automatically
-  strata.final.os <- data.frame()
+  strata.final.ns <- data.frame()
 
   # Define strata boundaries and transects for each species
-  for (i in unique(nasc.density.summ.os$scientificName)) {
+  for (i in unique(nasc.density.summ.ns$scientificName)) {
     # Select positive transects and calculate differences between transect numbers
     # diffs >= 2 define stratum breaks
-    temp.spp <- filter(nasc.density.summ.os, scientificName == i) %>%
+    temp.spp <- filter(nasc.density.summ.ns, scientificName == i) %>%
       filter(positive == TRUE) %>%
       mutate(diff = c(1, diff(transect))) %>%
       ungroup()
@@ -608,7 +613,7 @@ if (stratify.manually.os) {
 
       # Add vessel name and distance bin to strata.df for final cuts
       strata.df <- strata.df %>%
-        left_join(filter(select(nasc.density.summ.os, scientificName, transect, dist.bin),
+        left_join(filter(select(nasc.density.summ.ns, scientificName, transect, dist.bin),
                          scientificName == i)) %>%
         mutate(stratum.key = factor(paste(stratum, dist.bin)))
 
@@ -627,13 +632,13 @@ if (stratify.manually.os) {
         left_join(select(strata.df.summ, stratum.key, stratum))
 
       # Combine with stratum vectors for other species
-      strata.final.os <- bind_rows(strata.final.os, strata.df)
+      strata.final.ns <- bind_rows(strata.final.ns, strata.df)
     }
   }
 }
 
 # Create acoustic transect labels for offshore maps
-tx.labels.os <- nasc.offshore %>% 
+tx.labels.ns <- nasc.nearshore %>% 
   group_by(transect) %>% 
   summarise(
     vessel.name = vessel.name[1],
@@ -645,32 +650,32 @@ tx.labels.os <- nasc.offshore %>%
     brg = 90 - swfscMisc::bearing(end.lat, end.long, start.lat, start.long)[1])
 
 # Add start latitude and longitude to strata table
-strata.final.os <- strata.final.os %>%
-  left_join(select(tx.labels.os, -end.lat, -end.long, -brg)) %>%
+strata.final.ns <- strata.final.ns %>%
+  left_join(select(tx.labels.ns, -end.lat, -end.long, -brg)) %>%
   filter(!is.na(vessel.name))
 
 # Create final strata and calculate area
 # Create df for transect-level stock info
-nasc.stock.os <- data.frame()
+nasc.stock.ns <- data.frame()
 # 
-# strata.final.os <- strata.manual.os %>% 
+# strata.final.ns <- strata.manual.ns %>% 
 #   mutate(stratum.orig = stratum)
 
 # Summarise NASC to get species present
-offshore.spp <- nasc.prop.spp.os %>% 
+nearshore.spp <- nasc.prop.spp.ns %>% 
   filter(nasc > 0) %>% 
   group_by(scientificName) %>% 
   tally()
 
 if (exists("strata.offshore")) rm(strata.offshore)
 
-for (i in unique(offshore.spp$scientificName)) {
+for (i in unique(nearshore.spp$scientificName)) {
   # Select each strata per species
-  strata.sub <- filter(strata.final.os, scientificName == i) %>% 
+  strata.sub <- filter(strata.final.ns, scientificName == i) %>% 
     select(transect, stratum)  
   
   # Define strata to stock
-  nasc.stock.temp <- strata.points.os %>% 
+  nasc.stock.temp <- strata.points.ns %>% 
     filter(loc == "inshore") %>%
     left_join(strata.sub) %>% 
     mutate(stock = case_when(
@@ -684,12 +689,12 @@ for (i in unique(offshore.spp$scientificName)) {
     distinct()
   
   # Combine results
-  nasc.stock.os <- bind_rows(nasc.stock.os, nasc.stock.temp)
+  nasc.stock.ns <- bind_rows(nasc.stock.ns, nasc.stock.temp)
   
   for (j in sort(unique(strata.sub$stratum))) {
     # Create offshore stratum polygons ----------------------------------------
     # Add stratum numbers and stock designation to strata.points
-    primary.poly.temp <- strata.points.os %>% 
+    primary.poly.temp <- strata.points.ns %>% 
       left_join(strata.sub) %>%
       left_join(nasc.stock.temp) %>% 
       filter(stratum == j) %>%
@@ -739,7 +744,7 @@ save(strata.offshore,
 
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
 # Summarise strata transects
-strata.summ.os <- strata.final.os %>% 
+strata.summ.ns <- strata.final.ns %>% 
   # mutate(vessel.name = "RL") %>% 
   group_by(scientificName, stratum) %>% 
   summarise(
@@ -759,7 +764,7 @@ save(strata.offshore,
      file = here("Output/strata_offshore_final.Rdata"))
 
 # Convert polygons to points and add coordinates -------------------------------
-strata.offshore.points  <- strata.offshore %>% 
+strata.nearshore.points  <- strata.offshore %>% 
   st_cast("MULTIPOINT") %>%
   st_cast("POINT") %>%
   mutate(
@@ -769,12 +774,12 @@ strata.offshore.points  <- strata.offshore %>%
   st_set_geometry(NULL)
 
 # Save final strata points
-save(strata.offshore.points,  
-     file = here("Output/strata_points_offshore.Rdata"))
+save(strata.nearshore.points,  
+     file = here("Output/strata_points_nearshore.Rdata"))
 
 # Write offshore stata points to CSV
-write.csv(strata.offshore.points,  
-          file = here("Output/strata_points_offshore.csv"),
+write.csv(strata.nearshore.points,  
+          file = here("Output/strata_points_nearshore.csv"),
           quote = F, row.names = F)
 
 # Summarize nasc.strata by stock
@@ -785,14 +790,14 @@ strata.summ.offshore <- strata.offshore %>%
 
 if (save.figs) {
   # Add strata polygons to acoustic proportions map
-  map.stratum.all.os <- base.map + 
+  map.stratum.all.ns <- base.map + 
     # Plot final strata
     geom_sf(data = strata.offshore, aes(colour = factor(stratum), 
                                        fill = stock), alpha = 0.5) +
     # Plot proportion of backscatter from each species present
-    geom_point(data = nasc.prop.all.os, aes(X, Y, size = cps.nasc), 
+    geom_point(data = nasc.prop.all.ns, aes(X, Y, size = cps.nasc), 
                colour = "gray20", show.legend = F) +
-    geom_point(data = filter(nasc.prop.spp.os, nasc > 0),
+    geom_point(data = filter(nasc.prop.spp.ns, nasc > 0),
                aes(X, Y, size = nasc), colour = "red", show.legend = F) +
     scale_colour_discrete("Stratum") +
     scale_fill_manual("Stock", 
@@ -808,12 +813,12 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save figure
-  ggsave(here("Figs/fig_nasc_acoustic_proportions_strata_os.png"), map.stratum.all.os,
+  ggsave(here("Figs/fig_nasc_acoustic_proportions_strata_ns.png"), map.stratum.all.ns,
          width = map.width*2.6, height = map.height*1.5)
 }
 
 # Convet nasc.density to sf and project
-nasc.density.os <- ungroup(nasc.density.os) %>% 
+nasc.density.ns <- ungroup(nasc.density.ns) %>% 
   project_df(to = crs.proj)
 
 # Summarize positive clusters to filter clusters from removed strata
@@ -822,42 +827,42 @@ pos.cluster.summ <- pos.clusters %>%
   summarise(nIndiv = sum(num)) %>% 
   filter(nIndiv >= nIndiv.min)
 
-pos.clusters.os <- pos.clusters
+pos.clusters.ns <- pos.clusters
 
-nasc.os.clusters <- sort(unique(nasc.offshore$cluster))
+nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
 
 if (save.figs) {
   # Create a list for saving biomass density plots
-  biomass.dens.figs.os <- list()
+  biomass.dens.figs.ns <- list()
   
   # Plot anchovy biomass density
   for (i in unique(strata.offshore$scientificName)) {
     for (j in unique(filter(strata.offshore, scientificName == i)$stock)) {
       # Filter biomass density
-      nasc.density.plot.os <- nasc.density.os %>%
-        left_join(filter(nasc.stock.os, scientificName == i, stock == j)) %>% 
+      nasc.density.plot.ns <- nasc.density.ns %>%
+        left_join(filter(nasc.stock.ns, scientificName == i, stock == j)) %>% 
         filter(density != 0, scientificName == i, 
-               stock == j, transect %in% strata.final.os$transect[strata.final.os$scientificName == i])
+               stock == j, transect %in% strata.final.ns$transect[strata.final.ns$scientificName == i])
       
       # Filter positive clusters
-      pos.cluster.txt <- pos.clusters.os %>% 
+      pos.cluster.txt <- pos.clusters.ns %>% 
         filter(scientificName == i, stock == j,
-               cluster %in% nasc.os.clusters) %>% 
+               cluster %in% nasc.ns.clusters) %>% 
         ungroup() %>% 
         project_df(to = crs.proj)
       
       # Map biomass density, strata polygons, and positive trawl clusters
-      biomass.dens.os <- base.map +
+      biomass.dens.ns <- base.map +
         geom_sf(data = filter(strata.offshore, scientificName == i, stock == j),
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
         # Plot vessel track
         geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
         # Plot zero nasc data
-        geom_point(data = filter(nasc.offshore, cps.nasc == 0), aes(X, Y),
+        geom_point(data = filter(nasc.nearshore, cps.nasc == 0), aes(X, Y),
                    colour = 'gray50', size = 0.15, alpha = 0.5) +
         # Plot NASC data
-        geom_point(data = nasc.density.plot.os, aes(X, Y, size = bin, fill = bin),
+        geom_point(data = nasc.density.plot.ns, aes(X, Y, size = bin, fill = bin),
                    shape = 21, alpha = 0.75) +
         # Configure size and colour scales
         scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
@@ -875,23 +880,23 @@ if (save.figs) {
                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
       
       # Save figures
-      ggsave(biomass.dens.os, 
+      ggsave(biomass.dens.ns, 
              filename = paste(here("Figs/fig_biomass_dens_os_"), i, "-", j, ".png",sep = ""),
              width  = map.width,height = map.height)
       
       # Save plot to list
-      biomass.dens.figs.os[[i]][[j]] <- biomass.dens.os
+      biomass.dens.figs.ns[[i]][[j]] <- biomass.dens.ns
     }
   }
   # Save map objects
-  save(biomass.dens.figs.os, file = here("Output/biomass_dens_os_map_all.Rdata"))  
+  save(biomass.dens.figs.ns, file = here("Output/biomass_dens_os_map_all.Rdata"))  
 } else {
   load(here("Output/biomass_dens_os_map_all.Rdata"))
 }
 
 # Create blank plots for missing species
 for (i in cps.spp) {
-  if (is.null(biomass.dens.figs.os[[i]])) {
+  if (is.null(biomass.dens.figs.ns[[i]])) {
     df <- data.frame()
     biomass.dens.temp <- ggplot(df) + geom_point() + 
       xlim(0,10) + ylim(0,10) + 
@@ -903,25 +908,25 @@ for (i in cps.spp) {
 }
 
 # Save final nasc data frame used for point and bootstrap estimates
-save(nasc.offshore, file = here("Output/nasc_offshore_final.Rdata"))
+save(nasc.nearshore, file = here("Output/nasc_offshore_final.Rdata"))
 
 # Create new list for computing biomass estimates
 point.estimates.offshore <- data.frame()
-nasc.summ.strata.os      <- data.frame()
+nasc.summ.strata.ns      <- data.frame()
 
 # Calculate point estimates for each species
-for (i in unique(strata.final.os$scientificName)) {
+for (i in unique(strata.final.ns$scientificName)) {
   # Subset strata for species i
-  strata.temp <- filter(strata.final.os, scientificName == i) %>% 
+  strata.temp <- filter(strata.final.ns, scientificName == i) %>% 
     select(transect, stratum)
   
   # Add stratum numbers to nasc
-  nasc.os.temp <- nasc.offshore %>%
+  nasc.ns.temp <- nasc.nearshore %>%
     left_join(strata.temp) %>% 
     filter(!is.na(stratum))
   
   # Summarise nasc by stratum
-  nasc.os.temp.summ <- nasc.os.temp %>% 
+  nasc.ns.temp.summ <- nasc.ns.temp %>% 
     group_by(stratum) %>% 
     summarise(
       n_samples = n(),
@@ -930,8 +935,8 @@ for (i in unique(strata.final.os$scientificName)) {
     select(scientificName, everything())
   
   # Combine nasc summaries
-  nasc.summ.strata.os <- bind_rows(nasc.summ.strata.os, 
-                                nasc.os.temp.summ)
+  nasc.summ.strata.ns <- bind_rows(nasc.summ.strata.ns, 
+                                nasc.ns.temp.summ)
   
   # Create data frame with stratum and area (m^2)
   stratum.info.offshore <- strata.offshore %>% 
@@ -944,20 +949,20 @@ for (i in unique(strata.final.os$scientificName)) {
   # Currently has na.rm = TRUE for calculting biomass
   point.estimates.offshore <- bind_rows(point.estimates.offshore,
                                          data.frame(scientificName = i,
-                                                    estimate_point(nasc.offshore, stratum.info.offshore, species = i)))
+                                                    estimate_point(nasc.nearshore, stratum.info.offshore, species = i)))
 }
 
 save(point.estimates.offshore, 
-     file = here("Output/biomass_point_estimates_os.Rdata"))
+     file = here("Output/biomass_point_estimates_ns.Rdata"))
 
 # Save strata nasc summaries to CSV
-write_csv(nasc.summ.strata.os, here("Output/nasc_strata_summary_os.csv"))
+write_csv(nasc.summ.strata.ns, here("Output/nasc_strata_summary_ns.csv"))
 
 # Add stock designations to point estimates
 point.estimates.offshore <- left_join(point.estimates.offshore, strata.summ.offshore)
 
 # Summarize point estimates (by stocks)
-pe.os <- point.estimates.offshore %>%
+pe.ns <- point.estimates.offshore %>%
   group_by(scientificName, stock) %>%
   summarise(
     area    = sum(area),
@@ -975,22 +980,22 @@ pe.os <- point.estimates.offshore %>%
     biomass.mean.point = biomass.total)
 
 # Save point estimates
-save(pe.os, file = here("Output/biomass_point_estimates_os_final.Rdata"))
-write_csv(pe.os, here("Output/biomass_point_estimates_os_final.csv"))
+save(pe.ns, file = here("Output/biomass_point_estimates_os_final.Rdata"))
+write_csv(pe.ns, here("Output/biomass_point_estimates_os_final.csv"))
 
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
   # Create data frame for biomass estimates
-  bootstrap.estimates.os <- data.frame()
+  bootstrap.estimates.ns <- data.frame()
   # Create data frame for abundance estimates by length
-  abundance.estimates.os <- data.frame()
+  abundance.estimates.ns <- data.frame()
   # Create data frame for stratum summaries
-  survey.summary.os <- data.frame()
+  survey.summary.ns <- data.frame()
   # Create data frame for catch summaries
-  catch.summary.os <- data.frame()
+  catch.summary.ns <- data.frame()
   # Create data frame for stratum summaries
-  stratum.summary.os <- data.frame()
+  stratum.summary.ns <- data.frame()
   
   # Configure progress bar
   pb1 <- tkProgressBar("R Progress Bar", 
@@ -1010,18 +1015,18 @@ if (do.bootstrap) {
       st_set_geometry(NULL)
     
     # Subset strata for species i
-    strata.temp <- filter(strata.final.os, scientificName == i) %>% 
+    strata.temp <- filter(strata.final.ns, scientificName == i) %>% 
       select(transect, stratum) %>% 
       left_join(filter(strata.summ.offshore, scientificName == i)) %>% 
       filter(!is.na(area))
     
     # Add stratum numbers to nasc and remove transects outside of defined strata
-    nasc.temp <- nasc.offshore %>%
+    nasc.temp <- nasc.nearshore %>%
       left_join(strata.temp) %>% 
       filter(!is.na(stratum))
 
     # Summarize nasc.temp to get strata to merge with pos.clusters below
-    nasc.temp.summ <- nasc.offshore %>% 
+    nasc.temp.summ <- nasc.nearshore %>% 
       group_by(stratum, cluster) %>% 
       summarise(n = n_distinct(cluster))
     
@@ -1032,7 +1037,7 @@ if (do.bootstrap) {
       summarise(counts = sum(counts))
     
     # Summarize stratum clusters for all CPS
-    stratum.cluster.cps <- nasc.offshore %>% 
+    stratum.cluster.cps <- nasc.nearshore %>% 
       group_by(cluster, stratum) %>% 
       summarise(nIntervals = n()) %>% 
       left_join(lf.summ.cluster)
@@ -1089,7 +1094,7 @@ if (do.bootstrap) {
                               Sample = seq(1,boot.num), boot.df[2:nrow(boot.df), ])
 
       # Combine results
-      bootstrap.estimates.os <- bind_rows(bootstrap.estimates.os, boot.temp)
+      bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
 
       # Calculate abundance by length class using bootstrap function ----
       abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], j, 
@@ -1100,7 +1105,7 @@ if (do.bootstrap) {
       abundance.temp <- data.frame(Species = i, Stratum = j,
                                    SL = L.vec, freq = abund.vec)
       # Combine results
-      abundance.estimates.os <- bind_rows(abundance.estimates.os, abundance.temp)
+      abundance.estimates.ns <- bind_rows(abundance.estimates.ns, abundance.temp)
       
       # Update the progress bar
       pb.prog2 <- round(stratum.counter/n_distinct(nasc.temp$stratum)*100)
@@ -1122,38 +1127,38 @@ if (do.bootstrap) {
     # Update the species counter
     spp.counter     <- spp.counter + 1
     # Combine survey summary by species
-    survey.summary.os  <- bind_rows(survey.summary.os, survey.summ.temp)
+    survey.summary.ns  <- bind_rows(survey.summary.ns, survey.summ.temp)
     # Combine survey summary by species
-    catch.summary.os   <- bind_rows(catch.summary.os, catch.summ.temp)
+    catch.summary.ns   <- bind_rows(catch.summary.ns, catch.summ.temp)
     # Combine stratum summary
-    stratum.summary.os <- bind_rows(stratum.summary.os, pos.cluster.spp)
+    stratum.summary.ns <- bind_rows(stratum.summary.ns, pos.cluster.spp)
   }
   
   # Close the species counter
   close(pb1)
   
   # # Replace NaNs in abundance summaries with zeros
-  # abundance.estimates.os[atm:::is.nan.df(abundance.estimates.os)] <- 0
-  # abundance.estimates.os[is.nan(abundance.estimates.os)] <- 0
+  # abundance.estimates.ns[atm:::is.nan.df(abundance.estimates.ns)] <- 0
+  # abundance.estimates.ns[is.nan(abundance.estimates.ns)] <- 0
   # 
   # Save bootstrap results
-  save(bootstrap.estimates.os, abundance.estimates.os, survey.summary.os, 
-       catch.summary.os, stratum.summary.os,
-       file = (here("Output/biomass_bootstrap_est_os.Rdata")))
+  save(bootstrap.estimates.ns, abundance.estimates.ns, survey.summary.ns, 
+       catch.summary.ns, stratum.summary.ns,
+       file = (here("Output/biomass_bootstrap_est_ns.Rdata")))
   
 } else{
   # Save bootstrap results
-  load(here("Output/biomass_bootstrap_est_os.Rdata"))
+  load(here("Output/biomass_bootstrap_est_ns.Rdata"))
   
 }
 
 # Rename scientificName column
-catch.summary.os <- catch.summary.os %>% 
+catch.summary.ns <- catch.summary.ns %>% 
   left_join(strata.summ.offshore) %>%
   rename(Stock = stock)
 
 # Summarise abundance across strata
-abund.summ.os <- abundance.estimates.os %>%
+abund.summ.ns <- abundance.estimates.ns %>%
   left_join(strata.summ.offshore, by = c("Species" = "scientificName",
                                           "Stratum" = "stratum")) %>%
   group_by(Species, Stock = stock, SL) %>% 
@@ -1163,22 +1168,22 @@ abund.summ.os <- abundance.estimates.os %>%
 # Calculate estimated biomass from from TL and estimated.wg --------------------
 # CURRENTLY USING ESTIMATED.WG ESTIMATED FROM TOTAL LENGTH
 # MUST UPDATE TO USE ESTIMATED.WG FROM STANDARD LENGTH
-abund.summ.os <- abund.summ.os %>% 
+abund.summ.ns <- abund.summ.ns %>% 
   mutate(estimated.wg = estimate_ts(Species, TL)$estimated.wg,
          biomass      = abundance * estimated.wg)
 
 # Add stock designations to bootstrap estimates
-bootstrap.estimates.os <- bootstrap.estimates.os %>% 
+bootstrap.estimates.ns <- bootstrap.estimates.ns %>% 
   left_join(strata.summ.offshore, by = c("Species" = "scientificName",
                                           "Stratum" = "stratum")) %>% 
   rename(Stock = stock)
 
 # Remove rows where stock is NA
-survey.summary.os <- survey.summary.os %>% 
+survey.summary.ns <- survey.summary.ns %>% 
   filter(!is.na(stock))
 
 # Summarize results from bootstrap per species and stratum
-be.stratum.os <- bootstrap.estimates.os %>% 
+be.stratum.ns <- bootstrap.estimates.ns %>% 
   group_by(Species, Stock, Stratum) %>% 
   summarise(
     n.samples         = n(),
@@ -1192,8 +1197,8 @@ be.stratum.os <- bootstrap.estimates.os %>%
     lower.ci.B        = quantile(biomass,probs = 0.025)*10^3,
     upper.ci.B        = quantile(biomass,probs = 0.975)*10^3) %>% 
   mutate(pct.tot.B    = biomass.mean.boot/sum(biomass.mean.boot)*100) %>%
-  left_join(survey.summary.os, by = c("Species","Stratum")) %>%
-  left_join(catch.summary.os,  by = c("Species" = "scientificName",
+  left_join(survey.summary.ns, by = c("Species","Stratum")) %>%
+  left_join(catch.summary.ns,  by = c("Species" = "scientificName",
                                       "Stratum" = "stratum", "Stock")) %>% 
   arrange(Species, Stratum) %>%
   select(
@@ -1201,42 +1206,42 @@ be.stratum.os <- bootstrap.estimates.os %>%
     biomass.mean.boot, lower.ci.B, upper.ci.B, biomass.sd, pct.tot.B)
 
 # Save results
-save(be.stratum.os, 
-     file = here("Output/biomass_bootstrap_estimates_stratum_os.Rdata"))
+save(be.stratum.ns, 
+     file = here("Output/biomass_bootstrap_estimates_stratum_ns.Rdata"))
 
 # Add stock designations to stratum summary
-stratum.summary.os <- stratum.summary.os %>% 
+stratum.summary.ns <- stratum.summary.ns %>% 
   left_join(strata.summ.offshore) %>% 
   rename(Stock = stock)
 
 # Summarize clusters for each species for entire survey
-cluster.summary.total.os <- stratum.summary.os %>%
+cluster.summary.total.ns <- stratum.summary.ns %>%
   group_by(scientificName, Stock) %>% 
   summarise(nClusters = n_distinct(cluster)) %>% 
   rename(Species = scientificName)
 
 # Summarize sampling for entire survey
-survey.summary.total.os <- survey.summary.os %>% 
+survey.summary.total.ns <- survey.summary.ns %>% 
   group_by(Species, Stock = stock) %>% 
   summarise(
     Strata     = n(),
     nTransects = sum(nTransects),
     Distance   = sum(Distance)) %>% 
-  left_join(cluster.summary.total.os)
+  left_join(cluster.summary.total.ns)
 
 # Summarise catch for entire survey
-catch.summary.total.os <- catch.summary.os %>% 
+catch.summary.total.ns <- catch.summary.ns %>% 
   group_by(Species = scientificName, Stock) %>% 
   summarise(nIndiv = sum(nIndiv))
 
 # Summarize results from bootstrap per species across all samples
-be.sample.os <- bootstrap.estimates.os %>% 
+be.sample.ns <- bootstrap.estimates.ns %>% 
   group_by(Species, Stock, Sample) %>% 
   summarise(area    = sum(Area)*2.915533e-07,
             biomass = sum(biomass))
 
 # Summarize results from bootstrap per species across all strata
-be.survey.os <- be.sample.os %>%
+be.survey.ns <- be.sample.ns %>%
   group_by(Species, Stock) %>%
   summarise(
     Area = area[1],
@@ -1244,8 +1249,8 @@ be.survey.os <- be.sample.os %>%
     biomass.sd = sd(biomass) * 10^3,
     lower.ci.B = quantile(biomass, probs = 0.025) * 10^3,
     upper.ci.B = quantile(biomass, probs = 0.975) * 10^3) %>%
-  left_join(survey.summary.total.os) %>%
-  left_join(catch.summary.total.os) %>%
+  left_join(survey.summary.total.ns) %>%
+  left_join(catch.summary.total.ns) %>%
   arrange(Species) %>%
   select(
     Species, Stock, Area, nTransects, Distance, nClusters, nIndiv, 
@@ -1253,32 +1258,32 @@ be.survey.os <- be.sample.os %>%
   )
 
 # Save results
-write.csv(be.survey.os, 
-          file  = here("Output/biomass_bootstrap_estimates_survey_os.csv"),
+write.csv(be.survey.ns, 
+          file  = here("Output/biomass_bootstrap_estimates_survey_ns.csv"),
           quote = F,row.names = F)
 
-save(be.survey.os, file = here("Output/biomass_bootstrap_estimates_survey_os.Rdata"))
+save(be.survey.ns, file = here("Output/biomass_bootstrap_estimates_survey_ns.Rdata"))
 
 # Combine stratum and survey estimates
-be.os <- be.stratum.os %>% 
-  bind_rows(be.survey.os) %>% 
+be.ns <- be.stratum.ns %>% 
+  bind_rows(be.survey.ns) %>% 
   arrange(Species, Stock, Stratum) %>% 
   replace_na(list(Stratum = "All", pct.tot.B = 100)) %>%
-  left_join(select(pe.os, -Area)) %>%
+  left_join(select(pe.ns, -Area)) %>%
   rename(Biomass = biomass.mean.point) %>% 
   mutate(biomass.cv = (biomass.sd / Biomass)*100) %>% 
   select(Species, Stock, Stratum, Area, nTransects, Distance, nClusters, nIndiv,
          Biomass, lower.ci.B, upper.ci.B, biomass.sd, biomass.cv)
 
-be.os[atm:::is.nan.df(be.os)] <- NA
+be.ns[atm:::is.nan.df(be.ns)] <- NA
 
 # Save results
-write.csv(be.os,
-          file = here("Output/biomass_bootstrap_estimates_final_os.csv"),
+write.csv(be.ns,
+          file = here("Output/biomass_bootstrap_estimates_final_ns.csv"),
           quote = F, row.names = F)
 
-save(be.os, 
-     file = here("Output/biomass_bootstrap_estimates_final_os.Rdata"))
+save(be.ns, 
+     file = here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
 
 # Get rows with estimates from all strata
-be.stratum.all.os <- which(be.os$Stratum == "All")
+be.stratum.all.ns <- which(be.ns$Stratum == "All")
