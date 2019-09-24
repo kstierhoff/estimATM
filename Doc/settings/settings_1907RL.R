@@ -303,6 +303,8 @@ min.tx.length          <- c(RL  = 3,
 tx.spacing.bins <- c(0, 6, 15, 35, 50, 100)
 tx.spacing.dist <- c(5, 10, 20, 40, 80)
 
+tx.spacing.ns   <- 5 # Nearshore transect spacing, in nmi; set NA if calculating programatically
+
 # SCS data
 scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
