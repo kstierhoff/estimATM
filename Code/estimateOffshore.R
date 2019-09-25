@@ -1,3 +1,6 @@
+# Remove any existing offshore backscatter data from memory
+if (exists("nasc.offshore")) {rm(nasc.offshore)}
+
 # Estimate offshore biomass -----------------------------------------------
 # List offshore backscatter files
 offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
@@ -12,12 +15,26 @@ for (o in offshore.files) {
   }
 }
 
-# nasc.offshore$transect <- gsub("O", "", nasc.vessel$transect)
-
 # Remove vessels not to be included in the offshore biomass estimates
 nasc.offshore <- nasc.offshore %>% 
-  filter(vessel.name %in% nasc.vessels.offshore) %>%
+  filter(vessel.name %in% nasc.vessels.offshore) %>% 
+  mutate(vessel.orig = case_when(
+    is.na(vessel.orig) ~ vessel.name,
+    TRUE ~ as.character(vessel.orig)))
+
+# Combine nasc data for all NASC vessels
+if (merge.vessels) {
+  nasc.offshore <- nasc.offshore %>% 
+    mutate(vessel.name = "All")
+} else {
+  nasc.offshore <- nasc.offshore %>% 
+    mutate(vessel.orig = vessel.name)
+}
+
+# Format data for processing
+nasc.offshore <- nasc.offshore %>%
   mutate(
+    id = seq_along(Interval),
     transect = str_replace(transect, "O", ""),
     transect.name = paste(vessel.name, transect),
     cps.nasc      = NASC.50,
@@ -26,10 +43,18 @@ nasc.offshore <- nasc.offshore %>%
                             nasc.summ.interval),
               labels = F, include.lowest = TRUE))
 
+# Remove intervals that fall within the primary survey area
+nasc.offshore.diff <- nasc.offshore %>% 
+  select(long, lat, id) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  st_difference(strata.super.polygons)
+
+nasc.offshore <- filter(nasc.offshore, id %in% nasc.offshore.diff$id)
+
 # Summarise nasc for plotting ---------------------------------------------
 nasc.plot.os <- nasc.offshore %>% 
   select(filename, transect, transect.name, int, lat, long, cps.nasc) %>% 
-  group_by(filename, transect, int) %>% 
+  group_by(filename, transect, transect.name, int) %>% 
   summarise(
     lat  = lat[1],
     long = long[1],
@@ -74,6 +99,7 @@ save(cluster.distance.os, file = here("Output/nasc_cluster_distance_offshore.Rda
 nasc.offshore <- bind_cols(nasc.offshore, cluster.distance.os) %>% 
   project_df(to = crs.proj)
 
+# Summarize numbers of intervals per trawl cluster
 nasc.offshore.summ <- nasc.offshore %>% 
   group_by(cluster) %>% 
   tally() %>% 
@@ -285,7 +311,7 @@ nasc.density.summ.os <- nasc.density.os %>%
 
 # Save biomass density data
 save(nasc.density.os, nasc.density.summ.os, 
-     file = here("Output/nasc_biomass_density_offshore.Rdata"))
+     file = here("Output/nasc_biomass_density_os.Rdata"))
 
 # Select legend objects 
 dens.levels.all.os <- sort(unique(nasc.density.os$bin.level))
@@ -331,7 +357,7 @@ tx.nn.os <- tx.nn.os %>%
   arrange(transect)
 
 # Save nearest neighbor distance info
-save(tx.nn.os, file = here("Output/transect_spacing_offshore.Rdata"))
+save(tx.nn.os, file = here("Output/transect_spacing_os.Rdata"))
 
 # Summarise biomass density by transect and species
 nasc.density.summ.os <- nasc.density.summ.os %>% 
@@ -564,7 +590,7 @@ if (stratify.manually.os) {
       mutate(diff = c(1, diff(transect))) %>%
       ungroup()
 
-    if (nrow(temp.spp) > 0) {
+    if (nrow(temp.spp) > 1) {
       # Find the start of each positive stratum
       spp.starts <- temp.spp %>%
         filter(diff > max.diff)
@@ -587,7 +613,7 @@ if (stratify.manually.os) {
 
       # Combine starts and ends in to a data frame for plotting and generating stratum vectors
       strata.spp <- data.frame(scientificName = i,
-                               stratum = seq(1,length(stratum.start)),
+                               stratum = seq(1, length(stratum.start)),
                                start = stratum.start,
                                end = stratum.end) %>%
         mutate(n.tx = end - start + 1)
@@ -656,15 +682,15 @@ nasc.stock.os <- data.frame()
 # strata.final.os <- strata.manual.os %>% 
 #   mutate(stratum.orig = stratum)
 
-# Summarise NASC to get species present
-offshore.spp <- nasc.prop.spp.os %>% 
-  filter(nasc > 0) %>% 
-  group_by(scientificName) %>% 
-  tally()
+# # Summarise NASC to get species present
+# offshore.spp <- nasc.prop.spp.os %>% 
+#   filter(nasc > 0) %>% 
+#   group_by(scientificName) %>% 
+#   tally()
 
 if (exists("strata.offshore")) rm(strata.offshore)
 
-for (i in unique(offshore.spp$scientificName)) {
+for (i in unique(strata.final.os$scientificName)) {
   # Select each strata per species
   strata.sub <- filter(strata.final.os, scientificName == i) %>% 
     select(transect, stratum)  
@@ -674,14 +700,14 @@ for (i in unique(offshore.spp$scientificName)) {
     filter(loc == "inshore") %>%
     left_join(strata.sub) %>% 
     mutate(stock = case_when(
-      i == "Engraulis mordax" & stratum == 2 ~ "Northern",
-      i == "Engraulis mordax" & stratum == 1 ~ "Central",
-      i == "Sardinops sagax"  & stratum == 1  ~ "Northern",
-      i == "Sardinops sagax"  & stratum == 1  ~ "Southern",
+      i == "Engraulis mordax" & lat >= stock.break.anch ~ "Northern",
+      i == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
+      i == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
+      i == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
       i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
       scientificName = i) %>% 
     select(transect, stock, scientificName) %>% 
-    distinct()
+    distinct() #%>% filter(!is.na(stock))
   
   # Combine results
   nasc.stock.os <- bind_rows(nasc.stock.os, nasc.stock.temp)
@@ -733,6 +759,9 @@ for (i in unique(offshore.spp$scientificName)) {
   }
 }
 
+# Ungroup to make work with filtering and plotting with mapview()
+strata.offshore <- ungroup(strata.offshore)
+
 # Save strata polygons
 save(strata.offshore, 
      file = here("Output/strata_offshore_raw.Rdata"))
@@ -770,11 +799,11 @@ strata.offshore.points  <- strata.offshore %>%
 
 # Save final strata points
 save(strata.offshore.points,  
-     file = here("Output/strata_points_offshore.Rdata"))
+     file = here("Output/strata_points_os.Rdata"))
 
 # Write offshore stata points to CSV
 write.csv(strata.offshore.points,  
-          file = here("Output/strata_points_offshore.csv"),
+          file = here("Output/strata_points_os.csv"),
           quote = F, row.names = F)
 
 # Summarize nasc.strata by stock
@@ -940,11 +969,13 @@ for (i in unique(strata.final.os$scientificName)) {
     mutate(area = as.numeric(area)) %>% 
     st_set_geometry(NULL)
   
+  # WHY ARE TRANSECTS NOT GETTING THE CORRECT STRATUM DESIGNATIONS???
+  
   # Compute point estimates
   # Currently has na.rm = TRUE for calculting biomass
   point.estimates.offshore <- bind_rows(point.estimates.offshore,
                                          data.frame(scientificName = i,
-                                                    estimate_point(nasc.offshore, stratum.info.offshore, species = i)))
+                                                    estimate_point(nasc.os.temp, stratum.info.offshore, species = i)))
 }
 
 save(point.estimates.offshore, 
@@ -1092,7 +1123,7 @@ if (do.bootstrap) {
       bootstrap.estimates.os <- bind_rows(bootstrap.estimates.os, boot.temp)
 
       # Calculate abundance by length class using bootstrap function ----
-      abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], j, 
+      abund.vec <- estimate_bootstrap(nasc.offshore, cluster.final[[i]], j, 
                                       stratum.area = stratum.area, 
                                       species = i, do.lf = do.lf, 
                                       boot.number = 0)$abundance.vector

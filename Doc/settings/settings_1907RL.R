@@ -171,6 +171,11 @@ nasc.vessels           <- c("RL","LM", "SD", "LBC")
 nasc.vessels.offshore  <- c("RL","SD")
 nasc.vessels.nearshore <- c("LBC","LM","SD")
 
+# Combine data from all vessels?
+# Should data from different vessels be combined, e.g., for Lasker and Saildrone
+# in the same offshore strata
+merge.vessels <- TRUE 
+
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
 # Number of intervals over which to summarize NASC

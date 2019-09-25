@@ -30,8 +30,8 @@ nasc.nearshore <- nasc.nearshore %>%
 
 # Summarise nasc for plotting ---------------------------------------------
 nasc.plot.ns <- nasc.nearshore %>% 
-  select(filename, transect, transect.name, int, lat, long, cps.nasc) %>% 
-  group_by(filename, transect.name, transect, int) %>% 
+  select(filename, vessel.name, transect, transect.name, int, lat, long, cps.nasc) %>% 
+  group_by(filename, vessel.name, transect.name, transect, int) %>% 
   summarise(
     lat  = lat[1],
     long = long[1],
