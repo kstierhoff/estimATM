@@ -9,11 +9,11 @@ ns.lims <- filter(strata.primary,
 
 # Get biomass density in the ROI
 nasc.density.sub <- nasc.density %>% 
-  filter(transect %in% nasc.density.ns$transect,
+  filter(transect %in% nasc.density.nse$transect,
          scientificName == spp.ns,
          density != 0) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == spp.ns,
          density != 0,
          transect %in% unique(strata.sub$transect))
@@ -37,7 +37,7 @@ nasc.map.ns <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
@@ -86,7 +86,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect)) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect)) 
@@ -127,7 +127,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") + 
@@ -182,7 +182,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect)) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect)) 
@@ -223,7 +223,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") + 
@@ -278,7 +278,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect)) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect)) 
@@ -319,7 +319,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") + 
@@ -374,7 +374,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect))
 
-nasc.density.ns.sub <- nasc.density.ns %>%
+nasc.density.nse.sub <- nasc.density.nse %>%
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect))
@@ -415,7 +415,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin),
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin),
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin),
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") +
@@ -470,7 +470,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect)) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect)) 
@@ -511,7 +511,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") + 
@@ -562,7 +562,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect)) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect)) 
@@ -603,7 +603,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") + 
@@ -658,7 +658,7 @@ nasc.density.sub <- nasc.density %>%
          density != 0,
          transect %in% unique(strata.sub$transect)) 
 
-nasc.density.ns.sub <- nasc.density.ns %>% 
+nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
          transect %in% unique(strata.sub$transect)) 
@@ -699,7 +699,7 @@ nearshore.map <- base.map +
   # Plot NASC data
   geom_point(data = nasc.density.sub, aes(X, Y, size = bin, fill = bin), 
              colour = 'gray50', alpha = 0.75) +
-  geom_point(data = nasc.density.ns.sub, aes(X, Y, size = bin, fill = bin), 
+  geom_point(data = nasc.density.nse.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
   # Configure size and colour scales
   scale_colour_discrete("Stratum") + 
