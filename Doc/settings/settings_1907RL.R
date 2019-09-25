@@ -39,7 +39,7 @@ wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
-sd.numbers <- c("1024")
+sd.numbers <- c("1045", "1046")
 
 # Set Saildrone filter method
 sd.buffer.type   <- c("saildrone")
@@ -201,7 +201,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "-Final 38 kHz CPS.csv",
                             LM  = "_CPS-Final CPS.csv",
-                            SD  = "_CPS-Final CPS.csv",
+                            SD  = "_CPS_v2-Final 38 kHz CPS.csv",
                             LBC = "-Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Juan Krill Final 120.csv",
@@ -300,10 +300,11 @@ min.tx.length          <- c(RL  = 3,
                             SD  = 1,
                             LBC = 1)
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0, 6, 15, 35, 50, 100)
+tx.spacing.bins <- c(0, 6, 15, 35, 70, 100)
 tx.spacing.dist <- c(5, 10, 20, 40, 80)
 
 tx.spacing.ns   <- 5 # Nearshore transect spacing, in nmi; set NA if calculating programatically
+tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
 scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
