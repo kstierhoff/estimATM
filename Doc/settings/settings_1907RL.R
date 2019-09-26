@@ -1,6 +1,6 @@
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
-survey.name.long       <- "Summer 2019 California Current Ecosystem Survey"
+survey.name.long       <- "Summer 2019 California Current Ecosystem (CCE) Survey"
 survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
@@ -418,7 +418,7 @@ stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
 # ER60 file info
 raw.prefix    <- "1907RL_EK60"
 raw.size      <-  50   # file size in megabytes (MB)
-raw.log.range <- 350  # depth of ER60 logging (m)
+raw.log.range <- 1000  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
@@ -457,7 +457,7 @@ cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (f
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
-cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material" # Cal sphere info
+cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material; WC38.1" # Cal sphere info
 cal.sphere.name    <- "_Lasker_ sphere #1"
 cal.sphere.z       <- 6 # Nominal depth of calibration sphere below the transducer
 cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about impedance analyzer
@@ -476,7 +476,7 @@ cal.max.z          <-    8     # enter maximum water depth below transducers
 cal.noise          <- list(RL = c(-128,-142,-148,-155,-140,-138))
 
 # Axis options for calibration plots
-cal.scales    <- "fixed"  # fixed or free
+cal.scales    <- "free"  # fixed or free
 
 # Vessel echosounder info  ------------------------------------------------
 if (survey.vessel.primary == "SH") {
