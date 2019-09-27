@@ -25,7 +25,7 @@ nasc.offshore <- nasc.offshore %>%
 # Combine nasc data for all NASC vessels
 if (merge.vessels) {
   nasc.offshore <- nasc.offshore %>% 
-    mutate(vessel.name = "All")
+    mutate(vessel.name = "RL")
 } else {
   nasc.offshore <- nasc.offshore %>% 
     mutate(vessel.orig = vessel.name)
@@ -480,13 +480,11 @@ tx.lines.os.sf <- strata.points.os.sf %>%
   st_cast("LINESTRING")
 
 # Determine transect order by min latitude/longitude
-tx.order.os <- data.frame()
-
-use.nums <- TRUE
+use.nums <- FALSE
 
 if (use.nums) {
   # Calculate transect order per vessel
-  tx.order.temp <- nasc.offshore %>%
+  tx.order.os <- nasc.offshore %>%
     # filter(str_detect(vessel.name, i)) %>% 
     group_by(transect.name) %>% 
     summarise(max.lat  = max(lat),
@@ -496,10 +494,12 @@ if (use.nums) {
            diff      = rank.lat - rank.long,
            transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
            rank.final = rank(transect.num)) %>% 
-    arrange(rank.final)
+    arrange(rank.final) %>% 
+    mutate(transect = transect.num)
+  
 } else {
   # Calculate transect order per vessel
-  tx.order.temp <- nasc.offshore %>%
+  tx.order.os <- nasc.offshore %>%
     # filter(str_detect(vessel.name, i)) %>% 
     group_by(transect.name) %>% 
     summarise(max.lat  = max(lat),
@@ -509,21 +509,22 @@ if (use.nums) {
            diff      = rank.lat - rank.long,
            transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
            rank.final = rank.lat) %>% 
-    arrange(rank.final)
+    arrange(rank.final) %>% 
+    mutate(transect = rank.final)
 }
 
-# Assign transect order based on rank latitude
-if (nrow(tx.order.os) == 0) {
-  # If the first vessel, create transects from 0 to number of transects
-  tx.order.temp$transect <- tx.order.temp$rank.final
-} else {
-  # If not the first vessel, add rank latitude to largest existing transect number
-  tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.os$transect)
-}
-
-# Combine results from all vessels
-tx.order.os <- bind_rows(tx.order.os, tx.order.temp) %>% 
-  arrange(transect)
+# # Assign transect order based on rank latitude
+# if (nrow(tx.order.os) == 0) {
+#   # If the first vessel, create transects from 0 to number of transects
+#   tx.order.temp$transect <- tx.order.temp$rank.final
+# } else {
+#   # If not the first vessel, add rank latitude to largest existing transect number
+#   tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.os$transect)
+# }
+# 
+# # Combine results from all vessels
+# tx.order.os <- bind_rows(tx.order.os, tx.order.temp) %>% 
+#   arrange(transect)
 
 # Add transect numbers to NASC data frame
 nasc.offshore <- left_join(select(nasc.offshore, -transect), 
@@ -623,7 +624,7 @@ if (stratify.manually.os) {
       
       for (j in 1:nrow(strata.spp)) {
         # Create a vector of transects from start to end
-        transect <- seq(strata.spp$start[j],strata.spp$end[j])
+        transect <- seq(strata.spp$start[j], strata.spp$end[j])
 
         # Combine results
         strata.df <- bind_rows(strata.df,
@@ -688,25 +689,33 @@ nasc.stock.os <- data.frame()
 #   group_by(scientificName) %>% 
 #   tally()
 
+if (stock.break.source == "primary") {
+  strata.points.os <- strata.points.os %>% 
+    left_join(ungroup(select(tx.ends, transect.name, lat.stock = lat.i)))
+} else {
+  strata.points.os <- strata.points.os %>% 
+    mutate(lat.stock = lat)
+}
+
 if (exists("strata.offshore")) rm(strata.offshore)
 
 for (i in unique(strata.final.os$scientificName)) {
   # Select each strata per species
   strata.sub <- filter(strata.final.os, scientificName == i) %>% 
-    select(transect, stratum)  
+    select(transect.name, stratum)  
   
   # Define strata to stock
   nasc.stock.temp <- strata.points.os %>% 
     filter(loc == "inshore") %>%
     left_join(strata.sub) %>% 
     mutate(stock = case_when(
-      i == "Engraulis mordax" & lat >= stock.break.anch ~ "Northern",
-      i == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
-      i == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
-      i == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
+      i == "Engraulis mordax" & lat.stock >= stock.break.anch ~ "Northern",
+      i == "Engraulis mordax" & lat.stock <  stock.break.anch ~ "Central",
+      i == "Sardinops sagax"  & lat.stock >= stock.break.sar  ~ "Northern",
+      i == "Sardinops sagax"  & lat.stock <  stock.break.sar  ~ "Southern",
       i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
       scientificName = i) %>% 
-    select(transect, stock, scientificName) %>% 
+    select(transect.name, transect, stock, scientificName) %>% 
     distinct() #%>% filter(!is.na(stock))
   
   # Combine results
@@ -862,11 +871,15 @@ if (save.figs) {
   # Plot anchovy biomass density
   for (i in unique(strata.offshore$scientificName)) {
     for (j in unique(filter(strata.offshore, scientificName == i)$stock)) {
+      # Filter and subset nasc.stock.os per species and stratum
+      nasc.stock.os.temp <- filter(nasc.stock.os, scientificName == i, stock == j) %>% 
+        select(-transect, -scientificName)
+      
       # Filter biomass density
       nasc.density.plot.os <- nasc.density.os %>%
-        left_join(filter(nasc.stock.os, scientificName == i, stock == j)) %>% 
+        left_join(nasc.stock.os.temp) %>% 
         filter(density != 0, scientificName == i, 
-               stock == j, transect %in% strata.final.os$transect[strata.final.os$scientificName == i])
+               stock == j, transect.name %in% strata.final.os$transect.name[strata.final.os$scientificName == i])
       
       # Filter positive clusters
       pos.cluster.txt <- pos.clusters.os %>% 
@@ -942,10 +955,11 @@ nasc.summ.strata.os      <- data.frame()
 for (i in unique(strata.final.os$scientificName)) {
   # Subset strata for species i
   strata.temp <- filter(strata.final.os, scientificName == i) %>% 
-    select(transect, stratum)
+    select(transect.name, stratum)
   
   # Add stratum numbers to nasc
   nasc.os.temp <- nasc.offshore %>%
+    select(-stratum) %>% 
     left_join(strata.temp) %>% 
     filter(!is.na(stratum))
   
@@ -1042,7 +1056,7 @@ if (do.bootstrap) {
     
     # Subset strata for species i
     strata.temp <- filter(strata.final.os, scientificName == i) %>% 
-      select(transect, stratum) %>% 
+      select(transect.name, stratum) %>% 
       left_join(filter(strata.summ.offshore, scientificName == i)) %>% 
       filter(!is.na(area))
     

@@ -413,6 +413,9 @@ stratify.manually.os <- FALSE
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
 stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
+# Transects used to define stock boundaries (primary or other)
+# Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
+stock.break.source <- "primary" 
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
