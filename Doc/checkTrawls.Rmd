@@ -40,7 +40,12 @@ if (doc.type == "latex") {
 }
 ```
 
-```{r settings}
+```{r user-settings}
+# User-specified settings
+get.nav <- TRUE
+```
+
+```{r project-settings}
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(),"/")))
 
@@ -58,7 +63,71 @@ cps.spp           <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                       "Scomber japonicus","Trachurus symmetricus")
 ```
 
-```{r get-data}
+```{r get-nav}
+if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time)) - days(1)
+  }
+  
+  if (nav.lag > 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      sep = ""))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                                    row.names = NULL, skip = 0))
+    names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = long - 360,
+             SOG      = SOG * 1.94384,
+             datetime = ymd_hms(time),
+             SST      = na_if(SST, NaN),
+             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(lat, min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
+  }
+  
+  # Convert nav to spatial
+  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  nav.paths.sf <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
+} else {
+  # Load nav data
+  load(here("Data/Nav/nav_data.Rdata"))
+}
+```
+
+```{r get-trawl-data}
 # Copy trawl Access database
 haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
                   regexp = trawl.db.access)
@@ -137,6 +206,10 @@ if (trawl.source == "Access") {
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
 }
+
+# Select bad trawls
+haul.bad <- haul.all %>% 
+  filter(trawlPerformance %in% trawl.performance) 
 
 # Classify hauls by season (spring or summer)
 haul.all <- haul.all %>% 
@@ -1008,6 +1081,17 @@ ggplotly(lw.plot.leg)
 ```
 
 # Data checks
+## Removed hauls  
+
+Hauls removed due to trawl performance issues (e.g., aborted, bad, poor, etc.).
+
+```{r bad-hauls}
+haul.bad %>% 
+  select(haul, trawlDate, orderOcc, trawlPerformance) %>% 
+  mutate(trawlDate = date(trawlDate)) %>% 
+  datatable(rownames = FALSE)
+```
+
 ## Check hauls
 
 Trawl distances are examined to look for data entry errors. Trawls longer than 5 nmi are highlighted orange.
@@ -1015,7 +1099,7 @@ Trawl distances are examined to look for data entry errors. Trawls longer than 5
 ```{r check-trawl-distance}
 haul.paths %>% 
   st_set_geometry(NULL) %>% 
-  arrange(desc(distance)) %>% 
+  arrange(haul) %>% 
   mutate(distance = cell_spec(
     distance, knitr.format, color = "black",
     background = ifelse(distance <= 5, "white", "orange"))) %>%
@@ -1030,13 +1114,11 @@ haul.paths %>%
 
 ## Map hauls
 
-```{r map-hauls}
-if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
-  # Load existing navigation data
-  load(here("Data/Nav/nav_data.Rdata"))
-
+```{r map-hauls,out.height="8in",out.width="100%"}
+# Provider tiles info: http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+if (exists("nav.paths.sf")) {
   leaflet() %>% 
-    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    # Add provider tiles
     addProviderTiles(providers$Esri.OceanBasemap) %>%
     # Add nav data
     addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
@@ -1051,9 +1133,8 @@ if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
                      popup = ~popup, label = ~label,
                      group =  "Trawls")
 } else {
-  # mapview(haul.paths, color = "black", layer.name = "Haul Paths", legend = FALSE)  
   leaflet() %>% 
-    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    # Add provider tiles
     addProviderTiles(providers$Esri.OceanBasemap) %>%
     # Add trawl paths 
     addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
