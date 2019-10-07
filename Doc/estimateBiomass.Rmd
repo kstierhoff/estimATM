@@ -120,7 +120,7 @@ process.ctd       <- T # Process CTD and UCTD casts
 estimate.os       <- F # Estimate biomass in the offshore strata
 estimate.ns       <- F # Estimate biomass in the nearshore strata
 
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -339,7 +339,7 @@ if (get.nav) {
   save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
   # Load nav data
-  load(here("Data/NAV/nav_data.Rdata"))
+  load(here("Data/Nav/nav_data.Rdata"))
 }
 
 # Read transect waypoints
@@ -448,7 +448,7 @@ if (get.nav.sd) {
 
     # Save nav data
     save(nav.sd, nav.sd.sf, nav.now.sd, 
-         file = here("Data/NAV/nav_data_saildrone.Rdata"))
+         file = here("Data/Nav/nav_data_saildrone.Rdata"))
     
     # Create gps.csv files from ERDDAP data
     for (i in unique(nav.sd$saildrone)) {
@@ -461,7 +461,7 @@ if (get.nav.sd) {
     }
   } else {
     # Load nav data
-    load(here("Data/NAV/nav_data_saildrone.Rdata"))
+    load(here("Data/Nav/nav_data_saildrone.Rdata"))
   }
 }
 ```
@@ -625,7 +625,6 @@ For each .CSV file produced during Echoview processing, data within each `r bin.
 For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 50 m depth (NASC.50) is used. Transect names are extracted from .CSV file names, hort transects are excluded, and transect numbers are assigned.
 
 ```{r process-backscatter}
-#rm(processed.csv)
 if (process.csv) {
   if (process.csv.all) {
     # Create new data frame for backscatter data
@@ -4755,7 +4754,7 @@ if (process.ctd) {
   uctd.missing <- all.uctd.hdr %>% 
     filter(!cast %in% unique(all.uctd.casts$cast))
 
-    # Write table to CSV
+  # Write table to CSV
   write.csv(uctd.missing, file = here("Output/unprocessed_uctd.csv"), 
             quote = FALSE, row.names = FALSE)
     
@@ -5115,7 +5114,8 @@ ctd.info.all <- all.ctd.hdr %>%
   filter(!is.na(lat), !is.na(long))
 
 # Combine all CTD and UCTD cast data in one data frame
-ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>% 
+ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>%
+  left_join(select(ctd.info.all, cast, lat, long)) %>% 
   filter(cast %in% ctd.info.all$cast)
 
 # Save to CSV file
