@@ -1,22 +1,22 @@
-library(tidyverse)
-library(readr)
-library(lubridate)
-library(here)
-library(plotly)
-library(sf)
-library(mapview)
-library(atm)
-library(surveyR)
-
-# Get project name from directory
-prj.name <- last(unlist(str_split(here(),"/")))
-
-# Get all settings files
-settings.files <- dir(here("Doc/settings"))
-
-# Source survey settings file
-prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
-source(here("Doc/settings", prj.settings))
+# library(tidyverse)
+# library(readr)
+# library(lubridate)
+# library(here)
+# library(plotly)
+# library(sf)
+# library(mapview)
+# library(atm)
+# library(surveyR)
+# 
+# # Get project name from directory
+# prj.name <- last(unlist(str_split(here(),"/")))
+# 
+# # Get all settings files
+# settings.files <- dir(here("Doc/settings"))
+# 
+# # Source survey settings file
+# prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+# source(here("Doc/settings", prj.settings))
 
 # Import set data ----------------------------------------------------
 lm.sets <- read_csv("Data/Seine/lm_sets.csv") %>% 
@@ -134,40 +134,40 @@ load(here("Output/cps_nasc_prop_ns.Rdata"))
 
 # Plot Lisa Marie data ----------------------------------------------------
 # Summarise nasc for plotting
-nasc.plot.ns <- nasc.nearshore %>% 
+nasc.plot.ns <- nasc.nearshore %>%
   # filter(vessel.name == "LM") %>%
-  select(filename, transect, transect.name, int, lat, long, cps.nasc) %>% 
-  group_by(filename, transect, transect.name, int) %>% 
+  select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
+  group_by(filename, transect, transect.name, int) %>%
   summarise(
     lat  = lat[1],
     long = long[1],
-    NASC = mean(cps.nasc)) %>% 
-  # Create bins for defining point size in NASC plots%>% 
+    NASC = mean(cps.nasc)) %>%
+  # Create bins for defining point size in NASC plots%>%
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
-         bin.level =  as.numeric(bin)) %>% 
-  ungroup() %>% 
+         bin.level =  as.numeric(bin)) %>%
+  ungroup() %>%
   project_df(to = crs.proj)
 
-nasc.paths.ns <- nasc.plot.ns %>% 
-  st_as_sf(coords = c("long", "lat"), crs = 4326) %>% 
-  group_by(transect.name) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING") %>% 
+nasc.paths.ns <- nasc.plot.ns %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+  group_by(transect.name) %>%
+  summarise(do_union = F) %>%
+  st_cast("LINESTRING") %>%
   ungroup()
 
-# Use nav data to resize map to survey progress
-map.bounds <- nasc.paths.ns %>% 
-  st_transform(crs = 3310) %>%
-  st_bbox()
+# # Use nav data to resize map to survey progress
+# map.bounds <- nasc.paths.ns %>% 
+#   st_transform(crs = 3310) %>%
+#   st_bbox()
 
 # Filter for empty trawls
 set.zero    <- filter(set.pie, AllCPS == 0)
 
-# Calculate pie radius based on latitude range
-pie.scale <- 0.0125
-pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
-
-scale.pies <- FALSE
+# # Calculate pie radius based on latitude range
+# pie.scale <- 0.0125
+# pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
+# 
+# scale.pies <- FALSE
 
 # Calculate pie radius of each pie, based on All CPS landings
 if (scale.pies) {
@@ -177,10 +177,8 @@ if (scale.pies) {
 }
 
 set.pos <- filter(set.pie, AllCPS > 0) %>% 
+  replace(. == 0, 0.0000001) %>% 
   arrange(desc(X))
-
-# set.pos <- filter(set.pie, AllCPS > 0, str_detect(key.set, "Lisa Marie")) %>% 
-#   arrange(desc(X))
 
 # Select plot levels for backscatter data
 nasc.levels.all <- sort(unique(nasc.plot.ns$bin.level))
@@ -188,20 +186,38 @@ nasc.labels.all <- nasc.labels[nasc.levels.all]
 nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
 nasc.colors.all <- nasc.colors[nasc.levels.all]
 
-set.pies <- ggplot() + 
+set.pies <- base.map + 
   # Plot NASC data
   geom_path(data = nasc.plot.ns, aes(X, Y, group = transect.name)) +
-  # Plot trawl pies
+  # Plot purse seine pies
+  # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = radius),
+  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
+  #                                      "PacHerring", "PacMack", "Sardine"),
+  #                             color = 'black', alpha = 0.4) +
   scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius),
-                  cols = c("Anchovy", "JackMack", "Jacksmelt",
-                           "PacHerring", "PacMack", "Sardine"),
-                  color = 'black', alpha = 0.8) +
+                              cols = c("Anchovy", "JackMack", "Jacksmelt",
+                                       "PacHerring", "PacMack", "Sardine"),
+                              color = 'black', alpha = 0.8) +
+  # Configure trawl scale
+  scale_fill_manual(name = 'Species',
+                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                               "P. herring", "P. mackerel", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                               pac.herring.color, pac.mack.color, sardine.color)) +
   geom_point(data = set.zero, aes(X, Y)) +
-  coord_sf(crs = crs.proj) + 
-  theme_bw()
+  ggtitle("CPS Proportions in Purse Seines") +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 
 ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt.png"),
        height = 10, width = 10)
+
+trawl.set.wt.combo <- plot_grid(trawl.pie.cluster.wt, set.pies, nrow = 1)
+
+# Save combo map
+ggsave(trawl.set.wt.combo, filename = here("Figs/fig_trawl_seine_proportion_cluster_wt.png"),
+       height = map.height, width = map.width*2)
 
 # Map hauls and transect paths --------------------------------------------
 mapview(nasc.paths.ns, legend = F) + 

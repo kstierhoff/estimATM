@@ -1,55 +1,100 @@
+# Estimate offshore biomass -----------------------------------------------
 # Remove any existing offshore backscatter data from memory
 if (exists("nasc.offshore")) {rm(nasc.offshore)}
 
-# Estimate offshore biomass -----------------------------------------------
-# List offshore backscatter files
-offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
-                         regexp = "offshore.rds")
-
-# Import all offshore backscatter data
-for (o in offshore.files) {
-  if (exists("nasc.offshore")) {
-    nasc.offshore <- bind_rows(nasc.offshore, readRDS(offshore.files[o]))
-  } else {
-    nasc.offshore <- readRDS(offshore.files[o])
+# Process offshore backscatter data
+if (process.offshore) {
+  # List offshore backscatter files
+  offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
+                           regexp = "offshore.rds")
+  
+  # Import all offshore backscatter data
+  for (o in offshore.files) {
+    if (exists("nasc.offshore")) {
+      nasc.offshore <- bind_rows(nasc.offshore, readRDS(offshore.files[o]))
+    } else {
+      nasc.offshore <- readRDS(offshore.files[o])
+    }
   }
-}
-
-# Remove vessels not to be included in the offshore biomass estimates
-nasc.offshore <- nasc.offshore %>% 
-  filter(vessel.name %in% nasc.vessels.offshore) %>% 
-  mutate(vessel.orig = case_when(
-    is.na(vessel.orig) ~ vessel.name,
-    TRUE ~ as.character(vessel.orig)))
-
-# Combine nasc data for all NASC vessels
-if (merge.vessels) {
+  
+  # Remove vessels not to be included in the offshore biomass estimates
   nasc.offshore <- nasc.offshore %>% 
-    mutate(vessel.name = "RL")
+    filter(vessel.name %in% nasc.vessels.offshore) %>% 
+    mutate(vessel.orig = case_when(
+      is.na(vessel.orig) ~ vessel.name,
+      TRUE ~ as.character(vessel.orig)))
+  
+  # Combine nasc data for all NASC vessels
+  if (merge.vessels) {
+    nasc.offshore <- nasc.offshore %>% 
+      mutate(vessel.name = "RL")
+  } else {
+    nasc.offshore <- nasc.offshore %>% 
+      mutate(vessel.orig = vessel.name)
+  }
+  
+  # Format data for processing
+  nasc.offshore <- nasc.offshore %>%
+    mutate(
+      id = seq_along(Interval),
+      transect = str_replace(transect, "O", ""),
+      transect.name = paste(vessel.name, transect),
+      cps.nasc      = NASC.50,
+      stratum       = 1,
+      int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
+                              nasc.summ.interval),
+                labels = F, include.lowest = TRUE))
+  
+  # Identify intervals that fall outside the primary survey area
+  nasc.offshore.diff <- nasc.offshore %>% 
+    select(long, lat, id) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    st_difference(strata.super.polygons)
+  
+  # Remove intervals that fall within the primary survey area
+  nasc.offshore <- filter(nasc.offshore, id %in% nasc.offshore.diff$id)
+  
+  # Assign backscatter to trawl clusters ------------------------------------
+  # Create varialble for nearest cluster and minumum distance
+  cluster.distance.os <- data.frame(cluster = rep(NA, nrow(nasc.offshore)),
+                                    cluster.distance = rep(NA, nrow(nasc.offshore)))
+  # Configure progress bar
+  pb <- tkProgressBar("R Progress Bar", "Cluster Assignment", 0, 100, 0)
+  
+  # Assign trawl clusters
+  for (i in 1:nrow(nasc.offshore)) {
+    # Calculate distance between each NASC interval and all trawl clusters
+    temp.distance <- distance(nasc.offshore$lat[i], nasc.offshore$long[i], 
+                              super.clusters$lat, super.clusters$long, 
+                              units = "nm")
+    
+    # Assign cluster with minimum distance to NASC interval
+    cluster.distance.os$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
+    cluster.distance.os$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
+    
+    # Update progress bar
+    pb.prog <- round(i/nrow(nasc.offshore)*100)
+    info <- sprintf("%d%% done", pb.prog)
+    setTkProgressBar(pb, pb.prog, sprintf("Cluster Assignment (%s)", info), info)
+  }
+  
+  # Close progress bar
+  close(pb)
+  
+  # Add cluster distances to nasc
+  nasc.offshore <- bind_cols(nasc.offshore, cluster.distance.os) %>% 
+    project_df(to = crs.proj)
+  
+  # Save nasc cluster vector
+  save(cluster.distance.os, file = here("Output/nasc_cluster_distance_offshore.Rdata"))
+  
+  # Save results of processing
+  save(nasc.offshore, file = here("Data/Backscatter/nasc_offshore.Rdata"))
+  
 } else {
-  nasc.offshore <- nasc.offshore %>% 
-    mutate(vessel.orig = vessel.name)
+  # Load processed data
+  load(here("Data/Backscatter/nasc_offshore.Rdata"))
 }
-
-# Format data for processing
-nasc.offshore <- nasc.offshore %>%
-  mutate(
-    id = seq_along(Interval),
-    transect = str_replace(transect, "O", ""),
-    transect.name = paste(vessel.name, transect),
-    cps.nasc      = NASC.50,
-    stratum       = 1,
-    int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
-                            nasc.summ.interval),
-              labels = F, include.lowest = TRUE))
-
-# Remove intervals that fall within the primary survey area
-nasc.offshore.diff <- nasc.offshore %>% 
-  select(long, lat, id) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  st_difference(strata.super.polygons)
-
-nasc.offshore <- filter(nasc.offshore, id %in% nasc.offshore.diff$id)
 
 # Summarise nasc for plotting ---------------------------------------------
 nasc.plot.os <- nasc.offshore %>% 
@@ -63,40 +108,6 @@ nasc.plot.os <- nasc.offshore %>%
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
          bin.level =  as.numeric(bin)) %>% 
   ungroup() %>% 
-  project_df(to = crs.proj)
-
-# Assign backscatter to trawl clusters ------------------------------------
-# Create varialble for nearest cluster and minumum distance
-cluster.distance.os <- data.frame(cluster = rep(NA, nrow(nasc.offshore)),
-                                  cluster.distance = rep(NA, nrow(nasc.offshore)))
-# Configure progress bar
-pb <- tkProgressBar("R Progress Bar", "Cluster Assignment", 0, 100, 0)
-
-# Assign trawl clusters
-for (i in 1:nrow(nasc.offshore)) {
-  # Calculate distance between each NASC interval and all trawl clusters
-  temp.distance <- distance(nasc.offshore$lat[i], nasc.offshore$long[i], 
-                            super.clusters$lat, super.clusters$long, 
-                            units = "nm")
-  
-  # Assign cluster with minimum distance to NASC interval
-  cluster.distance.os$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
-  cluster.distance.os$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
-  
-  # Update progress bar
-  pb.prog <- round(i/nrow(nasc.offshore)*100)
-  info <- sprintf("%d%% done", pb.prog)
-  setTkProgressBar(pb, pb.prog, sprintf("Cluster Assignment (%s)", info), info)
-}
-
-# Close progress bar
-close(pb)
-
-# Save nasc cluster vector
-save(cluster.distance.os, file = here("Output/nasc_cluster_distance_offshore.Rdata"))
-
-# Add cluster distances to nasc
-nasc.offshore <- bind_cols(nasc.offshore, cluster.distance.os) %>% 
   project_df(to = crs.proj)
 
 # Summarize numbers of intervals per trawl cluster
@@ -252,12 +263,11 @@ if (save.figs) {
 
 # Calculate offshore acoustic biomass density -----------------------------
 nasc.offshore <- nasc.offshore %>% 
-  mutate( 
-    anch.dens = cps.nasc*prop.anch / (4*pi*sigmawg.anch) / 1000,
-    her.dens  = cps.nasc*prop.her  / (4*pi*sigmawg.her)  / 1000,
-    jack.dens = cps.nasc*prop.jack / (4*pi*sigmawg.jack) / 1000,
-    mack.dens = cps.nasc*prop.mack / (4*pi*sigmawg.mack) / 1000,
-    sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000)
+  mutate(anch.dens = cps.nasc*prop.anch / (4*pi*sigmawg.anch) / 1000,
+         her.dens  = cps.nasc*prop.her  / (4*pi*sigmawg.her)  / 1000,
+         jack.dens = cps.nasc*prop.jack / (4*pi*sigmawg.jack) / 1000,
+         mack.dens = cps.nasc*prop.mack / (4*pi*sigmawg.mack) / 1000,
+         sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000)
 
 # Format for plotting
 nasc.density.os <- nasc.offshore %>%
@@ -379,6 +389,7 @@ tx.ends.os <- nasc.offshore %>%
                              lat.o, long.o)[1])
 
 # Get original inshore transect ends -------------------------------------------
+# RESUME HERE ##################
 tx.i.os <- tx.ends.os %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
