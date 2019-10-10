@@ -39,7 +39,7 @@ wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
-sd.numbers <- c("1045", "1046")
+sd.numbers <- c("1045", "1046", "1047")
 
 # Set Saildrone filter method
 sd.buffer.type   <- c("saildrone")
