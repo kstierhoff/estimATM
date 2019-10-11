@@ -316,7 +316,6 @@ nasc.density.summ.os <- nasc.density.os %>%
   summarise(density = sum(density)) %>% 
   filter(scientificName %in% unique(lengths$scientificName)) %>% 
   left_join(select(tx.labels.tmp.os, transect.name, start.lat, start.long)) %>% 
-  # left_join(select(tx.nn.os, transect, vessel.name, dist.cum, dist.bin)) %>% 
   mutate(positive = density > 0)
 
 # Save biomass density data
@@ -389,7 +388,6 @@ tx.ends.os <- nasc.offshore %>%
                              lat.o, long.o)[1])
 
 # Get original inshore transect ends -------------------------------------------
-# RESUME HERE ##################
 tx.i.os <- tx.ends.os %>% 
   select(-lat.o, -long.o) %>% 
   rename(lat = lat.i, long = long.i) %>% 
@@ -523,19 +521,6 @@ if (use.nums) {
     arrange(rank.final) %>% 
     mutate(transect = rank.final)
 }
-
-# # Assign transect order based on rank latitude
-# if (nrow(tx.order.os) == 0) {
-#   # If the first vessel, create transects from 0 to number of transects
-#   tx.order.temp$transect <- tx.order.temp$rank.final
-# } else {
-#   # If not the first vessel, add rank latitude to largest existing transect number
-#   tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.os$transect)
-# }
-# 
-# # Combine results from all vessels
-# tx.order.os <- bind_rows(tx.order.os, tx.order.temp) %>% 
-#   arrange(transect)
 
 # Add transect numbers to NASC data frame
 nasc.offshore <- left_join(select(nasc.offshore, -transect), 
@@ -690,18 +675,13 @@ strata.final.os <- strata.final.os %>%
 # Create final strata and calculate area
 # Create df for transect-level stock info
 nasc.stock.os <- data.frame()
-# 
-# strata.final.os <- strata.manual.os %>% 
-#   mutate(stratum.orig = stratum)
 
-# # Summarise NASC to get species present
-# offshore.spp <- nasc.prop.spp.os %>% 
-#   filter(nasc > 0) %>% 
-#   group_by(scientificName) %>% 
-#   tally()
+# Ungroup tx.ends so it joins properly with strata.points.os  
+tx.ends <- ungroup(tx.ends)
 
 if (stock.break.source == "primary") {
   strata.points.os <- strata.points.os %>% 
+    ungroup() %>% 
     left_join(ungroup(select(tx.ends, transect.name, lat.stock = lat.i)))
 } else {
   strata.points.os <- strata.points.os %>% 
@@ -994,8 +974,6 @@ for (i in unique(strata.final.os$scientificName)) {
     mutate(area = as.numeric(area)) %>% 
     st_set_geometry(NULL)
   
-  # WHY ARE TRANSECTS NOT GETTING THE CORRECT STRATUM DESIGNATIONS???
-  
   # Compute point estimates
   # Currently has na.rm = TRUE for calculting biomass
   point.estimates.offshore <- bind_rows(point.estimates.offshore,
@@ -1073,11 +1051,12 @@ if (do.bootstrap) {
     
     # Add stratum numbers to nasc and remove transects outside of defined strata
     nasc.temp <- nasc.offshore %>%
-      left_join(strata.temp) %>% 
+      select(-stratum) %>% 
+      left_join(select(strata.temp, transect.name, stratum, stock)) %>% 
       filter(!is.na(stratum))
 
     # Summarize nasc.temp to get strata to merge with pos.clusters below
-    nasc.temp.summ <- nasc.offshore %>% 
+    nasc.temp.summ <- nasc.temp %>% 
       group_by(stratum, cluster) %>% 
       summarise(n = n_distinct(cluster))
     
@@ -1088,15 +1067,15 @@ if (do.bootstrap) {
       summarise(counts = sum(counts))
     
     # Summarize stratum clusters for all CPS
-    stratum.cluster.cps <- nasc.offshore %>% 
+    stratum.cluster.cps <- nasc.temp %>% 
       group_by(cluster, stratum) %>% 
       summarise(nIntervals = n()) %>% 
       left_join(lf.summ.cluster)
     
     # Summarize positive clusters per species
-    pos.cluster.spp <- pos.clusters %>%
+    pos.cluster.spp <- pos.clusters.os %>%
       filter(cluster %in% nasc.temp$cluster & scientificName == i) %>% 
-      inner_join(select(nasc.temp.summ,-n)) %>% 
+      inner_join(select(nasc.temp.summ, -n)) %>% 
       as.data.frame()
     
     # Summarize positive clusters per strata
@@ -1106,6 +1085,7 @@ if (do.bootstrap) {
     
     # Summarize stratum statistics
     survey.summ.temp <- nasc.temp %>% 
+      filter(!is.na(stock)) %>% 
       group_by(stratum, stock) %>% 
       summarise(
         nTransects     = n_distinct(transect),
@@ -1188,10 +1168,6 @@ if (do.bootstrap) {
   # Close the species counter
   close(pb1)
   
-  # # Replace NaNs in abundance summaries with zeros
-  # abundance.estimates.os[atm:::is.nan.df(abundance.estimates.os)] <- 0
-  # abundance.estimates.os[is.nan(abundance.estimates.os)] <- 0
-  # 
   # Save bootstrap results
   save(bootstrap.estimates.os, abundance.estimates.os, survey.summary.os, 
        catch.summary.os, stratum.summary.os,
@@ -1228,10 +1204,6 @@ bootstrap.estimates.os <- bootstrap.estimates.os %>%
   left_join(strata.summ.offshore, by = c("Species" = "scientificName",
                                           "Stratum" = "stratum")) %>% 
   rename(Stock = stock)
-
-# Remove rows where stock is NA
-survey.summary.os <- survey.summary.os %>% 
-  filter(!is.na(stock))
 
 # Summarize results from bootstrap per species and stratum
 be.stratum.os <- bootstrap.estimates.os %>% 
