@@ -33,17 +33,38 @@ if (process.offshore) {
       mutate(vessel.orig = vessel.name)
   }
   
+  # Export data for processing using the CTD app
+  write_csv(nasc.offshore, here("Output/CTDapp/CTDapp_All_Offshore.csv"))
+  
   # Format data for processing
   nasc.offshore <- nasc.offshore %>%
     mutate(
       id = seq_along(Interval),
       transect = str_replace(transect, "O", ""),
       transect.name = paste(vessel.name, transect),
-      cps.nasc      = NASC.50,
       stratum       = 1,
       int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
                               nasc.summ.interval),
                 labels = F, include.lowest = TRUE))
+  
+  # Apply cps.nasc, or use a fixed integration depth
+  if (source.cps.nasc["OS"]) {
+    # Use exteranlly supplied cps.nasc with variable integration depth (from CTD.app)
+    # Read file and create unique key for joining with nasc.vessel
+    cps.nasc.temp <- read.csv(data.cps.nasc["OS"]) %>% 
+      mutate(key = paste(lat, long, dist_m),
+             datetime = ymd_hms(paste(date, time))) %>% 
+      # Remove data from krill files (1807RL)
+      filter(!str_detect(tolower(filename), "krill")) 
+    
+    # Join nasc.vessel and cps.nasc on datetime
+    nasc.offshore <- nasc.offshore %>% 
+      left_join(select(cps.nasc.temp, datetime, cps.nasc))
+    
+  } else {
+    nasc.offshore <- nasc.offshore %>%
+      mutate(cps.nasc = NASC.50)
+  }
   
   # Identify intervals that fall outside the primary survey area
   nasc.offshore.diff <- nasc.offshore %>% 

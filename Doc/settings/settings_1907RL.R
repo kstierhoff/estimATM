@@ -238,12 +238,16 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T",
 source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             SD  = FALSE,
-                            LBC = FALSE) 
+                            LBC = FALSE,
+                            OS  = FALSE, # in the offshore strata
+                            NS  = FALSE) # in the neashore strata
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/CPS_NASC/cps_nasc_1907RL.csv"),
                             LM  = NA,
                             SD  = NA,
-                            LBC = NA) 
+                            LBC = NA,
+                            OS  = FALSE, # in the offshore strata
+                            NS  = FALSE) # in the neashore strata 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
                             LM  = "[^0-9]",

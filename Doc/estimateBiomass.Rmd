@@ -117,8 +117,8 @@ overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
-estimate.os       <- F # Estimate biomass in the offshore strata
-estimate.ns       <- F # Estimate biomass in the nearshore strata
+estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.offshore  <- F # Process offshore backscatter data
@@ -280,7 +280,7 @@ if (download.hab) {
 # Process vessel data  
 Vessel (e.g., lat/long, speed-over-ground, heading, etc.) and underway oceanographic data are available for all NOAA FSVs from ERDDAP in "near real time" during surveys (generally with a ~1 d lag, assuming an internet connection is available) or quality-assured (generally after the completion of survey legs). These data are logged continuously and averaged over 1-minute intervals. These data are relatively error-free and adhere to a strict format and are, therefore, more reliably and easily processed than the SCS event log (.elg) files provided to the Chief Scientist following a survey. Date ranges and desired variables are configured in the **`settings*.R`** files, and are used to assemble the URL used to download the data from ERDDAP.
 
-```{r process-nav}
+```{r process-nav, message=FALSE, warning=FALSE, include=FALSE}
 if (get.nav) {
   # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
@@ -623,7 +623,7 @@ For each .CSV file produced during Echoview processing, data within each `r bin.
 
 # Process backscatter data
 ## Read and summarize CSV files from Echoview  
-For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 50 m depth (NASC.50) is used. Transect names are extracted from .CSV file names, hort transects are excluded, and transect numbers are assigned.
+For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 70 m depth (NASC.70) is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned. Nearshore and offshore transects are processed but excluded from the primary analysis, but are available for further analysis if desired (e.g., `estimate.os = TRUE`, `estimate.ns = TRUE`, etc.).
 
 ```{r process-backscatter}
 if (process.csv) {
@@ -1117,8 +1117,11 @@ if (save.figs) {
 ggplotly(nasc.outlier.plotly)
 ```  
 
-## Characterize day/night
-(ref:plot-day-night) In the event that acoustic data were collected continuously (i.e., during day and night), each interval is characterized as being collected during day or night by estimating sunrise/sunset for each day based on the mean latitude and longitude of acoustic data from that day. If desired, data collected during either the day or night may be removed.
+## Characterize day/night  
+
+In the event that acoustic data were collected continuously (i.e., during day and night), each interval is characterized as being collected during day or night by estimating sunrise/sunset for each day based on the mean latitude and longitude of acoustic data from that day. If desired, data collected during either the day or night may be removed by changing the values of `r daynight.filter` in the `r prj.settings`. Data included in this analysis were from: `r glue::glue_collapse(daynight.filter, sep = ", ", last = " and ")`. 
+
+(ref:plot-day-night) Acoustic intervals characterized by day or night based on local sunrise/sunset times.
 
 ```{r plot-day-night,fig.cap='(ref:plot-day-night)'}
 # Summarize NASC by date and lat/long
@@ -1197,7 +1200,7 @@ include_graphics(here("Figs/fig_nasc_daynight.png"))
 ```
 
 ## Map acoustic backscatter  
-Acoustic backscatter is averaged over 2,000-m intervals and plotted along each transect. Transects are labeled by the vessel abbreviation and either a) transect name (using names from .CSV files) or b) transect number (by rank latitude for each vessel). Backscatter values > 50,000 m^2^ nmi^-2^ should be further examined for potential problems.  
+Acoustic backscatter is averaged over 2,000-m intervals and plotted along each transect. Transects are labeled by the vessel abbreviation and either a) the transect names assigned prior to or during the survey and extracted from .CSV files, or b) transect number assigned based on the rank latitude of the easternmost interval for each transect and vessel). **Backscatter values > 50,000 m^2^ nmi^-2^ should be further examined for potential problems (e.g., accidental integration of the seabed or surface noise).**  
 
 (ref:map-nasc-tx) Survey transects performed aboard _`r survey.vessel`_ overlaid with the distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r cps.depth` to `r int.start`-m deep) ascribed to CPS. Panels are labeled with a) transect names (from Echoview files) and b) transect numbers (used to define sampling strata).
 
