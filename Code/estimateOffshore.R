@@ -1310,3 +1310,22 @@ save(be.os,
 
 # Get rows with estimates from all strata
 be.stratum.all.os <- which(be.os$Stratum == "All")
+
+# Bootstrap estimates of biomass by species
+biomass.histogram.survey.os <- ggplot(be.sample.os, aes(biomass*1e3, fill = Stock)) + 
+  geom_histogram(alpha = 0.75) + facet_wrap(Species ~ Stock, scales = "free") + 
+  geom_vline(data = filter(pe.os, Stratum == "All"),aes(xintercept = biomass.mean.point)) +
+  geom_vline(data = be.survey.os, aes(xintercept = lower.ci.B), linetype = 'dashed') +
+  geom_vline(data = be.survey.os, aes(xintercept = upper.ci.B), linetype = 'dashed') +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = c(All = "gray50", Central = "orange", 
+                               Northern = "navyblue", Southern = "firebrick")) +
+  ylab("Count") + xlab(expression(Biomass~(t))) +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
+
+# Save figure
+ggsave(biomass.histogram.survey.os,
+       filename = here("Figs/fig_biomass_histogram_survey_os.png"),
+       height = 8, width = 14)
