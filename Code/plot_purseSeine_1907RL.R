@@ -30,6 +30,8 @@ lbc.sets <- read_csv("Data/Seine/lbc_sets.csv") %>%
          vessel_name = "Long Beach Carnage",
          key.set = paste(vessel_name, date, set))
 
+save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
+
 # Import specimen data ----------------------------------------------------
 lm.specimens <- read_csv("Data/Seine/lm_catch.csv") %>% 
   mutate(date = mdy(date),
@@ -131,6 +133,23 @@ set.pie <- set.summ.wt %>%
 
 # Load nearshore backscatter data -----------------------------------------
 load(here("Output/cps_nasc_prop_ns.Rdata"))
+
+# Summarise transects -----------------------------------------------------
+# Summarise nasc data
+nasc.summ.ns <- nasc.nearshore %>% 
+  group_by(vessel.name, transect.name, transect) %>% 
+  summarise(
+    start     = min(datetime),
+    end       = max(datetime),
+    duration  = difftime(end, start, units = "hours"),
+    n_int     = length(Interval),
+    distance  = length(Interval)*nasc.interval/1852,
+    lat       = lat[which.min(long)],
+    long      = long[which.min(long)],
+    mean_nasc = mean(cps.nasc)) %>% 
+  arrange(vessel.name, start)
+
+save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 
 # Plot Lisa Marie data ----------------------------------------------------
 # Summarise nasc for plotting
