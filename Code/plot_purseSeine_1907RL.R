@@ -135,7 +135,6 @@ load(here("Output/cps_nasc_prop_ns.Rdata"))
 # Plot Lisa Marie data ----------------------------------------------------
 # Summarise nasc for plotting
 nasc.plot.ns <- nasc.nearshore %>%
-  # filter(vessel.name == "LM") %>%
   select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
   group_by(filename, transect, transect.name, int) %>%
   summarise(
@@ -155,27 +154,27 @@ nasc.paths.ns <- nasc.plot.ns %>%
   st_cast("LINESTRING") %>%
   ungroup()
 
-# # Use nav data to resize map to survey progress
-# map.bounds <- nasc.paths.ns %>% 
-#   st_transform(crs = 3310) %>%
-#   st_bbox()
+# Plot Lisa Marie data ----------------------------------------------------
+# Use nav data to resize map to survey progress
+map.bounds.ns <- nasc.paths.ns %>%
+  filter(str_detect(transect.name, "LM")) %>% 
+  st_transform(crs = 3310) %>%
+  st_bbox()
+
+# Calculate pie radius based on latitude range
+pie.radius.ns <- as.numeric(abs(map.bounds.ns$ymin - map.bounds.ns$ymax)*pie.scale)
+
+# Calculate pie radius of each pie, based on All CPS landings
+if (scale.pies) {
+  set.pie$radius    <- pie.radius.ns*set.pie$bin
+} else {
+  set.pie$radius    <- pie.radius.ns
+}
 
 # Filter for empty trawls
 set.zero    <- filter(set.pie, AllCPS == 0)
 
-# # Calculate pie radius based on latitude range
-# pie.scale <- 0.0125
-# pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
-# 
-# scale.pies <- FALSE
-
-# Calculate pie radius of each pie, based on All CPS landings
-if (scale.pies) {
-  set.pie$radius    <- pie.radius*set.pie$bin
-} else {
-  set.pie$radius    <- pie.radius
-}
-
+# Replace zeros with minimally small value for scatterpie plotting
 set.pos <- filter(set.pie, AllCPS > 0) %>% 
   replace(. == 0, 0.0000001) %>% 
   arrange(desc(X))
@@ -190,10 +189,6 @@ set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
-  # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = radius),
-  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
-  #                                      "PacHerring", "PacMack", "Sardine"),
-  #                             color = 'black', alpha = 0.4) +
   scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
@@ -207,22 +202,93 @@ set.pies <- base.map +
   geom_point(data = set.zero, aes(X, Y)) +
   ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+           xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
+           ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
 
-ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt.png"),
-       height = 10, width = 10)
+ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LisaMarie.png"),
+       height = 10, width = 6)
 
-trawl.set.wt.combo <- plot_grid(trawl.pie.cluster.wt, set.pies, nrow = 1)
+# Map backscatter
+nasc.map.ns <- base.map +
+  # Plot transects data
+  geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
+          size = 0.5, colour = "gray70", 
+          alpha = 0.75, linetype = "dashed") +
+  # Plot NASC data
+  geom_path(data = nasc.plot.ns, aes(X, Y, group = transect.name),
+            colour = "gray50", size = 0.5, alpha = 0.5) +
+  # Plot NASC data
+  geom_point(data = nasc.plot.ns, aes(X, Y, size = bin, fill = bin), 
+             shape = 21, alpha = 0.75) +
+  # Configure size and colour scales
+  scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                    values = nasc.sizes.all,labels = nasc.labels.all) +
+  scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                    values = nasc.colors.all,labels = nasc.labels.all) +
+  # Configure legend guides
+  guides(fill = guide_legend(), size = guide_legend()) +
+  # Plot title
+  ggtitle("CPS Backscatter") +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
+           ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
+
+ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_LisaMarie.png"),
+       height = 10, width = 6)
+
+nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 1)
 
 # Save combo map
-ggsave(trawl.set.wt.combo, filename = here("Figs/fig_trawl_seine_proportion_cluster_wt.png"),
-       height = map.height, width = map.width*2)
+ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LisaMarie.png"),
+       height = 7, width = 6.5)
 
-# Map hauls and transect paths --------------------------------------------
-mapview(nasc.paths.ns, legend = F) + 
-  mapview(lm.spec.summ.sf, zcol = "scientificName", cex = "totalWeight") +
-  mapview(lbc.spec.summ.sf, zcol = "scientificName", cex = "totalWeight")
+# Plot Long Beach Carnage data ----------------------------------------------------
+# Use nav data to resize map to survey progress
+map.bounds.ns <- nasc.paths.ns %>%
+  filter(str_detect(transect.name, "LBC")) %>% 
+  st_transform(crs = 3310) %>%
+  st_bbox()
+
+# Calculate pie radius based on latitude range
+pie.radius.ns <- as.numeric(abs(map.bounds.ns$ymin - map.bounds.ns$ymax)*pie.scale)
+
+# Calculate pie radius of each pie, based on All CPS landings
+if (scale.pies) {
+  set.pie$radius    <- pie.radius.ns*set.pie$bin
+} else {
+  set.pie$radius    <- pie.radius.ns
+}
+
+# Filter for empty trawls
+set.zero    <- filter(set.pie, AllCPS == 0)
+
+# Replace zeros with minimally small value for scatterpie plotting
+set.pos <- filter(set.pie, AllCPS > 0) %>% 
+  replace(. == 0, 0.0000001) %>% 
+  arrange(desc(X))
+
+set.pies <- set.pies + 
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
+           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
+
+ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LongBeachCarnage.png"),
+       height = 6, width = 10)
+
+# Map backscatter
+nasc.map.ns <- nasc.map.ns +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
+           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
+
+ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_LongBeachCarnage.png"),
+       height = 6, width = 10)
+
+nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 2)
+
+# Save combo map
+ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
+       height = 10, width = 8)
 
 # Real length/weigth relationship models for each species
 lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
@@ -253,7 +319,7 @@ for (i in unique(L.max$scientificName)) {
   lw.df <- bind_rows(lw.df, data.frame(model.temp, L, W))
 }
 
-# Estiamate missing weights from lengths -------------------------------------------------------
+# Estimate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
 lm.specimens <- lm.specimens %>% 
   left_join(lw.models, by = 'scientificName') %>% 
@@ -278,6 +344,7 @@ lbc.specimens <- lbc.specimens %>%
     K = (weightg/totalLength_mm*10^3)*100)
 
 
+# Plot speciment L/W for Lisa Marie ----------------------------- 
 lw.plot.lm <- ggplot() + 
   # Plot seasonal length models for each species
   geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
@@ -290,12 +357,16 @@ lw.plot.lm <- ggplot() +
   facet_wrap(~scientificName, scales = "free") +
   xlab("Length (mm)") +
   ylab("Weight (g)") +
-  theme_bw() 
+  theme_bw()  +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "italic"))
 
-ggsave(lw.plot.lm, filename = here("Figs/fig_LW_plots_LisaMarie.png"))
+ggsave(lw.plot.lm, filename = here("Figs/fig_LW_plots_LisaMarie.png"),
+       width = 10, height = 7)
 
-ggplotly(lw.plot.lm)
+# ggplotly(lw.plot.lm)
 
+# Plot speciment L/W for Long Beach Carnage ----------------------------- 
 lw.plot.lbc <- ggplot() + 
   # Plot seasonal length models for each species
   geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
@@ -308,8 +379,11 @@ lw.plot.lbc <- ggplot() +
   facet_wrap(~scientificName, scales = "free") +
   xlab("Length (mm)") +
   ylab("Weight (g)") +
-  theme_bw() 
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "italic"))
 
-ggsave(lw.plot.lbc, filename = here("Figs/fig_LW_plots_LongBeachCarnage.png"))
+ggsave(lw.plot.lbc, filename = here("Figs/fig_LW_plots_LongBeachCarnage.png"),
+       width = 10, height = 7)
 
-ggplotly(lw.plot.lbc)
+# ggplotly(lw.plot.lbc)
