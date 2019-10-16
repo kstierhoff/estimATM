@@ -105,8 +105,8 @@ Options in this section control the execution of various code chunks. All chunks
 get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
+copy.files        <- T # Copy data files to local directory 
+process.csv       <- T # Process Echoview files
 save.figs         <- F # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
 do.bootstrap      <- F # Generate bootstrap estimates
@@ -120,8 +120,9 @@ process.ctd       <- F # Process CTD and UCTD casts
 estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 process.offshore  <- F # Process offshore backscatter data
+process.nearshore <- T # Process near backscatter data
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -653,8 +654,8 @@ if (process.csv) {
       nasc.files <- nasc.files[!nasc.files %in% processed.csv]
       
       # Load already processed vessel NASC data
-      if (exists(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))) {
-            nasc.vessel <- readRDS(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))
+      if (file.exists(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))) {
+        nasc.vessel <- readRDS(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))
       } else {
         nasc.vessel <- data.frame()  
       }
@@ -723,81 +724,6 @@ if (process.csv) {
           filter(fct_match(vessel.orig, paste("SD", sd.numbers, sep = ""))) %>% 
           filter(between(long, min.long, max.long)) %>% 
           filter(between(lat,  min.lat,  max.lat))
-        
-        # write.csv(select(nasc.vessel, id, long, lat), here("Data/Backscatter/nasc_saildrone.csv"))
-        
-        # nasc.vessel.sf <- nasc.vessel %>% 
-        #   select(id, long, lat, vessel.name) %>% 
-        #   st_as_sf(coords = c("long","lat"), crs = crs.geog)  
-
-      #   # Buffer planned Saildrone transects to assign transect numbers
-      #   sd.buffer <- transects.sf %>% 
-      #     filter(type %in% sd.buffer.type) %>% 
-      #     st_buffer(dist = sd.buffer.dist/60)
-      #   
-      #   if (sd.filter.method == "buffer") {
-      #     # Convert points to sf and subset by spatial intersection 
-      #     sd.points.sf <- nasc.vessel %>% 
-      #       st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
-      #       st_intersection(sd.buffer) 
-      #     
-      #     # Convert sf poitns to linestring
-      #     sd.lines.sf <- sd.points.sf %>% 
-      #       group_by(line) %>% 
-      #       summarise(do_union = F) %>% 
-      #       st_cast("LINESTRING")
-      #     
-      #     # Filter nasc.vessel by matching filtered sf points
-      #     nasc.vessel <- nasc.vessel %>% 
-      #       left_join(select(sd.points.sf, id, line, brg)) %>% 
-      #       mutate(transect.name = line,
-      #              time.align = align.time(datetime, 60)) %>%
-      #       # left_join(select(nav.sd, vessel.name = saildrone, time.align, COG) %>% 
-      #       filter(!is.na(line)) %>% 
-      #       filter(brg) %>% 
-      #       select(-id, -line, -geometry) 
-      #     # %>% st_set_geometry(NULL)
-      #     
-      #   } else if (sd.filter.method == "manual") {
-      #     # Read CSV file provided; data filtered using manually drawn polygons
-      #     if (prj.name == "1807RL-Saildrone") {
-      #       # Read edited shapefile
-      #       sd.nasc.filter <- st_read(here("Data/Backscatter/nasc_saildrone_edited.shp")) %>% 
-      #         mutate(transect.name = sprintf("%03d", tx_name)) %>% 
-      #         st_set_geometry(NULL)
-      #       
-      #       # Filter by matching ID
-      #       nasc.vessel <- nasc.vessel %>%
-      #         select(-transect.name) %>% 
-      #         left_join(select(sd.nasc.filter, id, transect.name)) %>% 
-      #         filter(!is.na(transect.name)) %>% 
-      #         filter(transect.name != "000") %>% 
-      #         mutate(transect.orig = paste("SD", transect.name)) %>% 
-      #         arrange(transect.name, long)
-      #       
-      #     } else {
-      #       # Convert to sf and assign transects based on overlap with planned transect buffer
-      #       sd.nasc.filter <- read_csv(here("Data/Backscatter", sd.nasc.name)) %>% 
-      #         filter(valid == 1) %>% 
-      #         select(datetime, long, lat) %>% 
-      #         st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-      #         st_intersection(sd.buffer) %>% 
-      #         st_set_geometry(NULL) %>% 
-      #         arrange(datetime)
-      #       
-      #       # Filter nasc.vessel using datetime in CSV data
-      #       # Add transect lines by merging with CSV data
-      #       nasc.vessel <- nasc.vessel %>% 
-      #         filter(fct_match(as.factor(datetime), as.factor(sd.nasc.csv$datetime))) %>% 
-      #         arrange(datetime) %>% 
-      #         bind_cols(select(sd.nasc.csv, line)) %>% 
-      #         mutate(transect.orig = paste("SD", line),
-      #                transect.name = transect.orig,
-      #                vessel.orig   = vessel.name,
-      #                vessel.name   = "SD") %>% 
-      #         select(-line)
-      #     }
-      #   } 
       }
       
       # Remove letters from transect names (e.g., 105A, 105B, etc.)
@@ -947,7 +873,7 @@ if (process.csv) {
       
       # Combine processed.csv.vessel
       if (exists("processed.csv")) {
-        processed.csv <- sort(c(processed.csv, processed.csv.vessel))
+        processed.csv <- unique(sort(c(processed.csv, processed.csv.vessel)))
       } else {
         processed.csv <- processed.csv.vessel
       }
@@ -6665,9 +6591,33 @@ If desired, estimate biomass in the offshore strata.
 if (estimate.os) {
   source(here("Code/estimateOffshore.R"))
 }
+```  
+
+#### Point estimates
+
+Point estimates of biomass (tons, t) for each CPS species and stock by sampling stratum and for the offshore survey area (Stratum = All). Stratum areas are nmi^2^.
+
+```{r biomass-point-estimates-final-offshore}
+if (exists("pe.os")) {
+  # Print point estimate table
+  pe.os %>%
+    rename(Biomass = biomass.mean.point) %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = F,
+          align = c("l","c","r","r","r"),
+          digits = c(0),
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    column_spec(1, italic = TRUE) %>% 
+    row_spec(0, align = c("c")) %>%
+    collapse_rows(columns = c(1))
+} else {
+  print("No offshore point estimates")
+}
 ```
 
-Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS in the offshore survey area, by stratum and within the entire area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.  
+#### Bootstrap estimates
+
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS in the offshore survey area, by stratum and within the entire area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
 
 ```{r biomass-bootstrap-estimates-os-final}
 if (exists("be.os")) {
@@ -6697,7 +6647,7 @@ if (exists("be.os")) {
 }
 ```
 
-Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire offshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.  
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire offshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
 
 ```{r biomass-bootstrap-estimates-os-totals-only}
 if (exists("be.os")) {
@@ -6736,28 +6686,17 @@ if (estimate.ns) {
 }
 ```
 
-```{r biomass-point-estimates-final-offshore}
-if (exists("pe.os")) {
-  # Print point estimate table
-  pe.os %>%
-    rename(Biomass = biomass.mean.point) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F,
-          align = c("l","c","r","r","r"),
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
-    column_spec(1, italic = TRUE) %>% 
-    row_spec(0, align = c("c")) %>%
-    collapse_rows(columns = c(1))
-} else {
-  print("No offshore point estimates")
-}
-```
+#### Point estimates
 
-```{r biomass-bootstrap-estimates-final-offshore}
-if (exists("be.os")) {
+
+#### Bootstrap estimates  
+
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS in the nearshore survey area, by stratum and within the entire area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.nearshore)` acoustic intervals were included in this analysis. 
+
+```{r biomass-bootstrap-estimates-ns-final}
+if (exists("be.ns")) {
   # Print bootstrap estimate table
-  be.os %>% 
+  be.ns %>% 
     rename(Number               = Stratum,
            Transects            = nTransects,
            Clusters             = nClusters,
@@ -6778,12 +6717,43 @@ if (exists("be.os")) {
     collapse_rows(columns = c(1:2)) %>%
     add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
 } else {
-  print("No offshore bootstrap estimates")
+  print("No nearshore bootstrap estimates")
 }
 ```
 
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire nearshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
+
+```{r biomass-bootstrap-estimates-ns-totals-only}
+if (exists("be.ns")) {
+  # Print bootstrap estimate table
+  be.ns %>% 
+    filter(Stratum == "All") %>% 
+    rename(Number               = Stratum,
+           Transects            = nTransects,
+           Clusters             = nClusters,
+           Individuals          = nIndiv,
+           "Point estimate"     = Biomass,
+           SD                   = biomass.sd,
+           CV                   = biomass.cv,
+           "Lower CI$_{95\\%}$" = lower.ci.B,
+           "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+    kable(format = knitr.format, booktabs = TRUE,escape = F,
+          align = c("l","c",rep("r",ncol(be) - 2)),
+          digits = c(0),
+          format.args = list(big.mark = ",")) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+    column_spec(1, italic = TRUE) %>%
+    row_spec(0, align = c("c")) %>%
+    collapse_rows(columns = c(1)) %>%
+    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+} else {
+  print("No nearshore bootstrap estimates present.")
+}
+``` 
+
 ## Estimation QA/QC
-Compare biomass estimates from bootstrap function used to calculate length-disaggregated biomass and abundance estimates based on acoustic density by number and weight. 
+
+Compare biomass estimates from bootstrap function used to calculate length-disaggregated biomass and abundance estimates based on acoustic density by number and weight in the primary survey area. 
 
 ```{r bootstrap-comparisons}
 # Import comparisons

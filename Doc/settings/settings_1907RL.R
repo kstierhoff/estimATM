@@ -173,8 +173,9 @@ nasc.vessels.nearshore <- c("LBC","LM","SD")
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
-# in the same offshore strata
-merge.vessels <- TRUE 
+# in the same strata?
+merge.vessels <- c(OS  = TRUE,
+                   NS = FALSE)
 
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
@@ -380,6 +381,7 @@ nClusters.min <- 2
 # Use manually defined strata?
 stratify.manually <- FALSE
 stratify.manually.os <- FALSE
+stratify.manually.ns <- FALSE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects

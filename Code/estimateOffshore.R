@@ -9,11 +9,11 @@ if (process.offshore) {
                            regexp = "offshore.rds")
   
   # Import all offshore backscatter data
-  for (o in offshore.files) {
+  for (oo in offshore.files) {
     if (exists("nasc.offshore")) {
-      nasc.offshore <- bind_rows(nasc.offshore, readRDS(offshore.files[o]))
+      nasc.offshore <- bind_rows(nasc.offshore, readRDS(offshore.files[oo]))
     } else {
-      nasc.offshore <- readRDS(offshore.files[o])
+      nasc.offshore <- readRDS(offshore.files[oo])
     }
   }
   
@@ -25,7 +25,7 @@ if (process.offshore) {
       TRUE ~ as.character(vessel.orig)))
   
   # Combine nasc data for all NASC vessels
-  if (merge.vessels) {
+  if (merge.vessels["OS"]) {
     nasc.offshore <- nasc.offshore %>% 
       mutate(vessel.name = "RL")
   } else {
@@ -176,7 +176,7 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_cluster_map_os.png"),
          width = map.width, height = map.height)
   
-  save(nasc.cluster.plot.os, file = here("Output/nasc_cluster_plot_offshore.Rdata"))
+  save(nasc.cluster.plot.os, file = here("Output/nasc_cluster_plot_os.Rdata"))
 }
 
 # Map trawl species proportions -------------------------------------------------------
@@ -237,7 +237,7 @@ nasc.offshore <- nasc.offshore %>%
   left_join(select(clf, -lat, -long, -X, -Y), by = c("cluster" = "cluster"))
 
 # Save results
-save(nasc.offshore, file = here("Output/cps_nasc_prop_offshore.Rdata"))
+save(nasc.offshore, file = here("Output/cps_nasc_prop_os.Rdata"))
 
 # Apportion offshore backscatter ------------------------------------------
 # Create data frame for plotting acoustic proportions by species
@@ -318,7 +318,7 @@ tx.labels.tmp.os <- nasc.offshore %>%
     start.long = max(long),
     end.lat = lat[which.min(long)],
     end.long = min(long),
-    brg = 90 - swfscMisc::bearing(end.lat,end.long,start.lat,start.long)[1])
+    brg = 90 - swfscMisc::bearing(end.lat, end.long, start.lat, start.long)[1])
 
 tx.end.labels.os <- tx.labels.tmp.os %>% 
   filter(start.lat < 48.54116) %>% 
