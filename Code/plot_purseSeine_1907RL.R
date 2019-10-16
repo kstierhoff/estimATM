@@ -208,7 +208,7 @@ set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius),
+  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius*1.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
@@ -255,7 +255,8 @@ nasc.map.ns <- base.map +
 ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_LisaMarie.png"),
        height = 10, width = 6)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 1)
+nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 1,
+                               labels = c("a)", "b)"))
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LisaMarie.png"),
@@ -286,7 +287,22 @@ set.pos <- filter(set.pie, AllCPS > 0) %>%
   replace(. == 0, 0.0000001) %>% 
   arrange(desc(X))
 
-set.pies <- set.pies + 
+set.pies <- base.map +
+  # Plot NASC data
+  geom_path(data = nasc.plot.ns, aes(X, Y, group = transect.name)) +
+  # Plot purse seine pies
+  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius*2.5),
+                              cols = c("Anchovy", "JackMack", "Jacksmelt",
+                                       "PacHerring", "PacMack", "Sardine"),
+                              color = 'black', alpha = 0.8) +
+  # Configure trawl scale
+  scale_fill_manual(name = 'Species',
+                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                               "P. herring", "P. mackerel", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                               pac.herring.color, pac.mack.color, sardine.color)) +
+  geom_point(data = set.zero, aes(X, Y)) +
+  ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
@@ -303,7 +319,8 @@ nasc.map.ns <- nasc.map.ns +
 ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_LongBeachCarnage.png"),
        height = 6, width = 10)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 2)
+nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 2,
+                               labels = c("a)", "b)"))
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
