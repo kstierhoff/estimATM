@@ -534,7 +534,8 @@ nearshore.map.final <- ggdraw() +
 # Save combined maps
 ggsave(nearshore.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*1.5, height = map.height*.75)
+       width  = (map.height*ns.aspect)*2.2, height = map.height*.75)
+
 
 # Jack mackerel-All ---------------------------------------------------------
 i = "Trachurus symmetricus"

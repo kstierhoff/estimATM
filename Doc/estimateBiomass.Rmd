@@ -105,8 +105,8 @@ Options in this section control the execution of various code chunks. All chunks
 get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
 save.figs         <- F # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
 do.bootstrap      <- F # Generate bootstrap estimates
@@ -120,7 +120,7 @@ process.ctd       <- F # Process CTD and UCTD casts
 estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.offshore  <- F # Process offshore backscatter data
 process.nearshore <- T # Process near backscatter data
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
@@ -129,10 +129,12 @@ get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```  
 
-## Survey-specific settings
+## Survey-specific settings  
+
 To more easily configure processing for different surveys and distribute updated code, a separate file used to configure survey-specific settings is created for each survey. The `settings*.R` files are stored in the `estimATM/Doc/settings` sub-directory. The settings file is defined automatically based on the name of the directory in which the .Rproj file is stored (in this case, `r here()`). For this analysis, **`r prj.settings`** was used.
 
 ## File handling  
+
 Files are copied locally for processing to avoid slow results when working across the network (especially from remote locations). Controls in the User Settings section (above) determine whether files are copied locally (usually `TRUE` during the first run) and whether files are overwritten. If files are known to have changed, set `overwrite.files <- TRUE` to overwrite files already present, else files already present will be skipped and only new files copied to the local directory. If files have not changed, set `copy.files <- FALSE` to speed processing (`overwrite.files` will be ignored and may be left set to `TRUE`).
 
 ```{r copy-files,include=F}
@@ -468,9 +470,6 @@ if (get.nav.sd) {
 }
 ```
 
-# Map survey plan
-Map the planned compultory (black, solid lines) and adaptive (red, dashed lines) acoustic transects.
-
 ```{r configure-base-map,include=F}
 # Get map data -------------------------------
 # Import landmarks
@@ -564,9 +563,14 @@ ggsave(base.map.bw,
        height = map.height, width = map.width)
 
 save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
-```
+```  
 
-```{r map-survey-plan}
+# Map survey plan  
+
+
+(ref:map-survey-plan) Planned compulsory (solid black lines) and adaptive (dashed red lines) transect lines sampled by _`r survey.vessel`_; offshore extensions to compulsory acoustic transects sampled by USVs (dashed green lines); and nearshore transect lines sampled by USVs and industry vessels (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms).
+
+```{r map-survey-plan,fig.cap='(ref:map-survey-plan)'}
 # Map planned transects
 survey.plan <- base.map +    
   geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
@@ -1000,7 +1004,9 @@ nasc %>%
 ## Examine backscatter data for outliers  
 The top 100 backscatter (NASC) values are plotted and labeled with the transect name and interval to look for unusual values in the integrated data from Echoview.  
 
-```{r plot-nasc-outliers}
+(ref:plot-nasc-outliers) The top 100 backscatter (NASC) values labeled with the transect name and corresponding interval.
+
+```{r plot-nasc-outliers,fig.cap='(ref:plot-nasc-outliers)'}
 # Select top 100 nasc values and look for outliers
 big.nasc <- nasc %>%
   arrange(desc(cps.nasc)) %>%
@@ -1516,9 +1522,12 @@ cluster.check %>%
 ```  
 
 ## Map trawl and trawl cluster locations
-Trawl paths (black lines; difficult to see at most scales, as mostly obscured by the trawl midpoints), trawl midpoints (red Xs), and cluster midpoints used to apportion putative CPS backscatter to species (green circles, numeric labels) are mapped relative to acoustic transects (heavy gray points) and vessel track (light gray line). 
 
-```{r map-trawl-clusters}
+Examine the locations of trawl hauls and results of trawl clustering.  
+
+(ref:map-trawl-clusters) Trawl paths (black lines; difficult to see at most scales, as mostly obscured by the trawl midpoints), trawl midpoints (red Xs), and cluster midpoints used to apportion putative CPS backscatter to species (green circles, numeric labels) are mapped relative to acoustic transects (heavy gray points) and vessel track (light gray line).
+
+```{r map-trawl-clusters,fig.cap='(ref:map-trawl-clusters)'}
 if (save.figs) {
   # Map trawl clusters -------------------------------------------------------
   trawl.cluster.plot <- base.map +
@@ -1803,9 +1812,11 @@ if (nrow(herring.hauls) > 0) {
 ```
 
 ## Summarize and export "single-species" haul data  
-Trawl hauls where a single species makes up $\geq$ 80% of the catch (by weight) are identified and haul metadata exported for furher analysis in Echoview to estimate _in situ_ target strength of various CPS. The location of "single-species" hauls are mapped and symbolized by the dominant species.
+Trawl hauls where a single species makes up $\geq$ 80% of the catch (by weight) are identified and haul metadata exported for furher analysis in Echoview to estimate _in situ_ target strength of various CPS.  
 
-```{r export-single-species-hauls}
+(ref:single-species-hauls) The location of "single-species" hauls symbolized by the dominant species in each haul.
+
+```{r export-single-species-hauls,fig.cap='(ref:single-species-hauls)'}
 # Summarize hauls with single species CPS catch for target strength estimation
 # Calculate total sample weight for each CPS species
 catch.ts <- catch %>% 
@@ -1922,7 +1933,11 @@ nasc <- bind_cols(nasc, cluster.distance)
 
 ## Map trawl cluster polygons around acoustic backscatter  
 
-```{r map-acoustic-trawl-clusters}
+Backscatter from each 100 m-long acoustic interval is apportioned by species according to the nearest (in space) trawl cluster.  
+
+(ref:acoustic-trawl-clusters) Acoustic intervals symbolized by nearest trawl clusters. Cluster numbers in **bold** are positive clusters.
+
+```{r map-acoustic-trawl-clusters,fig.cap='(ref:acoustic-trawl-clusters)'}
 # Create hulls around positive clusters
 nasc.super.clusters <- plyr::ddply(nasc, "cluster", find_hull) %>% 
   select(long, lat, cluster) %>% 
@@ -1966,11 +1981,9 @@ if (save.figs) {
 include_graphics(here("Figs/fig_nasc_cluster_map.png"))
 ```  
 
-A map showing trawl clusters assigned to 100-m acoustic transect intervals. Cluster numbers in **bold** are CPS-positive clusters.
-
 ## Map trawl-cluster species proportions by weight 
 
-(ref:trawl-species-proportions) Survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawl clusters with no CPS).
+(ref:trawl-species-proportions) Acoustic intervals symbolized by nearest trawl clusters (left) and survey transects performed aboard _`r survey.vessel`_ overlaid with proportions of CPS species in trawl clusters (black points indicate trawl clusters with no CPS, right).
 
 ```{r map-trawl-species-proportions,fig.cap='(ref:trawl-species-proportions)'}
 # Map trawl species proportions -------------------------------------------------------
@@ -2299,9 +2312,9 @@ catch.comp.errors <- catch.comp %>%
 if (nrow(catch.comp.errors) > 0) {
   write.csv(catch.comp.errors,file = here("Output/catch_comparison_errors.csv"),quote = F,row.names = F)
 }
-```
+```  
 
-This table includes only those hauls where `diffWt` and `diffCt` are not equal to zero.
+This table includes only those hauls where `diffWt` and `diffCt` are not equal to zero.  
 
 ```{r catch-comparison-errors}
 # Filter hauls with diffCt or diffWt != zero
@@ -2369,7 +2382,33 @@ if (nrow(length.outliers) == 0) {
 }
 ```
 
-### Compare L-W relationships between current and past surveys  
+### Examine speciment L-W data  
+
+The relationship between lenght and weight of all specimens is visually compared to those from historic surveys and also to L/W models derived from those specimens. If missing length or weight measurements are present, they are estimated from these models using the following equations and the coefficients in the table below:  
+
+$$W = a*L^b\text{,  and}$$  
+
+$$L = (W/a)^{(1/b)}\text{.}$$   
+
+Coefficients used to estimate total length (TL, mm) or weight in the equations above. Model types are: 'lm' = linear model, 'nlm' = naive linear model, and 'glm' = general linear model (Palance et al., in prep). Season is presently either spring or summer, and is defined in the survey info file.    
+
+```{r lw-model-table}
+# Filter table of L/W models used
+lw.models %>% 
+  arrange(scientificName) %>% 
+  left_join(select(spp.codes, scientificName, commonName)) %>%
+  select(scientificName, commonName, everything()) %>% 
+  rename(`Scientific name` = scientificName,
+         `Common name`     = commonName,
+         `Model type`      = model_type) %>% 
+  kable(format = knitr.format,booktabs = TRUE, escape = F,
+        digits = c(0,0,8,5,0),
+        align = c("l","l","r","r","l")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                full_width = F) %>%
+  row_spec(0, align = c("c")) %>%
+  column_spec(1, italic = TRUE)
+```  
 
 (ref:lw-plot) Length-weight relationships from the current survey [pink (female), blue (male), and green (unknown) points] and all previous surveys in the same season (gray points). Dashed lines represent the modeled (linear model with bias correction) relationships between length and weight for each species during the survey season. Large red and blue points indicate individuals where length or weight (typically individuals with binned lengths) were missing, respectively. Those missing values were estimated using the relationship between length and weight for each species.
 
@@ -2442,32 +2481,6 @@ ggsave(lw.plot.leg, filename = here("Figs/fig_LW_plots_leg.png"),
 # Add L/W plot
 include_graphics(here("Figs/fig_LW_plots.png"))
 ```
-
-The conversions are done using the following equations and the coefficients in the table below:  
-
-$$W = a*L^b\text{,  and}$$  
-
-$$L = (W/a)^{(1/b)}\text{.}$$   
-
-Coefficients used to convert between total length (TL, mm) and weight in the equations above. Model types are: 'lm' = linear model, 'nlm' = naive linear model, and 'glm' = general linear model (Palance et al., in prep). Season is presently either spring or summer, and is defined in the survey info file.    
-
-```{r lw-model-table}
-# Filter table of L/W models used
-lw.models %>% 
-  arrange(scientificName) %>% 
-  left_join(select(spp.codes, scientificName, commonName)) %>%
-  select(scientificName, commonName, everything()) %>% 
-  rename(`Scientific name` = scientificName,
-         `Common name`     = commonName,
-         `Model type`      = model_type) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = F,
-        digits = c(0,0,8,5,0),
-        align = c("l","l","r","r","l")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = F) %>%
-  row_spec(0, align = c("c")) %>%
-  column_spec(1, italic = TRUE)
-```  
 
 # Process CUFES data
 
@@ -2632,9 +2645,10 @@ write.csv(lengths, file = here("Output/ts_lengths.csv"),   quote = F, row.names 
 ```  
 
 ## Plot TS estimates  
-To determine whether target strength is being calculated correctly, compare target strength estimates (_TS_~ind~, white points) and theoretical target strength (black line) (top) and the frequency distribution of target strength (_TS_~ind~) for each species (bottom).
 
-```{r plot-target-strength}
+(ref:target-strength-comparison) To determine whether target strength is being calculated correctly, target strength estimates (_TS_~ind~, white points) are compared to theoretical target strength (black line) (top). The frequency distribution of target strength (_TS_~ind~) for each species is also examined (bottom).
+
+```{r plot-target-strength,fig.cap='(ref:target-strength-comparison)'}
 # Calculate theoretical TS for each species
 ts.theory <- data.frame()
 
@@ -2697,9 +2711,10 @@ include_graphics(here("Figs/fig_ts_combo_plot.png"))
 ```  
 
 ## Plot sigma estimates  
-Comparison of sigma estimates using the methods of **X** (x-axis) and **Y** (y-axis) by a) haul and b) cluster. If done correctly, all points should fall along the 1-to-1 lines.
 
-```{r plot-sigmas}
+(ref:plot-sigmas) Comparison of sigma estimates using the methods of **X** (x-axis) and **Y** (y-axis) by a) haul and b) cluster. If done correctly, all points should fall along the 1-to-1 lines.
+
+```{r plot-sigmas,fig.cap='(ref:plot-sigmas)'}
 # Plot TS estimates
 sigma.plot <- ggplot(lengths, aes(1/sigma.wg,1/sigma.ind*estimated.wg)) + 
   geom_point() + geom_abline() + 
@@ -2723,9 +2738,9 @@ Summarize all data to produce the final file used to estimate the biomass of eac
 
 First, total number from each haul is estimated from the subsample weight, subsample count, and total weight. Next, total numbers from each haul are summed over each trawl cluster. The summary by haul and cluster are plotted to look for errors.  
 
-A comparison of cross-sectional backscatter coefficient estimates per weight and individual. If done correctly, all points should fall along the 1-to-1 lines.
+(ref:summarize-ts) A comparison of cross-sectional backscatter coefficient estimates per weight and individual. If done correctly, all points should fall along the 1-to-1 lines.
 
-```{r summarize-ts}
+```{r summarize-ts,fig.cap='(ref:summarize-ts)'}
 # Calculate numeric abundance by species and haul
 n.summ.haul <- catch %>% 
   group_by(scientificName, cluster, haul) %>%
@@ -2823,6 +2838,7 @@ include_graphics(here("Figs/fig_sigma_comparisons_all.png"))
 ```  
 
 ## Calculate acoustic proportion by weight  
+
 The mean weight of each species in each cluster is estimated by 1) estimatiing the expected weight of each fish in each trawl using the the length-to-weight relationship in the `estimate_ts` function, 2) calculating the mean weight per trawl using the expected weights in Step 1), and 3) calculating the mean weight per cluster as the weighted average of the the trawl mean weight (from Step 2) and using the number of fish per trawl for weighting.  
 
 ```{r summarize-ts-by-weight}
@@ -2858,6 +2874,7 @@ names(ts.sub.her) <- paste(names(ts.sub.her), "her", sep = ".")
 
 # Create final files for biomass estimation  
 ## Summarize `sigmawg` and `sigmaindiv`  
+
 Calculate and combine sigmas by weight (`sigmawg`) and number (`sigmaindiv`) for each species and summarise total CPS catch by weight (`CPS.wg`) and number (`CPS.num`).
 
 ```{r combine-species-proportions}
@@ -2895,6 +2912,7 @@ write.csv(clf, file = here("Output/clf_cluster_summary.csv"),
 ```  
 
 ## Calculate acoustic proportions  
+
 The acoustic proportion, by number, of each species in each trawl cluster is computed as the product of the number of fish and it's sigma divided by the weighted average number of all species present.
 
 The acoustic proportion, by weight, of each species in each trawl cluster is computed similarly, but with a nuance. TS per weight has embeded the length-weight relationship of each species, meaning that the cluster weight of a given species will not be the actual measured weight, but instead the product of the number of each species and their expected mean weight.
@@ -2960,9 +2978,10 @@ write.csv(clf, file = here("Output/clf_ts_proportions.csv"),
 ```
 
 ## Map acoustic proportions by number and weight  
-CPS catch in each trawl cluster is mapped by a) proportion of total weight, b) acoustic proportion by number, and c) acoustic proportion by weight; if done correctly, panels b) and c) should be the same.  
 
-```{r map-acoustic-proportions}
+(ref:map-acoustic-proportions) CPS catch in each trawl cluster is mapped by a) proportion of total weight, b) acoustic proportion by number, and c) acoustic proportion by weight; if done correctly, panels b) and c) should be the same.
+
+```{r map-acoustic-proportions,fig.cap='(ref:map-acoustic-proportions)'}
 # Get acoustic proportions for mapping
 acoustic.prop.indiv <- clf %>%
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
@@ -3052,9 +3071,11 @@ if (save.figs) {
 include_graphics(here("Figs/fig_acoustic_proportion_comparison.png"))
 ```
 
-## Create final backscatter, CUFES, and acoustic proportion maps
+## Create final backscatter, CUFES, and acoustic proportion maps  
 
-```{r map-nasc-cufes-acoustic-proportion}
+(ref:map-nasc-cufes-acoustic-proportion) Survey transects overlaid with (a) the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS; (b) egg densities (eggs m^-3^) for Northern Anchovy, Jack Mackerel, and Pacific Sardine from the CUFES; and (c) acoustic proportions of CPS species in each trawl cluster (black points indicate trawls with no CPS).
+
+```{r map-nasc-cufes-acoustic-proportion,fig.cap='(ref:map-nasc-cufes-acoustic-proportion)'}
 # Create trawl figure
 acoustic.prop.cluster.final <- base.map +
   # Plot transects data
@@ -3105,7 +3126,8 @@ if (save.figs) {
 include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"))
 ```
 
-## Create final cluster-length-frequency files
+## Create final cluster-length-frequency files  
+
 Calculate length frequencies and create final files for biomass estimation.  
 
 ```{r calculate-length-frequencies}
@@ -3214,7 +3236,8 @@ save(cluster.final, file = here("Output/cluster_length_frequency_all.Rdata"))
 save(lf.final,      file = here("Output/cluster_length_frequency_tables.Rdata"))
 ```
 
-## Combine species proportions and integrated acoustic data
+## Combine species proportions and integrated acoustic data  
+
 Species proportions by weight and number are assigned to each 100-m vertically integrated acoustic sample to estimate abundance and biomass.  
  
 ```{r create-final-nasc-file}
@@ -3255,11 +3278,14 @@ write.csv(nasc, file = here("Output/cps_nasc_prop.csv"),
           quote = F, row.names = F)
 ```  
 
-# Define sampling strata
-## Map acoustic proportions by species
+# Define sampling strata  
+## Map acoustic proportions by species  
+
 For each species, the relative proportion of acoustic backscatter (e.g., `prop.anch`) is mapped along with the acoustic backscatter from all CPS (i.e., `cps.nasc`).  
 
-```{r apportion-backscatter}
+(ref:apportion-backscatter) Proportion of backscatter from each species (red points) relative to the total backscatter from all species (blac points).
+
+```{r apportion-backscatter,fig.cap='(ref:apportion-backscatter)'}
 # Create data frame for plotting acoustic proportions by species
 nasc.prop.all <- nasc %>%
   mutate(`Engraulis mordax`      = cps.nasc*prop.anch,
@@ -4569,6 +4595,7 @@ ctd.nav <- select(nav, datetime, long, lat) %>%
 ```  
 
 ## Process UCTD cast files  
+
 Read header and ASCII files from underway CTD (UCTD) casts and plot results. The location of each cast is determined by matching the date/time of the cast (extracted from the header; assumes probe was synchronized to the ship's time server) to the navigation data extracted from ERDDAP.  
 
 ```{r process-uctd-casts}
@@ -4703,6 +4730,7 @@ if (process.ctd) {
 ```  
 
 ### UCTD cast summary  
+
 Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard _`r survey.vessel`_.   
 
 ```{r summarize-uctd-casts}
@@ -4727,8 +4755,9 @@ uctd.table %>%
   scroll_box(height = "500px")
 ```
 
-### UCTD cast plots
-Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all UCTD casts.  
+### UCTD cast plots  
+
+Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all UCTD casts.
 
 ```{r plot-uctd-casts}
 # Plot temperature data
@@ -4803,6 +4832,7 @@ include_graphics(here("Figs/fig_uctd_cast_plots.png"))
 ```  
 
 ## Process CTD cast files  
+
 Read header and ASCII files from traditional CTD casts and plot results. The location of each cast is determined by matching the date/time of the cast (extracted from the header; assumes probe was synchronized to the ship's time server) to the navigation data extracted from ERDDAP.  
 
 ```{r process-ctd-casts}
@@ -4933,7 +4963,8 @@ if (length(ctd.hdr) == 0) {
 }
 ```  
 
-### CTD cast summary 
+### CTD cast summary  
+
 Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r summarize-ctd-casts}
@@ -4958,6 +4989,7 @@ ctd.table %>%
 ```  
 
 ### CTD cast plots  
+
 Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all CTD casts.
 
 ```{r plot-ctd-casts}
@@ -5058,6 +5090,7 @@ write.csv(ctd.info.all, file = here("Output/all_ctd_info.csv"),
 ```
 
 ## Assign CTD casts to acoustic transects  
+
 UCTD and CTD casts are assigned to acoustic transects so that they may be later used to determine the integration depth for estimating CPS abundance and biomass.  
 
 ```{r assign-ctd-transects}
@@ -5103,6 +5136,7 @@ ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = crs.geog) 
 ```
 
 ## Map CTD/UCTD cast locations  
+
 Maps of CTD (blue) and UCTD (purple) cast locations, labeled by a) cast number and b) sequential acoustic transect number (not transect names from Echoview templates). Panel b) is used to check whether CTD casts are being assigned to the appropriate acoustic transects.
 
 ```{r map-ctd-casts}
@@ -5149,9 +5183,9 @@ if (save.figs) {
 include_graphics(here("Figs/fig_ctd_map_all.png"))
 ```  
 
-An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click points for more information about each cast.  
+(ref:all-casts-mapview) An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click points for more information about each cast.
 
-```{r map-ctd-casts-interactive}
+```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)'}
 # Create interactive map of CTD locations
 mapview(nav.paths.sf, color = "black", alpha = 0.5, 
         layer.name = "Vessel track", col.regions = "black",
@@ -5160,18 +5194,19 @@ mapview(nav.paths.sf, color = "black", alpha = 0.5,
           layer.name = "CTD Casts", legend = TRUE)
 ```
 
-
 ## Calculate mixed-layer depth for each CTD cast  
-Consider estimating thermocline depth using the method described by Alvera-Azcarate et al. [-@Alvera-Azcarate2011]. Josiah may have some code to facilitate this.  
 
-## Calculate distance from shore for all NASC data and CTD/UCTD casts
+Consider estimating thermocline depth using the method described by Alvera-Azcarate et al. [-@Alvera-Azcarate2011]. Some preliminary code has been developed in `Code/estimateThermocline.R`.  
+
+## Calculate distance from shore for all NASC data and CTD/UCTD casts  
+
 Juan does this as a precursor to defining the integration depth by temperature.  
 
-## Estimate the lower limit of CPS distribution using the CTD casts and echo-integration files 
-This is currently being done by hand using Juan's CTD "app" and added to the `nasc` data frame as `cps.nasc`, if available. If not, `NASC.50` is used until those data are available, or until the process is automated by this script. The source of the `cps.nasc` data is defined in the `survey_info_*.R` file in the `Code` directory.
+## Estimate the lower limit of CPS distribution using the CTD casts and echo-integration files  
+
+This is currently being done by hand using Juan's CTD "app" and added to the `nasc` data frame as `cps.nasc`, if available. If not, `NASC.50` is used until those data are available, or until the process is automated by this script. The source of the `cps.nasc` data is defined in the `survey_info_*.R` file in the `Code` directory.  
 
 # Interactively explore acoustic, trawl, and CUFES data  
-The map below allows for the interacitve exploration of acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.  
 
 ```{r create-imap-objects, include=FALSE}
 # Convert backscatter data to sf -----------------------------------
@@ -5289,7 +5324,9 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
   st_transform(crs.geog)
 ```
 
-```{r interactive-data-explorer, echo=FALSE}
+(ref:interactive-data-explorer) Interactively explore acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.
+
+```{r interactive-data-explorer, fig.cap='(ref:interactive-data-explorer) ',echo=FALSE}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
 
@@ -6485,6 +6522,7 @@ be.nse[atm:::is.nan.df(be.nse)] <- NA
 write.csv(be.nse,
           file = here("Output/biomass_bootstrap_estimates_final_nse.csv"),
           quote = F, row.names = F)
+
 save(be.nse, 
      file = here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 
@@ -6540,7 +6578,9 @@ be.nse %>%
   add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
 ``` 
 
-```{r biomass-bootstrap-histograms-stratum-nse}
+(ref:biomass-bootstrap-histograms-stratum-nse) Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species and stratum (**Note: differences in x-axis limits**).
+
+```{r biomass-bootstrap-histograms-stratum-nse,fig.cap='(ref:biomass-bootstrap-histograms-stratum-nse)'}
 # Bootstrap estimates of biomass by species and stratum
 biomass.histogram.stratum.nse <- 
   ggplot(bootstrap.estimates.nse, aes(biomass*1e3, group = factor(Stratum), fill = factor(Stratum))) + 
@@ -6559,9 +6599,9 @@ ggsave(biomass.histogram.stratum.nse, filename = here("Figs/fig_biomass_histogra
 include_graphics(here("Figs/fig_biomass_histogram_stratum_nse.png"))
 ```  
 
-Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species and stratum (**Note: differences in x-axis limits**).  
+(ref:biomass-bootstrap-estimates-survey-nse) Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species and stratum (**Note: differences in x-axis limits**).
 
-```{r biomass-bootstrap-estimates-survey-ns}
+```{r biomass-bootstrap-estimates-survey-nse,fig.cap='(ref:biomass-bootstrap-estimates-survey-nse)'}
 # Bootstrap estimates of biomass by species
 biomass.histogram.survey.nse <- ggplot(be.sample.nse, aes(biomass*1e3, fill = Stock)) + 
   geom_histogram(alpha = 0.75) + facet_wrap(Species ~ Stock, scales = "free") + 
@@ -6585,8 +6625,9 @@ include_graphics(here("Figs/fig_biomass_histogram_survey_nse.png"))
 ```
 
 ## Calculate biomass - Other estimates
-### Offshore strata
-If desired, estimate biomass in the offshore strata.
+### Offshore strata  
+
+If desired, estimate biomass in the offshore strata. 
 
 ```{r estimate-offshore-biomass}
 if (estimate.os) {
@@ -6618,7 +6659,7 @@ if (exists("pe.os")) {
 
 #### Bootstrap estimates
 
-Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS in the offshore survey area, by stratum and within the entire area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS in the offshore survey area, by stratum and within the entire area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
 
 ```{r biomass-bootstrap-estimates-os-final}
 if (exists("be.os")) {
@@ -6648,7 +6689,7 @@ if (exists("be.os")) {
 }
 ```
 
-Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire offshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire offshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
 
 ```{r biomass-bootstrap-estimates-os-totals-only}
 if (exists("be.os")) {
@@ -6722,7 +6763,7 @@ if (exists("be.ns")) {
 }
 ```
 
-Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire nearshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc.offshore)` acoustic intervals were included in this analysis.  
+Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire nearshore survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `nrow(nasc.nearshore)` acoustic intervals were included in this analysis.  
 
 ```{r biomass-bootstrap-estimates-ns-totals-only}
 if (exists("be.ns")) {
