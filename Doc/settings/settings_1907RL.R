@@ -236,19 +236,19 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LBC = "\\d{3}T")
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = FALSE,
+source.cps.nasc        <- c(RL  = TRUE,
                             LM  = FALSE,
                             SD  = FALSE,
                             LBC = FALSE,
                             OS  = FALSE, # in the offshore strata
                             NS  = FALSE) # in the neashore strata
 # File containing CPS nasc from CTD app
-data.cps.nasc          <- c(RL  = here("Data/CPS_NASC/cps_nasc_1907RL.csv"),
+data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_1907RL.csv"),
                             LM  = NA,
                             SD  = NA,
                             LBC = NA,
-                            OS  = FALSE, # in the offshore strata
-                            NS  = FALSE) # in the neashore strata 
+                            OS  = NA, # in the offshore strata
+                            NS  = NA) # in the neashore strata 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
                             LM  = "[^0-9]",
