@@ -62,6 +62,18 @@ erddap.headers.sd    <- c("saildrone", "lat", "long", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 
+# Define date range for each Saildrone to remove overlapping transits
+sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
+                               start.date = ymd(c("2019-07-09", "2019-07-09", "2019-06-20")),
+                               end.date   = ymd(c("2019-08-07", "2019-08-12", "2019-08-25")))
+
+# sd.date.range    <- list("1045" = c("2019-07-09", "2019-08-07"),
+#                          "1046" = c("2019-07-09", "2019-08-12"),
+#                          "1047" = c("2019-06-20", "2019-08-25"))
+
+# Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
+sd.time.offset   <- 7 # Hours to add/subtract from GPS data (typically 0)
+
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
 cruise.name <- 201907 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
 cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL","SH",...))

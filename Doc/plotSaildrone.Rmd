@@ -1,7 +1,7 @@
 ---
-title: "Saildrone overlap"
+title: "Map Saildrone overlap to assist Echoview processing"
 author: "Kevin Stierhoff"
-date: "11/6/2018"
+date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
 output: html_document
 ---
 
@@ -48,9 +48,9 @@ prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", 
 source(here("Doc/settings", prj.settings))
 ```
 
-# Load Lasker NASC data and Saildrone nav
+# Load Lasker NASC data  
 
-```{r load-nasc}
+```{r load-nasc,include=FALSE,message=FALSE}
 # Load backscatter data
 load(here("Data/Backscatter/nasc_all.Rdata"))
 
@@ -60,7 +60,7 @@ nasc <- nasc %>%
 ```
 
 
-```{r process-nav}
+```{r process-nav,include=FALSE,message=FALSE}
 if (get.nav) {
   # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
@@ -177,7 +177,10 @@ if (resize.map) {
 }
 ```
 
-```{r get-saildrone-nav}
+
+# Load Saildrone tracks from ERDDAP
+
+```{r get-saildrone-nav,include=FALSE,message=FALSE}
 if (get.nav.sd) {
    # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data_saildrone.Rdata"))) {
@@ -259,7 +262,7 @@ if (get.nav.sd) {
 }
 ```
 
-```{r load-data}
+```{r export-gps-csv}
 # Export Saildrone nav as gps.csv for Echoview processing
 for (i in unique(nav.sd$saildrone)) {
   gps.tmp <- filter(nav.sd, saildrone == i) %>% 
@@ -272,9 +275,20 @@ for (i in unique(nav.sd$saildrone)) {
 }
 ```
 
+```{r restrict-data,message=FALSE}
+# Select only Saildrones in our analysis and restrict data to date range 
+# to eliminate transits
+nav.sd <- nav.sd %>% 
+  filter(saildrone %in% saildrone.list) %>% 
+  mutate(datetime = datetime + hours(sd.time.offset),
+         date = date(datetime)) %>% 
+  left_join(sd.date.range) %>% 
+  filter(date >= start.date & date <= end.date)
+```
+
 # Convert Lasker data to spatial and buffer
 
-```{r process-lasker}
+```{r process-lasker,message=FALSE}
 # Convert Lasker transects to lines
 tx.lines <- nasc %>% 
   arrange(vessel.name, long) %>% 
@@ -306,9 +320,11 @@ sd.lines <- nav.sd %>%
 
 # Convert Saildrone points to sf and downsample
 sd.sf <- nav.sd %>% 
-  mutate(datetime = ymd_hms(time),
-         date = date(datetime),
+  mutate(date = date(datetime),
          hour = hour(datetime)) %>% 
+  # mutate(datetime = ymd_hms(time),
+  #        date = date(datetime),
+  #        hour = hour(datetime)) %>% 
   group_by(saildrone, date, hour) %>% 
   slice(1) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
@@ -328,7 +344,7 @@ mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) +
 
 # Intersect Saildrone with planned transect buffers
 
-```{r intersect-nav}
+```{r intersect-nav,message=FALSE}
 # Get intersection of Saildrone and Lasker nav
 sd.intersection <- sd.sf %>% 
   st_intersection(filter(tx.buffer, Type %in% type.list))
@@ -381,6 +397,7 @@ sd.summary <- sd.intersection %>%
 
 ```{r filter-saildrone}
 sd.final <- sd.summary %>% 
+  arrange(saildrone, min.date) %>% 
   filter(n > 3)
 
 DT::datatable(sd.final)
