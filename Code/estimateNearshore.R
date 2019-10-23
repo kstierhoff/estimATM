@@ -449,7 +449,9 @@ nasc.density.summ.ns <- nasc.density.summ.ns %>%
 nasc.region <- data.frame()
 
 # Remove nearshore strata, if exists
+if (exists("tx.ends.ns")) rm(tx.ends.ns)
 if (exists("strata.ns")) rm(strata.ns) 
+if (exists("strata.points.ns")) rm(strata.points.ns) 
 
 for (v in unique(nasc.nearshore$vessel.name)) {
   # Get latitude range for backscatter data
@@ -465,7 +467,8 @@ for (v in unique(nasc.nearshore$vessel.name)) {
     arrange(Type, Region, Transect) %>% 
     filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max)) %>% 
     # mutate(transect = sprintf("%03d", Transect)) %>% 
-    mutate(transect = as.numeric(Transect)) %>% 
+    mutate(transect = as.numeric(Transect),
+           transect.name = paste(v, transect)) %>% 
     ungroup()
   
   # ggplot(region.wpts, aes(long, lat, colour = Region)) + geom_point() + coord_map()
@@ -486,25 +489,46 @@ for (v in unique(nasc.nearshore$vessel.name)) {
   for (k in unique(nasc.region.temp$key)) {
     # If an island region, create inner and outer polygons, combine, and compute area
     if (str_detect(k, "Island")) {
-      # Draw polygons around shallowest transect waypoint for island strata
-      ns.poly.i <- region.wpts %>%
-        group_by(transect) %>%
+      # Get inshore nearshore waypoints
+      tx.i.ns <- region.wpts %>%
+        group_by(transect, transect.name) %>%
         slice(which.min(abs(depth))) %>% 
-        mutate(key = paste(v, Region)) %>% 
+        mutate(grp = "original",
+               key = paste(v, Region)) %>% 
         filter(key == k) %>%
-        ungroup() %>% 
+        ungroup() 
+
+      # Get offshore nearshore waypoints
+      tx.o.ns <- region.wpts %>%
+        group_by(transect, transect.name) %>%
+        slice(which.max(abs(depth))) %>% 
+        mutate(grp = "original",
+               key = paste(v, Region)) %>% 
+        filter(key == k) %>%
+        ungroup() 
+      
+      # Create data frame with transect ends
+      tx.ends.ns.k <- tx.i.ns %>% 
+        mutate(vessel.name = v) %>% 
+        select(transect.name, transect, vessel.name, 
+               lat.i = lat, long.i = long) %>% 
+        bind_cols(select(tx.o.ns, lat.o = lat, long.o = long))
+      
+      # Combine transect waypoints for strata k
+      strata.points.ns.k <- tx.i.ns %>% 
+        bind_rows(tx.o.ns)   %>%
+        mutate(vessel.name = v,
+               key = paste(transect.name, grp)) 
+      
+      # Draw polygons around shallowest transect waypoint for island strata
+      ns.poly.i <- tx.i.ns %>% 
         st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
         summarise(do_union = F) %>% 
         st_cast("LINESTRING") %>% 
         st_cast("POLYGON") 
       
       # Draw polygons around deepest transect waypoint for island strata
-      ns.poly.o <- region.wpts %>%
-        group_by(transect) %>%
-        slice(which.max(abs(depth))) %>% 
-        mutate(key = paste(v, Region)) %>% 
-        filter(key == k) %>%
-        ungroup() %>% 
+      ns.poly.o <- tx.o.ns %>%
         st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
         summarise(do_union = F) %>% 
         st_cast("LINESTRING") %>% 
@@ -523,23 +547,23 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       
       # Draw pseudo-transects --------------------------------------------------------
       # Get transect ends, calculate bearing, and add transect spacing
-      tx.ends.ns <- nasc.region.temp %>% 
-        filter(key == k) %>% 
-        group_by(transect.name, transect, vessel.name) %>% 
+      tx.ends.ns.k <- nasc.region.temp %>%
+        filter(key == k) %>%
+        group_by(transect.name, transect, vessel.name) %>%
         summarise(
           lat.i  = lat[which.max(long)],
           long.i = max(long),
           lat.o  = lat[which.min(long)],
           long.o = min(long)
-        ) %>% 
-        left_join(select(tx.nn.ns, transect.name, spacing)) %>% 
+        ) %>%
+        left_join(select(tx.nn.ns, transect.name, spacing)) %>%
         mutate(
           brg = swfscMisc::bearing(lat.i, long.i,
                                    lat.o, long.o)[1])
       
       # Get original inshore transect ends -------------------------------------------
       # Select original inshore waypoints
-      tx.i.ns <- tx.ends.ns %>% 
+      tx.i.ns <- tx.ends.ns.k %>% 
         select(-lat.o, -long.o) %>% 
         rename(lat = lat.i, long = long.i) %>% 
         mutate(
@@ -549,7 +573,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       
       # Get N and S inshore waypoints ------------------------------------------------
       # Calculate inshore/north transects
-      tx.i.n.ns <- tx.ends.ns %>% 
+      tx.i.n.ns <- tx.ends.ns.k %>% 
         select(-lat.o, -long.o) %>% 
         rename(lat = lat.i, long = long.i) %>% 
         mutate(
@@ -560,7 +584,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
           order = 1)
       
       # Calculate inshore/south transects
-      tx.i.s.ns <- tx.ends.ns %>% 
+      tx.i.s.ns <- tx.ends.ns.k %>% 
         select(-lat.o, -long.o) %>% 
         rename(lat = lat.i, long = long.i) %>% 
         mutate(
@@ -585,7 +609,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       }
       
       # Get original offshore transect ends ------------------------------------------
-      tx.o.ns <- tx.ends.ns %>% 
+      tx.o.ns <- tx.ends.ns.k %>% 
         select(-lat.i, -long.i) %>% 
         rename(lat = lat.o, long = long.o) %>% 
         mutate(
@@ -595,7 +619,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       
       # Get N and S offshore waypoints -----------------------------------------------
       # Calculate offshore/north transects
-      tx.o.n.ns <- tx.ends.ns %>% 
+      tx.o.n.ns <- tx.ends.ns.k %>% 
         select(-lat.i, -long.i) %>% 
         rename(lat = lat.o, long = long.o) %>% 
         mutate(
@@ -606,7 +630,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
           order = 3)
       
       # Calculate offshore/south transects
-      tx.o.s.ns <- tx.ends.ns %>% 
+      tx.o.s.ns <- tx.ends.ns.k %>% 
         select(-lat.i, -long.i) %>% 
         rename(lat = lat.o, long = long.o) %>% 
         mutate(
@@ -640,12 +664,12 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       }
       
       # Assemble the final data frame with all waypoints -----------------------------
-      strata.points.ns <- tx.i.ns %>% 
+      strata.points.ns.k <- tx.i.ns %>% 
         bind_rows(tx.o.ns)   %>%
         mutate(key = paste(transect.name, grp)) 
       
       # Create polygons
-      ns.poly.k <- strata.points.ns %>% 
+      ns.poly.k <- strata.points.ns.k %>% 
         st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
         group_by(vessel.name) %>% 
         summarise(do_union = F) %>% 
@@ -655,12 +679,28 @@ for (v in unique(nasc.nearshore$vessel.name)) {
         mutate(area = st_area(.))
       
       # Convert to lines
-      ns.lines.sf <- strata.points.ns %>% 
+      ns.lines.sf <- strata.points.ns.k %>% 
         st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
         group_by(transect, grp) %>% 
         summarise(do_union = F) %>% 
         st_cast("LINESTRING")
       
+    }
+    
+    # Combine with other strata points ---------------------------------
+    if (exists("tx.ends.ns")) {
+      # Combine waypoints with all strata points
+      tx.ends.ns <- bind_rows(tx.ends.ns, tx.ends.ns.k)
+    } else {
+      tx.ends.ns <- tx.ends.ns.k
+    }
+    
+    # Combine with other strata points ---------------------------------
+    if (exists("strata.points.ns")) {
+      # Combine waypoints with all strata points
+      strata.points.ns <- bind_rows(strata.points.ns, strata.points.ns.k)
+    } else {
+      strata.points.ns <- strata.points.ns.k
     }
     
     # Combine with other polygons ----------------------------------------
@@ -796,47 +836,46 @@ if (stratify.manually.ns) {
   }
 }
 
-# # Create acoustic transect labels for offshore maps
-# tx.labels.ns <- nasc.nearshore %>% 
-#   group_by(transect) %>% 
-#   summarise(
-#     vessel.name = vessel.name[1],
-#     transect.name = transect.name[1],
-#     start.lat = lat[which.max(long)],
-#     start.long = max(long),
-#     end.lat = lat[which.min(long)],
-#     end.long = min(long),
-#     brg = 90 - swfscMisc::bearing(end.lat, end.long, start.lat, start.long)[1])
-
 #### RESUME HERE ----------------------------
-
-strata.final.ns <- mutate(strata.final.ns, transect.name = paste(vessel.name, transect))
-
 # Add start latitude and longitude to strata table
 strata.final.ns <- strata.final.ns %>%
-  # left_join(tx.labels.ns) %>%
-  # left_join(select(tx.labels.ns, -end.lat, -end.long, -brg)) %>%
-  left_join(select(tx.labels.ns, -vessel.name, -transect)) %>%
+  mutate(transect.name = paste(vessel.name, transect)) %>% 
+  left_join(tx.labels.ns) %>%
   filter(!is.na(vessel.name))
 
-# Plot classification
-# ggplot(strata.final.ns, aes(long, lat, colour = factor(stratum))) + 
-#   geom_point() + 
-#   facet_wrap(~scientificName) + 
-#   coord_map()
+# strata.final.ns <- strata.final.ns %>%
+#   # left_join(tx.labels.ns) %>%
+#   # left_join(select(tx.labels.ns, -end.lat, -end.long, -brg)) %>%
+#   left_join(select(tx.labels.ns, -vessel.name, -transect)) %>%
+#   filter(!is.na(vessel.name))
 
-# Create final strata and calculate area
-# Create df for transect-level stock info
-nasc.stock.ns <- data.frame()
-# 
-# strata.final.ns <- strata.manual.ns %>% 
-#   mutate(stratum.orig = stratum)
+# Plot classification
+ggplot(strata.final.ns, aes(long, lat, colour = factor(stratum))) +
+  geom_point() +
+  facet_wrap(~scientificName) +
+  coord_map()
+
+# Ungroup tx.ends so it joins properly with strata.points.os  
+tx.ends.ns <- ungroup(tx.ends.ns)
+
+if (stock.break.source == "primary") {
+  strata.points.ns <- strata.points.ns %>% 
+    ungroup() %>% 
+    left_join(ungroup(select(tx.ends.ns, transect.name, lat.stock = lat.i)))
+} else {
+  strata.points.ns <- strata.points.ns %>% 
+    mutate(lat.stock = lat)
+}
 
 # Summarise NASC to get species present
 nearshore.spp <- nasc.prop.spp.ns %>% 
   filter(nasc > 0) %>% 
   group_by(scientificName) %>% 
   tally()
+
+# Create final strata and calculate area
+# Create df for transect-level stock info
+nasc.stock.ns <- data.frame()
 
 if (exists("strata.offshore")) rm(strata.offshore)
 
@@ -846,25 +885,21 @@ for (i in unique(nearshore.spp$scientificName)) {
   }
   # Select each strata per species
   strata.sub <- filter(strata.final.ns, scientificName == i, vessel.name == k) %>% 
-    select(scientificName, transect, stratum) %>% 
-    distinct()
-  
+    select(transect, stratum)
+
   # Define strata to stock
-  nasc.stock.temp <- strata.final.ns %>% 
-    filter(vessel.name == k) %>%
-    # filter(vessel.name == k, loc == "inshore") %>%
+  nasc.stock.temp <- strata.points.ns %>% 
+    filter(vessel.name == k, loc == "inshore") %>%
     left_join(strata.sub) %>% 
     mutate(stock = case_when(
-      i == "Engraulis mordax" & stratum == 2 ~ "Northern",
-      i == "Engraulis mordax" & stratum == 1 ~ "Central",
-      i == "Sardinops sagax"  & stratum == 1  ~ "Northern",
-      i == "Sardinops sagax"  & stratum == 1  ~ "Southern",
+      i == "Engraulis mordax" & lat.stock >= stock.break.anch ~ "Northern",
+      i == "Engraulis mordax" & lat.stock <  stock.break.anch ~ "Central",
+      i == "Sardinops sagax"  & lat.stock >= stock.break.sar  ~ "Northern",
+      i == "Sardinops sagax"  & lat.stock <  stock.break.sar  ~ "Southern",
       i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
       scientificName = i) %>% 
-    ungroup() %>%
-    select(transect, stock, scientificName) %>%
-    arrange(transect) %>% 
-    distinct() # To select one row per transect
+    select(transect.name, transect, stock, scientificName) %>% 
+    distinct() #%>% filter(!is.na(stock))
   
   # Combine results
   nasc.stock.ns <- bind_rows(nasc.stock.ns, nasc.stock.temp)
@@ -872,9 +907,17 @@ for (i in unique(nearshore.spp$scientificName)) {
   for (j in sort(unique(strata.sub$stratum))) {
     # Create offshore stratum polygons ----------------------------------------
     # Add stratum numbers and stock designation to strata.points
-    primary.poly.temp <- strata.final.ns %>% 
-      filter(scientificName == i, vessel.name == k) %>% 
-      left_join(select(strata.sub, transect, stratum)) %>%
+
+    # primary.poly.temp <- strata.points.ns %>% 
+    #   filter(vessel.name == k) %>% 
+    #   left_join(select(strata.sub, transect, stratum)) %>%
+    #   left_join(nasc.stock.temp) %>% 
+    #   filter(stratum == j) %>%
+    #   mutate(scientificName = i) %>% 
+    #   ungroup()
+    
+    primary.poly.temp <- strata.points.ns %>% 
+      left_join(strata.sub) %>%
       left_join(nasc.stock.temp) %>% 
       filter(stratum == j) %>%
       mutate(scientificName = i) %>% 

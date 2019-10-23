@@ -697,8 +697,8 @@ strata.final.os <- strata.final.os %>%
 # Create df for transect-level stock info
 nasc.stock.os <- data.frame()
 
-# Ungroup tx.ends so it joins properly with strata.points.os  
-tx.ends <- ungroup(tx.ends)
+# Ungroup tx.ends.os so it joins properly with strata.points.os  
+tx.ends.os <- ungroup(tx.ends.os)
 
 if (stock.break.source == "primary") {
   strata.points.os <- strata.points.os %>% 
