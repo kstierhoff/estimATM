@@ -322,34 +322,12 @@ nasc.density.ns <- nasc.nearshore %>%
   mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin))
 
-### Delete ----- 
-
-# # Create acoustic transect labels for maps
-# tx.labels.ns <- nasc.nearshore %>% 
-#   ungroup() %>%
-#   group_by(transect.name) %>%
-#   summarise(
-#     vessel.name = vessel.name[1],
-#     transect = transect.name[1],
-#     start.lat = lat[which.max(long)],
-#     start.long = max(long),
-#     end.lat = lat[which.min(long)],
-#     end.long = min(long),
-#     brg = 90 - swfscMisc::bearing(end.lat,end.long,start.lat,start.long)[1]) %>% 
-#   mutate(lat  = start.lat,
-#          long = start.long) %>% 
-#   project_df(to = crs.proj)
-
-### Delete -----
-
 # Create acoustic transect labels for maps
 tx.labels.tmp.ns <- nasc.nearshore %>% 
-  ungroup() %>%
   group_by(transect.name) %>%
   summarise(
     vessel.name = vessel.name[1],
     transect    = transect[1],
-    # transect.name = transect.name[1],
     start.lat = lat[which.max(long)],
     start.long = max(long),
     end.lat = lat[which.min(long)],
@@ -444,14 +422,14 @@ nasc.density.summ.ns <- nasc.density.summ.ns %>%
 # USE SQUARE ENDS FOR TYPICAL TRANSECTS
 # USE CONNECTING ENDS FOR TRANSECTS AROUND ISLANDS
 
+# Remove nearshore strata, if exists
+if (exists("tx.ends.ns")) rm(tx.ends.ns) # inshore- and offshore-most intervals
+if (exists("strata.ns")) rm(strata.ns) 
+if (exists("strata.points.ns")) rm(strata.points.ns) 
+
 # Assign transects to region based on latitude
 # Because some duplicate transect numbers exist, can't do a straight join
 nasc.region <- data.frame()
-
-# Remove nearshore strata, if exists
-if (exists("tx.ends.ns")) rm(tx.ends.ns)
-if (exists("strata.ns")) rm(strata.ns) 
-if (exists("strata.points.ns")) rm(strata.points.ns) 
 
 for (v in unique(nasc.nearshore$vessel.name)) {
   # Get latitude range for backscatter data
@@ -850,10 +828,10 @@ strata.final.ns <- strata.final.ns %>%
 #   filter(!is.na(vessel.name))
 
 # Plot classification
-ggplot(strata.final.ns, aes(long, lat, colour = factor(stratum))) +
-  geom_point() +
-  facet_wrap(~scientificName) +
-  coord_map()
+# ggplot(strata.final.ns, aes(long, lat, colour = factor(stratum))) +
+#   geom_point() +
+#   facet_wrap(~scientificName) +
+#   coord_map()
 
 # Ungroup tx.ends so it joins properly with strata.points.os  
 tx.ends.ns <- ungroup(tx.ends.ns)
