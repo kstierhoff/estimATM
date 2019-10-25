@@ -855,7 +855,7 @@ nearshore.spp <- nasc.prop.spp.ns %>%
 # Create df for transect-level stock info
 nasc.stock.ns <- data.frame()
 
-if (exists("strata.offshore")) rm(strata.offshore)
+if (exists("strata.nearshore")) rm(strata.nearshore)
 
 for (i in unique(nearshore.spp$scientificName)) {
   for (k in unique(strata.final.ns$vessel.name)) {
@@ -937,17 +937,17 @@ for (i in unique(nearshore.spp$scientificName)) {
       mutate(scientificName = i)
     
     # Combine with other polygons ----------------------------------------
-    if (exists("strata.offshore")) {
-      strata.offshore <- rbind(strata.offshore, primary.poly.j)
+    if (exists("strata.nearshore")) {
+      strata.nearshore <- rbind(strata.nearshore, primary.poly.j)
     } else {
-      strata.offshore <- primary.poly.j
+      strata.nearshore <- primary.poly.j
     }
   }
 }
 
 # Save strata polygons
-save(strata.offshore, 
-     file = here("Output/strata_offshore_raw.Rdata"))
+save(strata.nearshore, 
+     file = here("Output/strata_nearshore_raw.Rdata"))
 
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
 # Summarise strata transects
@@ -959,7 +959,7 @@ strata.summ.ns <- strata.final.ns %>%
     end       = max(transect)) %>% 
   arrange(scientificName, stratum)
 
-strata.offshore <- strata.offshore %>% 
+strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
   st_difference(st_union(bathy_5m_poly)) %>% 
   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
@@ -967,11 +967,11 @@ strata.offshore <- strata.offshore %>%
   mutate(area = st_area(.)) 
 
 # Save clipped primary polygons
-save(strata.offshore, 
-     file = here("Output/strata_offshore_final.Rdata"))
+save(strata.nearshore, 
+     file = here("Output/strata_nearshore_final.Rdata"))
 
 # Convert polygons to points and add coordinates -------------------------------
-strata.nearshore.points  <- strata.offshore %>% 
+strata.nearshore.points  <- strata.nearshore %>% 
   st_cast("MULTIPOINT") %>%
   st_cast("POINT") %>%
   mutate(
@@ -984,13 +984,13 @@ strata.nearshore.points  <- strata.offshore %>%
 save(strata.nearshore.points,  
      file = here("Output/strata_points_nearshore.Rdata"))
 
-# Write offshore stata points to CSV
+# Write nearshore stata points to CSV
 write.csv(strata.nearshore.points,  
           file = here("Output/strata_points_nearshore.csv"),
           quote = F, row.names = F)
 
 # Summarize nasc.strata by stock
-strata.summ.offshore <- strata.offshore %>% 
+strata.summ.nearshore <- strata.nearshore %>% 
   select(scientificName, stratum, stock, area) %>%
   mutate(area = as.numeric(area)) %>% 
   st_set_geometry(NULL)
@@ -999,7 +999,7 @@ if (save.figs) {
   # Add strata polygons to acoustic proportions map
   map.stratum.all.ns <- base.map + 
     # Plot final strata
-    geom_sf(data = strata.offshore, aes(colour = factor(stratum), 
+    geom_sf(data = strata.nearshore, aes(colour = factor(stratum), 
                                         fill = stock), alpha = 0.5) +
     # Plot proportion of backscatter from each species present
     geom_point(data = nasc.prop.all.ns, aes(X, Y, size = cps.nasc), 
@@ -1043,8 +1043,8 @@ if (save.figs) {
   biomass.dens.figs.ns <- list()
   
   # Plot anchovy biomass density
-  for (i in unique(strata.offshore$scientificName)) {
-    for (j in unique(filter(strata.offshore, scientificName == i)$stock)) {
+  for (i in unique(strata.nearshore$scientificName)) {
+    for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
       # Filter biomass density
       nasc.density.plot.ns <- nasc.density.ns %>%
         left_join(filter(nasc.stock.ns, scientificName == i, stock == j)) %>% 
@@ -1060,7 +1060,7 @@ if (save.figs) {
       
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens.ns <- base.map +
-        geom_sf(data = filter(strata.offshore, scientificName == i, stock == j),
+        geom_sf(data = filter(strata.nearshore, scientificName == i, stock == j),
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
         # Plot vessel track
@@ -1115,10 +1115,10 @@ for (i in cps.spp) {
 }
 
 # Save final nasc data frame used for point and bootstrap estimates
-save(nasc.nearshore, file = here("Output/nasc_offshore_final.Rdata"))
+save(nasc.nearshore, file = here("Output/nasc_nearshore_final.Rdata"))
 
 # Create new list for computing biomass estimates
-point.estimates.offshore <- data.frame()
+point.estimates.nearshore <- data.frame()
 nasc.summ.strata.ns      <- data.frame()
 
 # Calculate point estimates for each species
@@ -1146,7 +1146,7 @@ for (i in unique(strata.final.ns$scientificName)) {
                                    nasc.ns.temp.summ)
   
   # Create data frame with stratum and area (m^2)
-  stratum.info.offshore <- strata.offshore %>% 
+  stratum.info.nearshore <- strata.nearshore %>% 
     filter(scientificName == i) %>% 
     select(stratum, area) %>%
     mutate(area = as.numeric(area)) %>% 
@@ -1154,27 +1154,27 @@ for (i in unique(strata.final.ns$scientificName)) {
   
   # Compute point estimates
   # Currently has na.rm = TRUE for calculting biomass
-  point.estimates.offshore <- bind_rows(point.estimates.offshore,
+  point.estimates.nearshore <- bind_rows(point.estimates.nearshore,
                                         data.frame(scientificName = i,
-                                                   estimate_point(nasc.nearshore, stratum.info.offshore, species = i)))
+                                                   estimate_point(nasc.nearshore, stratum.info.nearshore, species = i)))
 }
 
-save(point.estimates.offshore, 
+save(point.estimates.nearshore, 
      file = here("Output/biomass_point_estimates_ns.Rdata"))
 
 # Save strata nasc summaries to CSV
 write_csv(nasc.summ.strata.ns, here("Output/nasc_strata_summary_ns.csv"))
 
 # Add stock designations to point estimates
-point.estimates.offshore <- left_join(point.estimates.offshore, strata.summ.offshore)
+point.estimates.nearshore <- left_join(point.estimates.nearshore, strata.summ.nearshore)
 
 # Summarize point estimates (by stocks)
-pe.ns <- point.estimates.offshore %>%
+pe.ns <- point.estimates.nearshore %>%
   group_by(scientificName, stock) %>%
   summarise(
     area    = sum(area),
     biomass.total = sum(biomass.total)) %>%
-  bind_rows(point.estimates.offshore) %>%
+  bind_rows(point.estimates.nearshore) %>%
   mutate(area = area * 2.915533e-07) %>%
   arrange(scientificName, stock, stratum) %>%
   replace_na(list(stratum = "All")) %>%
@@ -1206,16 +1206,16 @@ if (do.bootstrap) {
   
   # Configure progress bar
   pb1 <- tkProgressBar("R Progress Bar", 
-                       "Multiple Bootstrap Estimation (Offshore) - Species", 0, 100, 0)
+                       "Multiple Bootstrap Estimation (nearshore) - Species", 0, 100, 0)
   spp.counter <- 1
   
-  for (i in unique(strata.offshore$scientificName)) {
+  for (i in unique(strata.nearshore$scientificName)) {
     # Get vector of lengths from clf.df column names
     L.cols  <- grep("L\\d", names(cluster.final[[i]]))
     L.vec   <- sort(as.numeric(str_extract(names(cluster.final[[i]][L.cols]),"\\d{1,2}")))
     
     # Create data frame with stratum and area (m^2)
-    strata.info.offshore <- strata.offshore %>% 
+    strata.info.nearshore <- strata.nearshore %>% 
       filter(scientificName == i) %>% 
       select(stratum, area) %>%
       mutate(area = as.numeric(area)) %>% 
@@ -1224,7 +1224,7 @@ if (do.bootstrap) {
     # Subset strata for species i
     strata.temp <- filter(strata.final.ns, scientificName == i) %>% 
       select(transect, stratum) %>% 
-      left_join(filter(strata.summ.offshore, scientificName == i)) %>% 
+      left_join(filter(strata.summ.nearshore, scientificName == i)) %>% 
       filter(!is.na(area))
     
     # Add stratum numbers to nasc and remove transects outside of defined strata
@@ -1279,7 +1279,7 @@ if (do.bootstrap) {
       as.data.frame()
     
     # Configure progress bar
-    pb2 <- tkProgressBar("R Progress Bar", "Multiple Bootstrap Estimation (Offshore) - Stratum", 0, 100, 0)
+    pb2 <- tkProgressBar("R Progress Bar", "Multiple Bootstrap Estimation (nearshore) - Stratum", 0, 100, 0)
     
     # Initialize species counter
     stratum.counter <- 1
@@ -1287,8 +1287,8 @@ if (do.bootstrap) {
     # Estimate biomass for each stratum
     for (j in unique(nasc.temp$stratum)) {
       # Extract stratum area
-      stratum.area <- as.numeric(strata.offshore$area[strata.offshore$scientificName == i & 
-                                                        strata.offshore$stratum == j])
+      stratum.area <- as.numeric(strata.nearshore$area[strata.nearshore$scientificName == i & 
+                                                        strata.nearshore$stratum == j])
       # Calculate biomass using bootstrap function ----
       set.seed(1) # Set seed for repeatable results
       boot.df <- estimate_bootstrap(nasc.temp, cluster.final[[i]], j, 
@@ -1361,12 +1361,12 @@ if (do.bootstrap) {
 
 # Rename scientificName column
 catch.summary.ns <- catch.summary.ns %>% 
-  left_join(strata.summ.offshore) %>%
+  left_join(strata.summ.nearshore) %>%
   rename(Stock = stock)
 
 # Summarise abundance across strata
 abund.summ.ns <- abundance.estimates.ns %>%
-  left_join(strata.summ.offshore, by = c("Species" = "scientificName",
+  left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
                                          "Stratum" = "stratum")) %>%
   group_by(Species, Stock = stock, SL) %>% 
   summarise(abundance = sum(freq)) %>% 
@@ -1381,7 +1381,7 @@ abund.summ.ns <- abund.summ.ns %>%
 
 # Add stock designations to bootstrap estimates
 bootstrap.estimates.ns <- bootstrap.estimates.ns %>% 
-  left_join(strata.summ.offshore, by = c("Species" = "scientificName",
+  left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
                                          "Stratum" = "stratum")) %>% 
   rename(Stock = stock)
 
@@ -1418,7 +1418,7 @@ save(be.stratum.ns,
 
 # Add stock designations to stratum summary
 stratum.summary.ns <- stratum.summary.ns %>% 
-  left_join(strata.summ.offshore) %>% 
+  left_join(strata.summ.nearshore) %>% 
   rename(Stock = stock)
 
 # Summarize clusters for each species for entire survey
