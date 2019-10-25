@@ -1346,6 +1346,8 @@ pe.ns <- point.estimates.ns %>%
 save(pe.ns, file = here("Output/biomass_point_estimates_ns_final.Rdata"))
 write_csv(pe.ns, here("Output/biomass_point_estimates_ns_final.csv"))
 
+# RESUME HERE -------------------------------------------------------------
+
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
