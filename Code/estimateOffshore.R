@@ -350,7 +350,7 @@ dens.sizes.all.os  <- dens.sizes[dens.levels.all.os]
 dens.colors.all.os <- dens.colors[dens.levels.all.os]
 
 # Stratify ----------------------------------------------------------------
-# Get transect spacing for plotting --------------------------
+# Get transect spacing for plotting ---------------------------------------
 # Get the midpoint (mean) lat/long of each transect
 tx.mid.os <- nasc.offshore %>% 
   group_by(vessel.name, transect, transect.name) %>% 
