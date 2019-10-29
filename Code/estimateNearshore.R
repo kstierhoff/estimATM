@@ -43,20 +43,6 @@ if (process.nearshore) {
   # Export data for processing using the CTD app
   write_csv(nasc.nearshore, here("Output/CTDapp/CTDapp_All_Nearshore.csv"))
   
-  # Summarise nasc for plotting ---------------------------------------------
-  nasc.plot.ns <- nasc.nearshore %>% 
-    select(filename, vessel.name, transect, transect.name, int, lat, long, cps.nasc) %>% 
-    group_by(filename, vessel.name, transect.name, transect, int) %>% 
-    summarise(
-      lat  = lat[1],
-      long = long[1],
-      NASC = mean(cps.nasc)) %>% 
-    # Create bins for defining point size in NASC plots%>% 
-    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
-           bin.level =  as.numeric(bin)) %>% 
-    ungroup() %>% 
-    project_df(to = crs.proj)
-  
   # Apply cps.nasc, or use a fixed integration depth
   if (source.cps.nasc["NS"]) {
     # Use exteranlly supplied cps.nasc with variable integration depth (from CTD.app)
@@ -244,6 +230,23 @@ nasc.nearshore <- nasc.nearshore %>%
 
 # Save results
 save(nasc.nearshore, file = here("Output/cps_nasc_prop_ns.Rdata"))
+
+# Summarise transects -----------------------------------------------------
+# Summarise nasc data
+nasc.summ.ns <- nasc.nearshore %>% 
+  group_by(vessel.name, transect.name, transect) %>% 
+  summarise(
+    start     = min(datetime),
+    end       = max(datetime),
+    duration  = difftime(end, start, units = "hours"),
+    n_int     = length(Interval),
+    distance  = length(Interval)*nasc.interval/1852,
+    lat       = lat[which.min(long)],
+    long      = long[which.min(long)],
+    mean_nasc = mean(cps.nasc)) %>% 
+  arrange(vessel.name, start)
+
+save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 
 # Apportion offshore backscatter ------------------------------------------
 # Create data frame for plotting acoustic proportions by species
