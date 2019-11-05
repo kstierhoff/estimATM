@@ -1349,8 +1349,6 @@ pe.ns <- point.estimates.ns %>%
 save(pe.ns, file = here("Output/biomass_point_estimates_ns_final.Rdata"))
 write_csv(pe.ns, here("Output/biomass_point_estimates_ns_final.csv"))
 
-# RESUME HERE -------------------------------------------------------------
-
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
@@ -1366,128 +1364,167 @@ if (do.bootstrap) {
   stratum.summary.ns <- data.frame()
   
   # Configure progress bar
-  pb1 <- tkProgressBar("R Progress Bar", 
-                       "Multiple Bootstrap Estimation (nearshore) - Species", 0, 100, 0)
+  pb1 <- tkProgressBar("Bootstrap - Species", 
+                       "Bootstrap Estimation (NS) - Species", 0, 100, 0)
   spp.counter <- 1
   
   for (i in unique(strata.nearshore$scientificName)) {
+    
     # Get vector of lengths from clf.df column names
     L.cols  <- grep("L\\d", names(cluster.final[[i]]))
     L.vec   <- sort(as.numeric(str_extract(names(cluster.final[[i]][L.cols]),"\\d{1,2}")))
     
-    # Create data frame with stratum and area (m^2)
-    strata.info.nearshore <- strata.nearshore %>% 
-      filter(scientificName == i) %>% 
-      select(vessel.name, stratum, area) %>%
-      mutate(area = as.numeric(area)) %>% 
-      st_set_geometry(NULL)
-    
-    # Subset strata for species i
-    strata.temp <- filter(strata.final.ns, scientificName == i) %>% 
-      select(vessel.name, transect, stratum) %>% 
-      left_join(filter(strata.summ.nearshore, scientificName == i)) %>% 
-      filter(!is.na(area))
-    
-    # Add stratum numbers to nasc and remove transects outside of defined strata
-    nasc.temp <- nasc.nearshore %>%
-      select(-stratum) %>% 
-      left_join(strata.temp) %>% 
-      filter(!is.na(stratum))
-    
-    # Summarize nasc.temp to get strata to merge with pos.clusters below
-    nasc.temp.summ <- nasc.nearshore %>% 
-      group_by(stratum, cluster) %>% 
-      summarise(n = n_distinct(cluster))
-    
-    # Summarize length data to get number of individuals
-    lf.summ.cluster <- lf.final %>% 
-      filter(scientificName == i) %>% 
-      group_by(cluster) %>% 
-      summarise(counts = sum(counts))
-    
-    # Summarize stratum clusters for all CPS
-    stratum.cluster.cps <- nasc.nearshore %>% 
-      group_by(cluster, stratum) %>% 
-      summarise(nIntervals = n()) %>% 
-      left_join(lf.summ.cluster)
-    
-    # Summarize positive clusters per species
-    pos.cluster.spp <- pos.clusters %>%
-      filter(cluster %in% nasc.temp$cluster & scientificName == i) %>% 
-      inner_join(select(nasc.temp.summ,-n)) %>% 
-      as.data.frame()
-    
-    # Summarize positive clusters per strata
-    stratum.cluster.spp <- pos.cluster.spp %>% 
-      group_by(scientificName, stratum) %>% 
-      summarise(nClusters = n_distinct(cluster))
-    
-    # Summarize stratum statistics
-    survey.summ.temp <- nasc.temp %>% 
-      group_by(stratum, stock) %>% 
-      summarise(
-        nTransects     = n_distinct(transect),
-        Distance       = length(Interval)*100/1852) %>% 
-      mutate(Species = i) %>% 
-      left_join(stratum.cluster.spp) %>% 
-      rename(Stratum = stratum)
-    
-    # Summarize catch statistics by stratum
-    catch.summ.temp <- n.summ.haul %>% 
-      left_join(select(stratum.cluster.cps, cluster, stratum)) %>% 
-      filter(scientificName == i, !is.na(stratum)) %>%
-      group_by(scientificName, stratum) %>% 
-      summarise(nIndiv = sum(num)) %>% 
-      as.data.frame()
-    
     # Configure progress bar
-    pb2 <- tkProgressBar("R Progress Bar", "Multiple Bootstrap Estimation (nearshore) - Stratum", 0, 100, 0)
+    pb3 <- tkProgressBar("Bootstrap - Vessel", 
+                         "Bootstrap Estimation (NS) - Vessel", 0, 100, 0)
+    vessel.counter <- 1
     
-    # Initialize species counter
-    stratum.counter <- 1
-    
-    # Estimate biomass for each stratum
-    for (j in unique(nasc.temp$stratum)) {
-      # Extract stratum area
-      stratum.area <- as.numeric(strata.nearshore$area[strata.nearshore$scientificName == i & 
-                                                        strata.nearshore$stratum == j])
-      # Calculate biomass using bootstrap function ----
-      set.seed(1) # Set seed for repeatable results
-      boot.df <- estimate_bootstrap(nasc.temp, cluster.final[[i]], j, 
-                                    stratum.area = stratum.area, 
-                                    species = i, do.lf = do.lf, 
-                                    boot.number = boot.num)$data.frame
+    for (j in unique(strata.nearshore$vessel.name)) {
+      # Create data frame with stratum and area (m^2)
+      strata.info.nearshore <- strata.nearshore %>% 
+        filter(scientificName == i, vessel.name == j) %>% 
+        select(vessel.name, stratum, area) %>%
+        mutate(area = as.numeric(area)) %>% 
+        st_set_geometry(NULL)
       
-      # Extract biomass estimates; remove first (point) estimate
-      boot.temp <- data.frame(Species = i, Stratum = j, Area = stratum.area,
-                              Sample = seq(1,boot.num), boot.df[2:nrow(boot.df), ])
+      # Subset strata for species i
+      strata.temp <- filter(strata.final.ns, scientificName == i, vessel.name == j) %>% 
+        select(vessel.name, transect, stratum) %>% 
+        left_join(filter(strata.summ.nearshore, scientificName == i, vessel.name == j)) %>% 
+        filter(!is.na(area))
       
-      # Combine results
-      bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
+      # Add stratum numbers to nasc and remove transects outside of defined strata
+      nasc.temp <- nasc.nearshore %>%
+        filter(vessel.name == j) %>% 
+        select(-stratum) %>% 
+        left_join(strata.temp) %>% 
+        filter(!is.na(stratum))
       
-      # Calculate abundance by length class using bootstrap function ----
-      abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], j, 
+      # ggplot(nasc.temp, aes(long, lat, size = cps.nasc, colour = factor(stratum))) + geom_point() + coord_map()
+      
+      # Summarize nasc.temp to get strata to merge with pos.clusters below
+      nasc.temp.summ <- nasc.temp %>% 
+        group_by(vessel.name, stratum, cluster) %>% 
+        summarise(n = n_distinct(cluster)) %>% 
+        ungroup()
+      
+      # Summarize length data to get number of individuals
+      lf.summ.cluster <- lf.final %>% 
+        filter(scientificName == i) %>% 
+        group_by(cluster) %>% 
+        summarise(counts = sum(counts)) %>% 
+        ungroup()
+      
+      # Summarize stratum clusters for all CPS
+      stratum.cluster.cps <- nasc.temp %>% 
+        group_by(cluster, stratum) %>% 
+        summarise(nIntervals = n()) %>% 
+        left_join(lf.summ.cluster) %>% 
+        ungroup()
+      
+      # Summarize positive clusters per species
+      pos.cluster.spp <- pos.clusters %>%
+        filter(cluster %in% nasc.temp$cluster, scientificName == i) %>% 
+        inner_join(select(nasc.temp.summ, -n)) %>% 
+        as.data.frame()
+      
+      # Summarize positive clusters per strata
+      stratum.cluster.spp <- pos.cluster.spp %>% 
+        group_by(scientificName, stratum) %>% 
+        summarise(nClusters = n_distinct(cluster)) %>% 
+        mutate(vessel.name = j) %>% 
+        ungroup()
+      
+      # Summarize stratum statistics
+      survey.summ.temp <- nasc.temp %>% 
+        group_by(vessel.name, stratum, stock) %>% 
+        summarise(
+          nTransects     = n_distinct(transect),
+          Distance       = length(Interval)*100/1852) %>% 
+        ungroup() %>% 
+        mutate(Species = i) %>% 
+        left_join(stratum.cluster.spp) %>% 
+        rename(Stratum = stratum)
+      
+      # Summarize catch statistics by stratum
+      catch.summ.temp <- n.summ.haul %>% 
+        left_join(select(stratum.cluster.cps, cluster, stratum)) %>% 
+        filter(scientificName == i, !is.na(stratum)) %>%
+        group_by(scientificName, stratum) %>% 
+        summarise(nIndiv = sum(num)) %>%
+        mutate(vessel.name = j) %>% 
+        ungroup() %>% 
+        as.data.frame()
+      
+      # Configure progress bar
+      pb2 <- tkProgressBar("Bootstrap - Stratum", 
+                           "Bootstrap Estimation (NS) - Stratum", 0, 100, 0)
+      # Initialize species counter
+      stratum.counter <- 1
+      
+      # Estimate biomass for each stratum
+      for (k in unique(nasc.temp$stratum)) {
+        # Extract stratum area
+        stratum.area <- strata.nearshore %>% 
+          filter(scientificName == i, vessel.name == j, stratum == k) %>% 
+          pull(area) %>% 
+          as.numeric()
+        
+        # Calculate biomass using bootstrap function ----
+        set.seed(1) # Set seed for repeatable results
+        boot.df <- estimate_bootstrap(nasc.temp, cluster.final[[i]], k, 
                                       stratum.area = stratum.area, 
                                       species = i, do.lf = do.lf, 
-                                      boot.number = 0)$abundance.vector
-      # Extract abundance estimates
-      abundance.temp <- data.frame(Species = i, Stratum = j,
-                                   SL = L.vec, freq = abund.vec)
-      # Combine results
-      abundance.estimates.ns <- bind_rows(abundance.estimates.ns, abundance.temp)
+                                      boot.number = boot.num)$data.frame
+        
+        # Extract biomass estimates; remove first (point) estimate
+        boot.temp <- data.frame(Species = i, Vessel = j, Stratum = k, Area = stratum.area,
+                                Sample = seq(1, boot.num), boot.df[2:nrow(boot.df), ])
+        
+        # Combine results
+        bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
+        
+        # Calculate abundance by length class using bootstrap function ----
+        abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], k, 
+                                        stratum.area = stratum.area, 
+                                        species = i, do.lf = do.lf, 
+                                        boot.number = 0)$abundance.vector
+        # Extract abundance estimates
+        abundance.temp <- data.frame(Species = i, Vessel = j, Stratum = k,
+                                     SL = L.vec, freq = abund.vec)
+        # Combine results
+        abundance.estimates.ns <- bind_rows(abundance.estimates.ns, abundance.temp)
+        
+        # Update the progress bar
+        pb.prog2 <- round(stratum.counter/n_distinct(nasc.temp$stratum)*100)
+        info2 <- sprintf("%d%% done", pb.prog2)
+        
+        setTkProgressBar(pb2, pb.prog2, sprintf("Bootstrap - Stratum (%s)", info2), info2)
+        # Update stratum counter
+        stratum.counter <- stratum.counter + 1      
+      }
+      # Close the stratum counter
+      close(pb2)
       
-      # Update the progress bar
-      pb.prog2 <- round(stratum.counter/n_distinct(nasc.temp$stratum)*100)
-      info2 <- sprintf("%d%% done", pb.prog2)
+      # Update the vessel progress bar
+      pb.prog3 <- round(vessel.counter/n_distinct(strata.nearshore$vessel.name)*100)
+      info3 <- sprintf("%d%% done", pb.prog3)
       
-      setTkProgressBar(pb2, pb.prog2, sprintf("Bootstrap - Stratum (%s)", info2), info2)
+      setTkProgressBar(pb3, pb.prog3, sprintf("Bootstrap - Vessel (%s)", info3), info3)
       # Update stratum counter
-      stratum.counter <- stratum.counter + 1      
+      vessel.counter <- vessel.counter + 1
+      
+      # Combine survey summary by species
+      survey.summary.ns  <- bind_rows(survey.summary.ns, survey.summ.temp)
+      # Combine survey summary by species
+      catch.summary.ns   <- bind_rows(catch.summary.ns, catch.summ.temp)
+      # Combine stratum summary
+      stratum.summary.ns <- bind_rows(stratum.summary.ns, pos.cluster.spp)
     }
-    # Close the stratum counter
-    close(pb2)
+    # Close the vessel counter
+    close(pb3)
     
-    # Update the progress bar
+    # Update the species progress bar
     pb.prog1 <- round(spp.counter/length(bootstrap.est.spp)*100)
     info1    <- sprintf("%d%% done", pb.prog1)
     
@@ -1495,12 +1532,6 @@ if (do.bootstrap) {
     
     # Update the species counter
     spp.counter     <- spp.counter + 1
-    # Combine survey summary by species
-    survey.summary.ns  <- bind_rows(survey.summary.ns, survey.summ.temp)
-    # Combine survey summary by species
-    catch.summary.ns   <- bind_rows(catch.summary.ns, catch.summ.temp)
-    # Combine stratum summary
-    stratum.summary.ns <- bind_rows(stratum.summary.ns, pos.cluster.spp)
   }
   
   # Close the species counter
@@ -1526,11 +1557,17 @@ catch.summary.ns <- catch.summary.ns %>%
   left_join(strata.summ.nearshore) %>%
   rename(Stock = stock)
 
+# RESUME HERE -------------------------------------------------------------
+
+# Why NaNs in abundance esimates? 
+# Check whether bootstrap estimates are being generated in strata with no data
+# Be sure that unique() is being applied to the appropriate subset data frames
+
 # Summarise abundance across strata
 abund.summ.ns <- abundance.estimates.ns %>%
   left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
                                          "Stratum" = "stratum")) %>%
-  group_by(Species, Stock = stock, SL) %>% 
+  group_by(Species, vessel.name, Stock = stock, SL) %>% 
   summarise(abundance = sum(freq)) %>% 
   mutate(TL = SL)  
 
