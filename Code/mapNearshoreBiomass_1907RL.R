@@ -527,9 +527,12 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
+# Get aspect ratio of nearshore map for setting figure dimensions
+ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+
 nearshore.map.final <- ggdraw() +
   draw_plot(nearshore.map) +
-  draw_plot(inset.map, 0.38, 0.78, 0.2, 0.2) 
+  draw_plot(inset.map, 0.51, 0.76, 0.225, 0.225)
 
 # Save combined maps
 ggsave(nearshore.map.final, 
@@ -626,7 +629,7 @@ ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordin
 # Combine main and inset maps
 nearshore.map.final <- ggdraw() +
   draw_plot(nearshore.map) +
-  draw_plot(inset.map, 0.39, 0.78, 0.20, 0.20) 
+  draw_plot(inset.map, 0.51, 0.76, 0.225, 0.225)
 
 # Save combined maps
 ggsave(nearshore.map.final, 
