@@ -317,8 +317,9 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
                             LM  = NA,
-                            SD  = NA,
-                            LBC = NA) 
+                            SD  = paste("SD", c(134:211)),
+                            LBC = NA)
+
 # Minimum acoustic transect length (nmi)
 min.tx.length          <- c(RL  = 3,
                             LM  = 1,

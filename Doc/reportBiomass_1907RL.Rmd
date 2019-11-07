@@ -1,5 +1,11 @@
 ---
 output: 
+  bookdown::pdf_document2:
+    includes: 
+      in_header: yaml/header.tex
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
   bookdown::word_document2:
     reference_docx: template/report_template_Rmarkdown.docx
     toc: yes
@@ -7,12 +13,6 @@ output:
     pandoc_args: [
      "--filter", "yaml/pandoc-newpage-filter.R"
      ]
-  bookdown::pdf_document2:
-    includes: 
-      in_header: yaml/header.tex
-    toc: yes
-    toc_depth: 3
-    number_sections: yes
   bookdown::html_document2:
     toc: yes
     toc_float: yes
@@ -88,13 +88,15 @@ source(here("Doc/settings", prj.settings))
 ```{r load-output}
 # Load biomass estimate tables
 load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
-load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 load(here("Output/biomass_bootstrap_estimates_final_os.Rdata"))
+load(here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
+load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 
 # Get survey estiamtes for all strata
 be.all     <- filter(be, Stratum == "All")
-be.all.nse <- filter(be.nse, Stratum == "All")
 be.all.os  <- filter(be.os, Stratum == "All")
+be.all.ns  <- filter(be.ns, Stratum == "All")
+be.all.nse <- filter(be.nse, Stratum == "All")
 
 # Load abundance and length summaries
 load(here("Output/length_summary_all.Rdata"))
@@ -783,6 +785,32 @@ include_graphics(here("Figs/fig_cluster_distance_cumulative_biomass.png"))
 ```{r biomass-table-all,results='asis'}
 # Configure bootstrap estimate table
 be.table <- be  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)  
+
+be.table.os <- be.os  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)  
+
+be.table.ns <- be.ns  %>%
   rename(Name = Species,
          Number           = Stratum,
          Transects        = nTransects,
@@ -1918,27 +1946,6 @@ A list of Discussion topics to be expanded and/or added-to:
 # Nearshore biomass estimates {#appendix-biomass-ns}  
 ## Introduction {#appendix-biomass-ns-introduction}
 ## Methods {#appendix-biomass-ns-methods}
-## Results {#appendix-biomass-ns-results}  
-
-\newpage  
-
-# Nearshore biomass extrapolation {#appendix-biomass-nse}  
-## Introduction {#appendix-biomass-nse-introduction}  
-
-The ATM-estimates of CPS biomass are for the surveyed area and period. Any biomass outside of this sampling domain is unknown. To explore the potential magnitude of CPS biomass where the ship did not sample, the survey data was extrapolated into the nearshore areas as described below.  
-
-## Methods {#appendix-biomass-nse-methods}  
-### Survey Design  
-
-Due to the shallow seabed and other nearshore hazards to navigation, acoustic sampling may not have encompassed the eastern extents of the stocks. To extrapolate biomasses into the unsampled area, distances were calculated for the projections of each transect to the 5-m isobath (**Fig. \@ref(fig:nearshore-estimation)**). The biomass densities along these unsampled transect extensions were assigned the values measured along the sampled transects equal distances from the eastern ends of the transects. As done for the strata sampled offshore, the extrapolated biomasses in the unsampled nearshore strata were calculated using Equations \@ref(eq:biomass-mean) and \@ref(eq:biomass-mean-density).  
-
-(ref:nearshore-estimation) Example biomass densities of the `r tolower(stock.ns)` stock of `r spp.common.ns` (_`r spp.ns`_) in stratum `r strata.ns` throughout the offshore survey region (gray points); the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points); and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
-
-```{r nearshore-estimation,fig.cap='(ref:nearshore-estimation)',out.height='5.35in',fig.pos='H', eval=T}
-include_graphics(here("Figs/fig_nasc_nearshore_example.png"))
-```  
-
-\newpage  
 
 ### Echosounder calibration
 #### F/V _Lisa Marie_  
@@ -1959,15 +1966,541 @@ _Text from survey report, or cite the survey report [@Stierhoff2019c]?_
 
 _Link to Appendix section._
 
+\newpage  
+
+## Results {#appendix-biomass-ns-results}
+### Northern Anchovy {#appendix-biomass-ns-anchovy}
+#### Northern stock {#appendix-biomass-ns-anchovy-n}
+
+Biomass of the northern stock of Northern Anchovy in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-n-ns)**, **Fig. \@ref(fig:ns-biom-dens-anch-n)**). **The stock was distributed between approximately Fort Bragg and San Diego.**  
+
+(ref:biomass-anch-n-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-anch-n-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Engraulis mordax", Stock == "Northern") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-anch-n-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+#### Central stock {#appendix-biomass-ns-anchovy-s}
+
+Biomass of the central stock of Northern Anchovy in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c-ns)**, **Fig. \@ref(fig:ns-biom-dens-anch-c)**). **The stock was distributed between approximately Fort Bragg and San Diego.**  
+
+(ref:biomass-anch-c-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the central stock of Northern Anchovy (_Engraulis mordax_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-anch-c-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Engraulis mordax", Stock == "Central") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-anch-c-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+(ref:ns-biom-dens-anch-n) Biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+
+```{r ns-biom-dens-anch-n,fig.cap='(ref:ns-biom-dens-anch-n)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Engraulis mordax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Engraulis mordax-Northern.png"))
+} else {
+  print("No results for this species/stock.")
+}
+``` 
+
+\newpage
+
+(ref:ns-biom-dens-anch-c) Biomass densities of central stock of Northern Anchovy (_Engraulis mordax_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
+
+```{r ns-biom-dens-anch-c,fig.cap='(ref:ns-biom-dens-anch-c)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Engraulis mordax-Central.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Engraulis mordax-Central.png"))
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+### Pacific Sardine {#appendix-biomass-ns-sardine}
+#### Northern stock {#appendix-biomass-ns-sardine-n} 
+
+Biomass of the northern stock of Pacific Sardine in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n-ns)**, **Fig. \@ref(fig:ns-biom-dens-sar-n)**). **The stock was distributed between Newport and Pt. Conception.**  
+
+(ref:biomass-sar-n-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-sar-n-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Sardinops sagax", Stock == "Northern") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-sar-n-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```
+
+#### Southern stock {#appendix-biomass-ns-sardine-s}
+
+Biomass of the southern stock of Pacific Sardine in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-s-ns)**, **Fig. \@ref(fig:ns-biom-dens-sar-s)**). **The stock was distributed between Pt. Conception and San Diego; however, little biomass was observed in this relatively small area.**  
+
+(ref:biomass-sar-s-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the southern stock of Pacific Sardine (_Sardinops sagax_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-sar-s-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Sardinops sagax", Stock == "Southern") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-sar-s-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage
+
+(ref:ns-biom-dens-sar-n) Biomass densities of northern stock of Pacific Sardine (_Sardinops sagax_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+
+```{r ns-biom-dens-sar-n,fig.cap='(ref:ns-biom-dens-sar-n)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Sardinops sagax-Northern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Sardinops sagax-Northern.png"))
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+(ref:ns-biom-dens-sar-s) Biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
+
+```{r ns-biom-dens-sar-s,fig.cap='(ref:ns-biom-dens-sar-s)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Sardinops sagax-Southern.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Sardinops sagax-Southern.png"))
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+### Pacific Mackerel {#appendix-biomass-ns-mack}
+
+Biomass of Pacific Mackerel in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-mack-ns)**, **Fig. \@ref(fig:ns-biom-dens-mack)**). **The stock was distributed between Newport and San Diego.**  
+
+(ref:biomass-mack-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Mackerel (_Scomber japonicus_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-mack-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Scomber japonicus", Stock == "All") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-mack-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+(ref:ns-biom-dens-mack) Biomass densities of Pacific Mackerel (_Scomber japonicus_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel. The gray line represents the vessel track.
+
+```{r ns-biom-dens-mack,fig.cap='(ref:ns-biom-dens-mack)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Scomber japonicus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Scomber japonicus-All.png"))
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+### Jack Mackerel {#appendix-biomass-ns-jack}
+
+Biomass of Jack Mackerel in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-jack-ns)**, **Fig. \@ref(fig:ns-biom-dens-jack)**). **The stock was distributed between Newport and San Diego.**  
+
+(ref:biomass-jack-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Jack Mackerel (_Trachurus symmetricus_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-jack-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Trachurus symmetricus", Stock == "All") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-jack-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+(ref:ns-biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one mackerel. The gray line represents the vessel track.
+
+```{r ns-biom-dens-jack,fig.cap='(ref:ns-biom-dens-jack)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Trachurus symmetricus-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Trachurus symmetricus-All.png"))
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+
+\newpage  
+
+### Pacific Herring {#appendix-biomass-ns-her}
+
+Biomass of Pacific Herring in the nearshore area was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-her-ns)**, **Fig. \@ref(fig:ns-biom-dens-her)**). **The stock was distributed between Newport and San Diego.**
+
+(ref:biomass-her-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Herring (_Clupea pallasii_) in the nearshore strata. Stratum areas are nmi^2^.
+
+```{r biomass-her-ns}
+be.table.sub <- be.table.ns %>% 
+  filter(Name == "Clupea pallasii", Stock == "All") 
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      # theme_vanilla() %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               Individuals          = function(x) sprintf("%.0f", x),
+      #               Mean                 = function(x) sprintf("%.0f", x),
+      #               Distance             = function(x) sprintf("%.0f", x),
+      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
+      #               # SD                   = function(x) sprintf("%.0f", x),
+      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
+          align           = c("l","c",rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-her-ns)') %>% 
+      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = c(1:2)) %>%
+      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
+      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage 
+
+(ref:ns-biom-dens-her) Biomass densities of Pacific Herring (_Clupea pallasii_) in the nearshore survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
+
+```{r ns-biom-dens-her,fig.cap='(ref:ns-biom-dens-her)',out.height='8in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_dens_ns_Clupea pallasii-All.png"))) {
+  include_graphics(here("Figs/fig_biomass_dens_ns_Clupea pallasii-All.png"))
+} else {
+  print("No results for this species/stock.")
+}
+```
+
+\newpage   
+
+(ref:biomass-all-ns) Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS in the nearshore survey area, by stratum and within the entire area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `nrow(nasc.nearshore)` acoustic intervals were included in this analysis.
+
+```{r biomass-all-ns,eval=FALSE}
+if (exists("be.ns")) {
+  # Print bootstrap estimate table
+  be.table.ns <- be.ns %>% 
+    rename(Number               = Stratum,
+           Transects            = nTransects,
+           Clusters             = nClusters,
+           Individuals          = nIndiv,
+           Mean                 = Biomass,
+           SD                   = biomass.sd,
+           CV                   = biomass.cv,
+           "Lower CI$_{95\\%}$" = lower.ci.B,
+           "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+    select(-SD)
+  
+  be.table.ns %>% 
+    kable(format = knitr.format, booktabs = F, escape = F,
+          align = c("l","c",rep("r",ncol(be.table.ns) - 2)),
+          digits = c(0),
+          format.args = list(big.mark = ","),
+          caption = '(ref:biomass-all-ns)') %>% 
+    kable_styling(latex_options = c("striped","hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+    column_spec(1, italic = TRUE) %>%
+    collapse_rows(columns = c(1:2)) %>%
+    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))  
+  
+} else {
+  print("No nearshore bootstrap estimates present.")
+}
+```
+
+\newpage 
+
+# Nearshore biomass extrapolation {#appendix-biomass-nse}  
+## Introduction {#appendix-biomass-nse-introduction}  
+
+The ATM-estimates of CPS biomass are for the surveyed area and period. Any biomass outside of this sampling domain is unknown. To explore the potential magnitude of CPS biomass where the ship did not sample, the survey data was extrapolated into the nearshore areas as described below.  
+
+## Methods {#appendix-biomass-nse-methods}  
+### Survey Design  
+
+Due to the shallow seabed and other nearshore hazards to navigation, acoustic sampling may not have encompassed the eastern extents of the stocks. To extrapolate biomasses into the unsampled area, distances were calculated for the projections of each transect to the 5-m isobath (**Fig. \@ref(fig:nearshore-estimation)**). The biomass densities along these unsampled transect extensions were assigned the values measured along the sampled transects equal distances from the eastern ends of the transects. As done for the strata sampled offshore, the extrapolated biomasses in the unsampled nearshore strata were calculated using Equations \@ref(eq:biomass-mean) and \@ref(eq:biomass-mean-density).  
+
+(ref:nearshore-extrapolation) Example biomass densities of the `r tolower(stock.ns)` stock of `r spp.common.ns` (_`r spp.ns`_) in stratum `r strata.ns` throughout the offshore survey region (gray points); the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points); and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+
+```{r nearshore-estimation,fig.cap='(ref:nearshore-extrapolation)',out.height='5.35in',fig.pos='H', eval=T}
+include_graphics(here("Figs/fig_nasc_nearshore_example.png"))
+```  
+
+\newpage  
+
 ## Results {#appendix-biomass-nse-results}
 ### Northern Anchovy {#appendix-biomass-nse-anchovy}
 #### Northern stock {#appendix-biomass-nse-anchovy-n}
 
-Extrapolation of the northern stock of Northern Anchovy biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-n-ns)**, **Fig. \@ref(fig:ns-biom-dens-anch-n)**).
+Extrapolation of the northern stock of Northern Anchovy biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-n-nse)**, **Fig. \@ref(fig:nse-biom-dens-anch-n)**).
 
-(ref:biomass-anch-n-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-anch-n-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-anch-n-ns,eval=T}
+```{r biomass-anch-n-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Engraulis mordax", Stock == "Northern")
 
@@ -2000,7 +2533,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-anch-n-ns)') %>% 
+          caption = '(ref:biomass-anch-n-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2012,15 +2545,16 @@ if (nrow(be.table.sub) != 0) {
 }
 ```  
 
-#### Central stock {#appendix-biomass-nse-anchovy-c}
-Extrapolation of the central stock of Northern Anchovy biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c-ns)**, **Fig. \@ref(fig:ns-biom-dens-anch-c)**).
+#### Central stock {#appendix-biomass-nse-anchovy-c}  
+
+Extrapolation of the central stock of Northern Anchovy biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Engraulis mordax' & be.all.nse$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c-nse)**, **Fig. \@ref(fig:nse-biom-dens-anch-c)**).
 
 <!-- **Appendix \@ref(appendix-biomass-nse-anchovy-c)** -->
 <!-- Relative length frequency (**Fig. \@ref(fig:rlf-anchovy)**)   -->
 
-(ref:biomass-anch-c-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the central stock of Northern Anchovy (_Engraulis mordax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-anch-c-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the central stock of Northern Anchovy (_Engraulis mordax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-anch-c-ns,eval=T}
+```{r biomass-anch-c-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Engraulis mordax", Stock == "Central")
 
@@ -2053,7 +2587,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-anch-c-ns)') %>% 
+          caption = '(ref:biomass-anch-c-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2067,9 +2601,9 @@ if (nrow(be.table.sub) != 0) {
 
 \newpage  
 
-(ref:ns-biom-dens-anch-n) Biomass densities of the northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-anch-n) Biomass densities of the northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-anch-n,fig.cap='(ref:ns-biom-dens-anch-n)',out.height='8in',fig.pos='H'}
+```{r nse-biom-dens-anch-n,fig.cap='(ref:nse-biom-dens-anch-n)',out.height='8in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Northern.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Northern.png"))
 } else {
@@ -2079,9 +2613,9 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Northern.png"))
 
 \newpage  
 
-(ref:ns-biom-dens-anch-c) Biomass densities of the central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-anch-c) Biomass densities of the central stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-anch-c,fig.cap='(ref:ns-biom-dens-anch-c)',out.width='6in',fig.pos='H'}
+```{r nse-biom-dens-anch-c,fig.cap='(ref:nse-biom-dens-anch-c)',out.width='6in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Central.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Central.png"))
 } else {
@@ -2094,11 +2628,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Engraulis mordax-Central.png")))
 ### Pacific Sardine {#appendix-biomass-nse-sardine}
 #### Northern stock {#appendix-biomass-nse-sardine-n}  
 
-Extrapolation of the northern stock of Pacific Sardine biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n-ns)**, **Fig. \@ref(fig:ns-biom-dens-sar-n)**).  
+Extrapolation of the northern stock of Pacific Sardine biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n-nse)**, **Fig. \@ref(fig:nse-biom-dens-sar-n)**).  
 
-(ref:biomass-sar-n-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-sar-n-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-sar-n-ns,eval=T}
+```{r biomass-sar-n-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Sardinops sagax", Stock == "Northern")
 
@@ -2131,7 +2665,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-sar-n-ns)') %>% 
+          caption = '(ref:biomass-sar-n-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2144,11 +2678,11 @@ if (nrow(be.table.sub) != 0) {
 ```  
 
 #### Southern stock {#appendix-biomass-nse-sardine-s}  
-Extrapolation of the southern stock of Pacific Sardine biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-s-ns)**, **Fig. \@ref(fig:ns-biom-dens-sar-s)**).  
+Extrapolation of the southern stock of Pacific Sardine biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Sardinops sagax' & be.all.nse$Stock == "Southern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-s-nse)**, **Fig. \@ref(fig:nse-biom-dens-sar-s)**).  
 
-(ref:biomass-sar-s-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the southern stock of Pacific Sardine (_Sardinops sagax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-sar-s-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the southern stock of Pacific Sardine (_Sardinops sagax_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-sar-s-ns,eval=T}
+```{r biomass-sar-s-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Sardinops sagax", Stock == "Southern")
 
@@ -2181,7 +2715,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-sar-s-ns)') %>% 
+          caption = '(ref:biomass-sar-s-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2195,9 +2729,9 @@ if (nrow(be.table.sub) != 0) {
 
 \newpage
 
-(ref:ns-biom-dens-sar-n) Biomass densities of the northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-sar-n) Biomass densities of the northern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-sar-n,fig.cap='(ref:ns-biom-dens-sar-n)',out.height='8in',fig.pos='H'}
+```{r nse-biom-dens-sar-n,fig.cap='(ref:nse-biom-dens-sar-n)',out.height='8in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Northern.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Northern.png"))
 } else {
@@ -2207,9 +2741,9 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Northern.png")))
 
 \newpage
 
-(ref:ns-biom-dens-sar-s) Biomass densities of the southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-sar-s) Biomass densities of the southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-sar-s,fig.cap='(ref:ns-biom-dens-sar-s)',out.width='7in',fig.pos='H'}
+```{r nse-biom-dens-sar-s,fig.cap='(ref:nse-biom-dens-sar-s)',out.width='7in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Southern.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Southern.png"))
 } else {
@@ -2220,11 +2754,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Sardinops sagax-Southern.png")))
 \newpage
 
 ### Pacific Mackerel {#appendix-biomass-nse-mack}
-Extrapolation of the Pacific Mackerel biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-mack-ns)**, **Fig. \@ref(fig:ns-biom-dens-mack)**).
+Extrapolation of the Pacific Mackerel biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-mack-nse)**, **Fig. \@ref(fig:nse-biom-dens-mack)**).
 
-(ref:biomass-mack-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Mackerel (_Scomber japonicus_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-mack-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Mackerel (_Scomber japonicus_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-mack-ns,eval=T}
+```{r biomass-mack-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Scomber japonicus")
 
@@ -2257,7 +2791,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-mack-ns)') %>% 
+          caption = '(ref:biomass-mack-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2271,9 +2805,9 @@ if (nrow(be.table.sub) != 0) {
 
 \newpage
 
-(ref:ns-biom-dens-mack) Biomass densities of Pacific Mackerel (_Scomber japonicus_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-mack) Biomass densities of Pacific Mackerel (_Scomber japonicus_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-mack,fig.cap='(ref:ns-biom-dens-mack)',out.height='8.35in',fig.pos='H'}
+```{r nse-biom-dens-mack,fig.cap='(ref:nse-biom-dens-mack)',out.height='8.35in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Scomber japonicus-All.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Scomber japonicus-All.png"))
 } else {
@@ -2284,11 +2818,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Scomber japonicus-All.png"))) {
 \newpage
 
 ### Jack Mackerel {#appendix-biomass-nse-jack}
-Extrapolation of the Jack Mackerel biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%, **Table \@ref(tab:biomass-jack-ns)**, **Fig. \@ref(fig:ns-biom-dens-jack)**).
+Extrapolation of the Jack Mackerel biomass into the unsampled, nearshore waters amounts to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%, **Table \@ref(tab:biomass-jack-nse)**, **Fig. \@ref(fig:nse-biom-dens-jack)**).
 
-(ref:biomass-jack-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Jack Mackerel (_Trachurus symmetricus_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-jack-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Jack Mackerel (_Trachurus symmetricus_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-jack-ns,eval=T}
+```{r biomass-jack-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Trachurus symmetricus")
 
@@ -2321,7 +2855,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-jack-ns)') %>% 
+          caption = '(ref:biomass-jack-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2335,9 +2869,9 @@ if (nrow(be.table.sub) != 0) {
 
 \newpage
 
-(ref:ns-biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-jack,fig.cap='(ref:ns-biom-dens-jack)',out.height='8.35in',fig.pos='H'}
+```{r nse-biom-dens-jack,fig.cap='(ref:nse-biom-dens-jack)',out.height='8.35in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Trachurus symmetricus-All.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Trachurus symmetricus-All.png"))
 } else {
@@ -2348,11 +2882,11 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Trachurus symmetricus-All.png"))
 \newpage
 
 ### Pacific Herring {#appendix-biomass-nse-her}
-Extrapolation of the Pacific Herring biomass into the unsampled, nearshore waters amounted to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-her-ns)**, **Fig. \@ref(fig:ns-biom-dens-her)**).
+Extrapolation of the Pacific Herring biomass into the unsampled, nearshore waters amounted to an estimated `r prettyNum(be.all.nse$Biomass[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.nse$lower.ci.B[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.nse$upper.ci.B[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.nse$biomass.cv[be.all.nse$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-her-nse)**, **Fig. \@ref(fig:nse-biom-dens-her)**).
 
-(ref:biomass-her-ns) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Herring (_Clupea pallasii_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
+(ref:biomass-her-nse) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Herring (_Clupea pallasii_) in the unsampled, nearshore waters. Stratum areas are nmi^2^.
 
-```{r biomass-her-ns,eval=T}
+```{r biomass-her-nse,eval=T}
 be.table.sub <- be.table.nse %>% 
   filter(Name == "Clupea pallasii")
 
@@ -2385,7 +2919,7 @@ if (nrow(be.table.sub) != 0) {
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-her-ns)') %>% 
+          caption = '(ref:biomass-her-nse)') %>% 
       kable_styling(latex_options = c("striped","hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
@@ -2399,9 +2933,9 @@ if (nrow(be.table.sub) != 0) {
 
 \newpage  
 
-(ref:ns-biom-dens-her) Biomass densities of Pacific Herring (_Clupea pallasii_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
+(ref:nse-biom-dens-her) Biomass densities of Pacific Herring (_Clupea pallasii_), per strata, throughout the survey region (gray points) and the subset of biomass densities used to extrapolate biomass into the unsampled nearshore waters (colored points), and the corresponding offshore (dashed polygon) and nearshore (solid polygon) strata.
 
-```{r ns-biom-dens-her,fig.cap='(ref:ns-biom-dens-her)',out.height='8.35in',fig.pos='H'}
+```{r nse-biom-dens-her,fig.cap='(ref:nse-biom-dens-her)',out.height='8.35in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_dens_nse_Clupea pallasii-All.png"))) {
   include_graphics(here("Figs/fig_biomass_dens_nse_Clupea pallasii-All.png"))
 } else {

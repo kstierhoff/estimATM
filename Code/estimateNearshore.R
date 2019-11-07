@@ -104,6 +104,20 @@ if (process.nearshore) {
   load(here("Data/Backscatter/nasc_nearshore.Rdata"))
 }
 
+# Filter unwanted transects
+nasc.nearshore <- nasc.nearshore %>% 
+  filter(!transect.name %in% unlist(tx.rm[nasc.vessels.nearshore]))
+
+# Convert nav to spatial
+# nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+nav.ns.sf <- st_as_sf(nasc.nearshore, coords = c("long","lat"), crs = crs.geog) 
+
+nav.paths.ns.sf <- nav.ns.sf %>% 
+  group_by(vessel.name, transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup()
+
 # Summarise nasc for plotting ---------------------------------------------
 nasc.plot.ns <- nasc.nearshore %>% 
   select(filename, vessel.name, transect, transect.name, int, lat, long, cps.nasc) %>% 
@@ -119,7 +133,7 @@ nasc.plot.ns <- nasc.nearshore %>%
   project_df(to = crs.proj)
 
 # Plot data coverage
-# ggplot(nasc.plot.ns, aes(long, lat, colour = vessel.name)) + geom_point() + facet_wrap(~vessel.name) + coord_map()
+# ggplot(nasc.plot.ns, aes(long, lat, colour = vessel.name, size = NASC)) + geom_point() + facet_wrap(~vessel.name) + coord_map()
 
 # Summarize numbers of intervals per trawl cluster
 nasc.nearshore.summ <- nasc.nearshore %>% 
@@ -244,7 +258,8 @@ nasc.summ.ns <- nasc.nearshore %>%
     lat       = lat[which.min(long)],
     long      = long[which.min(long)],
     mean_nasc = mean(cps.nasc)) %>% 
-  arrange(vessel.name, start)
+  arrange(vessel.name, start) %>% 
+  ungroup()
 
 save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 
@@ -343,10 +358,8 @@ tx.labels.ns <- tx.start.labels.ns %>%
   rbind(tx.end.labels.ns) %>% 
   project_df(to = crs.proj)
 
-# # Map transect labels
-# ggplot(tx.labels.ns, aes(long, lat, label = transect)) +
-#   geom_text() +
-#   facet_wrap(~vessel.name, scales = "free")
+# Map transect labels
+# ggplot(tx.labels.ns, aes(long, lat, label = transect)) + geom_text() + facet_wrap(~vessel.name, scales = "free")
 
 # Summarise biomass density by transect and species (nasc.density.summ.ns)
 nasc.density.summ.ns <- nasc.density.ns %>% 
@@ -824,6 +837,7 @@ if (stratify.manually.ns) {
 # Add start latitude and longitude to strata table
 strata.final.ns <- strata.final.ns %>%
   mutate(transect.name = paste(vessel.name, sprintf("%03d", transect))) %>% 
+  # mutate(key = paste(scientificName, stock, vessel.name, stratum)) %>% 
   left_join(tx.labels.ns) %>%
   filter(!is.na(vessel.name)) %>% 
   ungroup()
@@ -878,7 +892,7 @@ for (i in unique(nearshore.spp$scientificName)) {
         i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
         scientificName = i) %>% 
       filter(!is.na(stratum)) %>% 
-      select(transect.name, stock, scientificName) %>%
+      select(vessel.name, transect.name, stock, scientificName, stratum) %>%
       distinct() %>%
       arrange(transect.name) %>% 
       ungroup()
@@ -1082,26 +1096,73 @@ for (i in unique(nearshore.spp$scientificName)) {
 #   facet_wrap(~scientificName) +
 #   theme_bw()
 # 
-# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "vessel.name")
-
 
 # Save strata polygons
 save(strata.nearshore, 
      file = here("Output/strata_nearshore_raw.Rdata"))
 
+if (exists("strata.nearshore.fac")) rm("strata.nearshore.fac")
+
+for (ii in unique(strata.nearshore$scientificName)) {
+  strata.ns.fac.tmp <- strata.nearshore %>% 
+    filter(scientificName == ii) %>% 
+    arrange(stock, vessel.name, stratum) %>% 
+    mutate(strata.fac = as.numeric(as.factor(paste(stock, vessel.name, stratum))), 
+           key = paste(scientificName, stock, vessel.name, stratum)) %>% 
+    select(strata.fac, key) %>% 
+    st_set_geometry(NULL)
+  
+  if (exists("strata.nearshore.fac")) {
+    # Combine results
+    strata.nearshore.fac <- bind_rows(strata.nearshore.fac, strata.ns.fac.tmp) 
+    
+  } else {
+    # Create new data frame
+    strata.nearshore.fac <- strata.ns.fac.tmp
+  }
+}
+
+# Add new strata factor to nearshore stratum polygons
+strata.nearshore <- strata.nearshore %>% 
+  ungroup() %>% 
+  mutate(key = paste(scientificName, stock, vessel.name, stratum)) %>% 
+  select(scientificName, stock, vessel.name, everything(), -stratum) %>% 
+  left_join(strata.nearshore.fac, by = "key") %>% 
+  rename(stratum = strata.fac)
+
+# Add new strata factor to nearshore stratum polygons
+# Create join key in nasc.stock.ns, for use in stratification later
+nasc.stock.ns <- nasc.stock.ns %>% 
+  mutate(key = paste(scientificName, stock, vessel.name, stratum)) %>% 
+  left_join(strata.nearshore.fac)
+
+# ggplot(strata.nearshore, aes(fill = factor(stratum))) +
+#   geom_sf() +
+#   facet_wrap(~scientificName) +
+#   theme_bw()
+# 
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
+
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
 # Summarise strata transects
 strata.summ.ns <- strata.final.ns %>% 
-  # mutate(vessel.name = "RL") %>% 
-  group_by(scientificName, vessel.name, stratum) %>% 
+  left_join(nasc.stock.ns) %>% 
+  group_by(scientificName, stock, vessel.name, stratum) %>% 
   summarise(
     start     = min(transect),
-    end       = max(transect)) %>% 
-  arrange(scientificName, stratum) %>% 
+    end       = max(transect),
+    first     = transect.name[which.min(transect)],
+    last      = transect.name[which.max(transect)]) %>% 
+  arrange(scientificName, stock, vessel.name, stratum) %>% 
   ungroup()
 
 strata.nearshore <- strata.nearshore %>% 
@@ -1111,11 +1172,11 @@ strata.nearshore <- strata.nearshore %>%
   ungroup() %>% 
   mutate(area = st_area(.)) 
 
-# mapview(filter(strata.nearshore2, scientificName == "Sardinops sagax"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore2, scientificName == "Clupea pallasii"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore2, scientificName == "Engraulis mordax"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore2, scientificName == "Scomber japonicus"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore2, scientificName == "Trachurus symmetricus"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "vessel.name")
 
 # Save clipped primary polygons
 save(strata.nearshore, 
@@ -1175,25 +1236,21 @@ if (save.figs) {
          width = map.width*2.6, height = map.height*1.5)
 }
 
-# Convet nasc.density to sf and project
-nasc.density.ns <- ungroup(nasc.density.ns) %>% 
+# Project nasc.density
+nasc.density.ns <- nasc.density.ns %>% 
+  ungroup() %>% 
   project_df(to = crs.proj)
 
 # Summarize positive clusters to filter clusters from removed strata
 pos.cluster.summ <- pos.clusters %>% 
   group_by(scientificName, cluster) %>% 
   summarise(nIndiv = sum(num)) %>% 
+  ungroup() %>% 
   filter(nIndiv >= nIndiv.min)
 
 pos.clusters.ns <- pos.clusters
 
 nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
-
-# Select biomass density legend objects 
-dens.levels.all.ns <- sort(unique(nasc.density.ns$bin.level))
-dens.labels.all.ns <- dens.labels[dens.levels.all.ns]
-dens.sizes.all.ns  <- dens.sizes[dens.levels.all.ns]
-dens.colors.all.ns <- dens.colors[dens.levels.all.ns]
 
 if (save.figs) {
   # Create a list for saving biomass density plots
@@ -1215,13 +1272,19 @@ if (save.figs) {
         ungroup() %>% 
         project_df(to = crs.proj)
       
+      # Select biomass density legend objects 
+      dens.levels.all.ns <- sort(unique(nasc.density.plot.ns$bin.level))
+      dens.labels.all.ns <- dens.labels[dens.levels.all.ns]
+      dens.sizes.all.ns  <- dens.sizes[dens.levels.all.ns]
+      dens.colors.all.ns <- dens.colors[dens.levels.all.ns]
+      
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens.ns <- base.map +
         geom_sf(data = filter(strata.nearshore, scientificName == i, stock == j),
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
         # Plot vessel track
-        geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+        # geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
         # Plot zero nasc data
         geom_point(data = filter(nasc.nearshore, cps.nasc == 0), aes(X, Y),
                    colour = 'gray50', size = 0.15, alpha = 0.5) +
@@ -1230,9 +1293,9 @@ if (save.figs) {
                    shape = 21, alpha = 0.75) +
         # Configure size and colour scales
         scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-                          values = dens.sizes.all, labels = dens.labels.all) +
+                          values = dens.sizes.all.ns, labels = dens.labels.all.ns) +
         scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-                          values = dens.colors.all, labels = dens.labels.all) +
+                          values = dens.colors.all.ns, labels = dens.labels.all.ns) +
         # Plot positive cluster midpoints
         geom_shadowtext(data = pos.cluster.txt,
                         aes(X, Y, label = cluster), 
@@ -1276,16 +1339,25 @@ for (i in cps.spp) {
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.nearshore, file = here("Output/nasc_nearshore_final.Rdata"))
 
+# Add stock and revised strata designations to strata.final.ns
+strata.final.ns <- strata.final.ns %>% 
+  left_join(select(nasc.stock.ns, scientificName, transect.name, stock)) %>% 
+  mutate(key = paste(scientificName, stock, vessel.name, stratum)) %>% 
+  select(-stratum) %>% 
+  left_join(strata.nearshore.fac) %>% 
+  rename(stratum = strata.fac)
+
 # Create new list for computing biomass estimates
 point.estimates.ns  <- data.frame()
 nasc.summ.strata.ns <- data.frame()
 
 # Calculate point estimates for each species
 for (i in unique(strata.final.ns$scientificName)) {
-  for (j in unique(strata.final.ns$vessel.name)) {
+  for (j in unique(strata.final.ns$vessel.name[strata.final.ns$scientificName == i])) {
     # Subset strata for species i
     strata.temp <- filter(strata.final.ns, scientificName == i, vessel.name == j) %>% 
-      select(transect.name, stratum)
+      # left_join(nasc.stock.ns)
+      select(transect.name, stratum, stock)
     
     if (nrow(strata.temp) > 0) {
       # Add stratum numbers to nasc
@@ -1293,6 +1365,8 @@ for (i in unique(strata.final.ns$scientificName)) {
         select(-stratum) %>% 
         left_join(strata.temp) %>% 
         filter(!is.na(stratum))
+      
+      # ggplot(nasc.ns.temp, aes(long, lat, size = cps.nasc, colour = factor(stratum))) + geom_point() + coord_map()
       
       # Summarise nasc by stratum
       nasc.ns.temp.summ <- nasc.ns.temp %>% 
@@ -1340,7 +1414,7 @@ pe.ns <- point.estimates.ns %>%
     biomass.total = sum(biomass.total)) %>%
   bind_rows(point.estimates.ns) %>%
   mutate(area = area * 2.915533e-07) %>%
-  arrange(scientificName, stock, vessel.name, stratum) %>%
+  arrange(scientificName, stock, stratum) %>%
   replace_na(list(stratum = "All", vessel.name = "All")) %>%
   select(Species = scientificName, Stock = stock, Vessel = vessel.name, 
          Stratum = stratum, Area = area, biomass.mean.point = biomass.total)
@@ -1379,7 +1453,7 @@ if (do.bootstrap) {
                          "Bootstrap Estimation (NS) - Vessel", 0, 100, 0)
     vessel.counter <- 1
     
-    for (j in unique(strata.nearshore$vessel.name)) {
+    for (j in unique(strata.nearshore$vessel.name[strata.nearshore$scientificName == i])) {
       # Create data frame with stratum and area (m^2)
       strata.info.nearshore <- strata.nearshore %>% 
         filter(scientificName == i, vessel.name == j) %>% 
@@ -1556,12 +1630,6 @@ if (do.bootstrap) {
 catch.summary.ns <- catch.summary.ns %>% 
   left_join(strata.summ.nearshore) %>%
   rename(Stock = stock)
-
-# RESUME HERE -------------------------------------------------------------
-
-# Why NaNs in abundance esimates? 
-# Check whether bootstrap estimates are being generated in strata with no data
-# Be sure that unique() is being applied to the appropriate subset data frames
 
 # Summarise abundance across strata
 abund.summ.ns <- abundance.estimates.ns %>%
