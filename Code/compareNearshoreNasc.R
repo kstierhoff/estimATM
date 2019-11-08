@@ -57,11 +57,19 @@ nasc.comp.sd$depth <- get.depth(noaa.bathy,
 ggplot() +
   geom_sf(data = nasc.lines) +
   geom_point(data = nasc.comp, aes(long, lat), shape = 21, fill = "white") 
+
+ggplot() +
+  geom_sf(data = nasc.lines.sd) +
+  geom_point(data = nasc.comp.sd, aes(long, lat), shape = 21, fill = "white") 
   # geom_text(data = nasc.comp, aes(long, lat, label = transect)) 
 
 mapview(nasc.lines) + mapview(nasc.comp.sf)
 
 mapview(nasc.lines.sd) + mapview(nasc.comp.sd.sf)
+
+ggplot() +
+  geom_density(data = filter(nasc.comp, depth >= -100), aes(depth), fill = "gray50", alpha = .5) +
+  geom_density(data = filter(nasc.comp.sd, depth >= -100), aes(depth), fill = "green", alpha = .5)
 
 save(nasc.comp, nasc.comp.sd,
      file = here::here("Output/nasc_comparison_nearshore.Rdata"))
