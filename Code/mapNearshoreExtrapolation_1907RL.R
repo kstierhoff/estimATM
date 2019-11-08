@@ -437,12 +437,12 @@ ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$
 # Combine main and inset maps
 nse.map.final <- ggdraw() +
   draw_plot(nse.map) +
-  draw_plot(inset.map, 0.77, 0.68, 0.3, 0.3)
+  draw_plot(inset.map, 0.65, 0.68, 0.3, 0.3)
 
 # Save combined maps
 ggsave(nse.map.final,
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*1.1, height = map.height*.75)
+       width  = (map.height*ns.aspect), height = map.height*.75)
 
 # Pacific mackerel-All ---------------------------------------------------------
 i = "Scomber japonicus"
@@ -521,8 +521,8 @@ nse.map <- base.map +
                     values = dens.colors.ns, labels = dens.labels.ns) +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
-  theme(legend.position      = c(1,0.5),
-        legend.justification = c(0,0.5)) +
+  theme(legend.position      = c(0,0),
+        legend.justification = c(0,0)) +
   coord_sf(crs = crs.proj,
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
@@ -532,13 +532,12 @@ ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$
 
 nse.map.final <- ggdraw() +
   draw_plot(nse.map) +
-  draw_plot(inset.map, 0.51, 0.76, 0.225, 0.225)
+  draw_plot(inset.map, 0.57, 0.72, 0.25, 0.25)
 
 # Save combined maps
 ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*2.2, height = map.height*.75)
-
+       width  = (map.height*ns.aspect)*1.25, height = map.height*.75)
 
 # Jack mackerel-All ---------------------------------------------------------
 i = "Trachurus symmetricus"
@@ -629,12 +628,12 @@ ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$
 # Combine main and inset maps
 nse.map.final <- ggdraw() +
   draw_plot(nse.map) +
-  draw_plot(inset.map, 0.51, 0.76, 0.225, 0.225)
+  draw_plot(inset.map, 0.55, 0.75, 0.225, 0.225)
 
 # Save combined maps
 ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*2.2, height = map.height*.75)
+       width  = (map.height*ns.aspect)*1.5, height = map.height*.75)
 
 # Pacific herring-All ---------------------------------------------------------
 i = "Clupea pallasii"
