@@ -1,9 +1,9 @@
-# Create nearshore example map --------------------------------------------
+# Create nse example map --------------------------------------------
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- filter(strata.primary,
                   scientificName == spp.ns,
                   stock == stock.ns,
-                  stratum == strata.ns) %>% 
+                  stratum == stratum.ns) %>% 
   st_transform(crs = crs.proj) %>% 
   st_bbox()
 
@@ -27,10 +27,10 @@ dens.colors.ns <- dens.colors[dens.levels.ns]
 # Map backscatter - no transect labels
 nasc.map.ns <- base.map +
   geom_sf(data = filter(strata.primary, scientificName == spp.ns,
-                        stock == stock.ns, stratum == strata.ns),
+                        stock == stock.ns, stratum == stratum.ns),
           fill = NA, size = 0.5) +
-  geom_sf(data = filter(strata.nearshore, scientificName == spp.ns,
-                        stock == stock.ns, stratum == strata.ns),
+  geom_sf(data = filter(strata.nse, scientificName == spp.ns,
+                        stock == stock.ns, stratum == stratum.ns),
           fill = NA, size = 0.5, colour = 'red') +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -59,21 +59,21 @@ ggsave(nasc.map.ns,
        width  = map.width*1.5, height = map.height*.75)
 
 
-# Create nearshore biomass plots for each species and stock --------------------
+# Create nse biomass plots for each species and stock --------------------
 # Northern anchovy-Northern ----------------------------------------------------
 i = "Engraulis mordax"
 j = "Northern"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j, 
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>% 
   filter(scientificName == i, 
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>% 
@@ -116,11 +116,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map + 
+nse.map <- base.map + 
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)), 
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)), 
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)), 
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -143,16 +143,16 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
 # Combine main and inset maps
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.29, 0.72, 0.25, 0.25) 
 
 # Save combined maps
-ggsave(nearshore.map.final, 
+ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.6, height = map.height*.75)
 
@@ -160,16 +160,16 @@ ggsave(nearshore.map.final,
 i = "Engraulis mordax"
 j = "Central"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j, 
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>% 
   filter(scientificName == i, 
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>% 
@@ -212,11 +212,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map + 
+nse.map <- base.map + 
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)), 
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)), 
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)), 
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -239,16 +239,16 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
 # Combine main and inset maps
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.67, 0.62, 0.35, 0.35) 
 
 # Save combined maps
-ggsave(nearshore.map.final, 
+ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*.75, height = map.height*.75)
 
@@ -256,16 +256,16 @@ ggsave(nearshore.map.final,
 i = "Sardinops sagax"
 j = "Northern"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j, 
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>% 
   filter(scientificName == i, 
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>% 
@@ -308,11 +308,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map + 
+nse.map <- base.map + 
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)), 
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)), 
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)), 
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -335,16 +335,16 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
 # Combine main and inset maps
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.57, 0.78, 0.2, 0.2) 
 
 # Save combined maps
-ggsave(nearshore.map.final, 
+ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.5, height = map.height*.75)
 
@@ -352,16 +352,16 @@ ggsave(nearshore.map.final,
 i = "Sardinops sagax"
 j = "Southern"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j,
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>%
   filter(scientificName == i,
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>%
@@ -404,11 +404,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map +
+nse.map <- base.map +
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)),
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)),
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)),
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
@@ -431,16 +431,16 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]),
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
 # Combine main and inset maps
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.77, 0.68, 0.3, 0.3)
 
 # Save combined maps
-ggsave(nearshore.map.final,
+ggsave(nse.map.final,
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*1.1, height = map.height*.75)
 
@@ -448,16 +448,16 @@ ggsave(nearshore.map.final,
 i = "Scomber japonicus"
 j = "All"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j, 
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>% 
   filter(scientificName == i, 
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>% 
@@ -500,11 +500,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map + 
+nse.map <- base.map + 
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)), 
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)), 
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)), 
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -527,15 +527,15 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.51, 0.76, 0.225, 0.225)
 
 # Save combined maps
-ggsave(nearshore.map.final, 
+ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*2.2, height = map.height*.75)
 
@@ -544,16 +544,16 @@ ggsave(nearshore.map.final,
 i = "Trachurus symmetricus"
 j = "All"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j, 
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>% 
   filter(scientificName == i, 
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>% 
@@ -596,11 +596,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map + 
+nse.map <- base.map + 
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)), 
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)), 
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)), 
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -623,16 +623,16 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
 # Combine main and inset maps
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.51, 0.76, 0.225, 0.225)
 
 # Save combined maps
-ggsave(nearshore.map.final, 
+ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*2.2, height = map.height*.75)
 
@@ -640,16 +640,16 @@ ggsave(nearshore.map.final,
 i = "Clupea pallasii"
 j = "All"
 
-# Get primary and nearshore strata for species i
-strata.nearshore.spp <- filter(strata.nearshore, scientificName == i, stock == j)
+# Get primary and nse strata for species i
+strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
 
 strata.primary.spp   <- filter(strata.primary, scientificName == i, stock == j, 
-                               stratum %in% unique(strata.nearshore.spp$stratum))
+                               stratum %in% unique(strata.nse.spp$stratum))
 
 # Get strata for species i and only the primary survey vessel
 strata.sub <- strata.final %>% 
   filter(scientificName == i, 
-         stratum %in% unique(strata.nearshore.spp$stratum))
+         stratum %in% unique(strata.nse.spp$stratum))
 
 # Set the map boundaries based on the bounding box of the offshore stratum
 ns.lims <- strata.primary.spp %>% 
@@ -692,11 +692,11 @@ inset.map <- base.map.bw +
            ylim = c(inset.map.bounds["ymin"], inset.map.bounds["ymax"]))
 
 # Create main map
-nearshore.map <- base.map + 
+nse.map <- base.map + 
   # Add strata
   geom_sf(data = strata.primary.spp, aes(colour = factor(stratum)), 
           fill = NA, linetype = 'dashed', alpha = 0.5) +
-  geom_sf(data = strata.nearshore.spp, aes(colour = factor(stratum)), 
+  geom_sf(data = strata.nse.spp, aes(colour = factor(stratum)), 
           fill = NA, alpha = 0.5) +
   # Plot vessel track
   geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
@@ -719,15 +719,15 @@ nearshore.map <- base.map +
            xlim = c(ns.lims["xmin"], ns.lims["xmax"]), 
            ylim = c(ns.lims["ymin"], ns.lims["ymax"]))
 
-# Get aspect ratio of nearshore map for setting figure dimensions
-ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordinates$limits$y)
+# Get aspect ratio of nse map for setting figure dimensions
+ns.aspect <- diff(nse.map$coordinates$limits$x)/diff(nse.map$coordinates$limits$y)
 
 # Combine main and inset maps
-nearshore.map.final <- ggdraw() +
-  draw_plot(nearshore.map) +
+nse.map.final <- ggdraw() +
+  draw_plot(nse.map) +
   draw_plot(inset.map, 0.73, 0.715, 0.225, 0.225) 
 
 # Save combined maps
-ggsave(nearshore.map.final, 
+ggsave(nse.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
        width  = (map.height*ns.aspect)*.75, height = map.height*.75)

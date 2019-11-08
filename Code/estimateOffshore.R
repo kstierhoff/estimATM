@@ -241,7 +241,7 @@ save(nasc.offshore, file = here("Output/cps_nasc_prop_os.Rdata"))
 
 # Summarise nasc data
 nasc.summ.os <- nasc.offshore %>% 
-  group_by(vessel.name, transect.name, transect) %>% 
+  group_by(vessel.orig, transect.name, transect) %>% 
   summarise(
     start     = min(datetime),
     end       = max(datetime),
@@ -251,7 +251,8 @@ nasc.summ.os <- nasc.offshore %>%
     lat       = lat[which.min(long)],
     long      = long[which.min(long)],
     mean_nasc = mean(cps.nasc)) %>% 
-  arrange(vessel.name, start) %>% 
+  arrange(vessel.orig, start) %>% 
+  rename(vessel.name = vessel.orig) %>% 
   ungroup()
 
 save(nasc.summ.os, file = here("Output/nasc_summ_tx_os.Rdata"))
@@ -720,7 +721,7 @@ tx.ends.os <- ungroup(tx.ends.os)
 if (stock.break.source == "primary") {
   strata.points.os <- strata.points.os %>% 
     ungroup() %>% 
-    left_join(ungroup(select(tx.ends, transect.name, lat.stock = lat.i)))
+    left_join(ungroup(select(tx.ends.os, transect.name, lat.stock = lat.i)))
 } else {
   strata.points.os <- strata.points.os %>% 
     mutate(lat.stock = lat)
@@ -954,9 +955,11 @@ if (save.figs) {
       biomass.dens.figs.os[[i]][[j]] <- biomass.dens.os
     }
   }
+  
   # Save map objects
   save(biomass.dens.figs.os, file = here("Output/biomass_dens_os_map_all.Rdata"))  
 } else {
+  # Load map objects
   load(here("Output/biomass_dens_os_map_all.Rdata"))
 }
 

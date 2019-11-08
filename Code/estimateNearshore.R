@@ -1165,10 +1165,19 @@ strata.summ.ns <- strata.final.ns %>%
   arrange(scientificName, stock, vessel.name, stratum) %>% 
   ungroup()
 
+# Create a mask for LBC data, used to punch holes in Lasker's super polygons
+# Used to remover overlap with Lasker samples
+island.polygons <- strata.ns %>% 
+  filter(str_detect(region, "Island")) %>%
+  st_union() 
+
+strata.super.polygons.ns <- strata.super.polygons %>% 
+  st_difference(island.polygons)
+
 strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
   st_difference(st_union(bathy_5m_poly)) %>% 
-  # st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
+  # st_difference(filter(strata.super.polygons.ns, vessel.name == "RL")) %>% 
   ungroup() %>% 
   mutate(area = st_area(.)) 
 
@@ -1762,207 +1771,21 @@ save(be.ns,
 # Get rows with estimates from all strata
 be.stratum.all.ns <- which(be.ns$Stratum == "All")
 
-# Unused code ----------------------------------------------------------------
+# Bootstrap estimates of biomass by species
+biomass.histogram.survey.ns <- ggplot(be.sample.ns, aes(biomass*1e3, fill = Stock)) + 
+  geom_histogram(alpha = 0.75) + facet_wrap(Species ~ Stock, scales = "free") + 
+  geom_vline(data = filter(pe.ns, Stratum == "All"),aes(xintercept = biomass.mean.point)) +
+  geom_vline(data = be.survey.ns, aes(xintercept = lower.ci.B), linetype = 'dashed') +
+  geom_vline(data = be.survey.ns, aes(xintercept = upper.ci.B), linetype = 'dashed') +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = c(All = "gray50", Central = "orange", 
+                               Northern = "navyblue", Southern = "firebrick")) +
+  ylab("Count") + xlab(expression(Biomass~(t))) +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
 
-# for (k in unique(nasc.region$key)) {
-#   if (str_detect(k, "Island")) {
-#     # Draw polygons around deepest transect waypoint for island strata
-#     ns.strata.temp <- region.wpts %>%
-#       ungroup() %>%
-#       mutate(key = paste("LBC", Region)) %>% 
-#       # filter(key == k) %>% 
-#       st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-#       concaveman(concavity = 10)  
-#   } else {
-#     # Draw polygons around easternmost and westernmost nasc intervals
-#     
-#   }
-#   ns.strata.temp <- nasc.region %>%
-#     filter(key == k) %>% 
-#     st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-#     concaveman(concavity = 10)  
-# }
-# 
-# 
-# # Do st_intersection to remove Channel Islands, particularly for LCB data
-# tx.ends.ns <- nasc.nearshore %>% 
-#   group_by(transect.name, transect, vessel.name) %>% 
-#   summarise(
-#     lat.i  = lat[which.max(long)],
-#     long.i = max(long),
-#     lat.o  = lat[which.min(long)],
-#     long.o = min(long)
-#   ) %>% 
-#   left_join(select(tx.nn.ns, transect.name, spacing)) %>% 
-#   mutate(
-#     brg = swfscMisc::bearing(lat.i, long.i,
-#                              lat.o, long.o)[1])
-# 
-# # Get original inshore transect ends -------------------------------------------
-# tx.i.ns <- tx.ends.ns %>% 
-#   select(-lat.o, -long.o) %>% 
-#   rename(lat = lat.i, long = long.i) %>% 
-#   mutate(
-#     grp = "original",
-#     loc = "inshore",
-#     order = 2)
-# 
-# # Get N and S inshore waypoints ------------------------------------------------
-# # Calculate inshore/north transects
-# tx.i.n.ns <- tx.ends.ns %>% 
-#   select(-lat.o, -long.o) %>% 
-#   rename(lat = lat.i, long = long.i) %>% 
-#   mutate(
-#     lat  = destination(lat, long, brg + 90, spacing/2, units = "nm")["lat"],
-#     long = destination(lat, long, brg + 90, spacing/2, units = "nm")["lon"],
-#     grp = "north",
-#     loc = "inshore",
-#     order = 1)
-# 
-# # Calculate inshore/south transects
-# tx.i.s.ns <- tx.ends.ns %>% 
-#   select(-lat.o, -long.o) %>% 
-#   rename(lat = lat.i, long = long.i) %>% 
-#   mutate(
-#     lat  = destination(lat, long, brg - 90, spacing/2, units = "nm")["lat"],
-#     long = destination(lat, long, brg - 90, spacing/2, units = "nm")["lon"],
-#     grp = "south",
-#     loc = "inshore",
-#     order = 3)
-# 
-# # Combine all inshore transects
-# tx.i.ns <- tx.i.ns %>%
-#   bind_rows(tx.i.n.ns) %>%
-#   bind_rows(tx.i.s.ns) %>%
-#   arrange(transect, desc(order))
-# 
-# # Get original offshore transect ends ------------------------------------------
-# tx.o.ns <- tx.ends.ns %>% 
-#   select(-lat.i, -long.i) %>% 
-#   rename(lat = lat.o, long = long.o) %>% 
-#   mutate(
-#     grp = "original",
-#     loc = "offshore",
-#     order = 2)
-# 
-# # Get N and S offshore waypoints -----------------------------------------------
-# # Calculate offshore/north transects
-# tx.o.n.ns <- tx.ends.ns %>% 
-#   select(-lat.i, -long.i) %>% 
-#   rename(lat = lat.o, long = long.o) %>% 
-#   mutate(
-#     lat  = destination(lat, long, brg + 90, spacing/2, units = "nm")["lat"],
-#     long = destination(lat, long, brg + 90, spacing/2, units = "nm")["lon"],
-#     grp = "north",
-#     loc = "offshore",
-#     order = 1)
-# 
-# # Calculate inshore/south transects
-# tx.o.s.ns <- tx.ends.ns %>% 
-#   select(-lat.i, -long.i) %>% 
-#   rename(lat = lat.o, long = long.o) %>% 
-#   mutate(
-#     lat  = destination(lat, long, brg - 90, spacing/2, units = "nm")["lat"],
-#     long = destination(lat, long, brg - 90, spacing/2, units = "nm")["lon"],
-#     grp = "south",
-#     loc = "offshore",
-#     order = 3)
-# 
-# # Combine all offshore transects
-# tx.o.final.ns <- tx.o.ns %>% 
-#   bind_rows(filter(tx.o.n.ns)) %>% 
-#   bind_rows(filter(tx.o.s.ns)) %>% 
-#   arrange(desc(transect), order)
-# 
-# # Assemble the final data frame with all waypoints -----------------------------
-# strata.points.ns <- tx.i.ns %>% 
-#   bind_rows(tx.o.final.ns)   %>%
-#   mutate(key = paste(transect.name, grp)) 
-# 
-# # Convert to points
-# strata.points.ns.sf <- st_as_sf(strata.points.ns, coords = c("long","lat"), crs = 4326) 
-# 
-# # Create polygons
-# strata.super.polygons.ns <- strata.points.ns.sf %>% 
-#   ungroup() %>% 
-#   # group_by(vessel.name) %>% 
-#   summarise(do_union = F) %>% 
-#   st_cast("POLYGON") %>% 
-#   st_make_valid() %>% 
-#   st_difference(st_union(bathy_5m_poly)) %>% 
-#   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
-#   mutate(area = st_area(.))
-# 
-# # Convert to lines
-# tx.lines.ns.sf <- strata.points.ns.sf %>% 
-#   group_by(transect, grp) %>% 
-#   summarise(do_union = F) %>% 
-#   st_cast("LINESTRING")
-
-# # Determine transect order by min latitude/longitude
-# tx.order.ns <- data.frame()
-# 
-# use.nums <- TRUE
-# 
-# if (use.nums) {
-#   # Calculate transect order per vessel
-#   tx.order.temp <- nasc.nearshore %>%
-#     # filter(str_detect(vessel.name, i)) %>% 
-#     group_by(transect.name) %>% 
-#     summarise(max.lat  = max(lat),
-#               min.long = max(long)) %>% 
-#     mutate(rank.lat  = rank(max.lat), 
-#            rank.long = rev(rank(min.long)), 
-#            diff      = rank.lat - rank.long,
-#            transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
-#            rank.final = rank(transect.num)) %>% 
-#     arrange(rank.final)
-#   
-# } else {
-#   # Calculate transect order per vessel
-#   tx.order.temp <- nasc.nearshore %>%
-#     # filter(str_detect(vessel.name, i)) %>% 
-#     group_by(transect.name) %>% 
-#     summarise(max.lat  = max(lat),
-#               min.long = max(long)) %>% 
-#     mutate(rank.lat  = rank(max.lat), 
-#            rank.long = rev(rank(min.long)), 
-#            diff      = rank.lat - rank.long,
-#            transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
-#            rank.final = rank.lat) %>% 
-#     arrange(rank.final)
-# }
-# 
-# # Assign transect order based on rank latitude
-# if (nrow(tx.order.ns) == 0) {
-#   # If the first vessel, create transects from 0 to number of transects
-#   tx.order.temp$transect <- tx.order.temp$rank.final
-# } else {
-#   # If not the first vessel, add rank latitude to largest existing transect number
-#   tx.order.temp$transect <- tx.order.temp$rank.final + max(tx.order.ns$transect)
-# }
-# 
-# # Combine results from all vessels
-# tx.order.ns <- bind_rows(tx.order.ns, tx.order.temp) %>% 
-#   arrange(transect)
-# 
-# # Add transect numbers to NASC data frame
-# nasc.nearshore <- left_join(select(nasc.nearshore, -transect), 
-#                            select(tx.order.ns, transect.name, transect))
-# 
-# # Add transect numbers to NASC density summary data frame
-# nasc.density.summ.ns <- nasc.density.summ.ns %>% 
-#   ungroup() %>% 
-#   select(-transect) %>% 
-#   left_join(select(tx.order.ns, transect.name, transect))
-# 
-# nasc.density.ns <- nasc.density.ns %>% 
-#   ungroup() %>% 
-#   select(-transect) %>% 
-#   left_join(select(tx.order.ns, transect.name, transect))
-# 
-# # Add transect numbers to strata points data frame
-# strata.points.ns <- strata.points.ns %>% 
-#   ungroup() %>% 
-#   select(-transect) %>% 
-#   left_join(select(tx.order.ns, transect.name, transect))
+# Save figure
+ggsave(biomass.histogram.survey.ns,
+       filename = here("Figs/fig_biomass_histogram_survey_ns.png"),
+       height = 8, width = 14)
