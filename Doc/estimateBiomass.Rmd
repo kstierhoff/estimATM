@@ -107,7 +107,7 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+save.figs         <- T # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
 do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
@@ -122,7 +122,7 @@ estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshor
 
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.offshore  <- T # Process offshore backscatter data
-process.nearshore <- T # Process near backscatter data
+process.nearshore <- F # Process near backscatter data
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -4184,7 +4184,7 @@ nearshore.points.sf <- st_as_sf(nearshore.points, coords = c("long","lat"), crs 
 
 # Ensure strata objects do not exist
 if (exists("strata.primary")) rm(strata.primary)
-if (exists("strata.nearshore.temp")) rm(strata.nearshore.temp)
+if (exists("strata.nse.temp")) rm(strata.nse.temp)
 if (exists("strata.inshore")) rm(strata.inshore)
 if (exists("nearshore.clip")) rm(nearshore.clip)
 
@@ -4311,10 +4311,10 @@ for (i in unique(strata.final$scientificName)) {
       strata.primary <- primary.poly.j
     }
     
-    if (exists("strata.nearshore.temp")) {
-      strata.nearshore.temp <- rbind(strata.nearshore.temp, nearshore.poly.j)
+    if (exists("strata.nse.temp")) {
+      strata.nse.temp <- rbind(strata.nse.temp, nearshore.poly.j)
     } else {
-      strata.nearshore.temp <- nearshore.poly.j
+      strata.nse.temp <- nearshore.poly.j
     }
     
     if (exists("nearshore.clip")) {
@@ -4334,8 +4334,8 @@ for (i in unique(strata.final$scientificName)) {
 # Save strata polygons
 save(strata.primary, 
      file = here("Output/strata_primary_raw.Rdata"))
-save(strata.nearshore.temp, 
-     file = here("Output/strata_nearshore_raw.Rdata"))
+save(strata.nse.temp, 
+     file = here("Output/strata_nse_raw.Rdata"))
 
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
 strata.primary <- strata.primary %>% 
@@ -4352,30 +4352,30 @@ save(strata.primary,
 
 # Clip nearshore polygons using the 5 m isobathy polygon -----------------------
 # Remove self-intersecting portions of polygons
-strata.nearshore.temp <- st_make_valid(strata.nearshore.temp) %>% 
+strata.nse.temp <- st_make_valid(strata.nse.temp) %>% 
   ungroup()
 
-if (exists("strata.nearshore")) rm(strata.nearshore)
+if (exists("strata.nse")) rm(strata.nse)
 
-for (k in unique(strata.nearshore.temp$scientificName)) {
+for (k in unique(strata.nse.temp$scientificName)) {
   # Clip strata for each species
-  strata.nearshore.diff <- strata.nearshore.temp %>% 
+  strata.nse.diff <- strata.nse.temp %>% 
     filter(scientificName == k) %>%
     ungroup() %>% 
     st_difference(bathy_5m_poly) %>% 
     mutate(area = st_area(.))
   
   # Combine features
-  if (exists("strata.nearshore")) {
-    strata.nearshore <- rbind(strata.nearshore,
-                              strata.nearshore.diff)
+  if (exists("strata.nse")) {
+    strata.nse <- rbind(strata.nse,
+                              strata.nse.diff)
   } else {
-    strata.nearshore <- strata.nearshore.diff
+    strata.nse <- strata.nse.diff
   }
 }
 
 # Add vessel name to nearshore strata
-strata.nearshore <- strata.nearshore %>% 
+strata.nse <- strata.nse %>% 
   left_join(select(strata.summ, scientificName, stratum, vessel.name))
 
 # Exclude nearshore area sampled by Saildrone in 1807RL
@@ -4384,23 +4384,23 @@ if (prj.name %in% c("1807RL")) {
   sd.mask <- st_read(here("Data/GIS/saildrone_mask.shp"))
 
   # Extract Saildrone strata in a temporary object
-  strata.nearshore.sd <- strata.nearshore %>%
+  strata.nse.sd <- strata.nse %>%
     filter(vessel.name == "SD1024")
 
   # Keep the difference between nearshore stata and the Saildrone mask
-  strata.nearshore <- strata.nearshore %>%
+  strata.nse <- strata.nse %>%
     filter(vessel.name == "RL") %>%
     st_difference(sd.mask) %>%
     mutate(area = st_area(.)) %>%
     select(-Id)
 
   # Recombine
-  strata.nearshore <- rbind(strata.nearshore, strata.nearshore.sd)
+  strata.nse <- rbind(strata.nse, strata.nse.sd)
 }
 
 # Save final nearshore polygons
-save(strata.nearshore, 
-     file = here("Output/strata_nearshore_final.Rdata"))
+save(strata.nse, 
+     file = here("Output/strata_nse_final.Rdata"))
 
 # Convert polygons to points and add coordinates -------------------------------
 strata.primary.points  <- strata.primary %>% 
@@ -4412,7 +4412,7 @@ strata.primary.points  <- strata.primary %>%
     grp = paste(scientificName, stock, stratum)) %>% 
   st_set_geometry(NULL)
 
-strata.nearshore.points <- strata.nearshore %>% 
+strata.nse.points <- strata.nse %>% 
   st_cast("MULTIPOINT") %>%
   st_cast("POINT") %>% 
   mutate(
@@ -4425,7 +4425,7 @@ strata.nearshore.points <- strata.nearshore %>%
 save(strata.primary.points,  
      file = here("Output/strata_points_primary.Rdata"))
 
-save(strata.nearshore.points, 
+save(strata.nse.points, 
      file = here("Output/strata_points_nearshore.Rdata"))
 
 # Write primary stata points to CSV
@@ -4439,7 +4439,7 @@ strata.summ.primary <- strata.primary %>%
   mutate(area = as.numeric(area)) %>% 
   st_set_geometry(NULL)
 
-strata.summ.nearshore <- strata.nearshore %>% 
+strata.summ.nearshore <- strata.nse %>% 
   select(scientificName, stratum, stock, area) %>%
   mutate(area = as.numeric(area)) %>% 
   st_set_geometry(NULL)
@@ -5386,7 +5386,7 @@ densPal <- colorFactor(dens.colors.all, dens.levels.all)
 strata.primary.sub <- strata.primary %>% 
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
 
-strata.nearshore.sub <- strata.nearshore %>% 
+strata.nse.sub <- strata.nse %>% 
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
 
 # Create leaflet map
@@ -5447,19 +5447,19 @@ i.map <- leaflet() %>%
                    popup = ~popup,
                    group = "Planned Transects (Ancillary)") %>%
   # Add nearshore stratum polygons
-  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Clupea pallasii"), 
+  addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
               weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
               fillOpacity = 0.50, group = "Biomass (Herring)") %>%
-  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Engraulis mordax"), 
+  addPolygons(data = filter(strata.nse.sub, scientificName == "Engraulis mordax"), 
               weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
               fillOpacity = 0.50, group = "Biomass (Anchovy)") %>%
-  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Sardinops sagax"), 
+  addPolygons(data = filter(strata.nse.sub, scientificName == "Sardinops sagax"), 
               weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
               fillOpacity = 0.50, group = "Biomass (Sardine)") %>%
-  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Scomber japonicus"), 
+  addPolygons(data = filter(strata.nse.sub, scientificName == "Scomber japonicus"), 
               weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
               fillOpacity = 0.50, group = "Biomass (P. mackerel)") %>%
-  addPolygons(data = filter(strata.nearshore.sub, scientificName == "Trachurus symmetricus"), 
+  addPolygons(data = filter(strata.nse.sub, scientificName == "Trachurus symmetricus"), 
               weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
               fillOpacity = 0.50, group = "Biomass (J. mackerel)") %>%
   # Add primary stratum polygons
@@ -5708,7 +5708,7 @@ for (i in unique(strata.final$scientificName)) {
     mutate(area = as.numeric(area)) %>%
     st_set_geometry(NULL)
   
-  stratum.info.nearshore <- strata.nearshore %>% 
+  stratum.info.nearshore <- strata.nse %>% 
     filter(scientificName == i) %>% 
     select(stratum, area) %>%
     mutate(area = as.numeric(area)) %>% 
@@ -5785,7 +5785,7 @@ pe %>%
   # row_spec(pe.stratum.all, bold = TRUE, color = c("#000000"),background = "#8B8C94") %>%
   collapse_rows(columns = c(1))
 
-save(nasc.nearshore.final, file = here("Output/nasc_nearshore_final.Rdata"))
+save(nasc.nearshore.final, file = here("Output/nasc_nse_final.Rdata"))
 ```
 
 ### Nearshore extrapolation
@@ -6254,13 +6254,13 @@ if (do.bootstrap) {
                        "Multiple Bootstrap Estimation (Nearshore) - Species", 0, 100, 0)
   spp.counter <- 1
   
-  for (i in unique(strata.nearshore$scientificName)) {
+  for (i in unique(strata.nse$scientificName)) {
     # Get vector of lengths from clf.df column names
     L.cols  <- grep("L\\d", names(cluster.final[[i]]))
     L.vec   <- sort(as.numeric(str_extract(names(cluster.final[[i]][L.cols]),"\\d{1,2}")))
     
     # Create data frame with stratum and area (m^2)
-    stratum.info.nearshore <- strata.nearshore %>% 
+    stratum.info.nearshore <- strata.nse %>% 
       filter(scientificName == i) %>% 
       select(stratum, area) %>%
       mutate(area = as.numeric(area)) %>% 
@@ -6333,8 +6333,8 @@ if (do.bootstrap) {
     # Estimate biomass for each stratum
     for (j in unique(nasc.nearshore$stratum)) {
       # Extract stratum area
-      stratum.area <- as.numeric(strata.nearshore$area[strata.nearshore$scientificName == i & 
-                                          strata.nearshore$stratum == j])
+      stratum.area <- as.numeric(strata.nse$area[strata.nse$scientificName == i & 
+                                          strata.nse$stratum == j])
       # Calculate biomass using bootstrap function ----
       set.seed(1) # Set seed for repeatable results
       boot.df <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], j, 

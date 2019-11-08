@@ -56,10 +56,8 @@ erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_we
 erddap.survey.start.sd <- "2019-06-18T00%3A00%3A00Z"
 erddap.survey.end.sd   <- "2019-09-30T23%3A59%3A00Z"
 # Configure columns and classes
-erddap.vars.sd       <- c("trajectory,latitude,longitude,time")
-erddap.headers.sd    <- c("saildrone", "lat", "long", "time")
-# erddap.headers.sd    <- c("saildrone","lat","long","COG","HDG","time")
-erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
+erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
+erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 
 # Define date range for each Saildrone to remove overlapping transits

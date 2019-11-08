@@ -239,6 +239,23 @@ nasc.offshore <- nasc.offshore %>%
 # Save results
 save(nasc.offshore, file = here("Output/cps_nasc_prop_os.Rdata"))
 
+# Summarise nasc data
+nasc.summ.os <- nasc.offshore %>% 
+  group_by(vessel.name, transect.name, transect) %>% 
+  summarise(
+    start     = min(datetime),
+    end       = max(datetime),
+    duration  = difftime(end, start, units = "hours"),
+    n_int     = length(Interval),
+    distance  = length(Interval)*nasc.interval/1852,
+    lat       = lat[which.min(long)],
+    long      = long[which.min(long)],
+    mean_nasc = mean(cps.nasc)) %>% 
+  arrange(vessel.name, start) %>% 
+  ungroup()
+
+save(nasc.summ.os, file = here("Output/nasc_summ_tx_os.Rdata"))
+
 # Apportion offshore backscatter ------------------------------------------
 # Create data frame for plotting acoustic proportions by species
 nasc.prop.all.os <- nasc.offshore %>%

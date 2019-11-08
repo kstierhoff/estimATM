@@ -1,0 +1,535 @@
+---
+title: "Saildrone vs. Lasker NASC (1807RL)"
+author: "Kevin L. Stierhoff"
+date: "4/30/2019"
+output: 
+  bookdown::pdf_document2:
+    includes: 
+      in_header: yaml/header.tex
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+  bookdown::word_document2:
+    reference_docx: template/report_template_Rmarkdown.docx
+    toc: yes
+    toc_depth: 3
+    pandoc_args: [
+     "--filter", "yaml/pandoc-newpage-filter.R"
+     ]
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+---
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,lubridate, knitr, here, mgcv,xts,sf,
+               kableExtra,bookdown,bookdownplus,concaveman,mapview)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                      out.width = "100%",
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# ggplot2 options
+theme_set(theme_bw())
+```  
+
+```{r project-info}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r load-data}
+# Load Saildrone nav data
+load(here("Data/Nav/nav_data_saildrone.Rdata"))
+
+# Restrict data to SWFSC Saildrones
+nav.sd <- nav.sd %>% 
+  filter(saildrone %in% sd.numbers) %>% 
+  mutate(time.align  = align.time(datetime, 60),
+         vessel.orig = as.factor(paste0("SD", saildrone)))
+
+nav.sd.sf <- nav.sd.sf %>% 
+  filter(saildrone %in% sd.numbers)
+
+# ggplot(nav.sd, aes(long, lat, group = saildrone, colour = saildrone)) + geom_point() + coord_map()
+# mapview(nav.sd.sf, zcol = "saildrone")
+
+# Load Saildrone backscatter data
+if (file.exists(here("Data/Backscatter/SD/nasc_vessel_SD_nearshore.rds"))) {
+  nasc.sd.ns <- readRDS(here("Data/Backscatter/SD/nasc_vessel_SD_nearshore.rds"))  
+}
+
+if (file.exists(here("Data/Backscatter/SD/nasc_vessel_SD_offshore.rds"))) {
+  nasc.sd.os <- readRDS(here("Data/Backscatter/SD/nasc_vessel_SD_offshore.rds"))
+}
+
+# ggplot(nasc.sd.ns, aes(long, lat, colour = vessel.orig)) + geom_point() + coord_map()
+# ggplot(nasc.sd.os, aes(long, lat, colour = vessel.orig)) + geom_point() + coord_map()
+
+# Combine backscatter data
+nasc.sd <- bind_rows(nasc.sd.ns, nasc.sd.os)
+
+# ggplot(nasc.sd, aes(long, lat, colour = vessel.orig)) + geom_point() + coord_map()
+```
+
+```{r process-saildrone-nasc}
+# Add SOG to nasc
+nasc.sd <- nasc.sd %>% 
+  mutate(time.align  = align.time(datetime, 60),
+         nasc.comp = NASC.50 - NASC.5, # Substract upper 5 m from Saildrone NASC
+         loc = cut(lat, c(0,34.7,40.430520,48.490, 55), labels = FALSE),
+         region = as.factor(case_when(
+           loc == 1 ~ "SCB",
+           loc == 2 ~ "CenCoast",
+           loc == 3 ~ "WaOr",
+           loc == 4 ~ "Van",
+           TRUE ~ "Other")),
+         region = fct_reorder(region, loc)) %>% 
+  left_join(select(nav.sd, vessel.orig, time.align, SOG)) %>%
+  filter(!is.na(SOG)) %>% 
+  arrange(desc(nasc.comp)) %>% 
+  mutate(nasc.rank = seq_along(nasc.comp),
+         sog.bin = cut(SOG, seq(0, ceiling(max(SOG)), 0.2)),
+         vessel = "Saildrone")
+```
+
+\newpage
+
+# Normalized summed $s_A$ versus survey region
+
+$s_A$ is summed and normalized (divided by the number of samples) then compared in 0.2 kn speed over ground (SOG, kn) increments across the four survey regions (Van = Vancouver Is.; WaOr = Washington/Oregon; CenCoast = Cape Mendocino to Pt. Conception; and SCB = S. CA Bight, south of Pt. Conception).
+
+**$s_A$ is NASC.50 - NASC.5, to exclude potential surface noise.**
+
+```{r sd-nasc-sog}
+# Summarise Saildrone NASC by region and SOG bin
+nasc.sd.sog.summ <- nasc.sd %>% 
+  group_by(region, sog.bin) %>% 
+  summarise(n.int = n(),
+            sum.nasc = sum(NASC.50),
+            sum.nasc.n = sum.nasc/n.int)
+
+# Plot sum of NASC vs. SOG bit, by retion
+sd.nasc.sog <- ggplot(nasc.sd.sog.summ, aes(sog.bin, log(sum.nasc), colour = region)) + 
+  geom_line(aes(group = region)) + geom_point() +
+  xlab("SOG (kn)") + ylab(expression(log(Sigma("NASC")))) +
+  labs(color = "Region") +
+  theme(axis.text.x = element_text(angle = 90))
+
+ggsave(sd.nasc.sog, filename = here("Figs/fig_sog_sum-nasc_comp.png"))
+
+include_graphics(here("Figs/fig_sog_sum-nasc_comp.png"))
+```
+
+```{r process-sd-nav}
+# Assign Saildrone nav to regions
+nav.sd <- nav.sd %>% 
+  mutate(loc = cut(lat, c(0,34.7,40.430520,48.490, 55), labels = FALSE),
+         region = as.factor(case_when(
+           loc == 1 ~ "SCB",
+           loc == 2 ~ "CenCoast",
+           loc == 3 ~ "WaOr",
+           loc == 4 ~ "Van",
+           TRUE ~ "Other")),
+         region = fct_reorder(region, loc))
+
+# ggplot(nav.sd, aes(long, lat, colour = region)) + geom_point() + coord_map()
+```
+
+```{r}
+
+median.sd.speed <- nasc.sd %>% 
+  group_by(vessel.orig) %>% 
+  summarise(sog.med = median(SOG))
+
+# Plot histgrams of Saildrone speed along planned transects
+ggplot(nasc.sd, aes(SOG)) + 
+  geom_histogram() + 
+  geom_vline(data = median.sd.speed, aes(xintercept = sog.med), linetype = "dashed") +
+  facet_wrap(~vessel.orig)
+```
+
+
+\newpage
+
+# Compare $s_A$ and SOG
+## Raw data
+
+```{r}
+# Plot NASC.50-NASC.5 vs. SOG to look for FAD effect
+sd.sog.nasc <- ggplot(nasc.sd, aes(SOG, NASC.50 - NASC.5)) +
+  geom_point() +
+  ggtitle("Saildrone NASC vs. Speed")
+
+ggsave(sd.sog.nasc, filename = here("Figs/fig_nasc_vs_sog_saildrone.png"))
+
+include_graphics(here("Figs", "fig_nasc_vs_sog_saildrone.png"))
+```
+
+\newpage
+
+## Median SOG and $s_A$
+
+Tablular results
+
+```{r sd-median-sog-nasc}
+# Compute median Saildrone SOG
+nav.sd.summ <- nav.sd %>% 
+  group_by(region) %>% 
+  summarise(med.sog = median(SOG))
+
+# Calculate median Saildrone NASC 
+nasc.sd.summ <- nasc.sd %>% 
+  group_by(region) %>% 
+  summarise(med.log.nasc = median(log(NASC.50 + 1), na.rm = TRUE)) 
+
+# Combine median SOG and NASC
+nasc.sog.comp <- nav.sd.summ %>% 
+  left_join(nasc.sd.summ)
+
+nasc.sog.comp %>% 
+  rename(Region = region, SOG = med.sog, log_NASC = med.log.nasc) %>% 
+  kable()
+```
+
+Graphical results
+
+```{r sd-sog-nasc-plot}
+# Plot median NASC vs. SOG for survey regions
+sd.sog.nasc.med <- ggplot(nasc.sog.comp, aes(med.sog, med.log.nasc, label = region, colour = region)) + 
+  geom_text(aes(fontface = "bold")) +
+  labs(colour = "Region")
+
+ggsave(sd.sog.nasc.med, filename = here("Figs/fig_sog_nasc_med.png"))
+
+include_graphics(here("Figs/fig_sog_nasc_med.png"))
+```
+
+\newpage
+
+```{r sd-nasc-hull}
+nasc.sd.sf <- select(nasc.sd, long, lat, vessel.orig) %>% 
+  st_as_sf(coords = c("long","lat"), crs = 4326)
+
+sd.hull <- concaveman(nasc.sd.sf)
+```
+
+
+```{r process-lasker-nasc}
+load("D:/CODE/R_packages/EstimateCPS/1807RL/Output/nasc_final.Rdata")
+
+nasc <- nasc %>% 
+  mutate(nasc.comp = NASC.50) %>% 
+  arrange(desc(nasc.comp)) %>% 
+  mutate(nasc.rank = seq_along(nasc.comp),
+         vessel = "Lasker")
+
+# Get Lasker data that intersects Saildrone footprint
+# nasc.sf <- nasc %>% 
+#   select(nasc.rank, long, lat) %>% 
+#   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+#   st_intersection(sd.hull)
+# 
+# save(nasc.sf, file = here("Output/nasc_overlap_lasker.Rdata"))
+
+load(here("Output/nasc_overlap_lasker.Rdata"))
+
+# Filter non-overlapping intervals
+nasc <- nasc %>% 
+  filter(nasc.rank %in% nasc.sf$nasc.rank) %>% 
+  mutate()
+```
+
+## Ranked $s_A$ comparison
+
+```{r ranked-nasc-comparison}
+n.int <- 250
+
+nasc.ranks <- filter(select(nasc, nasc.rank, nasc.comp, vessel), nasc.rank <= n.int) %>% 
+  bind_rows(filter(select(nasc.sd, nasc.rank, nasc.comp, vessel), nasc.rank <= n.int))
+
+nasc.rank.plot <- ggplot(nasc.ranks, aes(nasc.rank, nasc.comp, colour = vessel)) + geom_point() +
+  ggtitle("Ranked Saildrone and Lasker NASC") +
+  xlab("Rank") + ylab(expression(italic(s)[A])) +
+  labs(colour = "Vessel")
+
+ggsave(nasc.rank.plot, filename = here("Figs", "fig_ranked_nasc_comparison.png"))
+
+include_graphics(here("Figs", "fig_ranked_nasc_comparison.png"))
+```
+
+\newpage
+
+# Compare $s_A$ from _Lasker_ and Saildrone
+## qqplots of $s_A$ by depth
+
+```{r sd-nasc-qqplots}
+png(here("Figs/fig_nasc_comp_base.png"), width = 600, height = 600)
+par(mfrow = c(2,2))
+qqplot(log(nasc$NASC.20 - nasc$NASC.5 + 1), log(nasc.sd$NASC.20 - nasc.sd$NASC.5 + 1),
+       main = "~5 to 20 m",
+       xlab = "log(NASC; RL)", ylab = "log(NASC; SD)",
+       xlim = c(0, 15), ylim = c(0, 15))
+abline(1,1)
+
+qqplot(log(nasc$NASC.40 - nasc$NASC.20 + 1), log(nasc.sd$NASC.40 - nasc.sd$NASC.20 + 1),
+       main = "~20 to 40 m",
+       xlab = "log(NASC; RL)", ylab = "log(NASC; SD)",
+       xlim = c(0, 15), ylim = c(0, 15))
+abline(1,1)
+
+qqplot(log(nasc$NASC.70 - nasc$NASC.40 + 1), log(nasc.sd$NASC.70 - nasc.sd$NASC.40 + 1),
+       main = "~40 to 70 m",
+       xlab = "log(NASC; RL)", ylab = "log(NASC; SD)",
+       xlim = c(0, 15), ylim = c(0, 15))
+abline(1,1)
+
+qqplot(log(nasc$NASC.70 + 1), log(nasc.sd$NASC.70 + 1),
+       main = "~5 to 70 m",
+       xlab = "log(NASC; RL)", ylab = "log(NASC; SD)",
+       xlim = c(0, 15), ylim = c(0, 15))
+abline(1,1)
+invisible(dev.off())
+
+include_graphics(here("Figs/fig_nasc_comp_base.png"))
+```
+
+\newpage
+
+## GAM (mgcv) of $s_A$ vs. SOG
+### Model summary
+
+```{r nasc-sog-gam-summary}
+gam1 <- mgcv::gam(NASC.50 ~ s(SOG), family = nb(link = log), data = nasc.sd)
+
+summary(gam1)
+```
+
+### Model plot
+
+```{r nasc-sog-gam-plot}
+plot(gam1)
+```
+
+\newpage
+
+# Compare $s_A$ PDFs by depth
+## Across all regions
+**Depth for _Lasker_ is adjusted -5 m (i.e., NASC.5 is at 10 m depth) to compensate for differences in transducer depth.**
+
+**NASC.5 for Saildrone is not included in the PDF.**
+
+```{r}
+# Compute Saildrone NASC pdf by depths between 5 and 50 m
+nasc.cols <- c("NASC.5","NASC.10","NASC.15","NASC.20","NASC.25","NASC.30","NASC.35",
+               "NASC.40","NASC.45","NASC.50")
+
+nasc.cols.pdf <- c("n.5","n.10","n.15","n.20","n.25","n.30","n.35",
+                   "n.40","n.45","n.50")
+
+nasc.sd.pdf <- nasc.sd %>% 
+  select(nasc.cols) %>% 
+  mutate(n.5  = NASC.5,
+         n.10 = NASC.10 - NASC.5,
+         n.15 = NASC.15 - NASC.10,
+         n.20 = NASC.20 - NASC.15,
+         n.25 = NASC.25 - NASC.20,
+         n.30 = NASC.30 - NASC.25,
+         n.35 = NASC.35 - NASC.30,
+         n.40 = NASC.40 - NASC.35,
+         n.45 = NASC.45 - NASC.40,
+         n.50 = NASC.50 - NASC.45) %>% 
+  select(nasc.cols.pdf) %>% 
+  as_tibble() %>% 
+  gather() %>% 
+  mutate(depth = -as.numeric(str_replace(key,"n.",""))) %>% 
+  filter(depth != -5) %>% 
+  group_by(key,depth) %>% 
+  summarise(nasc.sum = sum(value)) %>% 
+  mutate(nasc.sum.pdf = nasc.sum/sum(.$nasc.sum),
+         vessel = "Saildrone") %>% 
+  arrange(desc(depth))
+
+nasc.pdf <- nasc %>% 
+  select(nasc.cols) %>% 
+  mutate(n.5  = NASC.5,
+         n.10 = NASC.10 - NASC.5,
+         n.15 = NASC.15 - NASC.10,
+         n.20 = NASC.20 - NASC.15,
+         n.25 = NASC.25 - NASC.20,
+         n.30 = NASC.30 - NASC.25,
+         n.35 = NASC.35 - NASC.30,
+         n.40 = NASC.40 - NASC.35,
+         n.45 = NASC.45 - NASC.40,
+         n.50 = NASC.50 - NASC.45) %>% 
+  select(nasc.cols.pdf) %>% 
+  as_tibble() %>% 
+  gather() %>% 
+  mutate(depth = -as.numeric(str_replace(key,"n.",""))) %>% 
+  group_by(key,depth) %>% 
+  summarise(nasc.sum = sum(value)) %>% 
+  mutate(nasc.sum.pdf = nasc.sum/sum(.$nasc.sum),
+         vessel = "Lasker") %>% 
+  arrange(desc(depth)) %>% 
+  bind_rows(nasc.sd.pdf) %>% 
+  mutate(depth.adj = case_when(
+           vessel == "Lasker" ~ depth - 5,
+           TRUE ~ depth))
+
+nasc.pdf.plot <- ggplot(nasc.pdf, aes(depth.adj, nasc.sum.pdf, colour = vessel)) + 
+  geom_line(size = 1) +   geom_point() + 
+  xlab("Depth (m)") + ylab("Probability density") + 
+  labs(color = "Vessel") +
+  coord_flip()
+
+ggsave(nasc.pdf.plot, filename = here("Figs/fig_nasc_depth_pdf.png"))
+
+include_graphics(here("Figs/fig_nasc_depth_pdf.png"))
+
+write_csv(nasc.pdf, here("Output/nasc_depth_pdf.csv"))
+```
+
+\newpage
+
+## By region
+**Depth for _Lasker_ is adjusted -5 m (i.e., NASC.5 is at 10 m depth) to compensate for differences in transducer depth.**
+
+**NASC.5 for Saildrone is not included in the PDF.**
+
+
+```{r}
+nasc.sd.pdf.reg <- nasc.sd %>% 
+  select(nasc.cols, lat) %>% 
+  mutate(n.5  = NASC.5,
+         n.10 = NASC.10 - NASC.5,
+         n.15 = NASC.15 - NASC.10,
+         n.20 = NASC.20 - NASC.15,
+         n.25 = NASC.25 - NASC.20,
+         n.30 = NASC.30 - NASC.25,
+         n.35 = NASC.35 - NASC.30,
+         n.40 = NASC.40 - NASC.35,
+         n.45 = NASC.45 - NASC.40,
+         n.50 = NASC.50 - NASC.45,
+         loc = cut(lat, c(0,34.7,40.430520,48.490, 55), labels = FALSE),
+         region = as.factor(case_when(
+           loc == 1 ~ "SCB",
+           loc == 2 ~ "CenCoast",
+           loc == 3 ~ "WaOr",
+           loc == 4 ~ "Van",
+           TRUE ~ "Other")),
+         region = fct_reorder(region, loc)) %>% 
+  select(nasc.cols.pdf, region) %>% 
+  as_tibble() %>% 
+  gather("key","value",-region) %>% 
+  mutate(depth = -as.numeric(str_replace(key,"n.",""))) %>% 
+  filter(depth != -5) %>% 
+  group_by(region, key, depth) %>% 
+  summarise(nasc.sum = sum(value)) 
+
+nasc.sd.pdf.reg.summ <- data.frame()
+
+for (i in unique(nasc.sd.pdf.reg$region)) {
+  tmp <- filter(nasc.sd.pdf.reg, region == i) %>% 
+    mutate(nasc.sum.pdf = nasc.sum/sum(.$nasc.sum),
+           vessel = "Saildrone") %>% 
+    arrange(region, desc(depth)) 
+  
+  nasc.sd.pdf.reg.summ <- bind_rows(nasc.sd.pdf.reg.summ, tmp)
+}
+
+nasc.pdf.reg <- nasc %>% 
+  select(nasc.cols, lat) %>% 
+  mutate(n.5  = NASC.5,
+         n.10 = NASC.10 - NASC.5,
+         n.15 = NASC.15 - NASC.10,
+         n.20 = NASC.20 - NASC.15,
+         n.25 = NASC.25 - NASC.20,
+         n.30 = NASC.30 - NASC.25,
+         n.35 = NASC.35 - NASC.30,
+         n.40 = NASC.40 - NASC.35,
+         n.45 = NASC.45 - NASC.40,
+         n.50 = NASC.50 - NASC.45,
+         loc = cut(lat, c(0,34.7,40.430520,48.490, 55), labels = FALSE),
+         region = as.factor(case_when(
+           loc == 1 ~ "SCB",
+           loc == 2 ~ "CenCoast",
+           loc == 3 ~ "WaOr",
+           loc == 4 ~ "Van",
+           TRUE ~ "Other")),
+         region = fct_reorder(region, loc)) %>% 
+  select(nasc.cols.pdf, region) %>% 
+  as_tibble() %>% 
+  gather("key","value",-region) %>% 
+  mutate(depth = -as.numeric(str_replace(key,"n.",""))) %>% 
+  group_by(region, key, depth) %>% 
+  summarise(nasc.sum = sum(value)) 
+
+nasc.pdf.reg.summ <- data.frame()
+
+for (i in unique(nasc.pdf.reg$region)) {
+  tmp <- filter(nasc.pdf.reg, region == i) %>% 
+    mutate(nasc.sum.pdf = nasc.sum/sum(.$nasc.sum),
+           vessel = "Lasker") %>% 
+    arrange(region, desc(depth)) 
+  
+  nasc.pdf.reg.summ <- bind_rows(nasc.pdf.reg.summ, tmp)
+}
+
+nasc.pdf.reg.final <- nasc.pdf.reg.summ %>% 
+  bind_rows(nasc.sd.pdf.reg.summ) %>% 
+  mutate(depth.adj = case_when(
+           vessel == "Lasker" ~ depth - 5,
+           TRUE ~ depth)) %>% 
+  arrange(region, vessel, desc(depth))
+
+nasc.pdf.region.plot <- ggplot(nasc.pdf.reg.final, aes(depth.adj, nasc.sum.pdf, colour = vessel)) + 
+  geom_line(size = 1) +   geom_point() + 
+  facet_wrap(~region, nrow = 1) +
+  scale_y_continuous(limits = c(0, signif(max(max(nasc.pdf.reg.final$nasc.sum.pdf)),1))) +
+  xlab("Depth (m)") + ylab("Probability density") + 
+  labs(color = "Vessel") +
+  coord_flip() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold"))
+
+ggsave(nasc.pdf.region.plot, filename = here("Figs/fig_nasc_depth_pdf_region.png"),
+       height = 7, width = 9)
+
+include_graphics(here("Figs/fig_nasc_depth_pdf_region.png"))
+
+write_csv(nasc.pdf.reg.final, here("Output/nasc_depth_pdf_region.csv"))
+
+```
+
