@@ -470,7 +470,7 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 # # Calibration information ------------------------------------------------
 cal.vessels        <- "RL"
 cal.dir            <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
-cal.datetime       <- "30 April and 4 May 2019" # Date/time of calibration
+cal.datetime       <- "30 April and 4 May" # Date/time of calibration
 cal.plot.date      <- "2019-05-01" # Date of the calibration, used to plot cal time series
 cal.window         <- 50            # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
