@@ -157,20 +157,23 @@ nasc.super.clusters.ns <- nasc.nearshore %>%
 if (save.figs) {
   nasc.cluster.plot.ns <- base.map +
     # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y, colour = factor(cluster)),
-               size = 0.5, show.legend = FALSE) +
+    geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
     # Plot convex hull around NASC clusters
-    geom_sf(data = nasc.super.clusters.ns, aes(fill = factor(cluster)),
-            colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    geom_sf(data = nasc.super.clusters.ns, colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    # geom_point(data = nasc.nearshore, aes(X, Y, colour = factor(cluster)),
+    #            size = 0.5, show.legend = FALSE) +
+    # # Plot convex hull around NASC clusters
+    # geom_sf(data = nasc.super.clusters.ns, aes(fill = factor(cluster)),
+    #         colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
     # Plot cluster midpoints
-    geom_text(data = cluster.mid, aes(X, Y, label = cluster),
-              colour = 'gray20', size = 2) +
+    geom_shadowtext(data = cluster.mid, aes(X, Y, label = cluster),
+                    colour = 'gray20', bg.colour = "white", size = 2) +
     # Plot positive trawl cluster midpoints
     geom_shadowtext(data = filter(cluster.mid, cluster %in% super.clusters$cluster), 
                     aes(X, Y, label = cluster), 
-                    size = 2, colour = "black", bg.colour = "white") +
+                    size = 2, colour = "blue", bg.colour = "white", fontface = "bold") +
     # Plot panel label
     ggtitle("Integrated NASC Clusters-Nearshore") +
     coord_sf(crs = crs.proj, 
@@ -1165,21 +1168,41 @@ strata.summ.ns <- strata.final.ns %>%
   arrange(scientificName, stock, vessel.name, stratum) %>% 
   ungroup()
 
+# Remove overlapping intervals --------------------------------------------
 # Create a mask for LBC data, used to punch holes in Lasker's super polygons
-# Used to remover overlap with Lasker samples
 island.polygons <- strata.ns %>% 
   filter(str_detect(region, "Island")) %>%
   st_union() 
 
+# Remove primary super polygon intersecting island polygons
 strata.super.polygons.ns <- strata.super.polygons %>% 
-  st_difference(island.polygons)
+  st_difference(island.polygons) %>% 
+  ungroup()
 
+# Remove overlap with 5 m isobath and primary survey strata
+# strata.nearshore <- select(strata.nearshore, -vessel.name.1, -area.1)
 strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
   st_difference(st_union(bathy_5m_poly)) %>% 
-  # st_difference(filter(strata.super.polygons.ns, vessel.name == "RL")) %>% 
+  st_difference(select(strata.super.polygons.ns, geometry)) %>%
   ungroup() %>% 
   mutate(area = st_area(.)) 
+
+# Convert biomass density to sf ------------------------------
+nasc.density.ns.sf <- nasc.density.ns %>% 
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
+  mutate(
+    label = paste0('Species: ', scientificName, "; ", 
+                   'Transect: ', transect, "; ",
+                   'Density: ', signif(density, 2), ' t/sq.nmi'),
+    popup = paste0('<b>Species: </b>', scientificName,  '<br/>',
+                   '<b>Transect: </b>', transect, '<br/>',
+                   '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>')
+  )
+
+# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax")) +
+#   mapview(filter(strata.nearshore2, scientificName == "Engraulis mordax"),zcol = "stock") +
+#   mapview(filter(nasc.density.ns.sf, scientificName == "Engraulis mordax"), cex = "bin.level", zcol = "bin.level")
 
 # mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "vessel.name")
@@ -1260,6 +1283,11 @@ pos.cluster.summ <- pos.clusters %>%
 pos.clusters.ns <- pos.clusters
 
 nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
+
+
+# Remove overlapping intervals --------------------------------------------
+
+# RESUME HERE!!
 
 if (save.figs) {
   # Create a list for saving biomass density plots

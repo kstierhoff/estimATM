@@ -151,20 +151,23 @@ nasc.super.clusters.os <- nasc.offshore %>%
 if (save.figs) {
   nasc.cluster.plot.os <- base.map +
     # Plot nasc data
-    geom_point(data = nasc.offshore, aes(X, Y, colour = factor(cluster)),
-               show.legend = FALSE) +
+    geom_point(data = nasc.offshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
     # Plot convex hull around NASC clusters
-    geom_sf(data = nasc.super.clusters.os, aes(fill = factor(cluster)),
-            colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    geom_sf(data = nasc.super.clusters.os, colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    # geom_point(data = nasc.offshore, aes(X, Y, colour = factor(cluster)),
+    #            show.legend = FALSE) +
+    # # Plot convex hull around NASC clusters
+    # geom_sf(data = nasc.super.clusters.os, aes(fill = factor(cluster)),
+    #         colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
     # Plot cluster midpoints
-    geom_text(data = cluster.mid, aes(X, Y, label = cluster),
-              colour = 'gray20', size = 2) +
+    geom_shadowtext(data = cluster.mid, aes(X, Y, label = cluster),
+                    colour = 'gray20', bg.colour = "white", size = 2) +
     # Plot positive trawl cluster midpoints
     geom_shadowtext(data = filter(cluster.mid, cluster %in% super.clusters$cluster), 
                     aes(X, Y, label = cluster), 
-                    size = 2, colour = "black", bg.colour = "white") +
+                    size = 2, colour = "blue", bg.colour = "white", fontface = "bold") +
     # Plot panel label
     ggtitle("Integrated NASC Clusters-Offshore") +
     coord_sf(crs = crs.proj, 

@@ -107,9 +107,9 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+save.figs         <- T # Draw new figures and maps
 save.imap         <- F # Save Leaflet maps
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 
 # Sometimes F
@@ -117,8 +117,8 @@ overwrite.files   <- F # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- F # Overwrite CSV files (TRUE if files have changed)
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
-estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.offshore  <- F # Process offshore backscatter data
@@ -1950,20 +1950,23 @@ if (save.figs) {
   # Map trawl clusters -------------------------------------------------------
   nasc.cluster.plot <- base.map +
     # Plot nasc data
-    geom_point(data = nasc, aes(X, Y, colour = factor(cluster)),
-               show.legend = FALSE) +
+    geom_point(data = nasc, aes(X, Y), size = 0.5, show.legend = FALSE) +
     # Plot convex hull around NASC clusters
-    geom_sf(data = nasc.super.clusters, aes(fill = factor(cluster)),
-                 colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    geom_sf(data = nasc.super.clusters, colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    # geom_point(data = nasc, aes(X, Y, colour = factor(cluster)),
+    #            show.legend = FALSE) +
+    # # Plot convex hull around NASC clusters
+    # geom_sf(data = nasc.super.clusters, aes(fill = factor(cluster)),
+    #         colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
     # Plot cluster midpoints
-    geom_text(data = cluster.mid, aes(X, Y, label = cluster),
-              colour = 'gray20', size = 2) +
+    geom_shadowtext(data = cluster.mid, aes(X, Y, label = cluster),
+                    colour = 'gray20', bg.colour = "white", size = 2) +
     # Plot positive trawl cluster midpoints
     geom_shadowtext(data = filter(cluster.mid, cluster %in% super.clusters$cluster), 
                                   aes(X, Y, label = cluster), 
-                    size = 2, colour = "black", bg.colour = "white") +
+                    size = 2, colour = "blue", bg.colour = "white", fontface = "bold") +
     # Plot panel label
     ggtitle("Integrated NASC Clusters") +
     coord_sf(crs = crs.proj, 
