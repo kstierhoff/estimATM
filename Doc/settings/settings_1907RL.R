@@ -172,10 +172,16 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
-# Survey vesslels that collected acoustic data (a character vector of vessel abbreviations)
+# Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM", "SD", "LBC") 
 nasc.vessels.offshore  <- c("RL","SD")
 nasc.vessels.nearshore <- c("LBC","LM","SD")
+
+# Purse seine data info
+# Survey vessels that collected purse seine data
+seine.vessels          <- c("LM")
+# Use seine data to apportion backscatter
+use.seine.data         <- TRUE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
@@ -334,12 +340,12 @@ tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculatin
 scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
-# CUFES database
+# CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
 cufes.db.sqlite        <- "cufes201907RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
-# Trawl database
+# Trawl data
 trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")

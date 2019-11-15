@@ -18,7 +18,7 @@
 # prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
 # source(here("Doc/settings", prj.settings))
 
-# Source following the section entivted estimateNearshore in estimateBiomass.
+# Source following the section entitled estimateNearshore in estimateBiomass.
 
 # Import set data ----------------------------------------------------
 lm.sets <- read_csv("Data/Seine/lm_sets.csv") %>% 

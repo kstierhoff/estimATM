@@ -62,6 +62,21 @@ if (process.nearshore) {
       mutate(cps.nasc = NASC.50)
   }
   
+  # Process purse seine data
+  if (process.seine) {
+    source(here("Code", paste0("processSeine_", survey.name, ".R")))  
+    
+    if (use.seine.data) {
+      # Combine clf and clf.seine
+      clf <- bind_rows(clf, clf.seine)
+      # Combine super.clusters and super.clusters.ns
+      super.clusters <- bind_rows(super.clusters, super.clusters.ns)
+      
+      # Add seine clusters to cluster.mid and cluster.pos OR
+      # Map set.clusters and set.pos with COLORs
+    }
+  }
+  
   # Assign backscatter to trawl clusters ------------------------------------
   # Create varialble for nearest cluster and minumum distance
   cluster.distance.ns <- data.frame(cluster = rep(NA, nrow(nasc.nearshore)),
@@ -1284,16 +1299,33 @@ pos.clusters.ns <- pos.clusters
 
 nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
 
-
 # Remove overlapping intervals --------------------------------------------
+# Subset nearshore backscatter and remove overlap with Lasker
+nasc.ns.sub <- nasc.nearshore %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  st_difference(strata.super.polygons.ns)
 
-# RESUME HERE!!
+# Filter nearshore backscatter using nasc.ns.sub
+nasc.nearshore <- nasc.nearshore %>% 
+  filter(id %in% nasc.ns.sub$id)
 
+# Subset nearshore biomass density and remove overlap with Lasker
+nasc.density.ns.sub <- nasc.density.ns %>% 
+  mutate(id = seq_along(transect)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  st_difference(strata.super.polygons.ns)
+
+# Filter nearshore biomass density using nasc.density.ns.sub
+nasc.density.ns <- nasc.density.ns %>% 
+  mutate(id = seq_along(transect)) %>% 
+  filter(id %in% nasc.density.ns.sub$id)
+
+# Plot biomass density for each species and stock -------------------------
 if (save.figs) {
   # Create a list for saving biomass density plots
   biomass.dens.figs.ns <- list()
   
-  # Plot anchovy biomass density
+  # Plot biomass density
   for (i in unique(strata.nearshore$scientificName)) {
     for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
       # Filter biomass density
