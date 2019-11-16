@@ -33,9 +33,6 @@ if (process.offshore) {
       mutate(vessel.orig = vessel.name)
   }
   
-  # Export data for processing using the CTD app
-  write_csv(nasc.offshore, here("Output/CTDapp/CTDapp_All_Offshore.csv"))
-  
   # Format data for processing
   nasc.offshore <- nasc.offshore %>%
     mutate(
@@ -46,6 +43,10 @@ if (process.offshore) {
       int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
                               nasc.summ.interval),
                 labels = F, include.lowest = TRUE))
+  
+  # Export data for processing using the CTD app
+  write_csv(nasc.offshore, here("Output/CTDapp/CTDapp_All_Offshore.csv"))
+  save(nasc.offshore, file = here("Output/CTDapp/CTDapp_All_Offshore.Rdata"))
   
   # Apply cps.nasc, or use a fixed integration depth
   if (source.cps.nasc["OS"]) {

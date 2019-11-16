@@ -275,7 +275,7 @@ tx.char.pattern        <- c(RL  = "[^0-9]",
                             LBC = "[^0-9]") 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
-                            LM  = FALSE,
+                            LM  = TRUE,
                             SD  = FALSE,
                             LBC = FALSE) 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)

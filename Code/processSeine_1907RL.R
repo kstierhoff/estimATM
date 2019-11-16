@@ -179,11 +179,11 @@ super.clusters.ns <- filter(set.clusters, cluster %in% unique(set.pos$cluster)) 
 
 # Subset data from all platforms
 lm.lengths <- lm.specimens %>% 
-  select(key.set, scientificName, totalLength_mm, weightg) %>% 
+  select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>% 
   mutate(vessel.name = "LM")
 
 lbc.lengths <- lbc.specimens %>% 
-  select(key.set, scientificName, totalLength_mm, weightg) %>% 
+  select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>% 
   mutate(vessel.name = "LBC")
 
 # Combine data from all platforms and filter unwanted vessels
@@ -357,7 +357,8 @@ write.csv(ts.proportions.seine, file = here("Output/ts_proportions_raw_seine.csv
 clf.seine <- clf.seine %>% 
   left_join(catch.summ.num.seine,  by = 'cluster') %>% 
   left_join(cluster.summ.wt.seine, by = 'cluster') %>% 
-  left_join(ts.proportions.seine,  by = 'cluster')
+  left_join(ts.proportions.seine,  by = 'cluster') %>% 
+  mutate(sample.type = "Purse seine")
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
 clf.seine$sigmaindiv.anch[clf.seine$prop.anch == 0] <- 1
@@ -375,3 +376,109 @@ clf.seine$sigmawg.sar[clf.seine$prop.sar      == 0] <- 1
 # Save to file
 write.csv(clf.seine, file = here("Output/clf_ts_proportions_seine.csv"),
           row.names = F, quote = F)
+
+# Calculate length frequencies for each species and purse seine cluster --------------------
+# Create a list for storing final species-specific cluster results
+cluster.final.seine <- list()
+lf.final.seine      <- data.frame()
+
+# For each species, calculate length frequencies, combine with clf, and write final file
+for (i in unique(lengths.seine$scientificName)) {
+  # Create a data frame for results
+  lf.df.seine <- data.frame()
+  
+  for (ii in unique(lengths.seine$cluster)) {
+    # Subset specimen data by species and trawl cluster
+    lengths.sub <- droplevels(filter(lengths.seine, scientificName == i & cluster == ii))
+    
+    # Define length bins
+    lf.breaks <- seq(length.min - 0.5, length.max$sl[length.max$species == i] + 0.5, 1)
+    lf.labels <- seq(length.min, length.max$sl[length.max$species == i], 1)
+    
+    # Calculate the proportion (histogram density) of individuals in each size class
+    # Setting right = F includes X.5 in the lower class (e.g., 14.5 = 14, 14.6 = 15)
+    # Length inputs are native lengths (i.e., SL for sardine and anchovy, FL for herring and meckerels)
+    if (i %in% c("Sardinops sagax", "Engraulis mordax")) {
+      f <- hist(lengths.sub$standardLength_mm/10, breaks = lf.breaks, plot = F, right = F)$density      
+    } else if (i %in% c("Scomber japonicus", "Trachurus symmetricus", "Clupea pallasii")) {
+      f <- hist(lengths.sub$forkLength_mm/10, breaks = lf.breaks, plot = F, right = F)$density        
+    }
+    
+    # Create a vector of size class
+    lf.bin <- lf.breaks[1:length(lf.breaks) - 1]
+    
+    # Create a vector of cluster number
+    # haul <- rep(ii, length(f))
+    # Add results to data frame
+    lf.df.seine <- rbind(lf.df.seine, data.frame(cluster = ii, lf.bin, lf.labels, f))
+  }
+  
+  # Replace NaN values with zeros
+  lf.df.seine$f[is.nan(lf.df.seine$f)] <- 0
+  
+  # Get estimated numbers of individuals for each haul
+  n.summ.set.sub <- filter(n.summ.set, as.character(scientificName) == i) %>% 
+    select(cluster, num)
+  
+  # Add estimated total number of individuals in each cluster (based on subsample weight) 
+  # to the length frequency data frame
+  lf.df.seine <- left_join(lf.df.seine, n.summ.set.sub) %>% 
+    rename(spp.num = num) %>% 
+    replace_na(list(spp.num = 0)) %>%
+    mutate(counts = f * spp.num) 
+  
+  # Summarise lengths by cluster, to filter subsequent data frames
+  lf.df.seine.summ <- lf.df.seine %>% 
+    group_by(cluster) %>% 
+    summarise(nIndiv = sum(counts)) %>% 
+    filter(nIndiv > 0)
+  
+  # Calculate the estimated number of individuals in each size class
+  lf.df.seine <- lf.df.seine %>% 
+    mutate(counts = f * spp.num) %>% 
+    filter(is.na(cluster) == FALSE)
+  
+  # Combine length frequency data for plotting later
+  lf.final.seine <- bind_rows(lf.final.seine, lf.df.seine)
+  
+  # Reshape data frame by cluster for adding to clf
+  lf.table.seine <- reshape2::dcast(lf.df.seine, cluster ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
+  
+  # Convert counts to relative frequencies
+  lf.table.seine[ , 2:ncol(lf.table.seine)] <- lf.table.seine[ , 2:ncol(lf.table.seine)]/lf.table.seine$`(all)`
+  
+  # Rename columns
+  names(lf.table.seine)[2:ncol(lf.table.seine)] <- paste("L", names(lf.table.seine)[2:ncol(lf.table.seine)], sep = "")
+  lf.table.seine <- left_join(select(set.clusters, cluster), lf.table.seine)
+  
+  # Replace NA values with zeros
+  lf.table.seine[is.na(lf.table.seine)] <- 0
+  
+  # Add length frequencies for each species to clf for final analysis
+  clf.final.ns <- left_join(clf.seine, lf.table.seine, by = 'cluster') %>% 
+    mutate(species = i)
+  
+  # Write final data frame to .csv for each species
+  write.csv(clf.final.ns,
+            file = paste(here("Output/cluster_length_frequency_seine_"), 
+                         i, "_", survey.name, ".csv", sep = ""),
+            row.names = F)
+  
+  # Add species-specific results to list of results
+  cluster.final.seine[[i]] <- clf.final.ns
+  
+  # Plot length frequencies by species and cluster
+  lf.plot.seine <- ggplot(lf.df.seine, aes(lf.labels, counts)) + geom_bar(stat = 'identity') + 
+    facet_wrap(~cluster, scales = 'free_y') + theme_bw() + 
+    xlab("Standard length (cm)") + ylab("Counts") + ggtitle(i)
+  
+  # Save plot
+  ggsave(lf.plot.seine, 
+         filename = paste(here("Figs/fig_cluster_length_frequency_seine_"), 
+                          i, ".png", sep = ""),
+         height = 7, width = 10) 
+}
+
+# Save results
+save(cluster.final.seine, file = here("Output/cluster_length_frequency_all_seine.Rdata"))
+save(lf.final.seine,      file = here("Output/cluster_length_frequency_tables_seine.Rdata"))

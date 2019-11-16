@@ -42,6 +42,7 @@ if (process.nearshore) {
   
   # Export data for processing using the CTD app
   write_csv(nasc.nearshore, here("Output/CTDapp/CTDapp_All_Nearshore.csv"))
+  save(nasc.nearshore, file = here("Output/CTDapp/CTDapp_All_Nearshore.Rdata"))
   
   # Apply cps.nasc, or use a fixed integration depth
   if (source.cps.nasc["NS"]) {
@@ -68,14 +69,21 @@ if (process.nearshore) {
     
     if (use.seine.data) {
       # Combine clf and clf.seine
-      clf <- bind_rows(clf, clf.seine)
+      clf <- clf %>%
+        mutate(sample.type = "Trawl") %>% 
+        bind_rows(clf.seine)
+      
+      lf.final <- lf.final %>% 
+        bind_rows(lf.final.seine)
+
       # Combine super.clusters and super.clusters.ns
       super.clusters <- bind_rows(super.clusters, super.clusters.ns)
-      
-      # Add seine clusters to cluster.mid and cluster.pos OR
-      # Map set.clusters and set.pos with COLORs
+
     }
   }
+  
+  # Save after processing nearshore
+  save(clf, super.clusters, lf.final, file = here("Output/clf_nearshore.Rdata"))
   
   # Assign backscatter to trawl clusters ------------------------------------
   # Create varialble for nearest cluster and minumum distance
@@ -117,6 +125,7 @@ if (process.nearshore) {
 } else {
   # Load processed data
   load(here("Data/Backscatter/nasc_nearshore.Rdata"))
+  load(here("Output/clf_nearshore.Rdata"))
 }
 
 # Filter unwanted transects
@@ -181,14 +190,18 @@ if (save.figs) {
     # geom_sf(data = nasc.super.clusters.ns, aes(fill = factor(cluster)),
     #         colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
-    scale_colour_discrete(name = "Cluster") +
+    scale_colour_manual(name = "Cluster", values = c("Trawl" = "blue", "Purse seine" = "red")) +
     # Plot cluster midpoints
-    geom_shadowtext(data = cluster.mid, aes(X, Y, label = cluster),
+    geom_shadowtext(data = filter(clf, CPS.num == 0), 
+                    aes(X, Y, label = cluster),
                     colour = 'gray20', bg.colour = "white", size = 2) +
     # Plot positive trawl cluster midpoints
-    geom_shadowtext(data = filter(cluster.mid, cluster %in% super.clusters$cluster), 
-                    aes(X, Y, label = cluster), 
-                    size = 2, colour = "blue", bg.colour = "white", fontface = "bold") +
+    geom_text_repel(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster),
+                    aes(X, Y, label = cluster, colour = sample.type),
+                    size = 2, fontface = 'bold') +
+    # geom_shadowtext(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster), 
+    #                 aes(X, Y, label = cluster, colour = sample.type), 
+    #                 size = 2, bg.colour = "white", fontface = "bold") +
     # Plot panel label
     ggtitle("Integrated NASC Clusters-Nearshore") +
     coord_sf(crs = crs.proj, 
@@ -205,6 +218,10 @@ if (save.figs) {
 
 # Map trawl species proportions -------------------------------------------------------
 # Select and rename trawl data for pie charts
+if (use.seine.data) {
+  cluster.pie <- bind_rows(cluster.pie, set.pie)
+}
+
 cluster.pie.ns <- cluster.pie %>% 
   filter(cluster %in% unique(nasc.nearshore.summ$cluster)) 
 
@@ -242,7 +259,7 @@ if (save.figs) {
     geom_point(data = cluster.zero.ns, aes(X, Y), 
                size = 2, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawls") +
+    ggtitle("CPS Species Proportions in Net Samples") +
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -338,7 +355,7 @@ nasc.nearshore <- nasc.nearshore %>%
 nasc.density.ns <- nasc.nearshore %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
          sar.dens, transect, transect.name, int, cluster) %>% 
-  group_by(transect, transect.name, int) %>% 
+  group_by(transect, transect.name, int, cluster) %>% 
   summarise(
     lat = lat[1],
     long = long[1],
@@ -347,7 +364,7 @@ nasc.density.ns <- nasc.nearshore %>%
     `Trachurus symmetricus` = mean(jack.dens),
     `Scomber japonicus`     = mean(mack.dens),
     `Sardinops sagax`       = mean(sar.dens)) %>% 
-  gather(scientificName, density, -transect, -transect.name, -int, -lat, -long) %>% 
+  gather(scientificName, density, -transect, -transect.name, -int, -lat, -long, -cluster) %>% 
   mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   ungroup()
@@ -1300,20 +1317,27 @@ pos.clusters.ns <- pos.clusters
 nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
 
 # Remove overlapping intervals --------------------------------------------
-# Subset nearshore backscatter and remove overlap with Lasker
-nasc.ns.sub <- nasc.nearshore %>%
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  st_difference(strata.super.polygons.ns)
+if (process.nearshore) {
+  # Subset nearshore backscatter and remove overlap with Lasker
+  nasc.ns.sub <- nasc.nearshore %>%
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    st_difference(strata.super.polygons.ns)
+  
+  # Subset nearshore biomass density and remove overlap with Lasker
+  nasc.density.ns.sub <- nasc.density.ns %>% 
+    mutate(id = seq_along(transect)) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    st_difference(strata.super.polygons.ns)  
+  
+  save(nasc.ns.sub, nasc.density.ns.sub,
+       file = here("Output/nasc_nearshore_unique.Rdata"))
+} else {
+  load(here("Output/nasc_nearshore_unique.Rdata"))
+}
 
 # Filter nearshore backscatter using nasc.ns.sub
 nasc.nearshore <- nasc.nearshore %>% 
   filter(id %in% nasc.ns.sub$id)
-
-# Subset nearshore biomass density and remove overlap with Lasker
-nasc.density.ns.sub <- nasc.density.ns %>% 
-  mutate(id = seq_along(transect)) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  st_difference(strata.super.polygons.ns)
 
 # Filter nearshore biomass density using nasc.density.ns.sub
 nasc.density.ns <- nasc.density.ns %>% 
@@ -1335,11 +1359,14 @@ if (save.figs) {
                stock == j, transect %in% strata.final.ns$transect[strata.final.ns$scientificName == i])
       
       # Filter positive clusters
-      pos.cluster.txt <- pos.clusters.ns %>% 
-        filter(scientificName == i, stock == j,
-               cluster %in% nasc.ns.clusters) %>% 
-        ungroup() %>% 
-        project_df(to = crs.proj)
+      pos.cluster.txt <- filter(clf, cluster %in% nasc.density.plot.ns$cluster) 
+      
+      # pos.cluster.txt <- pos.clusters.ns %>% 
+      #   filter(scientificName == i, stock == j,
+      #          cluster %in% nasc.ns.clusters) %>% 
+      #   ungroup() %>% 
+      #   project_df(to = crs.proj)
+      
       
       # Select biomass density legend objects 
       dens.levels.all.ns <- sort(unique(nasc.density.plot.ns$bin.level))
@@ -1492,6 +1519,10 @@ pe.ns <- point.estimates.ns %>%
 save(pe.ns, file = here("Output/biomass_point_estimates_ns_final.Rdata"))
 write_csv(pe.ns, here("Output/biomass_point_estimates_ns_final.csv"))
 
+
+## Resume here
+## Sort out combination of lf.df for species that don't occur in seine catch.
+
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
@@ -1513,9 +1544,18 @@ if (do.bootstrap) {
   
   for (i in unique(strata.nearshore$scientificName)) {
     
+    if (use.seine.data) {
+      cluster.final.ns <- cluster.final[[i]] %>% 
+        mutate(sample.type = "Trawl") %>% 
+        bind_rows(cluster.final.seine[[i]])
+    } else {
+      cluster.final.ns <- cluster.final[[i]] %>% 
+        mutate(sample.type = "Trawl")
+    }
+    
     # Get vector of lengths from clf.df column names
-    L.cols  <- grep("L\\d", names(cluster.final[[i]]))
-    L.vec   <- sort(as.numeric(str_extract(names(cluster.final[[i]][L.cols]),"\\d{1,2}")))
+    L.cols  <- grep("L\\d", names(cluster.final.ns))
+    L.vec   <- sort(as.numeric(str_extract(names(cluster.final.ns[L.cols]),"\\d{1,2}")))
     
     # Configure progress bar
     pb3 <- tkProgressBar("Bootstrap - Vessel", 
@@ -1563,7 +1603,8 @@ if (do.bootstrap) {
         group_by(cluster, stratum) %>% 
         summarise(nIntervals = n()) %>% 
         left_join(lf.summ.cluster) %>% 
-        ungroup()
+        ungroup() %>% 
+        replace(is.na(.), 0)
       
       # Summarize positive clusters per species
       pos.cluster.spp <- pos.clusters %>%
@@ -1615,7 +1656,7 @@ if (do.bootstrap) {
         
         # Calculate biomass using bootstrap function ----
         set.seed(1) # Set seed for repeatable results
-        boot.df <- estimate_bootstrap(nasc.temp, cluster.final[[i]], k, 
+        boot.df <- estimate_bootstrap(nasc.temp, cluster.final.ns, k, 
                                       stratum.area = stratum.area, 
                                       species = i, do.lf = do.lf, 
                                       boot.number = boot.num)$data.frame
@@ -1628,7 +1669,7 @@ if (do.bootstrap) {
         bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
         
         # Calculate abundance by length class using bootstrap function ----
-        abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final[[i]], k, 
+        abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final.ns, k, 
                                         stratum.area = stratum.area, 
                                         species = i, do.lf = do.lf, 
                                         boot.number = 0)$abundance.vector
