@@ -435,7 +435,8 @@ for (i in unique(lengths.seine$scientificName)) {
   
   # Calculate the estimated number of individuals in each size class
   lf.df.seine <- lf.df.seine %>% 
-    mutate(counts = f * spp.num) %>% 
+    mutate(counts = f * spp.num,
+           scientificName = i) %>% 
     filter(is.na(cluster) == FALSE)
   
   # Combine length frequency data for plotting later

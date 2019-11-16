@@ -1523,6 +1523,22 @@ write_csv(pe.ns, here("Output/biomass_point_estimates_ns_final.csv"))
 ## Resume here
 ## Sort out combination of lf.df for species that don't occur in seine catch.
 
+# Summarize positive clusters per species
+if (use.seine.data) {
+  pos.clusters.ns <- n.summ.haul %>% 
+    bind_rows(n.summ.set) %>% 
+    left_join(select(clf, cluster, lat, long, X, Y)) %>% 
+    ungroup() %>% 
+    mutate(stock = case_when(
+      scientificName == "Engraulis mordax" & lat >= stock.break.anch ~ "Northern",
+      scientificName == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
+      scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
+      scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
+      scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))  
+} else {
+  pos.clusters.ns <- pos.clusters
+}
+
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
@@ -1606,8 +1622,7 @@ if (do.bootstrap) {
         ungroup() %>% 
         replace(is.na(.), 0)
       
-      # Summarize positive clusters per species
-      pos.cluster.spp <- pos.clusters %>%
+      pos.cluster.spp <- pos.clusters.ns %>%
         filter(cluster %in% nasc.temp$cluster, scientificName == i) %>% 
         inner_join(select(nasc.temp.summ, -n)) %>% 
         as.data.frame()
@@ -1656,6 +1671,7 @@ if (do.bootstrap) {
         
         # Calculate biomass using bootstrap function ----
         set.seed(1) # Set seed for repeatable results
+        
         boot.df <- estimate_bootstrap(nasc.temp, cluster.final.ns, k, 
                                       stratum.area = stratum.area, 
                                       species = i, do.lf = do.lf, 
@@ -1669,7 +1685,7 @@ if (do.bootstrap) {
         bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
         
         # Calculate abundance by length class using bootstrap function ----
-        abund.vec <- estimate_bootstrap(nasc.nearshore, cluster.final.ns, k, 
+        abund.vec <- estimate_bootstrap(nasc.temp, cluster.final.ns, k, 
                                         stratum.area = stratum.area, 
                                         species = i, do.lf = do.lf, 
                                         boot.number = 0)$abundance.vector
