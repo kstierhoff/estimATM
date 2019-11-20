@@ -102,6 +102,8 @@ be.all.nse <- filter(be.nse, Stratum == "All")
 load(here("Output/length_summary_all.Rdata"))
 load(here("Output/length_frequency_summary.Rdata"))
 load(here("Output/abundance_table_all.Rdata"))
+# load(here("Output/abundance_table_all_os.Rdata"))
+# load(here("Output/abundance_table_all_ns.Rdata"))
 
 # Summarise length-disaggregated abundances to describe length ranges
 length.summ <- abund.summ %>% 
@@ -886,24 +888,21 @@ The estimated biomass of the northern stock of Northern Anchovy was `r prettyNum
 (ref:biomass-anch-n) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Northern Anchovy (_Engraulis mordax_). Stratum areas are nmi^2^.
 
 ```{r biomass-anch-n}
-be.table.sub <- be.table %>% 
-  filter(Name == "Engraulis mordax", Stock == "Northern") 
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
+  mutate(Region = "Nearshore")
 
+be.table.sub <- be.table %>% 
+  filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
+  
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
       italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
@@ -915,7 +914,7 @@ if (nrow(be.table.sub) != 0) {
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-anch-n)') %>% 
@@ -923,9 +922,9 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = c(1:3)) %>%
       # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
   print("No results for this species/stock.")
@@ -952,24 +951,21 @@ The estimated biomass of the central stock of Northern Anchovy was `r prettyNum(
 (ref:biomass-anch-c) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the central stock of Northern Anchovy (_Engraulis mordax_). Stratum areas are nmi^2^.
 
 ```{r biomass-anch-c}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Engraulis mordax", Stock == "Central") %>% 
+  mutate(Region = "Nearshore")
+
 be.table.sub <- be.table %>% 
-  filter(Name == "Engraulis mordax", Stock == "Central")
+  filter(Name == "Engraulis mordax", Stock == "Central") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
       italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
@@ -981,7 +977,7 @@ if (nrow(be.table.sub) != 0) {
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-anch-c)') %>% 
@@ -989,9 +985,8 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
-      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      collapse_rows(columns = c(1:3)) %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
   print("No results for this species/stock.")
@@ -1125,36 +1120,33 @@ The estimated biomass of the northern stock of Pacific Sardine was `r prettyNum(
 (ref:biomass-sar-n) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the northern stock of Pacific Sardine (_Sardinops sagax_). Stratum areas are nmi^2^.
 
 ```{r biomass-sar-n}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Sardinops sagax", Stock == "Northern") %>% 
+  mutate(Region = "Nearshore")
+
 be.table.sub <- be.table %>% 
-  filter(Name == "Sardinops sagax", Stock == "Northern")
+  filter(Name == "Sardinops sagax", Stock == "Northern") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
       italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
+                 CV = "Biomass") %>% 
       merge_h(part = "header") %>% 
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-sar-n)') %>% 
@@ -1162,10 +1154,11 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
-      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      collapse_rows(columns = c(1:3)) %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ```  
 
@@ -1187,24 +1180,21 @@ The estimated biomass of the southern stock of Pacific Sardine was `r prettyNum(
 (ref:biomass-sar-s) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for the southern stock of Pacific Sardine (_Sardinops sagax_). Stratum areas are nmi^2^.
 
 ```{r biomass-sar-s}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Sardinops sagax", Stock == "Southern") %>% 
+  mutate(Region = "Nearshore")
+
 be.table.sub <- be.table %>% 
-  filter(Name == "Sardinops sagax", Stock == "Southern")
+  filter(Name == "Sardinops sagax", Stock == "Southern") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
       italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
@@ -1216,7 +1206,7 @@ if (nrow(be.table.sub) != 0) {
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-sar-s)') %>% 
@@ -1224,10 +1214,11 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
-      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      collapse_rows(columns = c(1:3)) %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ```  
 
@@ -1359,24 +1350,21 @@ The estimated biomass of Pacific Mackerel was `r prettyNum(be.all$Biomass[be.all
 (ref:biomass-mack) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Mackerel (_Scomber japonicus_). Stratum areas are nmi^2^.
 
 ```{r biomass-mack}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Scomber japonicus") %>% 
+  mutate(Region = "Nearshore")
+
 be.table.sub <- be.table %>% 
-  filter(Name == "Scomber japonicus")
+  filter(Name == "Scomber japonicus") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
-      # italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
+      italic(j = 1) %>%
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
@@ -1388,7 +1376,7 @@ if (nrow(be.table.sub) != 0) {
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-mack)') %>% 
@@ -1396,10 +1384,12 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = c(1:3)) %>%
       # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ```  
 
@@ -1475,36 +1465,33 @@ The estimated biomass of Jack Mackerel was `r prettyNum(be.all$Biomass[be.all$Sp
 (ref:biomass-jack) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Jack Mackerel (_Trachurus symmetricus_). Stratum areas are nmi^2^.
 
 ```{r biomass-jack}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Trachurus symmetricus") %>% 
+  mutate(Region = "Nearshore")
+
 be.table.sub <- be.table %>% 
-  filter(Name == "Trachurus symmetricus")
+  filter(Name == "Trachurus symmetricus") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
       italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  Mean     = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
+                 CV = "Biomass") %>% 
       merge_h(part = "header") %>% 
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-jack)') %>% 
@@ -1512,10 +1499,11 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
-      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      collapse_rows(columns = c(1:3)) %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ```  
 
@@ -1592,24 +1580,21 @@ The estimated biomass of Pacific Herring was `r prettyNum(be.all$Biomass[be.all$
 (ref:biomass-her) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; standard deviation, SD; and coefficient of variation, CV) for Pacific Herring (_Clupea pallasii_). Stratum areas are nmi^2^.
 
 ```{r biomass-her}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Clupea pallasii") %>% 
+  mutate(Region = "Nearshore")
+
 be.table.sub <- be.table %>% 
-  filter(Name == "Clupea pallasii")
+  filter(Name == "Clupea pallasii") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      # theme_vanilla() %>% 
       merge_v(j = c("Name")) %>% 
       italic(j = 1) %>%
-      # set_formatter(Area                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               Individuals          = function(x) sprintf("%.0f", x),
-      #               Mean                 = function(x) sprintf("%.0f", x),
-      #               Distance             = function(x) sprintf("%.0f", x),
-      #               "CI$_{L,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               "CI$_{U,95\\%}$"     = function(x) sprintf("%.0f", x),
-      #               # SD                   = function(x) sprintf("%.0f", x),
-      #               CV                   = function(x) sprintf("%.0f", x)) %>% 
       add_header(Name  = "",
                  Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
@@ -1621,7 +1606,7 @@ if (nrow(be.table.sub) != 0) {
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = F, escape = F,
-          align           = c("l","c",rep("r",ncol(be) - 2)),
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-her)') %>% 
@@ -1629,10 +1614,11 @@ if (nrow(be.table.sub) != 0) {
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
-      # row_spec(be.stratum.all, bold = T, color = "black") %>% 
-      add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
+      collapse_rows(columns = c(1:3)) %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
+} else {
+  print("No results for this species/stock.")
 }
 ``` 
 

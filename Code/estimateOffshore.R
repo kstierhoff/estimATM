@@ -1242,7 +1242,24 @@ abund.summ.os <- abundance.estimates.os %>%
 # MUST UPDATE TO USE ESTIMATED.WG FROM STANDARD LENGTH
 abund.summ.os <- abund.summ.os %>% 
   mutate(estimated.wg = estimate_ts(Species, TL)$estimated.wg,
-         biomass      = abundance * estimated.wg)
+         biomass      = abundance * estimated.wg,
+         Region       = "Offshore")
+
+# Create and format abundance vs. length table for all species
+L.abund.table.os <- abund.summ.os %>%
+  ungroup() %>% 
+  select(Species, Stock, Region, SL, Abundance = abundance) %>% 
+  kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
+        digits = c(0),
+        format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                full_width = F) %>%
+  row_spec(0, align = c("c")) %>% 
+  collapse_rows(columns = c(1)) %>% 
+  scroll_box(height = "500px")
+
+# Save results
+save(L.abund.table.os, abund.summ.os, file = here("Output/abundance_table_all_os.Rdata"))
 
 # Add stock designations to bootstrap estimates
 bootstrap.estimates.os <- bootstrap.estimates.os %>% 

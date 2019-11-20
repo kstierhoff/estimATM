@@ -83,7 +83,8 @@ if (process.nearshore) {
   }
   
   # Save after processing nearshore
-  save(clf, super.clusters, lf.final, file = here("Output/clf_nearshore.Rdata"))
+  save(clf, super.clusters, lf.final, set.pie, 
+       file = here("Output/clf_nearshore.Rdata"))
   
   # Assign backscatter to trawl clusters ------------------------------------
   # Create varialble for nearest cluster and minumum distance
@@ -1770,7 +1771,24 @@ abund.summ.ns <- abundance.estimates.ns %>%
 # MUST UPDATE TO USE ESTIMATED.WG FROM STANDARD LENGTH
 abund.summ.ns <- abund.summ.ns %>% 
   mutate(estimated.wg = estimate_ts(Species, TL)$estimated.wg,
-         biomass      = abundance * estimated.wg)
+         biomass      = abundance * estimated.wg,
+         Region       = "Nearshore")
+
+# Create and format abundance vs. length table for all species
+L.abund.table.ns <- abund.summ.ns %>%
+  ungroup() %>% 
+  select(Species, Stock, Region, SL, Abundance = abundance) %>% 
+  kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
+        digits = c(0),
+        format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                full_width = F) %>%
+  row_spec(0, align = c("c")) %>% 
+  collapse_rows(columns = c(1)) %>% 
+  scroll_box(height = "500px")
+
+# Save results
+save(L.abund.table.ns, abund.summ.ns, file = here("Output/abundance_table_all_ns.Rdata"))
 
 # Add stock designations to bootstrap estimates
 bootstrap.estimates.ns <- bootstrap.estimates.ns %>% 
