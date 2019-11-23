@@ -383,7 +383,8 @@ cluster.final.seine <- list()
 lf.final.seine      <- data.frame()
 
 # For each species, calculate length frequencies, combine with clf, and write final file
-for (i in unique(lengths.seine$scientificName)) {
+for (i in cps.spp) {
+  # for (i in unique(lengths.seine$scientificName)) {
   # Create a data frame for results
   lf.df.seine <- data.frame()
   
@@ -481,5 +482,6 @@ for (i in unique(lengths.seine$scientificName)) {
 }
 
 # Save results
+save(n.summ.set, l.summ.set, file = here("Output/seine_summaries.Rdata"))
 save(cluster.final.seine, file = here("Output/cluster_length_frequency_all_seine.Rdata"))
 save(lf.final.seine,      file = here("Output/cluster_length_frequency_tables_seine.Rdata"))

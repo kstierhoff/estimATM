@@ -127,6 +127,7 @@ if (process.nearshore) {
   # Load processed data
   load(here("Data/Backscatter/nasc_nearshore.Rdata"))
   load(here("Output/clf_nearshore.Rdata"))
+  load(here("Output/seine_summaries.Rdata"))
 }
 
 # Filter unwanted transects
