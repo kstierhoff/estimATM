@@ -107,9 +107,9 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
-save.imap         <- F # Save Leaflet maps
-do.bootstrap      <- F # Generate bootstrap estimates
+save.figs         <- T # Draw new figures and maps
+save.imap         <- T # Save Leaflet maps
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 
 # Sometimes F
@@ -121,9 +121,10 @@ estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore 
 estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.offshore  <- F # Process offshore backscatter data
-process.nearshore <- F # Process near backscatter data
-process.seine     <- F # Process purse seine data
+process.offshore  <- T # Process offshore backscatter data
+process.nearshore <- T # Process near backscatter data
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
+process.seine     <- T # Process purse seine data
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -4561,7 +4562,9 @@ if (save.figs) {
                         aes(X, Y, label = cluster), 
                         colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
         # Configure legend guides
-        guides(fill = guide_legend(order = 1), size = guide_legend(order = 1)) +
+        guides(colour = guide_legend(order = 1),
+               fill   = guide_legend(order = 2), 
+               size   = guide_legend(order = 2)) +
         coord_sf(crs = crs.proj, 
          xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
          ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -6826,6 +6829,19 @@ if (exists("be.ns")) {
 }
 ``` 
 
+## Combine sampling regions  
+
+If combining data from multiple survey regions (e.g., the core and nearshore/offshore sampling regions), biomass density and length-disaggregated abundance data should be combined for presentation in the biomass report.  
+
+```{r combine-regions}
+if (combine.regions) {
+  if (save.figs) {
+    source(here("Code/combineFigures.R"))
+    source(here("Code/combineLengthDisaggAbund.R"))
+  }
+}
+```
+
 ## Estimation QA/QC
 
 Compare biomass estimates from bootstrap function used to calculate length-disaggregated biomass and abundance estimates based on acoustic density by number and weight in the primary survey area. 
@@ -6952,7 +6968,7 @@ for (i in unique(strata.final$scientificName)) {
   }
   
   # % contribution per stratum is the sum(numeric density/interval)/sum(numeric density/stratum)
-  #  numeric density is (nasc * proportion) / (4*pi*sigma.indiv) 
+  #  Numeric density is (nasc * proportion) / (4*pi*sigma.indiv) 
   
   # Summarize numeric abundance by stratum
   num.abund.stratum <- nasc.temp %>% 
@@ -7033,7 +7049,7 @@ for (i in unique(strata.final$scientificName)) {
   ggsave(lf.summ.plot, 
          filename = paste(here("Figs/fig_cluster_relative_length_frequency_"), 
                           i, ".png", sep = ""),
-         height = 10*a.ratio,width = 10) 
+         height = 10*a.ratio, width = 10) 
   # Add new plot to list
   lf.summ.plots[[i]] <- lf.summ.plot
 }

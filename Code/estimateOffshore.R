@@ -945,7 +945,9 @@ if (save.figs) {
                         aes(X, Y, label = cluster), 
                         colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
         # Configure legend guides
-        guides(fill = guide_legend(), size = guide_legend()) +
+        guides(colour = guide_legend(order = 1),
+               fill   = guide_legend(order = 2), 
+               size   = guide_legend(order = 2)) +
         coord_sf(crs = crs.proj, 
                  xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -1391,3 +1393,101 @@ biomass.histogram.survey.os <- ggplot(be.sample.os, aes(biomass*1e3, fill = Stoc
 ggsave(biomass.histogram.survey.os,
        filename = here("Figs/fig_biomass_histogram_survey_os.png"),
        height = 8, width = 14)
+
+# Create plots of length-disaggregated abundance and biomass
+# Create list for storing plots
+L.disagg.plots.os <- list()
+
+# Plot length-disaggrated abundance and biomass by length class for each species
+for (i in unique(abund.summ.os$Species)) {
+  for (j in unique(abund.summ.os$Stock[abund.summ.os$Species == i])) {
+    # Get y-axis limits for abundance and biomass plots
+    y.max.abund   <- max(abund.summ.os$abundance[abund.summ.os$Species == i & abund.summ.os$Stock == j]) * 1.1
+    y.max.biomass <- max(abund.summ.os$biomass[abund.summ.os$Species == i & abund.summ.os$Stock == j]) * 1.1
+    
+    if (!is.nan(y.max.abund)) {
+      # Create x-axis breaks from TL vector
+      max.x         <- max(abund.summ.os$TL[abund.summ.os$Species == i & abund.summ.os$Stock == j])
+      x.breaks      <- seq(0, max.x, max.x/10)
+      
+      # Plot length-disaggregated abundance for each species
+      L.abund.os <- ggplot(filter(abund.summ.os, Species == i, Stock == j), aes(TL,abundance)) + 
+        geom_bar(stat = 'identity',fill = 'gray50',colour = 'gray20') + 
+        scale_x_continuous("Length (cm)", breaks = x.breaks) + 
+        scale_y_continuous('Abundance (n)', limits = c(0, y.max.abund),
+                           expand = c(0,0), labels = fancy_sci) +
+        # facet_wrap(~Stock, nrow = 1) +
+        theme_bw() +
+        theme(strip.background.x = element_blank(),
+              strip.text.x = element_text(face = "bold"))
+      
+      # Plot length-disaggregated biomass for each species
+      L.biomass.os <- ggplot(filter(abund.summ.os, Species == i, Stock == j), aes(TL, biomass)) + 
+        geom_bar(stat = 'identity', fill = 'gray50', colour = 'gray20') + 
+        scale_x_continuous("Length (cm)", breaks = x.breaks) + 
+        scale_y_continuous('Biomass (t)', limits = c(0, y.max.biomass),
+                           expand = c(0,0), labels = fancy_sci) +
+        # facet_wrap(~Stock, nrow = 1) +
+        theme_bw() + 
+        theme(strip.background.x = element_blank(),
+              strip.text.x = element_text(face = "bold"))
+      
+      # Arrange all plots
+      L.disagg.all.os <- plot_grid(L.abund.os, L.biomass.os, ncol = 1, align = 'h')
+      
+      # Save plot
+      ggsave(L.disagg.all.os, 
+             filename = paste0(here("Figs/fig_L_disagg_os_"), i, "-", j, ".png"), 
+             height = 6, width = 6)
+      
+      # Add plot to list
+      L.disagg.plots.os[[i]][[j]] <- L.disagg.all.os 
+    }
+  }
+}
+
+# Create blank plots for missing species
+for (i in cps.spp) {
+  if (is.null(L.disagg.plots.os[[i]])) {
+    df <- data.frame()
+    L.disagg.temp.os <- ggplot(df) + geom_point() + 
+      xlim(0,10) + ylim(0,10) + 
+      annotate('text',5,5,label = 'No Data', size = 6, fontface = 'bold') +
+      theme_bw() + ggtitle(i)  
+    ggsave(L.disagg.temp.os, 
+           filename = paste0(here("Figs/fig_L_disagg_os_"), i, ".png"))
+  }
+}
+
+## Examine backscatter data for outliers --------------------------------------
+# Select top 100 nasc values and look for outliers
+big.nasc.os <- nasc.offshore %>%
+  arrange(desc(cps.nasc)) %>%
+  mutate(cps.nasc = cps.nasc/19,
+         rank = seq(n()),
+         label = paste0('Transect: ', transect.name,
+                        ' - Distance: ', round(dist_m), " m"),
+         popup = paste0('<b>Transect: </b>', transect.name, '<br/>',
+                        '<b>Time: </b>', min(datetime), "-", max(datetime), ' UTC<br/>',
+                        '<b>Distance: </b>', round(dist_m), ' m<br/>',
+                        '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
+  top_n(100, cps.nasc) %>% 
+  select(rank, cps.nasc, label, popup, datetime, dist_m, sounder, 
+         lat, long, transect.name, vessel.name) 
+
+# Create outlier plot
+nasc.outlier.plot.os <- ggplot(big.nasc.os, aes(rank, cps.nasc, ids = label)) +
+  geom_point(aes(colour = vessel.name)) +
+  geom_text_repel(data = top_n(big.nasc.os, 20, cps.nasc), 
+                  aes(rank, cps.nasc, label = label), size = 2) +
+  scale_color_discrete("Vessel") +
+  xlab("\nRank") + ylab(expression(italic(s)[A]/19)) +
+  theme_bw() +
+  theme(legend.position      = c(0.95,0.95),
+        legend.justification = c(1,1))
+
+if (save.figs) {
+  # Save figure
+  ggsave(nasc.outlier.plot.os, filename = here("Figs/fig_nasc_outliers_os.png"), 
+         height = 3, width = 5)
+}

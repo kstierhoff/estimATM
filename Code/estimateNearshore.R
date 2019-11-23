@@ -885,7 +885,7 @@ strata.final.ns <- strata.final.ns %>%
 #   coord_map() +
 #   theme_bw()
 
-# Ungroup tx.ends so it joins properly with strata.points.os  
+# Ungroup tx.ends so it joins properly with strata.points.ns  
 tx.ends.ns <- ungroup(tx.ends.ns)
 
 if (stock.break.source == "primary") {
@@ -1368,7 +1368,6 @@ if (save.figs) {
       #   ungroup() %>% 
       #   project_df(to = crs.proj)
       
-      
       # Select biomass density legend objects 
       dens.levels.all.ns <- sort(unique(nasc.density.plot.ns$bin.level))
       dens.labels.all.ns <- dens.labels[dens.levels.all.ns]
@@ -1398,7 +1397,9 @@ if (save.figs) {
                         aes(X, Y, label = cluster), 
                         colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
         # Configure legend guides
-        guides(fill = guide_legend(), size = guide_legend()) +
+        guides(colour = guide_legend(order = 1),
+               fill   = guide_legend(order = 2), 
+               size   = guide_legend(order = 2)) +
         coord_sf(crs = crs.proj, 
                  xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -1519,10 +1520,6 @@ pe.ns <- point.estimates.ns %>%
 # Save point estimates
 save(pe.ns, file = here("Output/biomass_point_estimates_ns_final.Rdata"))
 write_csv(pe.ns, here("Output/biomass_point_estimates_ns_final.csv"))
-
-
-## Resume here
-## Sort out combination of lf.df for species that don't occur in seine catch.
 
 # Summarize positive clusters per species
 if (use.seine.data) {
@@ -1647,7 +1644,7 @@ if (do.bootstrap) {
         rename(Stratum = stratum)
       
       # Summarize catch statistics by stratum
-      catch.summ.temp <- n.summ.haul %>% 
+      catch.summ.temp <- pos.clusters.ns %>% #n.summ.haul %>% 
         left_join(select(stratum.cluster.cps, cluster, stratum)) %>% 
         filter(scientificName == i, !is.na(stratum)) %>%
         group_by(scientificName, stratum) %>% 
@@ -1760,11 +1757,13 @@ catch.summary.ns <- catch.summary.ns %>%
 
 # Summarise abundance across strata
 abund.summ.ns <- abundance.estimates.ns %>%
+  filter(!is.nan(freq)) %>% # Remove abundance vectors with NaN values
   left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
                                          "Stratum" = "stratum")) %>%
-  group_by(Species, vessel.name, Stock = stock, SL) %>% 
+  group_by(Species, Stock = stock, SL) %>% 
   summarise(abundance = sum(freq)) %>% 
-  mutate(TL = SL)  
+  mutate(TL = SL) %>% 
+  ungroup()
 
 # Calculate estimated biomass from from TL and estimated.wg --------------------
 # CURRENTLY USING ESTIMATED.WG ESTIMATED FROM TOTAL LENGTH
@@ -1776,7 +1775,6 @@ abund.summ.ns <- abund.summ.ns %>%
 
 # Create and format abundance vs. length table for all species
 L.abund.table.ns <- abund.summ.ns %>%
-  ungroup() %>% 
   select(Species, Stock, Region, SL, Abundance = abundance) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
         digits = c(0),
@@ -1924,3 +1922,101 @@ biomass.histogram.survey.ns <- ggplot(be.sample.ns, aes(biomass*1e3, fill = Stoc
 ggsave(biomass.histogram.survey.ns,
        filename = here("Figs/fig_biomass_histogram_survey_ns.png"),
        height = 8, width = 14)
+
+# Create plots of length-disaggregated abundance and biomass
+# Create list for storing plots
+L.disagg.plots.ns <- list()
+
+# Plot length-disaggrated abundance and biomass by length class for each species
+for (i in unique(abund.summ.ns$Species)) {
+  for (j in unique(abund.summ.ns$Stock[abund.summ.ns$Species == i])) {
+    # Get y-axis limits for abundance and biomass plots
+    y.max.abund   <- max(abund.summ.ns$abundance[abund.summ.ns$Species == i & abund.summ.ns$Stock == j]) * 1.1
+    y.max.biomass <- max(abund.summ.ns$biomass[abund.summ.ns$Species == i & abund.summ.ns$Stock == j]) * 1.1
+    
+    if (!is.nan(y.max.abund)) {
+      # Create x-axis breaks from TL vector
+      max.x         <- max(abund.summ.ns$TL[abund.summ.ns$Species == i & abund.summ.ns$Stock == j])
+      x.breaks      <- seq(0, max.x, max.x/10)
+      
+      # Plot length-disaggregated abundance for each species
+      L.abund.ns <- ggplot(filter(abund.summ.ns, Species == i, Stock == j), aes(TL, abundance)) + 
+        geom_bar(stat = 'identity',fill = 'gray50',colour = 'gray20') + 
+        scale_x_continuous("Length (cm)", breaks = x.breaks) + 
+        scale_y_continuous('Abundance (n)', limits = c(0, y.max.abund),
+                           expand = c(0,0), labels = fancy_sci) +
+        # facet_wrap(~Stock, nrow = 1) +
+        theme_bw() +
+        theme(strip.background.x = element_blank(),
+              strip.text.x = element_text(face = "bold"))
+      
+      # Plot length-disaggregated biomass for each species
+      L.biomass.ns <- ggplot(filter(abund.summ.ns, Species == i, Stock == j), aes(TL, biomass)) + 
+        geom_bar(stat = 'identity', fill = 'gray50', colour = 'gray20') + 
+        scale_x_continuous("Length (cm)", breaks = x.breaks) + 
+        scale_y_continuous('Biomass (t)', limits = c(0, y.max.biomass),
+                           expand = c(0,0), labels = fancy_sci) +
+        # facet_wrap(~Stock, nrow = 1) +
+        theme_bw() + 
+        theme(strip.background.x = element_blank(),
+              strip.text.x = element_text(face = "bold"))
+      
+      # Arrange all plots
+      L.disagg.all.ns <- plot_grid(L.abund.ns, L.biomass.ns, ncol = 1, align = 'h')
+      
+      # Save plot
+      ggsave(L.disagg.all.ns, 
+             filename = paste0(here("Figs/fig_L_disagg_ns_"), i, "-", j, ".png"), 
+             height = 6, width = 6)
+      
+      # Add plot to list
+      L.disagg.plots.ns[[i]][[j]] <- L.disagg.all.ns
+    }
+  }
+}
+
+# Create blank plots for missing species
+for (i in cps.spp) {
+  if (is.null(L.disagg.plots.ns[[i]])) {
+    df <- data.frame()
+    L.disagg.temp.ns <- ggplot(df) + geom_point() + 
+      xlim(0,10) + ylim(0,10) + 
+      annotate('text',5,5,label = 'No Data', size = 6, fontface = 'bold') +
+      theme_bw() + ggtitle(i)  
+    ggsave(L.disagg.temp.ns, 
+           filename = paste0(here("Figs/fig_L_disagg_os_"), i, ".png"))
+  }
+}
+
+## Examine backscatter data for outliers --------------------------------------
+# Select top 100 nasc values and look for outliers
+big.nasc.ns <- nasc.nearshore %>%
+  arrange(desc(cps.nasc)) %>%
+  mutate(cps.nasc = cps.nasc/19,
+         rank = seq(n()),
+         label = paste0('Transect: ', transect.name,
+                        ' - Distance: ', round(dist_m), " m"),
+         popup = paste0('<b>Transect: </b>', transect.name, '<br/>',
+                        '<b>Time: </b>', min(datetime), "-", max(datetime), ' UTC<br/>',
+                        '<b>Distance: </b>', round(dist_m), ' m<br/>',
+                        '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
+  top_n(100, cps.nasc) %>% 
+  select(rank, cps.nasc, label, popup, datetime, dist_m, sounder, 
+         lat, long, transect.name, vessel.name) 
+
+# Create outlier plot
+nasc.outlier.plot.ns <- ggplot(big.nasc.ns, aes(rank, cps.nasc, ids = label)) +
+  geom_point(aes(colour = vessel.name)) +
+  geom_text_repel(data = top_n(big.nasc.ns, 20, cps.nasc), 
+                  aes(rank, cps.nasc, label = label), size = 2) +
+  scale_color_discrete("Vessel") +
+  xlab("\nRank") + ylab(expression(italic(s)[A]/19)) +
+  theme_bw() +
+  theme(legend.position      = c(0.95,0.95),
+        legend.justification = c(1,1))
+
+if (save.figs) {
+  # Save figure
+  ggsave(nasc.outlier.plot.ns, filename = here("Figs/fig_nasc_outliers_ns.png"), 
+         height = 3, width = 5)
+}

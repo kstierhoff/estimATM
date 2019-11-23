@@ -387,6 +387,7 @@ do.lf    <- TRUE
 # Estimate biomass in nearshore and offshore strata
 estimate.nearshore <- FALSE
 estimate.offshore  <- FALSE
+
 # Define regions to present in main Results
 estimate.regions   <- c("Core", "Nearshore")
 
