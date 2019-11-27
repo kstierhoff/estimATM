@@ -1,6 +1,6 @@
 ---
-title:  "Distribution, biomass, and demography of coastal pelagic fishes in the California Current Ecosystem based on acoustic-trawl sampling"
-author: "David A. Demer, Kevin L. Stierhoff, and Juan P. Zwolinski"
+title:  "Distribution, biomass, and demography of coastal pelagic fishes in the California Current Ecosystem during summer 2019 based on acoustic-trawl sampling"
+author: "Kevin L. Stierhoff, Juan P. Zwolinski, and David A. Demer"
 date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = T)`'
 output: 
   powerpoint_presentation:
@@ -52,79 +52,21 @@ png.res       <- 150 # dpi for saved PNG images (to reduce file size while at se
 ```
 
 ```{r user-input}
+# Combine survey regions? -----------------------------------------------------
+combine.regions <- TRUE
+
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(),"/")))
 
-# Survey information file -------------------------------------------------------
+# Survey information files ------------------------------------------------------
 settings.files <- dir(here("Doc/settings"))
-prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
+
+# Output files ------------------------------------------------------------------
+prj.output <- settings.files[str_detect(settings.files, paste0("output_", prj.name, ".R"))]
+source(here("Doc/settings", prj.output))
 ```
-
-```{r load-output}
-# Load biomass estimate tables
-load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
-load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
-
-# Get survey estiamtes for all strata
-be.all    <- filter(be, Stratum == "All")
-be.all.nse <- filter(be.nse, Stratum == "All")
-
-# Load abundance and length summaries
-load(here("Output/length_summary_all.Rdata"))
-load(here("Output/length_frequency_summary.Rdata"))
-load(here("Output/abundance_table_all.Rdata"))
-
-# Summarise length-disaggregated abundances to describe length ranges
-length.summ <- abund.summ %>% 
-  filter(biomass != 0) %>% 
-  group_by(scientificName = Species, stock = Stock) %>% 
-  summarise(L.min = min(TL),
-            L.max = max(TL))
-
-# Load trawl information
-load(here("Output/haul_info.Rdata"))
-load(here("Output/catch_info.Rdata"))
-load(here("Output/species_codes.Rdata"))
-
-# Load NASC summary
-load(here("Output/nasc_summ_tx.Rdata"))
-
-# Load transect spacing
-load(here("Output/transect_spacing.Rdata"))
-
-# Load calibration results
-load(here("Output/cal_output_table.Rdata"))
-``` 
-
-```{r biomass-table-all,results='asis'}
-# Configure bootstrap estimate table
-be.table <- be  %>%
-  rename(Name = Species,
-         Number           = Stratum,
-         Transects        = nTransects,
-         Clusters         = nClusters,
-         Individuals      = nIndiv,
-         Mean             = Biomass,
-         SD               = biomass.sd,
-         CV               = biomass.cv,
-         "CI(Lower)"      = lower.ci.B,
-         "CI(Upper)"      = upper.ci.B) %>% 
-  select(-SD)
-
-be.table.ns <- be.nse  %>%
-  rename(Name = Species,
-         Number           = Stratum,
-         Transects        = nTransects,
-         Clusters         = nClusters,
-         Individuals      = nIndiv,
-         Mean             = Biomass,
-         SD               = biomass.sd,
-         CV               = biomass.cv,
-         "CI(Lower)"      = lower.ci.B,
-         "CI(Upper)"      = upper.ci.B) %>% 
-  select(-SD) 
-```  
 
 ```{r}
 # Summarise survey distance (nmi) by vessel
@@ -139,30 +81,46 @@ dist.summ <- nasc.summ %>%
 
 # Background
 
-## Pacific Sardine | Spring and summer habitat distribution
+## Pacific Sardine | Habitat distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
-
-- Spring (shaded) and summer (hatched) potential habitat
-- Spring (dotted) and summer (dashed) 0.2 mg m^-3^ chl-a isoline
-
+::: {.column width="50%"}
+![](../Images/img_survey_region.png){width=100%}
 :::
 
-::: {.column width="60%"}
-![](../Images/img_survey_region.png){width=100%}
+::: {.column width="50%"}
+![](../Figs/fig_habitat_map.png){width=100%}
 :::
 ::::::
 
-## Pacific Sardine | Potential habitat
+<!-- ## Pacific Sardine | Spring and summer habitat distribution -->
 
-![](../Figs/fig_habitat_map.png){width=100%}
+<!-- :::::: {.columns} -->
+<!-- ::: {.column width="40%"} -->
+
+<!-- - Spring (shaded) and summer (hatched) potential habitat -->
+<!-- - Spring (dotted) and summer (dashed) 0.2 mg m^-3^ chl-a isoline -->
+
+<!-- ::: -->
+
+<!-- ::: {.column width="60%"} -->
+<!-- ![](../Images/img_survey_region.png){width=100%} -->
+<!-- ::: -->
+<!-- :::::: -->
+
+<!-- ## Pacific Sardine | Potential habitat -->
+
+<!-- ![](../Figs/fig_habitat_map.png){width=100%} -->
 
 # Methods
 
 ## Survey Plan
 
 ![](../Figs/fig_survey_plan.png){width=100%}
+
+## Survey vessels  
+
+![](../Images/img_vessels_wide_1907RL.png){width=100%}
 
 ## Target strength calculations
 
@@ -188,7 +146,20 @@ where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.
 
 ## Post-stratification
 
+:::::: {.columns}
+::: {.column width="40%"}
+
+- a) Acoustic interval cluster assignment
+- b) Proportion of CPS in trawl clusters
+
+:::
+
+::: {.column width="60%"}
+
 ![](../Figs/fig_nasc_trawl_cluster_wt.png){width=100%}
+
+:::
+::::::
 
 ## Backscatter, Eggs, and Acoustic Proportion
 
@@ -202,17 +173,98 @@ where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.
 survey.das <- n_distinct(c(unique(date(nasc.summ$start)), unique(date(nasc.summ$end))))
 ```
 
+:::::: {.columns}
+::: {.column width="40%"}
+
 - `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`
 - `r sum(str_detect(nasc.summ$transect.name, survey.vessel.primary))` transects
-- `r dist.summ$distance[dist.summ$vessel == survey.vessel.primary]` nmi
+- `r dist.summ$distance[dist.summ$vessel == survey.vessel.primary]` nmi  
+
+:::
+
+::: {.column width="60%"}
+
+![](../Figs/fig_vessel_track.png){width=100%}
+
+:::
+::::::
 
 # All CPS
-## All CPS | All Strata
+
+```{r biomass-table-all,results='asis'}
+# Configure bootstrap estimate tables
+be.table <- be  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI(Upper)"     = lower.ci.B,
+         "CI(Lower)"     = upper.ci.B) %>% 
+  mutate(Region = "Core") %>%
+  select(Name, Stock, Region, everything(), -SD)
+
+be.table.os <- be.os  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI(Upper)"     = lower.ci.B,
+         "CI(Lower)"     = upper.ci.B) %>% 
+  mutate(Region = "Offshore") %>%
+  select(Name, Stock, Region, everything(), -SD) 
+
+be.table.ns <- be.ns  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI(Upper)"     = lower.ci.B,
+         "CI(Lower)"     = upper.ci.B) %>% 
+  mutate(Region = "Nearshore") %>%
+  select(Name, Stock, Region, everything(), -SD)
+
+be.table.nse <- be.nse  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         Mean             = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI(Upper)"     = lower.ci.B,
+         "CI(Lower)"     = upper.ci.B) %>% 
+  mutate(Region = "NSE") %>%
+  select(Name, Stock, Region, everything(), -SD)
+
+if (combine.regions) {
+  be.table.all <- be.table %>% 
+    bind_rows(be.table.ns) %>% 
+    arrange(Name, Stock, Region)
+    
+} else {
+  be.table.all <- be.table
+}
+```  
+
+## All CPS | All Strata (Core)
 
 ```{r biomass-all-strata}
 num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)")
 
-regulartable(be.table) %>% 
+regulartable(filter(be.table.all, Region == "Core")) %>% 
   merge_v(j = c("Name")) %>% 
   italic(j = 1) %>%
   bold(~ Number == "All", bold = TRUE) %>% 
@@ -226,10 +278,45 @@ regulartable(be.table) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
-             CV = "Biomass") %>% 
+             CV       = "Biomass") %>% 
+  merge_h(part = "header") %>%
+  theme_box() %>%
+  bg(bg = c("#0691C9"), part = "header") %>% 
+  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  color(color = "white", part = "header") %>% 
+  align(align = "center", part = "header") %>%
+  colformat_num(col_keys = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  autofit()
+```
+
+## All CPS | All Strata (Nearshore)
+
+```{r biomass-all-strata-ns}
+num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)")
+
+regulartable(filter(be.table.all, Region == "Nearshore")) %>% 
+  merge_v(j = c("Name")) %>% 
+  italic(j = 1) %>%
+  bold(~ Number == "All", bold = TRUE) %>% 
+  set_formatter(Area         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                Individuals  = function(x) sprintf("%.0f", x),
+                Mean         = function(x) sprintf("%.0f", x),
+                Distance     = function(x) sprintf("%.0f", x),
+                "CI(Lower)"  = function(x) sprintf("%.0f", x),
+                "CI(Upper)"  = function(x) sprintf("%.0f", x),
+                CV           = function(x) sprintf("%.0f", x)) %>%
+  add_header(Name  = "",
+             Stock    = "",
+             Region   = "",
+             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Clusters = "Trawl", Individuals = "Trawl",
+             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             CV       = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
@@ -243,11 +330,11 @@ regulartable(be.table) %>%
 ## All CPS | Summary
 
 ```{r biomass-summary}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Number == "All") %>% 
   select(-Number)
 
-regulartable(be.table.sub) %>%
+regulartable(be.table.sub) %>% 
   merge_v(j = c("Name")) %>% 
   italic(j = 1) %>%
   set_formatter(Area         = function(x) sprintf("%.0f", x),
@@ -260,6 +347,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -274,10 +362,10 @@ regulartable(be.table.sub) %>%
 ```
 
 # Northern Anchovy (_Engraulis mordax_)
-## N. Anchovy | Northern stock
+## N. Anchovy | Northern stock - Biomass
 
 ```{r biomass-anch-n}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Engraulis mordax", Stock == "Northern") 
 
 regulartable(be.table.sub) %>% 
@@ -294,6 +382,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -311,21 +400,52 @@ regulartable(be.table.sub) %>%
 ## NS N. Anchovy | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Engraulis mordax-Northern.png){width=100%}
+```{r biom-dens-anch-n,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
 
 :::
 
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Engraulis mordax-Northern.png){width=100%}
+::: {.column width="50%"}  
+
+```{r l-disagg-anch-n,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
 :::
 ::::::
 
-## N. Anchovy | Central stock
+## N. Anchovy | Central stock - Biomass
 
 ```{r biomass-anch-c}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Engraulis mordax", Stock == "Central") 
 
 regulartable(be.table.sub) %>% 
@@ -342,6 +462,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -359,14 +480,45 @@ regulartable(be.table.sub) %>%
 ## CS N. Anchovy | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Engraulis mordax-Central.png){width=100%}
+```{r biom-dens-anch-c,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
 
 :::
 
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Engraulis mordax-Central.png){width=100%}
+::: {.column width="50%"}  
+
+```{r l-disagg-anch-c,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
 :::
 ::::::
 
@@ -375,10 +527,10 @@ regulartable(be.table.sub) %>%
 ![](../Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png)
 
 # Pacific Sardine (_Sardinops sagax_)
-## P. Sardine | Northern stock
+## P. Sardine | Northern stock - Biomass
 
 ```{r biomass-sar-n}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Sardinops sagax", Stock == "Northern") 
 
 regulartable(be.table.sub) %>% 
@@ -395,6 +547,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -412,21 +565,52 @@ regulartable(be.table.sub) %>%
 ## NS P. Sardine | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Sardinops sagax-Northern.png){width=100%}
+```{r biom-dens-sar-n,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
 
 :::
 
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Sardinops sagax-Northern.png){width=100%}
+::: {.column width="50%"}  
+
+```{r l-disagg-sar-n,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
 :::
 ::::::
 
-## P. Sardine | Southern stock
+## P. Sardine | Southern stock - Biomass
 
 ```{r biomass-sar-s}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Sardinops sagax", Stock == "Southern") 
 
 regulartable(be.table.sub) %>% 
@@ -443,6 +627,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -461,14 +646,45 @@ regulartable(be.table.sub) %>%
 ## SS P. Sardine | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Sardinops sagax-Southern.png){width=100%}
+```{r biom-dens-sar-s,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
 
 :::
 
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Sardinops sagax-Southern.png){width=100%}
+::: {.column width="50%"}  
+
+```{r l-disagg-sar-s,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
 :::
 ::::::
 
@@ -478,10 +694,10 @@ regulartable(be.table.sub) %>%
 
 # Pacific Mackerel (_Scomber japonicus_)
 
-## Pacific Mackerel
+## Pacific Mackerel - Biomass
 
 ```{r biomass-mack}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Scomber japonicus", Stock == "All") 
 
 regulartable(be.table.sub) %>% 
@@ -498,6 +714,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -515,14 +732,45 @@ regulartable(be.table.sub) %>%
 ## Pacific Mackerel | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Scomber japonicus-All.png){width=100%}
+```{r biom-dens-mack,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
 
 :::
 
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Scomber japonicus-All.png){width=100%}
+::: {.column width="50%"}  
+
+```{r l-disagg-mack,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
 :::
 ::::::
 
@@ -532,10 +780,10 @@ regulartable(be.table.sub) %>%
 
 # Jack Mackerel (_Trachurus symmetricus_)
 
-## Jack Mackerel
+## Jack Mackerel - Biomass
 
 ```{r biomass-jack}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Trachurus symmetricus", Stock == "All") 
 
 regulartable(be.table.sub) %>% 
@@ -552,6 +800,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -569,14 +818,45 @@ regulartable(be.table.sub) %>%
 ## Jack Mackerel | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Trachurus symmetricus-All.png){width=100%}
+```{r biom-dens-jack,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
 
 :::
 
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Trachurus symmetricus-All.png){width=100%}
+::: {.column width="50%"}  
+
+```{r l-disagg-jack,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
 :::
 ::::::
 
@@ -586,10 +866,10 @@ regulartable(be.table.sub) %>%
 
 # Pacific Herring (_Clupea pallasii_)
 
-## Pacific Herring
+## Pacific Herring - Biomass
 
 ```{r biomass-her}
-be.table.sub <- be.table %>% 
+be.table.sub <- be.table.all %>% 
   filter(Name == "Clupea pallasii", Stock == "All") 
 
 regulartable(be.table.sub) %>% 
@@ -606,6 +886,7 @@ regulartable(be.table.sub) %>%
                 CV           = function(x) sprintf("%.0f", x)) %>%
   add_header(Name  = "",
              Stock    = "",
+             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -623,20 +904,51 @@ regulartable(be.table.sub) %>%
 ## Pacific Herring | Biomass and length distribution
 
 :::::: {.columns}
-::: {.column width="40%"}
+::: {.column width="50%"}  
 
-![](../Figs/fig_biomass_dens_Clupea pallasii-All.png){width=100%}
+```{r biom-dens-her,out.height='7.5in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Clupea pallasii-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }  
+}
+```
+
+:::
+
+::: {.column width="50%"}  
+
+```{r l-disagg-her,out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Clupea pallasii-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
+:::
+::::::
 
 ## Pacific Herring | % Biomass by Cluster & Length
 
 ![](../Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png)
-
-:::
-
-::: {.column width="60%"}
-![](../Figs/fig_L_disagg_Clupea pallasii-All.png){width=100%}
-:::
-::::::
 
 ## Useful resources
 
