@@ -259,14 +259,14 @@ source.cps.nasc        <- c(RL  = TRUE,
                             LM  = FALSE,
                             SD  = FALSE,
                             LBC = FALSE,
-                            OS  = FALSE, # in the offshore strata
+                            OS  = TRUE, # in the offshore strata
                             NS  = FALSE) # in the neashore strata
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_1907RL.csv"),
                             LM  = NA,
                             SD  = NA,
                             LBC = NA,
-                            OS  = NA, # in the offshore strata
+                            OS  = here("Data/Backscatter/nasc_cps_OS_1907RL.csv"), # in the offshore strata
                             NS  = NA) # in the neashore strata 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
