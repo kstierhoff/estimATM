@@ -15,7 +15,7 @@
 # settings.files <- dir(here("Doc/settings"))
 # 
 # # Source survey settings file
-# prj.settings <- settings.files[str_detect(settings.files, paste(prj.name, ".R", sep = ""))]
+# prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 # source(here("Doc/settings", prj.settings))
 
 # Source following the section entitled estimateNearshore in estimateBiomass.
