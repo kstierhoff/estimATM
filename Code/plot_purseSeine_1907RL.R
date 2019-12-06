@@ -71,7 +71,7 @@ lbc.specimens <- read_csv("Data/Seine/lbc_catch.csv") %>%
 # Summarize speciment data ------------------------------------------------
 lm.spec.summ <- lm.specimens %>%
   group_by(key.set, scientificName) %>% 
-  summarise(totalWeight = sum(weightg),
+  summarise(totalWeight = sum(weightg, na.rm = TRUE),
             totalCount  = n()) %>% 
   left_join(select(lm.sets, key.set, lat, long)) %>% 
   filter(!is.na(lat)) %>% 
@@ -79,7 +79,7 @@ lm.spec.summ <- lm.specimens %>%
 
 lbc.spec.summ <- lbc.specimens %>%
   group_by(key.set, scientificName) %>% 
-  summarise(totalWeight = sum(weightg),
+  summarise(totalWeight = sum(weightg, na.rm = TRUE),
             totalCount  = n()) %>% 
   left_join(select(lbc.sets, key.set, lat, long)) %>% 
   filter(!is.na(lat)) 
@@ -306,6 +306,14 @@ set.pies <- base.map +
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
+  scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = radius*0.5),
+                              cols = c("Anchovy", "JackMack", "Jacksmelt",
+                                       "PacHerring", "PacMack", "Sardine"),
+                              color = 'black', alpha = 0.8) +
+  # geom_text(data = set.pos, aes(X, Y, label = label),
+  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
+  #                                      "PacHerring", "PacMack", "Sardine"),
+  #                             color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
@@ -317,6 +325,8 @@ set.pies <- base.map +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
+
+# set.pos.sf <- set.pos %>% st_as_sf(coords = c("long","lat"), crs = 4326)
 
 ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LongBeachCarnage.png"),
        height = 6, width = 10)
@@ -440,7 +450,7 @@ haul.pies <- base.map +
              aes(X, Y)) +
   ggtitle("CPS Proportions in Trawl Hauls") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
+           xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8),
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
 
 ggsave(haul.pies, filename = here("Figs/fig_trawl_proportion_haul_wt_Saildrone.png"),

@@ -2021,3 +2021,8 @@ if (save.figs) {
   ggsave(nasc.outlier.plot.ns, filename = here("Figs/fig_nasc_outliers_ns.png"), 
          height = 3, width = 5)
 }
+
+if (save.figs) {
+  # Plot nearshore backscatter and purse seine data
+  source(here("Code", paste0("plot_purseSeine_", survey.name, ".R")))
+}
