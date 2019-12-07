@@ -179,7 +179,7 @@ nasc.vessels.nearshore <- c("LBC","LM","SD")
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
-seine.vessels          <- c("LM", "LBC")
+seine.vessels          <- c("LM")
 # Use seine data to apportion backscatter
 use.seine.data         <- TRUE
 
