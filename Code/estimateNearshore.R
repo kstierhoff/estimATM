@@ -80,6 +80,10 @@ if (process.nearshore) {
       super.clusters <- bind_rows(super.clusters, super.clusters.ns)
 
     }
+  } else {
+    load(here("Output/seine_summaries.Rdata"))
+    load(here("Output/cluster_length_frequency_all_seine.Rdata"))
+    load(here("Output/cluster_length_frequency_tables_seine.Rdata"))
   }
   
   # Save after processing nearshore
