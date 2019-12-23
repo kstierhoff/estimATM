@@ -301,6 +301,16 @@ nasc.summ.ns <- nasc.nearshore %>%
 save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 
 # Apportion offshore backscatter ------------------------------------------
+# If enforcing max cluster distance, set proportions for each species to zero
+# where cluster.distance > max.cluster.dist
+if (limit.cluster.dist["NS"]) {
+  nasc.offshore$prop.anch[nasc.offshore$cluster.dist > max.cluster.dist] <- 0
+  nasc.offshore$prop.sar[nasc.offshore$cluster.dist  > max.cluster.dist] <- 0
+  nasc.offshore$prop.jack[nasc.offshore$cluster.dist > max.cluster.dist] <- 0
+  nasc.offshore$prop.mack[nasc.offshore$cluster.dist > max.cluster.dist] <- 0
+  nasc.offshore$prop.her[nasc.offshore$cluster.dist  > max.cluster.dist] <- 0  
+}
+
 # Create data frame for plotting acoustic proportions by species
 nasc.prop.all.ns <- nasc.nearshore %>%
   mutate(`Engraulis mordax`      = cps.nasc*prop.anch,

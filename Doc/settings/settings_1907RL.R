@@ -198,13 +198,16 @@ merge.regions <- c("SD", "LM")
 
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
+
 # Number of intervals over which to summarize NASC
 nasc.summ.interval     <- 2000/nasc.interval 
+
 # Echosounder type; e.g., EK60, EK80, other
 sounder.type           <- c(RL  = "EK80",
                             LM  = "EK60",
                             SD  = "EK80",
                             LBC = "EK60") 
+
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
@@ -261,6 +264,7 @@ source.cps.nasc        <- c(RL  = TRUE,
                             LBC = FALSE,
                             OS  = TRUE, # in the offshore strata
                             NS  = FALSE) # in the neashore strata
+
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_1907RL.csv"),
                             LM  = NA,
@@ -268,56 +272,67 @@ data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_1907RL.csv"
                             LBC = NA,
                             OS  = here("Data/Backscatter/nasc_cps_OS_1907RL.csv"), # in the offshore strata
                             NS  = NA) # in the neashore strata 
+
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
                             LM  = "[^0-9]",
                             SD  = "[^0-9]",
                             LBC = "[^0-9]") 
+
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
                             LM  = TRUE,
                             SD  = FALSE,
                             LBC = FALSE) 
+
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
 strip.tx.chars         <- c(RL  = FALSE,
                             LM  = FALSE,
                             SD  = FALSE,
                             LBC = FALSE) 
+
 # If T, removes transects with names including "transit"
 rm.transit             <- c(RL  = TRUE,
                             LM  = TRUE,
                             SD  = TRUE,
                             LBC = TRUE) 
+
 # If T, removes transects with names including "offshore"
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             SD  = TRUE,
                             LBC = TRUE)
+
 # If T, removes transects with names including "inshore"
 rm.inshore             <- c(RL  = TRUE,
                             LM  = TRUE,
                             SD  = TRUE,
                             LBC = TRUE)
+
 # If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL  = TRUE,
                             LM  = TRUE,
                             SD  = TRUE,
                             LBC = TRUE) 
+
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
                             LM  = FALSE,
                             SD  = FALSE,
                             LBC = FALSE) 
+
 # regex for matching number pattern
 tx.num.pattern         <- c(RL  = "-\\d{1}",
                             LM  = "-\\d{1}",
                             SD  = "-\\d{1}",
                             LBC = "-\\d{1}") 
+
 # Use transect names for transect numbers
 use.tx.number          <- c(RL  = TRUE,
                             LM  = TRUE,
                             SD  = TRUE,
                             LBC = TRUE) 
+
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
                             LM  = NA,
@@ -329,6 +344,14 @@ min.tx.length          <- c(RL  = 3,
                             LM  = 1,
                             SD  = 1,
                             LBC = 1)
+# Enforce nearest trawl cluster distance limits?
+limit.cluster.dist     <- c(OS  = TRUE,
+                            NS  = FALSE) 
+
+# Maximum distance to trawl clusters
+# If limit.cluster.dist == TRUE, set proportions to zero at distances greater than max.cluster.dist
+max.cluster.dist       <- 30
+
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
 tx.spacing.bins <- c(0, 6, 15, 35, 70, 100)
 tx.spacing.dist <- c(5, 10, 20, 40, 80)
@@ -350,8 +373,8 @@ trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry1907RL.accdb"
-trawl.performance      <- c("Aborted","Bad","Poor") # Character vector; trawl performance to exclude
-trawl.haul.exclude     <- NA           # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
+trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl performance to exclude
+trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
 ctd.hdr.pattern        <- "1907\\d{3}.hdr"
@@ -402,7 +425,7 @@ nIndiv.min    <- 10
 nClusters.min <- 2
 
 # Use manually defined strata?
-stratify.manually <- FALSE
+stratify.manually    <- FALSE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
