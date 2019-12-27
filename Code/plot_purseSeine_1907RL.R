@@ -21,7 +21,7 @@
 # Source following the section entitled estimateNearshore in estimateBiomass.
 
 # Import set data ----------------------------------------------------
-lm.sets <- read_csv("Data/Seine/lm_sets.csv") %>% 
+lm.sets <- read_csv(here("Data/Seine/lm_sets.csv")) %>% 
   mutate(date = mdy(date),
          lat = lat_deg + lat_decmin/60,
          long = -(long_deg + long_decmin/60),
