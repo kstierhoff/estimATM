@@ -27,7 +27,7 @@ lm.sets <- read_csv(here("Data/Seine/lm_sets.csv")) %>%
          long = -(long_deg + long_decmin/60),
          key.set = paste(vessel_name, date, set))
 
-lbc.sets <- read_csv("Data/Seine/lbc_sets.csv") %>% 
+lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv")) %>% 
   mutate(date = date(mdy_hm(datetime)),
          vessel_name = "Long Beach Carnage",
          key.set = paste(vessel_name, date, set))
@@ -35,7 +35,7 @@ lbc.sets <- read_csv("Data/Seine/lbc_sets.csv") %>%
 save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
 
 # Import specimen data ----------------------------------------------------
-lm.specimens <- read_csv("Data/Seine/lm_catch.csv") %>% 
+lm.specimens <- read_csv(here("Data/Seine/lm_catch.csv")) %>% 
   mutate(date = mdy(date),
          key.set = paste(vessel_name, date, set),
          label = paste("Date:", date, "Set:", set, "Fish num:", specimen_number),
@@ -55,7 +55,7 @@ lm.specimens <- read_csv("Data/Seine/lm_catch.csv") %>%
          missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
   filter(!is.na(scientificName))
 
-lbc.specimens <- read_csv("Data/Seine/lbc_catch.csv") %>% 
+lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>% 
   left_join(select(lbc.sets, date, set, key.set)) %>% 
   mutate(label = paste("Date:", date, "Set:", set, "Specimen num:", specimen_number),
          totalLength_mm = case_when(

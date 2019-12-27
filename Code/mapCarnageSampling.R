@@ -1,4 +1,4 @@
-lbc.sets <- read_csv("Data/Seine/lbc_sets.csv") %>% 
+lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv")) %>% 
   mutate(datetime = mdy_hm(datetime)) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
