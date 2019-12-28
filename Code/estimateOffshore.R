@@ -322,22 +322,79 @@ nasc.offshore <- nasc.offshore %>%
          mack.dens = cps.nasc*prop.mack / (4*pi*sigmawg.mack) / 1000,
          sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000)
 
+# Check proportions after restricting cluster distance
+# hist(nasc.offshore$anch.dens[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$her.dens[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$jack.dens[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$mack.dens[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$sar.dens[nasc.offshore$cluster.distance > 30])
+# 
+# hist(nasc.offshore$prop.anch[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$prop.her[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$prop.jack[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$prop.mack[nasc.offshore$cluster.distance > 30])
+# hist(nasc.offshore$prop.sar[nasc.offshore$cluster.distance > 30])
+
 # Format for plotting
-nasc.density.os <- nasc.offshore %>%
-  select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
-         sar.dens, transect, transect.name, int, cluster) %>% 
-  group_by(transect, transect.name, int) %>% 
-  summarise(
-    lat = lat[1],
-    long = long[1],
-    `Engraulis mordax`      = mean(anch.dens),
-    `Clupea pallasii`       = mean(her.dens),
-    `Trachurus symmetricus` = mean(jack.dens),
-    `Scomber japonicus`     = mean(mack.dens),
-    `Sardinops sagax`       = mean(sar.dens)) %>% 
-  gather(scientificName, density, -transect, -transect.name, -int, -lat, -long) %>% 
-  mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
-         bin.level = as.numeric(bin))
+if (limit.cluster.dist["OS"]) {
+  nasc.density.os <- nasc.offshore %>%
+    filter(cluster.distance <= 30) %>%
+    select(lat, long, anch.dens, her.dens, jack.dens, mack.dens,
+           sar.dens, transect, transect.name, int, cluster, cluster.distance) %>%
+    group_by(transect, transect.name, int) %>%
+    summarise(
+      lat                     = lat[1],
+      long                    = long[1],
+      all.clusters            = glue_collapse(unique(cluster), sep = ", "),
+      mean.dist               = mean(cluster.distance),
+      `Engraulis mordax`      = mean(anch.dens),
+      `Clupea pallasii`       = mean(her.dens),
+      `Trachurus symmetricus` = mean(jack.dens),
+      `Scomber japonicus`     = mean(mack.dens),
+      `Sardinops sagax`       = mean(sar.dens)) %>%
+    ungroup() %>%
+    gather(scientificName, density, -transect, -transect.name, -int, -lat, -long, -mean.dist, -all.clusters) %>%
+    mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
+           bin.level = as.numeric(bin))
+} else {
+  nasc.density.os <- nasc.offshore %>%
+    select(lat, long, anch.dens, her.dens, jack.dens, mack.dens,
+           sar.dens, transect, transect.name, int, cluster, cluster.distance) %>%
+    group_by(transect, transect.name, int) %>%
+    summarise(
+      lat                     = lat[1],
+      long                    = long[1],
+      all.clusters            = glue_collapse(unique(cluster), sep = ", "),
+      mean.dist               = mean(cluster.distance),
+      `Engraulis mordax`      = mean(anch.dens),
+      `Clupea pallasii`       = mean(her.dens),
+      `Trachurus symmetricus` = mean(jack.dens),
+      `Scomber japonicus`     = mean(mack.dens),
+      `Sardinops sagax`       = mean(sar.dens)) %>%
+    ungroup() %>%
+    gather(scientificName, density, -transect, -transect.name, -int, -lat, -long, -mean.dist, -all.clusters) %>%
+    mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
+           bin.level = as.numeric(bin))
+}
+
+# nasc.density.os <- nasc.offshore %>%
+#   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
+#          sar.dens, transect, transect.name, int, cluster, cluster.distance) %>% 
+#   group_by(transect, transect.name, int) %>% 
+#   summarise(
+#     lat                     = lat[1],
+#     long                    = long[1],
+#     all.clusters            = glue_collapse(unique(cluster), sep = ", "),
+#     mean.dist               = mean(cluster.distance),
+#     `Engraulis mordax`      = mean(anch.dens),
+#     `Clupea pallasii`       = mean(her.dens),
+#     `Trachurus symmetricus` = mean(jack.dens),
+#     `Scomber japonicus`     = mean(mack.dens),
+#     `Sardinops sagax`       = mean(sar.dens)) %>% 
+#   # ungroup() %>% 
+#   gather(scientificName, density, -transect, -transect.name, -int, -lat, -long, -mean.dist, -all.clusters) %>% 
+#   mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
+#          bin.level = as.numeric(bin))
 
 # Create acoustic transect labels for maps
 tx.labels.tmp.os <- nasc.offshore %>% 
@@ -643,7 +700,7 @@ if (stratify.manually.os) {
     if (nrow(temp.spp) > 1) {
       # Find the start of each positive stratum
       spp.starts <- temp.spp %>%
-        filter(diff > max.diff)
+        filter(diff >= max.diff)
 
       # If the start of the stratum == 1, stratum start is 1, else min transect number
       survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
@@ -653,13 +710,18 @@ if (stratify.manually.os) {
 
       # If the end of the stratum is the last transect in the survey,
       # select the last, else the last transect + 1
-      survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
-                           max(nasc.density.summ$transect),
+      survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ.os$transect),
+                           max(nasc.density.summ.os$transect),
                            max(temp.spp$transect) + 1)
 
       # A vector of stratum ends
-      stratum.end <- c(temp.spp$transect[which(temp.spp$diff > max.diff) - 1] + 1,
+      stratum.end <- c(temp.spp$transect[which(temp.spp$diff >= max.diff) - 1] + 1,
                        survey.end)
+      
+      strata.cull <- temp.spp %>% 
+        mutate(tx.bins = cut(transect, c(stratum.start, survey.end), include.lowest = TRUE, right = TRUE)) %>% 
+        group_by(tx.bins) %>% 
+        tally()
 
       # Combine starts and ends in to a data frame for plotting and generating stratum vectors
       strata.spp <- data.frame(scientificName = i,
@@ -912,7 +974,7 @@ if (save.figs) {
   # Create a list for saving biomass density plots
   biomass.dens.figs.os <- list()
   
-  # Plot anchovy biomass density
+  # Plot biomass density
   for (i in unique(strata.offshore$scientificName)) {
     for (j in unique(filter(strata.offshore, scientificName == i)$stock)) {
       # Filter and subset nasc.stock.os per species and stratum
@@ -954,6 +1016,9 @@ if (save.figs) {
         geom_shadowtext(data = pos.cluster.txt,
                         aes(X, Y, label = cluster), 
                         colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
+        # geom_shadowtext(data = cluster.pie.os,
+        #                 aes(X, Y, label = cluster), 
+        #                 colour = "red", bg.colour = "white", size = 2) +
         # Configure legend guides
         guides(colour = guide_legend(order = 1),
                fill   = guide_legend(order = 2), 
@@ -961,6 +1026,23 @@ if (save.figs) {
         coord_sf(crs = crs.proj, 
                  xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+      
+      # Check plot
+      # ggplot() +
+      #   # Plot zero nasc data
+      #   geom_point(data = filter(nasc.offshore, cps.nasc == 0), aes(X, Y),
+      #              colour = 'gray50', size = 0.15, alpha = 0.5) +
+      #   # Plot NASC data
+      #   geom_point(data = nasc.density.plot.os, aes(X, Y, size = bin, fill = bin),
+      #              shape = 21, alpha = 0.75) +
+      #   # Configure size and colour scales
+      #   scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
+      #                     values = dens.sizes.all, labels = dens.labels.all) +
+      #   scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
+      #                     values = dens.colors.all, labels = dens.labels.all) +
+      #   coord_sf(crs = crs.proj, 
+      #            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+      #            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
       
       # Save figures
       ggsave(biomass.dens.os, 
@@ -1010,6 +1092,19 @@ for (i in unique(strata.final.os$scientificName)) {
     select(-stratum) %>% 
     left_join(strata.temp) %>% 
     filter(!is.na(stratum))
+  
+  # Check proportions after restricting cluster distance
+  # hist(nasc.os.temp$anch.dens[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$her.dens[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$jack.dens[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$mack.dens[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$sar.dens[nasc.os.temp$cluster.distance > 30])
+  # 
+  # hist(nasc.os.temp$prop.anch[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$prop.her[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$prop.jack[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$prop.mack[nasc.os.temp$cluster.distance > 30])
+  # hist(nasc.os.temp$prop.sar[nasc.os.temp$cluster.distance > 30])
   
   # Summarise nasc by stratum
   nasc.os.temp.summ <- nasc.os.temp %>% 
