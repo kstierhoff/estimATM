@@ -438,29 +438,25 @@ stratify.manually.ns <- FALSE
 #     transect = 60:64)
 # )
 # 
-# # Offshore strata
-# strata.manual.os <- bind_rows(
-#   data.frame(
-#     scientificName = "Clupea pallasii",
-#     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Engraulis mordax",
-#     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Sardinops sagax",
-#     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Scomber japonicus",
-#     stratum = 1,
-#     transect = 1:8),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus",
-#     stratum = 1,
-#     transect = 1:8)
-# )
+# Offshore strata
+strata.manual.os <- bind_rows(
+  data.frame(
+    scientificName = "Engraulis mordax",
+    stratum = 1,
+    transect = 1:8),
+  data.frame(
+    scientificName = "Sardinops sagax",
+    stratum = 1,
+    transect = 1:3),
+  data.frame(
+    scientificName = "Scomber japonicus",
+    stratum = 1,
+    transect = 1:8),
+  data.frame(
+    scientificName = "Trachurus symmetricus",
+    stratum = 1,
+    transect = 1:8)
+)
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino

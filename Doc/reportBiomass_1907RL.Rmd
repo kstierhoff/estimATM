@@ -1,14 +1,5 @@
 ---
 output: 
-  bookdown::pdf_document2:
-    includes: 
-      in_header: yaml/header_1907RL.tex
-    toc: yes
-    toc_depth: 3
-    number_sections: yes
-  bookdown::html_document2:
-    toc: yes
-    toc_float: yes
   bookdown::word_document2:
     reference_docx: template/report_template_Rmarkdown.docx
     toc: yes
@@ -16,6 +7,15 @@ output:
     pandoc_args: [
      "--filter", "yaml/pandoc-newpage-filter.R"
      ]
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+  bookdown::pdf_document2:
+    includes: 
+      in_header: yaml/header_1907RL.tex
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
 csl: csl/ices-journal-of-marine-science.csl
 bibliography: bib/ast_bib.bib
 css: css/ast.css
@@ -64,7 +64,7 @@ panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf
 panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
 
 # output options
-png.res       <- 150 # dpi for saved PNG images (to reduce file size while at sea)
+png.res <- 150 # dpi for saved PNG images (to reduce file size while at sea)
 ```  
 
 ```{r loop-controls}
@@ -171,7 +171,7 @@ To estimate the biomass of CPS in offshore areas that are not routinely sampled,
 
 **[For each species and stock, add nearshore biomass estimates.]**
 
-For the survey area and period, the estimated biomass of the northern stock (or sub-population) of Northern Anchovy was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%). The northern stock ranged from approximately Westport, WA to Coos Bay, OR and standard length ($L_S$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Northern']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Northern']` cm with modes at 15 and 17 cm.  
+For the survey area and period, the estimated biomass of the northern stock of Northern Anchovy was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%). The northern stock ranged from approximately Westport, WA to Coos Bay, OR and standard length ($L_S$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Northern']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Northern']` cm with modes at 15 and 17 cm.  
 
 The estimated biomass of the central stock of Northern Anchovy was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=4)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=4)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=1)`%). The central stock ranged from approximately Fort Bragg to San Diego, CA and $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` cm with modes at 8 and 12 cm.  
 
@@ -789,20 +789,51 @@ where $\overline{\rho}_{ci}$ is the numerical density in interval $i$ represente
 
 ```{r}
 # Summarise survey distance (nmi) by vessel
+## Core survey area
 dist.summ <- nasc.summ %>%
   mutate(vessel = case_when(
     str_detect(transect.name, "RL")  ~ "RL",
     str_detect(transect.name, "SD")  ~ "SD",
-    str_detect(transect.name, "LCB") ~ "LCB",
+    str_detect(transect.name, "LBC") ~ "LBC",
     str_detect(transect.name, "LM")  ~ "LM",
     TRUE ~ "Other")) %>% 
   group_by(vessel) %>% 
-  summarise(distance = round(sum(distance)))
+  summarise(distance = round(sum(distance)),
+            n.tx     = n(),
+            mean.tx.dist = distance/n.tx)
+
+## Nearshore survey area
+if (exists("nasc.summ.ns")) {
+  dist.summ.ns <- nasc.summ.ns %>%
+    mutate(vessel = case_when(
+      str_detect(transect.name, "RL")  ~ "RL",
+      str_detect(transect.name, "SD")  ~ "SD",
+      str_detect(transect.name, "LBC") ~ "LBC",
+      str_detect(transect.name, "LM")  ~ "LM",
+      TRUE ~ "Other")) %>% 
+    group_by(vessel) %>% 
+    summarise(distance = round(sum(distance)),
+              n.tx     = n(),
+              mean.tx.dist = distance/n.tx)  
+}
+
+## Offshore survey area
+if (exists("nasc.summ.os")) {
+  dist.summ.os <- nasc.summ.os %>%
+    mutate(vessel = case_when(
+      str_detect(transect.name, "RL")  ~ "RL",
+      str_detect(transect.name, "SD")  ~ "SD",
+      str_detect(transect.name, "LBC") ~ "LBC",
+      str_detect(transect.name, "LM")  ~ "LM",
+      TRUE ~ "Other")) %>% 
+    group_by(vessel) %>% 
+    summarise(distance = round(sum(distance)),
+              n.tx     = n(),
+              mean.tx.dist = distance/n.tx)
+}
 ```
 
-The `r tolower(survey.season)` `r survey.year` survey took place between Cape Scott, Vancouver Island and San Diego during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. Acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=0)` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species.  
-
-**[Add survey statistics from nearshore survey vessels, Lisa Marie, Long Beach Carnage, and USV]**
+The `r tolower(survey.season)` `r survey.year` survey took place between Cape Scott, Vancouver Island and San Diego during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. In the core survey area, acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=0)` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. In the nearshore survey area, acoustic sampling was conducted along `r nrow(nasc.summ.ns)` daytime east-west transects (`r dist.summ.ns$n.tx[dist.summ.ns$vessel == "LM"]` by _Lisa Marie_ off WA and OR, `r dist.summ.ns$n.tx[dist.summ.ns$vessel == "SD"]` by the USV off northern and central CA, and `r dist.summ.ns$n.tx[dist.summ.ns$vessel == "LBC"]` by _Long Beach Carnage_ in the SCB) that totaled `r prettyNum(sum(nasc.summ.ns$distance),big.mark=",",digits=0)` nmi. As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.
 
 **Leg I**  
 On 13 June, _`r survey.vessel`_ departed from the Exploratorium (Pier 15) in San Francisco, CA at ~1800 (all times UTC) and began the transit to northern Vancouver Island. Throughout the transit, sampling was conducted during the day with CUFES, EK60s, EK80s, ME70, MS70 and SX90. On 17 June, _`r survey.vessel`_ arrived at the first offshore station off Cape Scott, British Columbia at ~1230 to begin acoustic sampling along transect 129. On 1 July, acoustic sampling ceased after the completion of transect 84 off Newport, OR. On 2 July, _`r survey.vessel`_ arrived at the Marine Operations-Pacific (MOC-P) Pier in Newport at ~2100 to complete Leg I.  
@@ -824,7 +855,7 @@ On 22 August, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in S
 
 ## Acoustic backscatter {#results-backscatter-distribution} 
 
-Acoustic backscatter ascribed to CPS (**Fig. \@ref(fig:nasc-cufes-trawl)a**) was observed throughout the survey area, but was most prevalent off southwest Vancouver Island and Cape Flattery; nearshore between the Columbia River and Cape Mendocino; and througout the entire survey area between Cape Blanco and San Diego. The majority (greater than ~90%) of biomass for each species was apportioned using catch data from trawl clusters conducted within a distance of $\leq$ 20 nmi (**Fig. \@ref(fig:biomass-cluster-distance)**).  
+Acoustic backscatter ascribed to CPS was observed throughout the core survey area, but was most prevalent off southwest Vancouver Island and Cape Flattery; nearshore between the Columbia River and Cape Mendocino; and througout the entire survey area between Cape Blanco and San Diego (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Acoustic backscatter ascribed to CPS was also observed throughout the nearshore survey area, but was most prevalent near the Columbia River and Newport (**Fig. \@ref(fig:nasc-ns-all)a**); around Cape Mendocino, Pt. Reyes, and between Monterey and Morro Bay (**Fig. \@ref(fig:nasc-ns-all)b**); and throughout the SCB (**Fig. \@ref(fig:nasc-ns-all)c**).  The majority (greater than ~90%) of biomass for each species was apportioned using catch data from trawl clusters conducted within a distance of $\leq$ 20 nmi (**Fig. \@ref(fig:biomass-cluster-distance)**).  
 
 ## Egg densities and distributions {#results-cufes-density}  
 
@@ -842,6 +873,14 @@ Pacific Herring catches were predominant, by weight, in trawl samples collected 
 ```{r nasc-cufes-trawl, fig.cap='(ref:nasc-cufes-trawl)',out.width='7.75in',fig.pos='H'}
 include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster.png"))
 ```  
+
+\newpage  
+
+(ref:nasc-ns-all) Spatial distributions of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS from nearshore sampling using a) F/V _Lisa Marie_, b) a USV, and c) F/V _Long Beach Carnage_. **[Consider replacing or removing this figure; however, it's currently included because nearshrore backscatter is not visible in Fig. \@ref(fig:nasc-cufes-trawl)a]**
+
+```{r nasc-ns-all, fig.cap='(ref:nasc-ns-all)',out.width='7.75in',fig.pos='H'}
+include_graphics(here("Figs/fig_backscatter_cps_AllNearshore.png"))
+```
 
 \elandscape
 \newpage  

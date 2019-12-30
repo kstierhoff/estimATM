@@ -231,7 +231,7 @@ ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LisaMarie.png
        height = 10, width = 6)
 
 # Map backscatter
-nasc.map.ns <- base.map +
+nasc.map.ns.lm <- base.map +
   # Plot transects data
   geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
           size = 0.5, colour = "gray70", 
@@ -250,15 +250,15 @@ nasc.map.ns <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("CPS Backscatter") +
+  ggtitle("CPS Backscatter-Lisa Marie") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
 
-ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_LisaMarie.png"),
+ggsave(nasc.map.ns.lm, filename = here("Figs/fig_backscatter_cps_LisaMarie.png"),
        height = 10, width = 6)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 1,
+nasc.set.wt.combo <- plot_grid(nasc.map.ns.lm, set.pies, nrow = 1,
                                labels = c("a)", "b)"))
 
 # Save combo map
@@ -310,10 +310,6 @@ set.pies <- base.map +
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
-  # geom_text(data = set.pos, aes(X, Y, label = label),
-  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
-  #                                      "PacHerring", "PacMack", "Sardine"),
-  #                             color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
@@ -333,7 +329,7 @@ ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LongBeachCarn
 
 # Map backscatter
 # Map backscatter
-nasc.map.ns <- base.map +
+nasc.map.ns.lbc <- base.map +
   # Plot transects data
   geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
           size = 0.5, colour = "gray70", 
@@ -352,15 +348,15 @@ nasc.map.ns <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("CPS Backscatter") +
+  ggtitle("CPS Backscatter-Long Beach Carnage") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
 
-ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_LongBeachCarnage.png"),
+ggsave(nasc.map.ns.lbc, filename = here("Figs/fig_backscatter_cps_LongBeachCarnage.png"),
        height = 6, width = 10)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, nrow = 2,
+nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, nrow = 2,
                                labels = c("a)", "b)"))
 
 # Save combo map
@@ -457,7 +453,7 @@ ggsave(haul.pies, filename = here("Figs/fig_trawl_proportion_haul_wt_Saildrone.p
        height = 10, width = 4)
 
 # Map backscatter
-nasc.map.ns <- base.map +
+nasc.map.ns.sd <- base.map +
   # Plot transects data
   geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
           size = 0.5, colour = "gray70", 
@@ -476,20 +472,30 @@ nasc.map.ns <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("CPS Backscatter") +
+  ggtitle("CPS Backscatter-USV") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
 
-ggsave(nasc.map.ns, filename = here("Figs/fig_backscatter_cps_Saildrone.png"),
-       height = 10, width = 4)
+ggsave(nasc.map.ns.sd, filename = here("Figs/fig_backscatter_cps_Saildrone.png"),
+       height = 10, width = 6)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns, haul.pies, nrow = 1,
+nasc.set.wt.combo <- plot_grid(nasc.map.ns.sd, haul.pies, nrow = 1,
                                labels = c("a)", "b)"))
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_trawl_proportion_haul_wt_Saildrone.png"),
-       height = 10, width = 8)
+       height = 10, width = 12)
+
+
+# Combine all backscatter figures -----------------------------------------
+nasc.ns.combo <- plot_grid(nasc.map.ns.lm, nasc.map.ns.sd, nasc.map.ns.lbc,
+                           align = "v", nrow = 1, 
+                           labels = c("a)", "b)", "c)"))
+
+# Save combo map
+ggsave(nasc.ns.combo, filename = here("Figs/fig_backscatter_cps_AllNearshore.png"),
+       height = 10, width = 20)
 
 # Real length/weigth relationship models for each species
 lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
