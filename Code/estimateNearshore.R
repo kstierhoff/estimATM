@@ -308,11 +308,11 @@ save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 # If enforcing max cluster distance, set proportions for each species to zero
 # where cluster.distance > max.cluster.dist
 if (limit.cluster.dist["NS"]) {
-  nasc.offshore$prop.anch[nasc.offshore$cluster.dist > max.cluster.dist] <- 0
-  nasc.offshore$prop.sar[nasc.offshore$cluster.dist  > max.cluster.dist] <- 0
-  nasc.offshore$prop.jack[nasc.offshore$cluster.dist > max.cluster.dist] <- 0
-  nasc.offshore$prop.mack[nasc.offshore$cluster.dist > max.cluster.dist] <- 0
-  nasc.offshore$prop.her[nasc.offshore$cluster.dist  > max.cluster.dist] <- 0  
+  nasc.nearshore$prop.anch[nasc.nearshore$cluster.dist > max.cluster.dist] <- 0
+  nasc.nearshore$prop.sar[nasc.nearshore$cluster.dist  > max.cluster.dist] <- 0
+  nasc.nearshore$prop.jack[nasc.nearshore$cluster.dist > max.cluster.dist] <- 0
+  nasc.nearshore$prop.mack[nasc.nearshore$cluster.dist > max.cluster.dist] <- 0
+  nasc.nearshore$prop.her[nasc.nearshore$cluster.dist  > max.cluster.dist] <- 0  
 }
 
 # Create data frame for plotting acoustic proportions by species
@@ -2039,4 +2039,52 @@ if (save.figs) {
 if (save.figs) {
   # Plot nearshore backscatter and purse seine data
   source(here("Code", paste0("plot_purseSeine_", survey.name, ".R")))
+}
+
+# Plot sA for CPS -------------------------------------------
+# Create vessel paths for plotting
+nav.paths.ns <- nasc.region %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(key) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup()
+
+# Select plot levels for backscatter data
+nasc.levels.all <- unique(nasc.plot.ns$bin.level)
+nasc.labels.all <- nasc.labels[sort(nasc.levels.all)]
+nasc.sizes.all  <- nasc.sizes[sort(nasc.levels.all)]
+nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
+
+if (save.figs) {
+  # Map backscatter
+  nasc.map.cps.ns <- base.map +
+    # Plot transects data
+    geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
+            size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.ns, colour = "gray50", size = 0.5, alpha = 0.5) +
+    # Plot NASC data
+    geom_point(data = nasc.plot.ns, aes(X, Y, size = bin, fill = bin), 
+               shape = 21, alpha = 0.75) +
+    # Configure size and colour scales
+    scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                      values = nasc.sizes.all,labels = nasc.labels.all) +
+    scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                      values = nasc.colors.all,labels = nasc.labels.all) +
+    # Configure legend guides
+    guides(fill = guide_legend(), size = guide_legend()) +
+    # Plot title
+    ggtitle("CPS Backscatter-Nearshore") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  # Save nasc plot
+  ggsave(nasc.map.cps.ns,
+         filename = here("Figs/fig_backscatter_cps_ns.png"),
+         width = map.width, height = map.height) 
+  
+  save(nasc.map.cps.ns, file = here("Output/nasc_plot_cps_ns.Rdata"))
 }
