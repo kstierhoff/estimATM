@@ -6983,9 +6983,6 @@ abund.summ.total <- lf.summ %>%
 # Create list for storing lf plots
 lf.summ.plots <- list()
 
-# Set number of columns in facet plot
-lf.ncols <- 5
-
 # # Export data for Juan to reproduce figures and correct percent contributions
 # save(lf.summ, abund.summ.total, strata.final, nasc, abundance.estimates,
 #      file = here("Output/lf_data_for_juan.Rdata"))
@@ -7090,22 +7087,29 @@ for (i in unique(strata.final$scientificName)) {
           strip.text.x       = element_text(face = "bold"))
   
   # Determine number of panels for setting aspect ratio
-  n.facets <- filter(lf.summ, scientificName == i) %>% 
-    group_by(cluster) %>% 
-    summarise(n = n()) %>% 
-    nrow()/lf.ncols
+  # n.facets <- filter(lf.summ, scientificName == i) %>% 
+  #   group_by(cluster) %>% 
+  #   summarise(n = n()) %>% 
+  #   nrow()/lf.ncols 
+  
+  n.facets <- filter(lf.summ, scientificName == i) %>%
+    group_by(scientificName) %>%
+    summarise(n_facets = n_distinct(cluster)/lf.ncols) %>%
+    pull()
   
   # Set aspect ratio for saved figures
-  a.ratio <- ceiling(n.facets)/lf.ncols
+  a.ratio <- round(n.facets)/lf.ncols
   
   # Save plot
   ggsave(lf.summ.plot, 
          filename = paste(here("Figs/fig_cluster_relative_length_frequency_"), 
                           i, ".png", sep = ""),
          height = 10*a.ratio, width = 10) 
+  
   # Add new plot to list
   lf.summ.plots[[i]] <- lf.summ.plot
 }
+
 # Save plots
 save(lf.summ.plots, file = here("Output/relative_length_frequencies_all.Rdata"))
 
