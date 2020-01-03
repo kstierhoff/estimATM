@@ -1644,5 +1644,5 @@ if (save.figs) {
          filename = here("Figs/fig_backscatter_cps_os.png"),
          width = map.width, height = map.height) 
   
-  save(nasc.map.cps.ns, file = here("Output/nasc_plot_cps_os.Rdata"))
+  save(nasc.map.cps.os, file = here("Output/nasc_plot_cps_os.Rdata"))
 }

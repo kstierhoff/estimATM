@@ -15,7 +15,7 @@ bibliography: bib/ast_bib.bib
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,mapview,
+pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,mapview,rgeos,
           knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
           maptools,png,grid,gridExtra,cowplot,flextable,fs,magick,
           stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
@@ -696,26 +696,26 @@ if (process.scs) {
 ```{r import-trawl-data}
 if (trawl.source == "SQL") {
   # Configure ODBC connection to TRAWL database
-  trawl.channel  <- dbConnect(odbc(), 
+  trawl.con  <- dbConnect(odbc(), 
                  Driver = "SQL Server", 
                  Server = "161.55.235.187", 
                  Database = "TRAWL", 
                  Trusted_Connection = "True")
 } else if (trawl.source == "Access") {
-  trawl.channel  <- dbConnect(odbc::odbc(), 
-                    Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                    DBQ = file.path(here("Data/Trawl"), trawl.db.access))
+  trawl.con  <- dbConnect(odbc::odbc(), 
+                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                          DBQ = file.path(here("Data/Trawl"), trawl.db.access))
 }
 
 # Import trawl database tables
-catch.all	     <- tbl(trawl.channel,"Catch") %>% collect()
-haul.all       <- tbl(trawl.channel,"Haul") %>% collect()
-lengths.all    <- tbl(trawl.channel,"Specimen") %>% collect()
-lengthFreq.all <- tbl(trawl.channel,"LengthFrequency") %>% collect()
-spp.codes      <- tbl(trawl.channel,"SpeciesCodes") %>% collect()
+catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
+haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
+lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
 
 # Close database channel
-dbDisconnect(trawl.channel)
+dbDisconnect(trawl.con)
 
 # Save imported database data to .Rdata file
 save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
