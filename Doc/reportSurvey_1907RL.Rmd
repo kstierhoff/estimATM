@@ -80,7 +80,7 @@ overwrite.csv   <- F # overwrite CSV files when copying
 overwrite.files <- F # overwrite files when copying
 download.maps   <- F # download habitat map
 save.figs       <- F # draw plots and maps, or use existing
-
+get.db          <- F # import database data
 process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- F # download nave data from ERDDAP
 process.csv     <- F # process CSV files from Echoview
@@ -697,32 +697,36 @@ if (process.scs) {
 ```
 
 ```{r import-trawl-data}
-if (trawl.source == "SQL") {
-  # Configure ODBC connection to TRAWL database
-  trawl.con  <- dbConnect(odbc(), 
-                 Driver = "SQL Server", 
-                 Server = "161.55.235.187", 
-                 Database = "TRAWL", 
-                 Trusted_Connection = "True")
-} else if (trawl.source == "Access") {
-  trawl.con  <- dbConnect(odbc::odbc(), 
-                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                          DBQ = file.path(here("Data/Trawl"), trawl.db.access))
+if (get.db) {
+  if (trawl.source == "SQL") {
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "SQL Server", 
+                            Server = "161.55.235.187", 
+                            Database = "TRAWL", 
+                            Trusted_Connection = "True")
+  } else if (trawl.source == "Access") {
+    trawl.con  <- dbConnect(odbc::odbc(), 
+                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                            DBQ = file.path(here("Data/Trawl"), trawl.db.access))
+  }
+  
+  # Import trawl database tables
+  catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
+  haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+  lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
+  lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+  spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+  
+  # Close database channel
+  dbDisconnect(trawl.con)
+  
+  # Save imported database data to .Rdata file
+  save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+       file = here("Data/Trawl/trawl_data.Rdata"))
+} else {
+  load(here("Data/Trawl/trawl_data.Rdata"))
 }
-
-# Import trawl database tables
-catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
-haul.all       <- tbl(trawl.con,"Haul") %>% collect()
-lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
-spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
-
-# Close database channel
-dbDisconnect(trawl.con)
-
-# Save imported database data to .Rdata file
-save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
-     file = here("Data/Trawl/trawl_data.Rdata"))
 ```
 
 ```{r process-trawl-haul-data}
@@ -1555,15 +1559,17 @@ On the three USVs (SD-1045, SD-1046, and SD-1047), a miniature wideband transcei
 ### Calibrations {#methods-echosounder-calibration}  
 On _`r survey.vessel`_, the transducer integrities were first verified through transducer-impedance measurements in water and air using an LCR meter (Agilent E4980A) and custom software (MATLAB; The MathWorks, Inc.). The impedance magnitude ($|Z|$, $\Omega$), phase ($\theta$, $^\circ$), conductance ($G$, $S$), susceptance ($B$, $S$), resistance ($R$, $\Omega$), and reactance ($X$, $\Omega$) were measured over broadband frequency ranges for each transducer quadrant (**Appendix \@ref(appendix-impedance-analyisis)**). No transducer impedance measurements were made on other vessels.  
 
-Next, the echosounder systems on each vessel were calibrated using the standard sphere technique [@Foote1987;@Demer2015]. On _`r survey.vessel`_, each WBT was calibrated in both CW (i.e., continuous wave or chirp mode) and FM modes (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere` (`r cal.sphere.name`); calibrations of WBTs in FM mode used both the WC38.1 and a smaller 25 mm WC sphere (not presented). All GPTs and WBTs on each vessel were configured using the calibration results via the control software (EK80 `r ek80.version`, Simrad; see **Section \@ref(results-echosounder-calibration)**). Calibration results for _`r survey.vessel`_'s WBTs in FM mode are not presented.  
+Next, the echosounder systems on each vessel were calibrated using the standard sphere technique [@Foote1987;@Demer2015]. On _`r survey.vessel`_, each WBT was calibrated in both CW (i.e., continuous wave or chirp mode) and FM modes (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere` (`r cal.sphere.name`); calibrations of WBTs in FM mode used both the WC38.1 and a smaller 25 mm WC sphere (not presented). On each vessel, GPTs or WBTs were configured using the calibration results via the control software (EK80 `r ek80.version`, Simrad; see **Section \@ref(results-echosounder-calibration)**). Calibration results for _`r survey.vessel`_'s WBTs in FM mode are not presented.  
 
 ### Data collection {#methods-acoustic-data-collection}  
 
-Computer clocks were synchronized with the GPS clock (UTC) using synchronization software (NetTime^[http://timesynctool.com]). Echosounder pulses were transmitted simultaneously at all frequencies, at variable intervals, as controlled by the ER60 Adaptive Logger [EAL^[https://swfsc.noaa.gov/eal/], @Renfree2016]. The EAL optimizes the pulse interval, based on the seabed depth, while avoiding aliased seabed echoes. Acoustic sampling for CPS-density estimation along the pre-determined transects was limited to daylight hours (approximately between sunrise and sunset).
+Computer clocks were synchronized with the GPS clock (UTC) using synchronization software (NetTime^[http://timesynctool.com]). Echosounder pulses were transmitted simultaneously at all frequencies, at variable intervals, as controlled by the ER60 Adaptive Logger [EAL^[https://swfsc.noaa.gov/eal/], @Renfree2016]. The EAL optimizes the pulse interval, based on the seabed depth, while avoiding aliased seabed echoes. Acoustic sampling for CPS-density estimation along the pre-determined transects was limited to daylight hours (approximately between sunrise and sunset).  
+
+The echosounder data from the USVs were erroneously timestamped (UTC+7 hrs), causing the correctly timestamped (UTC) navigation data to be mismatched. The erroneous timestamps were corrected in post-processing using the Fileset Time Offset parameter in Echoview.
 
 Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$, dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were logged to 60 m beyond the detected seabed range or to a maximum of `r raw.log.range` m and stored in Simrad .raw format with a `r raw.size`-MB maximum file size. For each acoustic instrument, the prefix for the file names is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software. For example, file generated by the Simrad EK80 software (`r ek80.version`) for a WBT operated in CW mode is named `1907RL-CW-D20190723-T125901.raw`.   
 
-To minimize acoustic interference, transmit pulses from the ME70, the MS70, the SX90, and the acoustic Doppler current profiler (Ocean Surveyor Model OS75 ADCP, Teledyne RD Instruments) were triggered using the K-Sync synchronization system (Simrad). All other instruments that produce sound within the echosounder bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Sperry Marine Model SRD-500A), or both.  
+To minimize acoustic interference, transmit pulses from the ME70, the MS70, the SX90, and the acoustic Doppler current profiler (Ocean Surveyor Model OS75 ADCP, Teledyne RD Instruments) were triggered using the K-Sync synchronization system (Simrad). All other instruments that produce sound within the echosounder bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Sperry Marine Model SRD-500A), or both. **[Add details about transmit pulse syncronization for nearshore vessels.]**
 
 ### Data processing {#methods-acoustic-data-processing}  
 
@@ -1585,7 +1591,9 @@ Echoes from schooling CPS and plankton (**Fig. \@ref(fig:ev-filtering-example)a,
 + Integrate the volume backscattering coefficients ($s_V$, m^2^ m^-3^) attributed to CPS over 5-m depths and averaged over 100-m distances;
 + Output the resulting nautical area scattering coefficients ($s_A$; m^2^ nmi^-2^) and associated information from each transect and frequency to comma-delimited text (.csv) files.  
 
-When necessary, the start and stop integration lines were manually edited to exclude reverberation due to bubbles, to include the entirety of shallow CPS aggregations, or to exclude seabed echoes.
+When necessary, the start and stop integration lines were manually edited to exclude reverberation due to bubbles, to include the entirety of shallow CPS aggregations, or to exclude seabed echoes.  
+
+**[Any differences between processing templates for nearshore vessels?]**
     
 (ref:ev-filtering-example) Echogram depicting CPS schools (red) and plankton aggregations (blue and green) at 38 kHz (top row) and 120 kHz (bottom row). Example data processing steps include the original echogram (left column), after noise subtraction and bin-averaging (middle column), and after filtering to retain only putative CPS echoes (right column).
 
@@ -1630,6 +1638,18 @@ include_graphics(here("Images/img_Nordic_264.png"))
 ```  
 
 \newpage  
+
+## Purse seine sampling {#methods-seine-sampling}  
+
+Purse seines were set to provide information about size, age, and species composition of fishes observed in the echosounders mounted on the fishing vessels. All specimens collected by _Lisa Marie_ and _Long Beach Carnage_ were frozen and later processed by the Washington Department of Fish and Wildlife (WDFW) or California Department of Fish and Wildlife (CDFW), respectively.  
+
+On _Lisa Marie_, as many as three purse seine sets were planned each day. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, Pacific Sardine, Northern Anchovy, Jack Mackerel, Pacific Mackerel, and Pacific Herring were sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set.
+
+The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 25 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually, and gonads were collected and preserved from female specimens.
+
+On _Long Beach Carnage_, a maximum of one set per day was planned during daylight hours. In the event of abundant CPS or an unsuccessful daytime set, a set was made at night. For each set, three dip net samples, spatially separated as much as possible, were collected, and specimens were frozen for later analysis by CDFW biologists. The total weight (tons) of the school was estimated by the captain. After the survey, each dip net sample was sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set.  
+
+The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 50 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually. Since samples were frozen, no gonad samples were analyzed from female specimens.  
 
 ## Ichthyoplankton and oceanographic sampling {#methods-other-sampling}
 ### Egg and larva sampling {#methods-egg-sampling}  
@@ -1773,14 +1793,25 @@ if (doc.type == "docx") {
 \newpage  
 
 ## Data collection {#results-data-collection}
-### Acoustic and trawl sampling {#results-acoustic-trawl-sampling}  
+### Acoustic and net sampling {#results-acoustic-trawl-sampling}  
 
-The primary survey spanned an area from approximately `r survey.landmark.n`, to `r survey.landmark.s` (**Fig. \@ref(fig:station-sampling)**), with `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and `r nrow(trawl.summ)` Nordic trawls. In the offshore area between Florence, OR and San Diego, _`r survey.vessel`_ surveyed `r num2words(n_distinct(nasc.summ.rl.os$transect))` east-west transects totaling `r prettyNum(sum(nasc.summ.rl.os$distance), digits = 1, big.mark = ",")` nmi, and two USVs (SD-1045 and SD-1046) surveyed `r n_distinct(nasc.summ.sd.os$transect)` east-west transects totaling `r prettyNum(sum(nasc.summ.sd.os$distance), digits = 1, big.mark = ",")` nmi.  
+```{r load-nearshore-nasc-summary}
+load(here("Output/purse_seine_sets.Rdata"))
+load(here("Output/nasc_summ_tx_ns.Rdata"))
+
+nasc.summ.lm.ns  <- filter(nasc.summ.ns, vessel.name == "LM")
+nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
+nasc.summ.sd.ns  <- filter(nasc.summ.ns, vessel.name == "SD")
+```  
+
+The core survey region spanned an area from approximately `r survey.landmark.n`, to `r survey.landmark.s` (**Fig. \@ref(fig:station-sampling)**), with `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and `r nrow(trawl.summ)` Nordic trawls. 
+
+In the nearshore region, F/V _Lisa Marie_ surveyed from approximately Cape Flattery the WA-OR border (**Fig. \@ref(fig:nasc-seine-lm)**), with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r nrow(lm.sets)` purse seine sets. The USV (SD-1047) surveyed between Cape Flattery and Pt. Conception, with `r nrow(nasc.summ.sd.ns)` east-west transects totaling `r sprintf("%.0f", sum(nasc.summ.sd.ns$distance))` nmi (**Fig. \@ref(fig:nasc-trawl-sd)**). F/V _Long Beach Carnage_ surveyed from approximately Pt. Conception to San Diego, including the nearshore waters around Santa Cruz and Santa Catalina Islands  (**Fig. \@ref(fig:nasc-seine-lbc)**), with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets.
+
+In the offshore region, between Florence, OR and San Diego, _`r survey.vessel`_ surveyed `r num2words(n_distinct(nasc.summ.rl.os$transect))` east-west transects totaling `r prettyNum(sum(nasc.summ.rl.os$distance), digits = 1, big.mark = ",")` nmi, and two USVs (SD-1045 and SD-1046) surveyed `r n_distinct(nasc.summ.sd.os$transect)` east-west transects totaling `r prettyNum(sum(nasc.summ.sd.os$distance), digits = 1, big.mark = ",")` nmi.  
 
 **Leg I**  
 On 13 June, _`r survey.vessel`_ departed from the Exploratorium (Pier 15) in San Francisco, CA at ~1800 (all times UTC) and began the transit to northern Vancouver Island. Throughout the transit, sampling was conducted during the day with CUFES, EK60s, EK80s, ME70, MS70 and SX90. On 17 June, _`r survey.vessel`_ arrived at the first offshore station off Cape Scott, British Columbia at ~1230 to begin acoustic sampling along transect 129. On 1 July, acoustic sampling ceased after the completion of transect 84 off Newport, OR. On 2 July, _`r survey.vessel`_ arrived at the Marine Operations-Pacific (MOC-P) Pier in Newport at ~2100 to complete Leg I.  
-
-On 21 June, Greg Shaughnessy (Ocean Gold Seafoods) embarked _`r survey.vessel`_ from F/V _Lisa Marie_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with the echosounder before rejoining _`r survey.vessel`_. At ~1900 on 25 June, Mr. Shaughnessy disembarked and was put ashore in Westport, WA via _`r survey.vessel`_'s skiff.  
 
 **Leg II**  
 On 8 July, _`r survey.vessel`_ departed from MOC-P Pier in Newport, OR, at ~0000. Acoustic sampling resumed at ~0145 on 8 July along transect 083 south of Newport, OR. On 24 July, acoustic sampling ceased after the completion of transect 050 off Albion, CA. On 25 July, _`r survey.vessel`_ arrived at the Pier 30/32 in San Francisco, CA at ~1300 to complete Leg II.  
@@ -1795,7 +1826,17 @@ On 22 August, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in S
 
 #### Nearshore sampling  
 
-Nearshore acoustic sampling was conducted along ~5 nmi-long transects spaced ~5 nmi apart to provide estimates of CPS biomass in shallow, nearshore waters where _`r survey.vessel`_ did not sample. During Legs I and IV, _`r survey.vessel`_ sampling off the coasts of WA and OR and in the Southern CA Bight was augmented with nearshore echosounder and purse-seine sampling from industry fishing vessels, F/V _Lisa Marie_ and _Long Beach Carnage_, respectively. Additionally, a USV conducted echosounder sampling nearshore, between Cape Flattery, WA and Pt. Conception. Details of those surveys are presented in **Appendix \@ref(appendix-nearshore)**.  
+During Leg I (from 20 June to 1 July), _`r survey.vessel`_ coordinated sampling with F/V _Lisa Marie_ between Cape Flattery, WA and the OR-CA border. On 21 June, Greg Shaughnessy (Ocean Gold Seafoods) embarked _`r survey.vessel`_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with the echosounder before rejoining _`r survey.vessel`_. At ~1900 on 25 June, Mr. Shaughnessy disembarked and was put ashore in Westport, WA via _`r survey.vessel`_'s skiff.  
+
+**[Combine with text above.]**
+
+On 21 June, Greg Shaughnessy (Ocean Gold Seafoods) embarked _`r survey.vessel`_ from F/V _Lisa Marie_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with the echosounder before rejoining _`r survey.vessel`_. At ~1900 on 25 June, Mr. Shaughnessy disembarked and was put ashore in Westport, WA via _`r survey.vessel`_'s skiff.  
+
+During Legs **II and III (from 20 June to 24 August)**, one USV (SD-1047) conducted daytime acoustic sampling between Cape Flattery and Pt. Conception. Between approximately Tillamook, OR and Pt. Arena, transects were sampled at 10-nmi spacing to allow the USV to catch-up to _`r survey.vessel`_. During Leg IV (from 26 August to 6 September), _`r survey.vessel`_ coordinated sampling with F/V _Long Beach Carnage_ in the Southern CA Bight between Pt. Conception and San Diego and around the northern Channel Islands.  
+
+#### Offshore sampling
+
+**[Add details here. See biomass report for sample text.]**
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
 
@@ -1838,7 +1879,7 @@ The combined use of NOAA ships, fishing vessels, and USVs to conduct ATM surveys
 
 + The USV sampled acoustic transects nearshore, where wind was often light and variable, had difficulty navigating and progressed slowly along the coasts of WA and OR compared to the offshore USVs, and therefore had decreased coincident sampling with _`r survey.vessel`_;
 + The fishing vessels and USVs sampled with fewer echosounder frequencies than _`r survey.vessel`_. Consequently, there were differences in the acoustic data processing which may affect the identification of CPS echoes;
-+ Researchers at NWFSC detected an erroneous timestamp in the echosounder data collected by Saildrone, but after initial data processing had been completed (see **Appendix \@ref(appendix-nearshore-acoustic-sampling-saildrone)**). Consequently, the data from the nearshore and offshore strata had to be completely reprocessed.
++ Researchers at NWFSC detected an erroneous timestamp in the echosounder data collected by Saildrone, but after initial data processing had been completed (see **Appendix \@ref(appendix-nearshore-acoustic-sampling-saildrone)**).  
 
 \newpage  
 \blandscape  
@@ -1994,38 +2035,6 @@ In summer 2018, _`r survey.vessel`_ only surveyed in water depths greater than ~
 
 Nearshore acoustic sampling was conducted during the day along ~5 nmi-long transects spaced ~5 nmi apart placed as close to shore as possible to provide estimates of CPS biomass in shallow, nearshore waters between Cape Flattery and San Diego. Acoustic sampling was conducted from F/V _Lisa Marie_ along the coast of WA and OR; and from and F/V _Long Beach Carnage_ along the mainland coast and around the northern Channel Islands in the Southern CA Bight; purse seines were set from each vessel to provide information about acoustic targets. Acoustic-only sampling was conducted from the nearshore USV between Cape Flattery and Pt. Conception; trawl samples from _`r survey.vessel`_ provided information about acoustic targets.  
 
-### Acoustic sampling {#appendix-nearshore-acoustic-sampling}
-
-#### F/V _Lisa Marie_ {#appendix-nearshore-acoustic-sampling-lisa-marie}
-
-During Leg I (from 20 June to 1 July), _`r survey.vessel`_ coordinated sampling with F/V _Lisa Marie_ between Cape Flattery, WA and the OR-CA border. 
-
-_Lisa Marie_ conducted echosounder-sonar transects between the eastern ends of _`r survey.vessel`_’s acoustic transects and shore. Purse seines were set to provide information about size, age, and species composition of fishes observed in the echosounders (see **Appendix \@ref(appendix-nearshore-net-sampling)** below). All specimens were frozen and later processed by the Washington Department of Fish and Wildlife (WDFW). On 21 June, Greg Shaughnessy (Ocean Gold Seafoods) embarked _`r survey.vessel`_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with the echosounder before rejoining _`r survey.vessel`_. At ~1900 on 25 June, Mr. Shaughnessy disembarked and was put ashore in Westport, WA via _`r survey.vessel`_'s skiff.  
-
- 
-#### Unmanned surface vehicles {#appendix-nearshore-acoustic-sampling-saildrone}  
-
-During Leg IV (from 20 June to 24 August), one USV (SD-1047) conducted daytime acoustic sampling in shallow, nearshore waters between Cape Flattery and Pt. Conception. Between approximately Tillamook, OR and Pt. Arena, transects were sampled at 10-nmi spacing to allow the USV to catch-up to _`r survey.vessel`_.  
-
-The echosounder data from the Saildrones were erroneously timestamped (UTC+7 hrs), causing the correctly timestamped (UTC) navigation data to be mismatched. The erroneous timestamps were corrected in post-processing using the Fileset Time Offset parameter in Echoview.  
-
-#### F/V _Long Beach Carnage_ {#appendix-nearshore-acoustic-sampling-carnage}  
-
-During Leg IV (from 26 August to 6 September), _`r survey.vessel`_ coordinated sampling with F/V _Long Beach Carnage_ in the Southern CA Bight between Pt. Conception and San Diego and around the northern Channel Islands. _Long Beach Carnage_ conducted echosounder-sonar transects between the eastern ends of _`r survey.vessel`_’s acoustic transects and shore. Purse seines were set to provide information about the size, age, and species composition of fish echoes sampled by the echosounders (see **Appendix \@ref(appendix-nearshore-net-sampling)** below). All specimens were frozen and later processed by the California Department of Fish and Wildlife (CDFW).  
-
-### Purse seine sampling {#appendix-nearshore-net-sampling}
-#### F/V _Lisa Marie_ {#appendix-nearshore-net-sampling-lisa-marie}
-
-As many as three purse seine sets were planned each day. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, Pacific Sardine, Northern Anchovy, Jack Mackerel, Pacific Mackerel, and Pacific Herring were sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set.
-
-The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 25 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually, and gonads were collected and preserved from female specimens.  
-
-#### F/V _Long Beach Carnage_ {#appendix-nearshore-net-sampling-carnage}
-
-A maximum of one set per day was planned during daylight hours. In the event of abundant CPS or an unsuccessful daytime set, a set was made at night. For each set, three dip net samples, spatially separated as much as possible, were collected, and specimens were frozen for later analysis by CDFW biologists. The total weight (tons) of the school was estimated by the captain. After the survey, each dip net sample was sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set.  
-
-The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 50 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually. Since samples were frozen, no gonad samples were analyzed from female specimens.  
-
 \newpage
 
 ## Results {#appendix-nearshore-results}
@@ -2034,16 +2043,7 @@ The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all
 
 ### Acoustic and purse seine sampling {#appendix-nearshore-results-sampling}
 
-```{r load-nearshore-nasc-summary}
-load(here("Output/purse_seine_sets.Rdata"))
-load(here("Output/nasc_summ_tx_ns.Rdata"))
-
-nasc.summ.lm.ns  <- filter(nasc.summ.ns, vessel.name == "LM")
-nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
-nasc.summ.sd.ns  <- filter(nasc.summ.ns, vessel.name == "SD")
-```
-
-F/V _Lisa Marie_ surveyed the nearshore area from approximately Cape Flattery the WA-OR border (**Fig. \@ref(fig:nasc-seine-lm)**), with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r nrow(lm.sets)` purse seine sets. The USV (SD-1047) surveyed the nearshore area between Cape Flattery and Pt. Conception, with `r nrow(nasc.summ.sd.ns)` east-west transects totaling `r sprintf("%.0f", sum(nasc.summ.sd.ns$distance))` nmi (**Fig. \@ref(fig:nasc-trawl-sd)**). F/V _Long Beach Carnage_ surveyed the nearshore area from approximately Pt. Conception to San Diego, including the nearshore areas around Santa Cruz and Santa Catalina Islands  (**Fig. \@ref(fig:nasc-seine-lbc)**), with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets.  
+  
 
 ### Distribution of CPS {#appendix-nearshore-results-distribution}
 
