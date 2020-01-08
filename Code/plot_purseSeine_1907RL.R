@@ -306,10 +306,10 @@ set.pies <- base.map +
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
-  scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = radius*0.5),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
-                              color = 'black', alpha = 0.8) +
+  # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = radius*0.5),
+  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
+  #                                      "PacHerring", "PacMack", "Sardine"),
+  #                             color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
