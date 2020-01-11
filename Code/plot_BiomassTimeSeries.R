@@ -21,6 +21,21 @@ if (get.db) {
   load(here("Output/biomass_database.Rdata"))
 }
 
+# Summarise results across regions
+biomass.ts.var <- biomass.ts %>% 
+  filter(stratum == "All", !region %in% c("Offshore")) %>% 
+  select(survey, species, stock, biomass_sd) %>% 
+  group_by(survey, species, stock) %>%
+  summarise(biomass_sd = sqrt(sum(biomass_sd^2)))
+
+biomass.ts <- biomass.ts %>% 
+  filter(stratum == "All", !region %in% c("Offshore")) %>%
+  group_by(survey, species, stock) %>% 
+  select(-region, -stratum, -biomass_sd, -biomass_cv) %>% 
+  summarise_all(list(sum)) %>% 
+  left_join(biomass.ts.var) %>% 
+  mutate(biomass_cv = biomass_sd/biomass*100)
+
 # Combine most recent estimates ------------------------------------------------
 
 # Format data ------------------------------------------------------------------
@@ -32,9 +47,8 @@ biomass.ts <- biomass.ts %>%
 
 # Create plot ------------------------------------------------------------------
 # Create line plot - single
-biomass.ts.line <- ggplot(filter(biomass.ts, stratum == "All", region == "Core"),
-                          aes(x = factor(year), y = biomass, colour = group,
-                              group = group)) +
+biomass.ts.line <- ggplot(biomass.ts, 
+                          aes(x = factor(year), y = biomass, colour = group, group = group)) +
   geom_path() +
   geom_point() +
   scale_colour_manual(name = 'Species',
@@ -54,7 +68,7 @@ ggsave(biomass.ts.line,
        width = 10, height = 6)
 
 # Create line plot - faceted
-biomass.ts.line.facet <- ggplot(filter(biomass.ts, stratum == "All", region == "Core"),
+biomass.ts.line.facet <- ggplot(biomass.ts,
                                 aes(x = factor(year), y = biomass, group = group)) +
   geom_path() +
   geom_point() +
@@ -75,11 +89,11 @@ ggsave(biomass.ts.line.facet,
        width = 10, height = 6)
 
 # Create stacked bar plot
-biomass.ts.bar <- ggplot(filter(biomass.ts, stratum == "All", region == "Core"), 
-                         aes(x = year, y = biomass, fill = species)) + 
-  geom_bar(colour = "black", position = "stack", stat = "identity") +
-  scale_fill_manual(name = 'Species',
-                    labels = c("Clupea pallasii", "Engraulis mordax", "Sardinops sagax",
+biomass.ts.bar <- ggplot(biomass.ts, 
+                         aes(x = factor(year), y = biomass, fill = group)) + 
+  geom_bar(colour = "black", position = "stack", stat = "identity", width = 0.6) +
+  scale_fill_manual(name = 'Species (Stock)',
+                    labels = c("Clupea pallasii", "Engraulis mordax (Southern)", "Sardinops sagax (Northern)",
                                "Scomber japonicus", "Trachurus symmetricus"),
                     values = c(pac.herring.color, anchovy.color,  
                                sardine.color, pac.mack.color, jack.mack.color)) +
@@ -92,4 +106,4 @@ biomass.ts.bar <- ggplot(filter(biomass.ts, stratum == "All", region == "Core"),
 # Save figure
 ggsave(biomass.ts.bar, 
        filename = here("Figs/fig_biomass_ts_bar.png"),
-       width = 10, height = 6)
+       width = 10, height = 4)

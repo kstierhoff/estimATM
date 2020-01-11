@@ -3438,7 +3438,7 @@ clust.dist.hist <- ggplot(filter(nasc.clust.hist, density > 0)) +
   theme_bw() + 
   xlab("Distance to positive cluster (nmi)") + 
   ylab("Frequency") +
-  ggtitle("Positive Intervals") +
+  # ggtitle("Positive Intervals") +
   theme(strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "italic"))
 
@@ -3486,19 +3486,27 @@ nasc.clust.biom <- nasc.clust.biom %>%
   mutate(cum.biom = cumsum(total.density),
          rel.cum.biom = cum.biom/max(cum.biom))
 
+# Summarize ECDF to get max cluster distance to X % cumulative biomass
+nasc.clust.biom.summ <- nasc.clust.biom %>% 
+  group_by(species) %>% 
+  summarise(max.cluster.dist = distance[min(which(rel.cum.biom >= cum.biomass.limit))])
+
 # Plot histogram of acoustic biomass
 clust.biom.hist <- ggplot(nasc.clust.biom, aes(distance, total.density)) + 
   geom_bar(stat = "identity") + 
   facet_wrap(~species, nrow = 1) +
   theme_bw() + xlab("Distance to positive cluster (nmi)") + 
   ylab("Total biomass") +
-  ggtitle("Biomass") +
+  # ggtitle("Biomass") +
   theme(strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "italic"))
 
 # Plot ECDF
 clust.biom.ecdf <- ggplot(nasc.clust.biom, aes(distance, rel.cum.biom)) + 
   geom_line() + 
+  geom_vline(data = nasc.clust.biom.summ, 
+             aes(xintercept = max.cluster.dist),
+             linetype = "dashed") +
   facet_wrap(~species, nrow = 1) +
   theme_bw() + 
   xlab("Distance to positive cluster (nmi)") + 

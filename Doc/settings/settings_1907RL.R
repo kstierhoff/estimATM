@@ -353,6 +353,8 @@ limit.cluster.dist     <- c(OS  = TRUE,
                             NS  = FALSE) 
 
 # Maximum distance to trawl clusters
+cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
+
 # If limit.cluster.dist == TRUE, set proportions to zero at distances greater than max.cluster.dist
 max.cluster.dist       <- 30
 
