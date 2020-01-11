@@ -27,7 +27,7 @@ dir_create(here("Output/routes",
                 c("Compulsory","Adaptive","Nearshore","Saildrone")))
 
 # Randomize
-do.random <- FALSE
+do.random <- TRUE
 save.csv  <- TRUE
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -37,7 +37,7 @@ fsv.buffer <- 80
 # Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10.1 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns <- tx.spacing.fsv/5 # For nearshore sampling
+tx.spacing.ns <- tx.spacing.fsv/2 # For nearshore sampling
 
 # Minimum transect length
 min.tx.length <- 0 # nmi
@@ -54,17 +54,17 @@ Information about the baseline transects, from which the final transects will be
 
 ```{r read-info,message=FALSE}
 # Read start locations
-baseline.info <- read_csv(here("Data/locations.csv")) %>% 
+baseline.info <- read_csv(here("Data/Map/baselines.csv")) %>% 
   arrange(order)
 
-# Read summer survey waypoints
-waypoints <- read_csv(here("Data/waypoints.csv"))
-
-# Convert waypoints to planned tranect lines
-tx_sf <- st_as_sf(waypoints, coords = c("long","lat"), crs = 4326) %>% 
-  group_by(type, line) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+# # Read summer survey waypoints
+# waypoints <- read_csv(here("Data/waypoints.csv"))
+# 
+# # Convert waypoints to planned tranect lines
+# tx_sf <- st_as_sf(waypoints, coords = c("long","lat"), crs = 4326) %>% 
+#   group_by(type, line) %>% 
+#   summarise(do_union = F) %>% 
+#   st_cast("LINESTRING")
 
 kable(baseline.info)
 ```  
@@ -116,10 +116,10 @@ if (do.random) {
     st_cast("LINESTRING")
   
   save(locations, random.segments, random.points, baselines,
-       file = here("Data/randomized_data.Rdata"))
+       file = here("Data/Map/randomized_baseline_data.Rdata"))
 } else {
   # Load randomized points
-  load(file = here("Data/randomized_data.Rdata"))
+  load(file = here("Data/Map/randomized_baseline_data.Rdata"))
 }
 ```
 
@@ -643,13 +643,13 @@ waypoints.final.ns.csv <- waypoints.final.ns.df %>%
 
 # Write all waypoints to one CSV (to import one route)
 write_csv(select(waypoints.final.csv, id, lat, long), 
-          here("Output/transect_wpts.csv"))
+          here("Output/waypoints/transect_wpts.csv"))
 
 write_csv(select(waypoints.final.sd.csv, id, lat, long), 
-          here("Output/transect_wpts_sd.csv"))
+          here("Output/waypoints/transect_wpts_sd.csv"))
 
 write_csv(select(waypoints.final.ns.csv, id, lat, long), 
-          here("Output/transect_wpts_ns.csv"))
+          here("Output/waypoints/transect_wpts_ns.csv"))
 if (save.csv) {
   # Write waypoints from individual files to multiple CSV to create single routes
   for (i in unique(waypoints.final.csv$transect)) {
@@ -692,9 +692,8 @@ if (save.csv) {
            id    = paste("UCTD", order)) %>% 
     select(id, lat, long)
   
-  write_csv(uctd.final.csv, here("Output/uctd_wpts.csv"))  
+  write_csv(uctd.final.csv, here("Output/waypoints/uctd_wpts.csv"))  
 }
-
 
 if (do.random) {
   # # Write transects to GPX file
