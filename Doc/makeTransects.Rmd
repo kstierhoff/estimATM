@@ -60,15 +60,6 @@ Information about the baseline transects, from which the final transects will be
 baseline.info <- read_csv(here("Data/Map/baselines.csv")) %>% 
   arrange(order)
 
-# # Read summer survey waypoints
-# waypoints <- read_csv(here("Data/waypoints.csv"))
-# 
-# # Convert waypoints to planned tranect lines
-# tx_sf <- st_as_sf(waypoints, coords = c("long","lat"), crs = 4326) %>% 
-#   group_by(type, line) %>% 
-#   summarise(do_union = F) %>% 
-#   st_cast("LINESTRING")
-
 kable(baseline.info)
 ```  
 
@@ -495,6 +486,10 @@ waypoint.type <- waypoints.final.df %>%
     TRUE ~ type)) %>% 
   ungroup()
 
+# ggplot(waypoint.type, aes(long, lat, colour = type)) +
+#   geom_point() +
+#   coord_map()
+
 # Add transect types to FSV transects and waypoints
 transects.final <- transects.final %>% 
   left_join(select(waypoint.type, transect, type))
@@ -507,7 +502,7 @@ waypoints.final <- waypoints.final %>%
 waypoints.final.df <- waypoints.final.df %>% 
   left_join(select(waypoint.type, transect, type)) 
 
-# ggplot(waypoints.final.df,
+# ggplot(filter(waypoints.final.df),
 #        aes(long, lat, colour = type, group = transect)) +
 #   geom_point() +
 #   geom_path() +
@@ -709,7 +704,9 @@ if (save.csv) {
       filter(transect == i, type == "Compulsory") %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Compulsory", paste(i, "C.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Compulsory", paste(i, "C.csv", sep = "")))  
+    }
   }
   
   for (i in unique(waypoints.final.csv$transect)) {
@@ -717,7 +714,9 @@ if (save.csv) {
       filter(transect == i, type == "Adaptive") %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "A.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "A.csv", sep = "")))  
+    }
   }
   
   # Write waypoints from individual files to multiple CSV to create single routes
@@ -726,7 +725,9 @@ if (save.csv) {
       filter(transect == i) %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Saildrone", paste(i, "S.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Saildrone", paste(i, "S.csv", sep = "")))
+    }
   }
   
   # Write waypoints from individual files to multiple CSV to create single routes
@@ -735,7 +736,9 @@ if (save.csv) {
       filter(transect == i) %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Nearshore", paste(i, "N.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Nearshore", paste(i, "N.csv", sep = ""))) 
+    }
   }
   
   # Write waypoints to CSV file
