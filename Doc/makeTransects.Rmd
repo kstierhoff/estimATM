@@ -26,8 +26,11 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 dir_create(here("Output/routes", 
                 c("Compulsory","Adaptive","Nearshore","Saildrone")))
 
+# Show map results
+show.maps <- FALSE
+
 # Randomize
-do.random <- TRUE
+do.random <- FALSE
 save.csv  <- TRUE
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -37,7 +40,7 @@ fsv.buffer <- 80
 # Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10.1 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns <- tx.spacing.fsv/2 # For nearshore sampling
+tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
 
 # Minimum transect length
 min.tx.length <- 0 # nmi
@@ -46,7 +49,7 @@ min.tx.length <- 0 # nmi
 uctd.spacing   <- 15
 
 # Number of transects to remove from the start (if near Mexico)
-rm.n.transects <- 1
+rm.n.transects <- 0
 ```  
 
 # Read baseline transect information
@@ -56,15 +59,6 @@ Information about the baseline transects, from which the final transects will be
 # Read start locations
 baseline.info <- read_csv(here("Data/Map/baselines.csv")) %>% 
   arrange(order)
-
-# # Read summer survey waypoints
-# waypoints <- read_csv(here("Data/waypoints.csv"))
-# 
-# # Convert waypoints to planned tranect lines
-# tx_sf <- st_as_sf(waypoints, coords = c("long","lat"), crs = 4326) %>% 
-#   group_by(type, line) %>% 
-#   summarise(do_union = F) %>% 
-#   st_cast("LINESTRING")
 
 kable(baseline.info)
 ```  
@@ -155,7 +149,10 @@ transects <- select(points, id, loc, lat, long) %>%
   filter(id > rm.n.transects) %>% 
   mutate(id = id - rm.n.transects)
 
-# mapview(baselines) + mapview(transects, zcol = "loc")
+if (show.maps) {
+  mapview(baselines) + mapview(transects, zcol = "loc")  
+}
+
 ```
 
 # Segmentize baseline transects for Saildrone sampling
@@ -190,7 +187,9 @@ transects.sd <- select(points.sd, id, loc, lat, long) %>%
   filter(id > rm.n.transects*2) %>% 
   mutate(id = id - rm.n.transects*2)
 
-# mapview(baselines) + mapview(transects.sd, zcol = "loc")
+if (show.maps) {
+  mapview(baselines) + mapview(transects.sd, zcol = "loc")
+}
 ```
 
 # Segmentize baseline transects for nearshore sampling
@@ -218,6 +217,7 @@ points.ns <- st_cast(segments.ns, "POINT") %>%
 # Create transect lines from points
 transects.ns <- select(points.ns, id, loc, lat, long) %>% 
   bind_rows(select(points.ns, id, loc, lat = lat1, long = long1)) %>% 
+  # bind_rows(points.ns.ci) %>% 
   st_as_sf(coords = c("long", "lat"), crs = 4326) %>% 
   group_by(loc, id) %>% 
   summarise(do_union = F) %>% 
@@ -225,7 +225,9 @@ transects.ns <- select(points.ns, id, loc, lat, long) %>%
   filter(id > rm.n.transects*2) %>% 
   mutate(id = id - rm.n.transects*2)
 
-# mapview(baselines) + mapview(transects.ns, zcol = "loc")
+if (show.maps) {
+  mapview(baselines) + mapview(transects.ns, zcol = "loc")
+}
 ```
 
 # Load other GIS layers
@@ -241,6 +243,16 @@ bathy_5m <- st_read(here("Data/GIS/bathy_5m_polygon.shp"))
 
 # Read waypoint polygon
 wpt.polygon <- st_read(here("Data/GIS/waypoint_polygon.shp")) 
+
+# Read Vancouver Island MPA polygon
+si.mpa <- read_csv(here("Data/GIS/scott_islands_mpa_boundary.csv")) %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("POLYGON")
+
+# Export to shapefile
+st_write(si.mpa, here("Data/GIS/scott_islands_mpa_polygon.shp"), 
+         delete_layer = TRUE)
 
 # Read EEZ files
 eez.us <- st_read(here("Data/GIS/eez_us.shp"))
@@ -313,7 +325,8 @@ for (i in unique(transects$loc)) {
   # around the central transects
   if (i == "north") {
     tx.temp <- st_difference(tx.temp, central.clip) %>% 
-    select(loc, id)
+      st_difference(si.mpa) %>% 
+      select(loc, id)
   }
   
   if (i == "south") {
@@ -344,7 +357,8 @@ for (i in unique(transects.sd$loc)) {
   # around the central transects
   if (i == "north") {
     tx.temp <- st_difference(tx.temp, central.clip) %>% 
-    select(loc, id)
+      st_intersection(offshore.clip) %>% 
+      select(loc, id)
   }
   
   # Combine results
@@ -369,8 +383,9 @@ for (i in unique(transects.ns$loc)) {
   # If the northern transects, also clip using the polygon
   # around the central transects
   if (i == "north") {
-    tx.temp <- st_difference(tx.temp, central.clip) %>% 
-    select(loc, id)
+    tx.temp <- st_difference(tx.temp, central.clip) %>%
+      st_intersection(offshore.clip) %>% 
+      select(loc, id)
   }
   
   # Combine results
@@ -384,6 +399,8 @@ for (i in unique(transects.ns$loc)) {
 # Calculate transect distances
 transects.final <- transects.final %>% 
   mutate(distance = as.numeric(st_length(.))/1852) %>% # Distance; nmi
+  filter(distance > 8) %>% 
+  mutate(id = rank(id)) %>% 
   rename(transect = id) %>% 
   arrange(transect)
 
@@ -395,8 +412,18 @@ transects.final.sd <- transects.final.sd %>%
   arrange(transect) %>% 
   filter(distance > min.tx.length)
 
+# Read Channel Island nearshore transect waypoints
+transects.ns.ci <- read_csv(here("Data/Nav/waypoints_channel_islands.csv")) %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+  select(loc = region, id) %>% 
+  mutate(id = id + max(points.ns$id)) %>% 
+  group_by(loc, id) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
 transects.final.ns <- transects.final.ns %>% 
   st_cast("LINESTRING") %>% 
+  rbind(transects.ns.ci) %>% 
   mutate(distance = as.numeric(st_length(.))/1852, # Distance; nmi
          type = "Nearshore") %>% # Define type as Saildrone 
   rename(transect = id) %>% 
@@ -456,18 +483,30 @@ waypoint.type <- waypoints.final.df %>%
   mutate(type = case_when(
     between(lat, 44.6, 48.55) ~ "Compulsory",
     lat < 34.5 ~ "Compulsory",
-    TRUE ~ type))
+    TRUE ~ type)) %>% 
+  ungroup()
+
+# ggplot(waypoint.type, aes(long, lat, colour = type)) +
+#   geom_point() +
+#   coord_map()
 
 # Add transect types to FSV transects and waypoints
 transects.final <- transects.final %>% 
   left_join(select(waypoint.type, transect, type))
-  
+
+# mapview(transects.final, zcol = "type")
 
 waypoints.final <- waypoints.final %>% 
   left_join(select(waypoint.type, transect, type)) 
 
 waypoints.final.df <- waypoints.final.df %>% 
   left_join(select(waypoint.type, transect, type)) 
+
+# ggplot(filter(waypoints.final.df),
+#        aes(long, lat, colour = type, group = transect)) +
+#   geom_point() +
+#   geom_path() +
+#   coord_map()
 
 # Get map boundaries
 bounds.long <- range(waypoints.final.df$long)
@@ -602,6 +641,7 @@ leaflet() %>%
                       "Central Mask", "FSV Mask", "EEZs"),
     options = layersControlOptions(collapsed = F)) %>% 
   hideGroup(c("Inshore Mask", "Offshore Mask", "UCTD Stations",
+              "Planned Transects-Saildrone",
               "Central Mask", "FSV Mask")) %>%  
   fitBounds(min(bounds.long), min(bounds.lat),
             max(bounds.long), max(bounds.lat))
@@ -641,6 +681,9 @@ waypoints.final.ns.csv <- waypoints.final.ns.df %>%
          transect = sprintf("%03d", transect),
          id    = paste(transect, ".", loc, "N", sep = "")) 
 
+# Create output directory
+dir_create(here("Output", c("waypoints")))
+
 # Write all waypoints to one CSV (to import one route)
 write_csv(select(waypoints.final.csv, id, lat, long), 
           here("Output/waypoints/transect_wpts.csv"))
@@ -650,14 +693,20 @@ write_csv(select(waypoints.final.sd.csv, id, lat, long),
 
 write_csv(select(waypoints.final.ns.csv, id, lat, long), 
           here("Output/waypoints/transect_wpts_ns.csv"))
+
 if (save.csv) {
+  # Create output directories
+  dir_create(here("Output/routes", c("Compulsory", "Adaptive", "Saildrone", "Nearshore")))
+  
   # Write waypoints from individual files to multiple CSV to create single routes
   for (i in unique(waypoints.final.csv$transect)) {
     wpts.sub <- waypoints.final.csv %>% 
       filter(transect == i, type == "Compulsory") %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Compulsory", paste(i, "C.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Compulsory", paste(i, "C.csv", sep = "")))  
+    }
   }
   
   for (i in unique(waypoints.final.csv$transect)) {
@@ -665,7 +714,9 @@ if (save.csv) {
       filter(transect == i, type == "Adaptive") %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "A.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "A.csv", sep = "")))  
+    }
   }
   
   # Write waypoints from individual files to multiple CSV to create single routes
@@ -674,7 +725,9 @@ if (save.csv) {
       filter(transect == i) %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Saildrone", paste(i, "S.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Saildrone", paste(i, "S.csv", sep = "")))
+    }
   }
   
   # Write waypoints from individual files to multiple CSV to create single routes
@@ -683,7 +736,9 @@ if (save.csv) {
       filter(transect == i) %>% 
       select(id, lat, long) 
     
-    write_csv(wpts.sub, here("Output/routes/Nearshore", paste(i, "N.csv", sep = "")))
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Nearshore", paste(i, "N.csv", sep = ""))) 
+    }
   }
   
   # Write waypoints to CSV file
