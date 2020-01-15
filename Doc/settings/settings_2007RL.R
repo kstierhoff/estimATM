@@ -17,6 +17,10 @@ uctd.spacing   <- 15
 # Number of transects to remove from the start (if near Mexico)
 rm.n.transects <- 0
 
+# Randomize
+do.random <- FALSE
+save.csv  <- FALSE
+
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
 survey.name.long       <- "Summer 2020 California Current Ecosystem (CCE) Survey"
