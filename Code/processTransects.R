@@ -6,6 +6,7 @@ pacman::p_load(tidyverse,mapproj,plotKML,ggmap,shadowtext,lubridate,
                sf,here,rnaturalearth,swfscMisc,fs,photobiology,
                mapview,marmap)
 
+pacman::p_load_gh("kstierhoff/atm")
 
 # Configure document parameters -------------------------------------------
 # Set ggplot2 theme
@@ -13,9 +14,10 @@ theme_set(theme_bw())
 
 # Create directory to store tables
 dir_create(here("Output/tables"))
+dir_create(here("Figs"))
 
-# Source functions
-source(here("Code/functions.R"))
+# # Source functions
+# source(here("Code/functions.R"))
 
 # User input --------------------------------------------------------------
 # Define transit and survey speed (kn) for estimating progress
@@ -23,11 +25,11 @@ survey.speed  <- 9.5
 transit.speed <- 12
 
 # Get NOAA bathymetry (used to extract bathymetry)
-get.bathy     <- FALSE
+get.bathy     <- TRUE
 extract.bathy <- TRUE
 
 # Region vector
-region.vec <- c(0,34.448,41.99,48.490, 55)
+region.vec <- c(0, 34.448, 41.99, 48.490, 55)
 
 # Beginning transit length (d)
 transit.distance <- 850
@@ -35,11 +37,14 @@ transit.distance <- 850
 transit.duration <- ceiling(transit.distance/transit.speed/24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
-leg.waste <- c(4,2,2,2)
+leg.waste <- c(4, 2, 2, 2)
 
 # Remove transects to adjust survey progress
 transects.rm <- c(seq(110, 128, 2), # Adaptive transects along Vancouver Is.
                   seq(42,58,2)) # Adaptive transects between Mendocino and SF
+
+# transects.rm <- c(seq(110, 128, 2), # Adaptive transects along Vancouver Is.
+#                   seq(42,58,2)) # Adaptive transects between Mendocino and SF
 
 # Compute leg durations and breaks ----------------------------------------
 # Calculate total days at sea (DAS)
@@ -60,7 +65,7 @@ leg.breaks <- cumsum(as.numeric(leg.length))
 
 # Read GPX file from Rose Point
 # GPX file is created by exporting the waypoints (only, not routes) from Rose Point
-route <- readGPX(here("Data/rosepoint_export.gpx"))
+route <- readGPX(here("Data/Nav/rosepoint_waypoints.gpx"))
 
 # create data frame of waypoints
 wpts <- route$waypoints %>% 
@@ -98,7 +103,8 @@ starts <- transects %>%
   summarise(
     long = max(Longitude),
     lat = Latitude[which.max(Longitude)]) %>% 
-  filter(Type %in% c("Adaptive","Compulsory"))
+  filter(Type %in% c("Adaptive","Compulsory")) %>% 
+  ungroup()
 
 # Calculate daylength across survey area ----------------------------------
 daylength.max <- day_length(date = ymd("2019-06-13"),
@@ -127,7 +133,8 @@ transect.regions <- transects %>%
            loc == 3 ~ "WA/OR",
            loc == 4 ~ "Vancouver Is.",
            TRUE ~ "Other")),
-         Region = fct_reorder(Region, loc))
+         Region = fct_reorder(Region, loc)) %>% 
+  ungroup()
 
 # add leg designations to transects
 transects <- left_join(transects, select(starts, group)) %>% 
@@ -160,14 +167,8 @@ crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # Califoria Albers Equal Area
 
 # Import landmarks
-locations <- filter(read.csv(here("Data/places.csv")), name %in% label.list) 
-
-locations.sf <- locations %>%
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-# Project sf
-locations.sf <- project_sf(locations.sf, crs.proj) %>% 
-  arrange(Y)
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
+  project_df(to = crs.proj)
 
 # Get 1000fm isobath
 bathy <- st_read(here("Data/GIS/bathy_contours.shp"))
@@ -201,8 +202,8 @@ base.map <- ggplot() +
   # Plot high-res land polygons
   geom_sf(data = states, fill = "gray90", colour = "gray50") +
   # Plot landmarks
-  geom_point(data = locations.sf, aes(X, Y), size = 2, colour = 'gray50') +
-  geom_shadowtext(data  = locations.sf, aes(X, Y, label = name), 
+  geom_point(data = locations, aes(X, Y), size = 2, colour = 'gray50') +
+  geom_shadowtext(data  = locations, aes(X, Y, label = name), 
                   colour = 'gray20', size = 2, fontface = 'bold', 
                   hjust = 0, nudge_x = 0.2, nudge_y = 0.05, angle = 25, 
                   bg.colour = "white") +
@@ -252,26 +253,28 @@ route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>%
          time_to_next = distance_to_next / survey.speed / daylength,
          time_cum = cumsum(time_to_next) + transit.duration,
          leg      = cut(time_cum, leg.breaks, labels = FALSE, include.lowest = TRUE)) %>%
-  st_set_geometry(NULL)
+  st_set_geometry(NULL) %>% 
+  project_df(to = 3310)
 
 # Write route plan to CSV
 write_csv(route.fsv, here("Output/route_plan_fsv.csv"))
 
 # Plot the route
-route.plot.fsv <- ggplot(route.fsv, aes(long, lat, colour = factor(leg))) +
-  geom_path() +
-  geom_text(data = locations, aes(lon, lat, label = name), 
-            size = 2, hjust = 0, inherit.aes = FALSE) +
-  scale_colour_discrete("Leg") + 
-  coord_map()
+route.plot.fsv <- base.map + 
+  # ggplot(route.fsv, aes(long, lat, colour = factor(leg))) +
+  geom_path(data = route.fsv, aes(X, Y, colour = factor(leg))) +
+  # geom_text(data = locations, aes(X, Y, label = name), 
+  #           size = 2, hjust = 0, inherit.aes = FALSE) +
+  scale_colour_discrete("Leg") 
 
 # Save the route plot
-ggsave(route.plot.fsv, filename = here("Figs/route_plan.png"))
+ggsave(route.plot.fsv, filename = here("Figs/fig_route_plan.png"))
 
 # Add legs to transects ---------------------------------------------------
 leg.summ <- route.fsv %>% 
   group_by(Transect) %>% 
-  summarise(Leg = max(leg))
+  summarise(Leg = max(leg)) %>% 
+  ungroup()
 
 transects <- transects %>% 
   left_join(leg.summ)
@@ -289,6 +292,28 @@ if (get.bathy) {
 } else {
   load(here("Data/bathymetry.Rdata"))
 }
+
+# # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
+# if (get.bathy) {
+#   # Get boundaries for bathymetry grid
+#   bathy.bounds <- nav.sf %>% 
+#     st_bbox() 
+#   
+#   # Download bathy grid
+#   noaa.bathy <- getNOAA.bathy(
+#     lon1 = bathy.bounds$xmin - 1, 
+#     lon2 = bathy.bounds$xmax + 1,
+#     lat1 = bathy.bounds$ymax + 1, 
+#     lat2 = bathy.bounds$ymin - 1, 
+#     resolution = 1)
+#   
+#   # Save bathy results
+#   save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
+#                                 survey.name,".Rdata", sep = ""))  
+# } else {
+#   load(paste(here("Data/GIS"), "/bathy_data_",
+#              survey.name,".Rdata", sep = ""))
+# }
 
 # Extract bathymetry
 transects$Depth <- get.depth(bathy_dem, transects$Longitude, transects$Latitude, locator = F, distance = T)$depth
