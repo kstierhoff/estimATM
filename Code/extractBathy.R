@@ -9,12 +9,12 @@ get.bathy <- FALSE
 # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
 if (get.bathy) {
   noaa.bathy <- getNOAA.bathy(lon1 = min(transects$Longitude - 1), 
-                             lon2 = max(transects$Longitude + 1),
-                             lat1 = max(transects$Latitude) + 1, 
-                             lat2 = min(transects$Latitude) - 1, 
-                             resolution = 1)
+                              lon2 = max(transects$Longitude + 1),
+                              lat1 = max(transects$Latitude) + 1, 
+                              lat2 = min(transects$Latitude) - 1, 
+                              resolution = 1)
   # Save bathy results
-  save(bathy_dem, file = here("Data/GIS/bathy_data_1907RL.Rdata"))  
+  save(noaa.bathy, file = here("Data/GIS/bathy_data_1907RL.Rdata"))  
 } else {
   load(here("Data/GIS/bathy_data_1907RL.Rdata"))
 }
@@ -32,7 +32,7 @@ tx.prof <- data.frame()
 for (i in unique(transects$group)) {
   tx.tmp <- filter(transects, group == i)
   
-  tmp <- get.transect(noaa.bathy, tx.tmp$long[1], tx.tmp$lat[1],
+  tmp <- get.transect(bathy_dem, tx.tmp$long[1], tx.tmp$lat[1],
                       tx.tmp$long[nrow(tx.tmp)], tx.tmp$lat[nrow(tx.tmp)],
                       distance = TRUE) %>% 
     mutate(transect = unique(tx.tmp$transect),
