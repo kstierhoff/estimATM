@@ -1,3 +1,22 @@
+# Survey planning ---------------------------------------------------------
+# Transect spacing (nautical miles)
+tx.spacing.fsv  <- 10.1 # For Lasker 
+tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
+tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
+
+# Mainland buffer distance for FSV and Saildrone transects
+sd.buffer  <- 6 # nmi
+fsv.buffer <- 80
+
+# Minimum transect length
+min.tx.length <- 0 # nmi
+
+# UCTD spacing (nautical miles)
+uctd.spacing   <- 15
+
+# Number of transects to remove from the start (if near Mexico)
+rm.n.transects <- 0
+
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
 survey.name.long       <- "Summer 2019 California Current Ecosystem (CCE) Survey"
