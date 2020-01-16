@@ -1,3 +1,14 @@
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,mapproj,plotKML,ggmap,shadowtext,lubridate,
+               sf,here,rnaturalearth,swfscMisc,fs,photobiology,ggspatial,
+               mapview,marmap)
+
+pacman::p_load_gh("kstierhoff/atm")
+pacman::p_load_gh("kstierhoff/surveyR")
+
 # Configure document parameters -------------------------------------------
 # Set ggplot2 theme
 theme_set(theme_bw())
@@ -6,6 +17,29 @@ theme_set(theme_bw())
 dir_create(here("Output/tables"))
 dir_create(here("Figs"))
 
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# User input --------------------------------------------------------------
+# Get NOAA bathymetry (used to extract bathymetry)
+copy.gpx      <- TRUE
+get.bathy     <- FALSE
+extract.bathy <- FALSE
+
+# Copy and process GPX file(s) --------------------------------------------
+# GPX file is created by exporting the waypoints (only, not routes) from Rose Point
+# File name and path are specified in the settings file
+if (copy.gpx) {
+  file_copy(gpx.file,
+            here("Data/Nav"), overwrite = TRUE)  
+}
 # Read GPX file
 route <- readGPX(here("Data/Nav/rosepoint_waypoints.gpx"))
 
@@ -95,6 +129,17 @@ uctds <- wpts %>%
            TRUE ~ "Other")),
          Region = fct_reorder(Region, loc)) %>% 
   arrange(station) 
+
+# Get map data ------------------------------------------------------------
+# Map landmarks
+label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
+                "Newport","Point Conception","Cape Mendocino","Columbia River",
+                "Cape Blanco","Bodega Bay","Westport","Fort Bragg",
+                "Morro Bay","Long Beach","Cape Scott","San Diego")
+
+# Coordinate reference systems for geographic and projected data
+crs.geog <- 4326 # WGS84
+crs.proj <- 3310 # Califoria Albers Equal Area
 
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
@@ -231,45 +276,44 @@ uctds.sf <- uctds %>%
   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
 
 # export tables to csv
-wpt.export <- select(transects, -group, -Leg)
-
+table.export <- select(transects, -group, -Leg)
 # Write all waypoints
-write_csv(wpt.export, here("Output/tables/waypoints_all.csv"))
+write_csv(table.export, here("Output/tables/waypoints_all.csv"))
 # Write adaptive waypoints
-if (nrow(filter(wpt.export, Type == "Adaptive")) > 0) {
-  write_csv(filter(wpt.export, Type == "Adaptive"),  here("Output/tables/waypoints_adaptive.csv"))  
+if (nrow(filter(table.export, Type == "Adaptive")) > 0) {
+  write_csv(filter(table.export, Type == "Adaptive"),  here("Output/tables/waypoints_adaptive.csv"))  
 }
 # Write compulsory waypoints
-if (nrow(filter(wpt.export, Type == "Compulsory")) > 0) {
-  write_csv(filter(wpt.export, Type == "Compulsory"),  here("Output/tables/waypoints_compulsory.csv"))  
+if (nrow(filter(table.export, Type == "Compulsory")) > 0) {
+  write_csv(filter(table.export, Type == "Compulsory"),  here("Output/tables/waypoints_compulsory.csv"))  
 }
 # Write saildrone waypoints
-if (nrow(filter(wpt.export, Type == "Saildrone")) > 0) {
-  write_csv(filter(wpt.export, Type == "Saildrone"),  here("Output/tables/waypoints_saildrone.csv"))  
+if (nrow(filter(table.export, Type == "Saildrone")) > 0) {
+  write_csv(filter(table.export, Type == "Saildrone"),  here("Output/tables/waypoints_saildrone.csv"))  
 }
 # Write mammal waypoints
-if (nrow(filter(wpt.export, Type == "Mammal")) > 0) {
-  write_csv(filter(wpt.export, Type == "Mammal"),  here("Output/tables/waypoints_mammal.csv"))  
+if (nrow(filter(table.export, Type == "Mammal")) > 0) {
+  write_csv(filter(table.export, Type == "Mammal"),  here("Output/tables/waypoints_mammal.csv"))  
 }
 # Write nearshore waypoints
-if (nrow(filter(wpt.export, Type == "Nearshore")) > 0) {
-  write_csv(filter(wpt.export, Type == "Nearshore"),  here("Output/tables/waypoints_nearshore.csv"))  
+if (nrow(filter(table.export, Type == "Nearshore")) > 0) {
+  write_csv(filter(table.export, Type == "Nearshore"),  here("Output/tables/waypoints_nearshore.csv"))  
 }
 # Write transit waypoints
-if (nrow(filter(wpt.export, Type == "Transit")) > 0) {
-  write_csv(filter(wpt.export, Type == "Transit"),  here("Output/tables/waypoints_transit.csv"))  
+if (nrow(filter(table.export, Type == "Transit")) > 0) {
+  write_csv(filter(table.export, Type == "Transit"),  here("Output/tables/waypoints_transit.csv"))  
 }
 # Write offshore waypoints
-if (nrow(filter(wpt.export, Type == "Offshore")) > 0) {
-  write_csv(filter(wpt.export, Type == "Offshore"),  here("Output/tables/waypoints_offshore.csv"))  
+if (nrow(filter(table.export, Type == "Offshore")) > 0) {
+  write_csv(filter(table.export, Type == "Offshore"),  here("Output/tables/waypoints_offshore.csv"))  
 }
 # Write extra waypoints
-if (nrow(filter(wpt.export, Type == "Extra")) > 0) {
-  write_csv(filter(wpt.export, Type == "Extra"),  here("Output/tables/waypoints_extra.csv"))  
+if (nrow(filter(table.export, Type == "Extra")) > 0) {
+  write_csv(filter(table.export, Type == "Extra"),  here("Output/tables/waypoints_extra.csv"))  
 }
 
-# Export survey plan for survey report -----------------------------------------
-wpt.plan <- wpt.export %>% 
+# Export survey plan for survey report
+wpt.plan <- table.export %>% 
   filter(Type %in% c("Adaptive","Compulsory")) %>% 
   select(line = Transect, wpt = Waypoint, lon = Longitude, lat = Latitude, type = Type) %>% 
   # mutate(type = tolower(type)) %>% 
@@ -285,7 +329,7 @@ if (nrow(uctd.export) > 0) {
   write_csv(uctd.export,  here("Output/tables/waypoints_uctd.csv"))  
 }
 
-# Create the map with all transects --------------------------------------------
+# Create the map with all transects
 survey.map <- base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", 
@@ -307,13 +351,35 @@ survey.map <- base.map +
 ggsave(survey.map, filename = here("Figs/fig_survey_plan_map.png"), 
        height = map.height, width = map.width)
 
-uctds <- st_as_sf(uctds, coords = c("lon","lat"), crs = crs.geog)
+# # Create map not showing nearshore transects along Vancouver Is. and in the SCB
+# transects.sd <- filter(transects.sf, Type == "Nearshore", between(Transect, 35, 211))
+# 
+# survey.map.sd <- base.map +
+#   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
+#   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", 
+#                                                   "Offshore", "Transit")),
+#           aes(linetype = Type, colour = Type)) +
+#   geom_sf(data = filter(transects.sd, Type %in% c("Adaptive", "Compulsory", "Mammal", 
+#                                                   "Nearshore","Offshore", "Transit")),
+#           aes(linetype = Type, colour = Type)) +
+#   scale_colour_manual(name = "Type", values = c("Adaptive" = "red","Compulsory" = "blue",
+#                                                 "Offshore" = "green", "Nearshore" = "#F08C09",
+#                                                 "Transit" = "cyan")) +
+#   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
+#   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
+#                                                   "Mammal" = "dashed", "Nearshore" = "solid",
+#                                                   "Offshore" = "solid","Transit" = "dashed")) +
+#   # geom_sf(data = filter(transects.sf, Type == "Saildrone"), colour = c("#F08C09")) +
+#   # geom_point(data = uctds, aes(lon, lat), shape = 21, fill = "white", size = 1) +
+#   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+#            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+#            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
+# 
+# # Save the map
+# ggsave(survey.map.sd, filename = here("Figs/fig_survey_map_saildrone.png"), 
+#        height = map.height, width = map.width)
 
-# Save results for use with checkTransects.Rmd
-save(transects, wpts, uctds, wpt.export,
-     file = (here("Output/process_transects_output.Rdata")))
-
-# Create the map with all transects --------------------------------------------
+# Create the map with all transects
 survey.map.leg = base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit")),
@@ -351,35 +417,7 @@ survey.map.region = base.map +
 
 # Save the map
 ggsave(survey.map.region, filename = here("Figs/fig_survey_map_region.png"), 
-       height = map.height, width = map.width)  
-
-# # Create map not showing nearshore transects along Vancouver Is. and in the SCB
-# transects.sd <- filter(transects.sf, Type == "Nearshore", between(Transect, 35, 211))
-# 
-# survey.map.sd <- base.map +
-#   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
-#   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", 
-#                                                   "Offshore", "Transit")),
-#           aes(linetype = Type, colour = Type)) +
-#   geom_sf(data = filter(transects.sd, Type %in% c("Adaptive", "Compulsory", "Mammal", 
-#                                                   "Nearshore","Offshore", "Transit")),
-#           aes(linetype = Type, colour = Type)) +
-#   scale_colour_manual(name = "Type", values = c("Adaptive" = "red","Compulsory" = "blue",
-#                                                 "Offshore" = "green", "Nearshore" = "#F08C09",
-#                                                 "Transit" = "cyan")) +
-#   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
-#   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
-#                                                   "Mammal" = "dashed", "Nearshore" = "solid",
-#                                                   "Offshore" = "solid","Transit" = "dashed")) +
-#   # geom_sf(data = filter(transects.sf, Type == "Saildrone"), colour = c("#F08C09")) +
-#   # geom_point(data = uctds, aes(lon, lat), shape = 21, fill = "white", size = 1) +
-#   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-#            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-#            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
-# 
-# # Save the map
-# ggsave(survey.map.sd, filename = here("Figs/fig_survey_map_saildrone.png"), 
-#        height = map.height, width = map.width)
+       height = map.height, width = map.width)
 
 # # Route plan-Nearshore ----------------------------------------------------
 # transects.ns <- read_csv(here("Output/transect_wpts_ns.csv")) %>% 

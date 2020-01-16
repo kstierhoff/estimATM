@@ -1,5 +1,5 @@
 ---
-title: "Check Rose Point Transects"
+title: "Check Transect Plan"
 author: "Kevin L. Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "GMT", usetz = TRUE)`'
 output:
@@ -14,7 +14,9 @@ output:
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,sf,mapview,lubridate,here,knitr,DT,bookdown)
+pacman::p_load(tidyverse,sf,mapview,lubridate,here,knitr,DT,bookdown,
+               plotKML,rnaturalearth,swfscMisc,fs,photobiology,ggspatial,
+               leaflet,leaflet.extras,leafem,htmltools,marmap,mapproj)
 
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("rstudio/distill")
@@ -25,6 +27,14 @@ pacman::p_load_gh("kstierhoff/atm")
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       out.width = "100%")
 ```  
+
+```{r user-input}
+# User input --------------------------------------------------------------
+copy.gpx          <- T # Copy GPX file from AST server
+process.transects <- F # Process GPX file using processTransects.R
+get.bathy         <- F # Get NOAA bathymetry (used to extract bathymetry)
+extract.bathy     <- F # Extract bathymetry profile along each transect
+```
 
 ```{r project-info}
 # Get project name from directory
@@ -38,66 +48,231 @@ prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", pr
 source(here("Doc/settings", prj.settings))
 ```
 
+```{r process-transects,include=F}
+# Copy and process GPX file(s) --------------------------------------------
+# GPX file is created by exporting the waypoints (only, not routes) from Rose Point
+# File name and path are specified in the settings file
+if (copy.gpx) {
+  file_copy(gpx.file,
+            here("Data/Nav"), overwrite = TRUE)  
+}
+
+# Process GPX files
+if (process.transects) {
+  source(here("Code/processTransects.R"))
+} else {
+  load(here("Output/process_transects_output.Rdata"))
+}
+```
+
 ```{r read-tables, include = FALSE}
-wpts <- read_csv(here::here("Output/tables", "waypoints_all.csv")) %>% 
-    st_as_sf(coords = c("Longitude","Latitude"), crs = 4326)
+if (!exists("bathy")) {bathy <- st_read(here("Data/GIS/bathy_contours.shp"))}
 
-uctds <- read_csv(here::here("Output/tables", "waypoints_uctd.csv")) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = 4326)
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = paste(NAME, Type))
 
-bathy <- st_read(here("Data/GIS/bathy_contours.shp"))
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>% 
+  st_transform(crs.geog)
 
-ca_mpas <- st_read(here("Data/GIS/MPA_CA_Existing.shp"))
+or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>% 
+  st_transform(crs.geog) 
 
-ca_state_waters <- st_read(here("Data/GIS/MAN_CA_StateWater.shp"))
-
-or_mpas <- st_read(here("Data/GIS/or_mpas.shp"))
-
-or_state_waters <- st_read(here("Data/GIS/or_state_waters.shp"))
+or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>% 
+  st_transform(crs.geog)
 
 nms_bounds <- st_read(here("Data/GIS/national_marine_sanctuaries.shp"))
 
-transects <- wpts %>% 
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(crs.geog)
+eez_can <- st_read(here("Data/GIS/eez_canada.shp")) %>% 
+  st_transform(crs.geog)
+eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
+  st_transform(crs.geog)
+
+transects <- transects %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   group_by(Type, Transect, Region) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   ungroup() %>% 
-  mutate(distance = round(as.numeric(st_length(.))/1852,1))
+  # mutate(distance = round(as.numeric(st_length(.))/1852,1)) %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.),
+         label    = paste("Transect", Transect),
+         popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                       'Distance:', distance, 'nmi<br/>'))
+
+# Add labels and popups to waypoints
+wpts <- wpt.export %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
 ```
 
-# Static map
-A static map as prepared for the cruise instructions.
+# Overview  
+
+First, a rough, randomized transect plan is generated using `makeTransects.Rmd`.  
+
+Next, routes created using `makeTransects.Rmd` are imported to Coastal Explorer for further line edits and final formatting.  
+
+Finally, those waypoints are exported to GPX format, which can be plotted and checked using `checkTransects.Rmd`.
+
+Repeat this process of editing in Coastal Explorer, exporting to GPX, and checking using `checkTransects.Rmd` to achieve a final transect plan. 
+
+# Visually inspect maps
+## Interactive map  
+
+```{r create-leaflet-map, out.width="100%", out.height="8in"}
+# Leaflet options
+# https://rstudio.github.io/leaflet/
+
+# Info on tile caching
+# https://bhaskarvk.github.io/leaflet.extras/reference/TileCaching.html
+
+# Set padding around data  
+wpts.df <- wpts %>% 
+  project_sf(crs.geog) 
+
+imap.bounds <-  map_bounds(wpts.df$Y, wpts.df$X, pad = 0.1)
+
+# Create color palette for MPAs
+all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
+                   unique(as.character(or_mpas$Label))))
+
+mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
+
+# Create color pallette for planned transects
+txPal    <- colorFactor(wpt.colors, wpt.types)
+
+# Plotting preferences ----------------------c("white", "white", "white")---------------------------------
+# Leaflet tile options; set both to T if caching
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
+
+# Create leaflet map
+leaflet() %>% 
+  # Enable tile caching
+  enableTileCaching() %>% 
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.OceanBasemap, 
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  # Add EEZs
+  addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+               label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
+  addPolylines(data = eez_can, color = "#000414", weight = 3, 
+               label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
+  addPolylines(data = eez_mex, color = "#000414", weight = 3, 
+               label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
+  # Add bathymetry contours
+  addPolylines(data = bathy, color = "white", weight = 2, 
+               label = ~paste(Contour, "m"), group = "Bathymetry Contours") %>% 
+  # Add State waters
+  addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
+              opacity = 0.75,
+              label = ~htmlEscape("OR State Waters"),
+              group = "State Waters") %>%
+  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
+              opacity = 0.75,
+              label = ~htmlEscape("CA State Waters"),
+              group = "State Waters") %>%
+  # Add CA MPAs
+  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+              fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+  # Add OR MPAs
+  addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+              fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+  # Add core planned transects
+  addPolylines(data = filter(transects, Type == "Compulsory"),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
+               group = "Planned Transects (Compulsory)") %>%
+  addPolylines(data = filter(transects, Type == "Adaptive"),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
+               group = "Planned Transects (Adaptive)") %>%
+  addCircleMarkers(data = filter(wpts, Type == "Compulsory"),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Compulsory)") %>%
+  addCircleMarkers(data = filter(wpts, Type == "Adaptive"),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Adaptive)") %>%
+  # Add ancillary planned transects 
+  addPolylines(data = filter(transects, Type == "Nearshore"),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
+               group = "Planned Transects (Nearhore)") %>%
+  addCircleMarkers(data = filter(wpts, Type == "Nearshore"),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Nearshore)") %>%
+  # addPolylines(data = filter(transects, Type == "Offshore"),
+  #              color = ~txPal(Type), weight = 3, opacity = 0.5,
+  #              label = ~htmlEscape(paste(Type, Transect)),
+  #              popup = ~popup,
+  #              group = "Planned Transects (Offshore)") %>%
+  # addCircleMarkers(data = filter(wpts, Type == "Offshore"),
+  #                  radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+  #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+  #                  label = ~htmlEscape(paste(Type, Waypoint)),
+  #                  popup = ~popup,
+  #                  group = "Planned Transects (Offshore)") %>%
+  addPolylines(data = filter(transects, Type == "Transit"),
+               color = ~txPal(Type), weight = 3, opacity = 0.5,
+               label = ~htmlEscape(paste(Type, Transect)),
+               popup = ~popup,
+               group = "Planned Transects (Transits)") %>%
+  addCircleMarkers(data = filter(wpts, Type == "Transit"),
+                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   popup = ~popup,
+                   group = "Planned Transects (Transits)") %>%
+  # Add UCTD statiosn
+  addCircleMarkers(data = uctds,
+                   radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                   fillOpacity = 1, fillColor =  "white",
+                   group = "UCTD Stations") %>%
+  # Add scale bar
+  addScaleBar(position = "bottomright") %>%
+  # Add map coordinates
+  addMouseCoordinates() %>% 
+  # Add measurement tool
+  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+             position = "topleft") %>% 
+  # Add layer controls
+  addLayersControl(
+    overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+                      "Bathymetry Contours",
+                      "Planned Transects (Compulsory)", "Planned Transects (Adaptive)",
+                      "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
+                      "Planned Transects (Transits)", "UCTD Stations"),
+    options = layersControlOptions(collapsed = FALSE)) %>%  
+  hideGroup(c("UCTD Stations")) %>% 
+  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+```  
+
+## Static map
 
 ```{r map-survey-play}
-include_graphics(here("Figs/survey_map.png"))
-```
-
-
-# Interactive maps
-Interactive maps to closely scrutinize the transect placement
-
-## Map transects by transect type
-
-```{r map-objects-type, out.height = "9in",out.width="100%"}
-mapview(bathy, color = "white", map.types = c("Esri.OceanBasemap"), legend = FALSE) + 
-  mapview(nms_bounds) +
-  mapview(ca_mpas, zcol = "Type", alpha = 0.75) +
-  mapview(or_mpas, zcol = "Label", alpha = 0.75) +
-  mapview(transects, zcol = "Type") + 
-  mapview(wpts, zcol = "Type", cex = 3, alpha = 0, legend = FALSE) + 
-  mapview(uctds, col.regions = "white", cex = 2, legend = FALSE)
-```
-
-## Map transects by region
-
-```{r map-objects-region, out.height = "9in",out.width="100%"}
-mapview(bathy, color = "white", map.types = c("Esri.OceanBasemap"), legend = FALSE) + 
-  mapview(nms_bounds) +
-  mapview(ca_mpas, zcol = "Type", alpha = 0.75) +
-  mapview(or_mpas, zcol = "Label", alpha = 0.75) +
-  mapview(transects, zcol = "Region") + 
-  mapview(wpts, zcol = "Region", cex = 3, alpha = 0, legend = FALSE) + 
-  mapview(uctds, col.regions = "white", cex = 2, legend = FALSE)
+include_graphics(here("Figs/fig_survey_plan_map.png"))
 ```
 
 # Data tables
@@ -105,6 +280,7 @@ mapview(bathy, color = "white", map.types = c("Esri.OceanBasemap"), legend = FAL
 
 ```{r acoustic-wpts-table}
 wpts %>% 
+  select(-label, -popup) %>% 
   filter(Type %in% c("Adaptive","Compulsory")) %>% 
   arrange(Waypoint) %>%
   mutate(
@@ -118,6 +294,7 @@ wpts %>%
 
 ```{r offshore-wpts-table}
 wpts %>% 
+  select(-label, -popup) %>%  
   filter(Type %in% c("Offshore")) %>% 
   arrange(Waypoint) %>%
   mutate(
@@ -131,6 +308,7 @@ wpts %>%
 
 ```{r nearshore-wpts-table}
 wpts %>% 
+  select(-label, -popup) %>% 
   filter(Type %in% c("Nearshore")) %>% 
   arrange(Waypoint) %>%
   mutate(
@@ -144,7 +322,8 @@ wpts %>%
 
 ```{r uctd-wpts-table}
 uctds %>% 
-  arrange(Name) %>%
+  select(Station = station, Region, Depth) %>% 
+  arrange(Station) %>%
   mutate(
     Long = as.data.frame(st_coordinates(.))$X,
     Lat = as.data.frame(st_coordinates(.))$Y) %>% 
