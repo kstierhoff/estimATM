@@ -58,7 +58,8 @@ daylength.min <- day_length(date = max(leg.ends),
 
 daylength.df <- data.frame(Transect = seq(1, max(starts$Transect)),
                            daylength = seq(daylength.min, daylength.max,
-                                           (daylength.max - daylength.min)/(max(starts$Transect) - 1)))
+                                           (daylength.max - daylength.min)/(max(starts$Transect) - 1))) %>% 
+  left_join(select(starts, Transect, lat))
 
 # Get survey regions from inshore most waypoints
 transect.regions <- transects %>% 
@@ -141,6 +142,8 @@ transects.even <- filter(transects, Transect %% 2 == 0) %>%
 # Create route for planning
 empty <- st_as_sfc("POINT(EMPTY)")
 
+
+# Create route plan for the FSV -------------------------------------------
 # Combine even and odd transects into one continuous route
 route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>% 
   bind_rows(filter(transects.even, Type %in% c("Adaptive","Compulsory"))) %>% 
