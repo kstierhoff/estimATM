@@ -159,7 +159,14 @@ route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>%
          time_cum = cumsum(time_to_next) + transit.duration,
          leg      = cut(time_cum, leg.breaks.gpx, labels = FALSE, include.lowest = TRUE)) %>%
   st_set_geometry(NULL) %>% 
-  project_df(to = 3310)
+  project_df(to = 3310) %>% 
+  mutate(
+    diff.wpt = c(1, diff(Waypoint)),
+    speed = case_when(
+      abs(diff.wpt) == 1 ~ survey.speed,
+      TRUE ~ transit.speed)) %>% 
+  select(Transect, Waypoint, Type, daylength, long, lat, X, Y, leg, speed, distance_to_next, distance_cum, 
+         time_to_next, time_cum, leg) 
 
 # Write route plan to CSV
 write_csv(route.fsv, here("Output/routes/route_plan_fsv.csv"))
