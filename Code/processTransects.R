@@ -149,39 +149,45 @@ route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>%
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   select(-group, -order) %>%
   mutate(long = as.data.frame(st_coordinates(.))$X,
-         lat = as.data.frame(st_coordinates(.))$Y,
-         distance_to_next = as.numeric(na.omit(c(0, st_distance(geometry,
-                                                                lead(geometry, 
-                                                                     default = empty),
-                                                                by_element = TRUE))))/1852,
+         lat  = as.data.frame(st_coordinates(.))$Y,
+         distance_to_next = as.numeric(
+           na.omit(c(0, st_distance(geometry,
+                                    lead(geometry, 
+                                         default = empty),
+                                    by_element = TRUE))))/1852) %>% 
+  mutate(distance_to_next = c(distance_to_next[2:n()],0),
          distance_cum = cumsum(distance_to_next),
          time_to_next = distance_to_next / survey.speed / daylength,
-         time_cum = cumsum(time_to_next) + transit.duration,
-         leg      = cut(time_cum, leg.breaks.gpx, labels = FALSE, include.lowest = TRUE)) %>%
+         time_cum     = cumsum(time_to_next) + transit.duration,
+         on_off       = 1,
+         leg          = cut(time_cum, leg.breaks.gpx, 
+                            labels = FALSE, include.lowest = TRUE)) %>%
   st_set_geometry(NULL) %>% 
   project_df(to = 3310) %>% 
   mutate(
-    diff.wpt = c(1, diff(Waypoint)),
+    diff.wpt = c(diff(round(Waypoint)), 0),
     speed = case_when(
-      abs(diff.wpt) == 1 ~ survey.speed,
-      TRUE ~ transit.speed)) %>% 
-  select(Transect, Waypoint, Type, daylength, long, lat, X, Y, leg, speed, distance_to_next, distance_cum, 
-         time_to_next, time_cum, leg) 
-
-# Write route plan to CSV
-write_csv(route.fsv, here("Output/routes/route_plan_fsv.csv"))
+      diff.wpt == 0 ~ survey.speed,
+      TRUE ~ transit.speed),
+    mode         = case_when(
+      speed == survey.speed ~ "survey",
+      speed == transit.speed ~ "transit",
+      TRUE ~ "other")) %>% 
+  select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
+         distance_to_next, distance_cum, time_to_next, time_cum, leg, Region) 
 
 # Plot the route
 route.plot.fsv <- base.map + 
-  # ggplot(route.fsv, aes(long, lat, colour = factor(leg))) +
   geom_path(data = route.fsv, aes(X, Y, colour = factor(leg))) +
-  # geom_text(data = locations, aes(X, Y, label = name), 
-  #           size = 2, hjust = 0, inherit.aes = FALSE) +
   scale_colour_discrete("Leg") 
 
 # Save the route plot
 ggsave(route.plot.fsv, filename = here("Figs/fig_route_plan.png"),
-       height = map.height, width = map.width)
+       height = map.height, width = map.width)  
+
+# Write route plan to CSV
+write_csv(select(route.fsv, -X, -Y), 
+          here("Output/routes/route_plan_fsv.csv"))
 
 # Add legs to transects ---------------------------------------------------
 leg.summ <- route.fsv %>% 
