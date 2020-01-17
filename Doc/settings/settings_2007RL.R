@@ -49,7 +49,7 @@ save.csv  <- FALSE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20200629_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- file.path(gpx.dir, "rosepoint_waypoints.gpx")
+gpx.file         <- "rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5

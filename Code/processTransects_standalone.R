@@ -37,7 +37,7 @@ extract.bathy <- FALSE
 # GPX file is created by exporting the waypoints (only, not routes) from Rose Point
 # File name and path are specified in the settings file
 if (copy.gpx) {
-  file_copy(gpx.file,
+  file_copy(file.path(gpx.dir, gpx.file),
             here("Data/Nav"), overwrite = TRUE)  
 }
 # Read GPX file

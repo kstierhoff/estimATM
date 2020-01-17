@@ -1,26 +1,3 @@
-# Survey planning ---------------------------------------------------------
-# Transect spacing (nautical miles)
-tx.spacing.fsv  <- 10.1*2 # For Lasker 
-tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
-
-# Mainland buffer distance for FSV and Saildrone transects
-sd.buffer  <- 6 # nmi
-fsv.buffer <- 80
-
-# Minimum transect length
-min.tx.length <- 0 # nmi
-
-# UCTD spacing (nautical miles)
-uctd.spacing   <- 15
-
-# Number of transects to remove from the start (if near Mexico)
-rm.n.transects <- 0
-
-# Randomize
-do.random <- FALSE
-save.csv  <- FALSE
-
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
 survey.name.long       <- "Summer 2020 ATM-DEPM Survey"
@@ -41,7 +18,70 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2020-03-24", "2020-04-19")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2020-03-24", "2020-04-19")))  
+
+# Survey planning ---------------------------------------------------------
+## Used by makeTransects.Rmd ------------------------
+# Transect spacing (nautical miles)
+tx.spacing.fsv  <- 15.1 # For Lasker 
+tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
+tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
+
+# Mainland buffer distance for FSV and Saildrone transects
+sd.buffer  <- 6 # nmi
+fsv.buffer <- 120
+
+# Minimum transect length
+min.tx.length <- 0 # nmi
+
+# UCTD spacing (nautical miles)
+uctd.spacing   <- 15
+
+# Number of transects to remove from the start (if near Mexico)
+rm.n.transects <- 0
+
+# Randomize
+do.random <- FALSE
+save.csv  <- TRUE
+
+## Used by processTransects.R -----------
+# GPX file location
+gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20200325_LASKER_SpringCPS/PLANNING/Rose Point/GPX"
+gpx.file         <- "rosepoint_waypoints_alt.gpx"
+
+# Define transit and survey speed (kn) for estimating progress
+survey.speed     <- 9.5
+transit.speed    <- 12
+survey.direction <- "Southward" # Southward or Northward; to compute day lengths
+
+# Beginning transit length (d)
+transit.distance <- 450
+transit.duration <- ceiling(transit.distance/transit.speed/24)
+
+# Leg waste (d) due to transit, late departures, and early arrivals
+leg.waste <- c(4, 2)
+
+# Remove transects to adjust survey progress
+transects.rm <- NA # Numbered transects to remove
+
+# Compute leg durations and breaks ----------------------------------------
+# Define leg ends
+leg.ends <- c(ymd("2020-03-25"), ymd("2020-04-18"))
+
+# Compute days per leg
+leg.days <- (leg.ends[seq(2, length(leg.ends), 2)] - leg.ends[seq(1,length(leg.ends) - 1, 2)]) + 1
+
+# Calculate total days at sea (DAS)
+total.das <- sum(leg.days)
+
+# Leg durations used to split transects 
+leg.length <- c(0, leg.days - leg.waste)
+
+# Leg breaks
+leg.breaks.gpx <- cumsum(as.numeric(leg.length))
+
+# Region vector used to break transects for waypoint files
+region.vec <- c(0, 34.7, 41.99, 48.490, 55)
 
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey

@@ -7,7 +7,7 @@ dir_create(here("Output/tables"))
 dir_create(here("Figs"))
 
 # Read GPX file
-route <- readGPX(here("Data/Nav/rosepoint_waypoints.gpx"))
+route <- readGPX(here("Data/Nav", gpx.file))
 
 # Create data frame of waypoints
 wpts <- route$waypoints %>% 
@@ -222,7 +222,10 @@ if (get.bathy) {
 
 # Extract bathymetry
 transects$Depth <- get.depth(noaa.bathy, transects$Longitude, transects$Latitude, locator = F, distance = T)$depth
-uctds$Depth     <- get.depth(noaa.bathy, uctds$lon, uctds$lat, locator = F, distance = T)$depth
+
+if (nrow(uctds) > 0) {
+  uctds$Depth     <- get.depth(noaa.bathy, uctds$lon, uctds$lat, locator = F, distance = T)$depth
+}
 
 # Extract bathymetry info
 if (extract.bathy) {
@@ -251,6 +254,7 @@ wpt.export <- select(transects, -group, -Leg)
 
 # Write all waypoints
 write_csv(wpt.export, here("Output/tables/waypoints_all.csv"))
+
 # Write adaptive waypoints
 if (nrow(filter(wpt.export, Type == "Adaptive")) > 0) {
   write_csv(filter(wpt.export, Type == "Adaptive"),  here("Output/tables/waypoints_adaptive.csv"))  
@@ -291,14 +295,16 @@ wpt.plan <- wpt.export %>%
   # mutate(type = tolower(type)) %>% 
   write_csv(here("Output/tables/waypoint_plan.csv"))
 
-# format UCTDs for export
-uctd.export <- uctds %>% 
-  select(Name = name, Latitude = lat, Longitude = lon, Region, Depth)
-
-# export to csv
-# Write saildrone waypoints
-if (nrow(uctd.export) > 0) {
-  write_csv(uctd.export,  here("Output/tables/waypoints_uctd.csv"))  
+if (nrow(uctds) > 0) {
+  # format UCTDs for export
+  uctd.export <- uctds %>% 
+    select(Name = name, Latitude = lat, Longitude = lon, Region, Depth)
+  
+  # export to csv
+  # Write saildrone waypoints
+  if (nrow(uctd.export) > 0) {
+    write_csv(uctd.export,  here("Output/tables/waypoints_uctd.csv"))  
+  }  
 }
 
 # Create the map with all transects --------------------------------------------
