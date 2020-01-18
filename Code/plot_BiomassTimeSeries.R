@@ -1,3 +1,6 @@
+library(odbc)
+library(tidyverse)
+
 if (get.db) {
   # Configure ODBC connection to AST database ------------------------------------
   ast.con  <- dbConnect(odbc(), 
@@ -21,6 +24,8 @@ if (get.db) {
   load(here("Output/biomass_database.Rdata"))
 }
 
+# source(here::here("Doc/settings/settings_1907RL.R"))
+
 # Summarise results across regions
 biomass.ts.var <- biomass.ts %>% 
   filter(stratum == "All", !region %in% c("Offshore")) %>% 
@@ -29,9 +34,15 @@ biomass.ts.var <- biomass.ts %>%
   summarise(biomass_sd = sqrt(sum(biomass_sd^2)))
 
 biomass.ts <- biomass.ts %>% 
-  filter(stratum == "All", !region %in% c("Offshore")) %>%
+  left_join(select(survey.info, survey, date_start)) %>% 
+  mutate(group = paste(species, stock, sep = "-"),
+         year  = year(date_start),
+         season = case_when(
+           month(date_start) < 6 ~ "Spring",
+           TRUE ~ "Summer")) %>%
+  filter(season == "Summer", stratum == "All", !region %in% c("Offshore")) %>%
+  select(-season, -region, -stratum, -biomass_sd, -biomass_cv, -date_start, -group, -year) %>%
   group_by(survey, species, stock) %>% 
-  select(-region, -stratum, -biomass_sd, -biomass_cv) %>% 
   summarise_all(list(sum)) %>% 
   left_join(biomass.ts.var) %>% 
   mutate(biomass_cv = biomass_sd/biomass*100)
@@ -42,7 +53,10 @@ biomass.ts <- biomass.ts %>%
 biomass.ts <- biomass.ts %>% 
   left_join(select(survey.info, survey, date_start)) %>% 
   mutate(group = paste(species, stock, sep = "-"),
-         year  = year(date_start)) %>% 
+         year  = year(date_start),
+         season = case_when(
+           month(date_start) < 6 ~ "Spring",
+           TRUE ~ "Summer")) %>% 
   filter(!group %in% c("Sardinops sagax-Southern","Engraulis mordax-Northern"))
 
 # Create plot ------------------------------------------------------------------
