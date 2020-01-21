@@ -46,6 +46,17 @@ biomass.ts <- biomass.ts %>%
   summarise_all(list(sum)) %>% 
   left_join(biomass.ts.var) %>% 
   mutate(biomass_cv = biomass_sd/biomass*100)
+# 
+# biomass.ts %>% 
+#   left_join(select(survey.info, survey, date_start)) %>% 
+#   mutate(group = paste(species, stock, sep = "-"),
+#          year  = year(date_start),
+#          season = case_when(
+#            month(date_start) < 6 ~ "Spring",
+#            TRUE ~ "Summer")) %>% 
+#   filter(year < 2013) %>% 
+#   View()
+
 
 # Combine most recent estimates ------------------------------------------------
 
@@ -57,40 +68,40 @@ biomass.ts <- biomass.ts %>%
          season = case_when(
            month(date_start) < 6 ~ "Spring",
            TRUE ~ "Summer")) %>% 
-  filter(!group %in% c("Sardinops sagax-Southern","Engraulis mordax-Northern"))
+  filter(!group %in% c("Sardinops sagax-Southern","Engraulis mordax-Northern")) %>% 
+  filter(!biomass == 0)
 
 # Create plot ------------------------------------------------------------------
 # Create line plot - single
-biomass.ts.line <- ggplot(biomass.ts, 
-                          aes(x = factor(year), y = biomass, colour = group, group = group)) +
+biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0), 
+                          aes(x = date_start, y = biomass, colour = group, group = group)) +
   geom_path() +
   geom_point() +
+  geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
   scale_colour_manual(name = 'Species',
                     labels = c("Clupea pallasii", "Engraulis mordax", "Sardinops sagax",
                                "Scomber japonicus", "Trachurus symmetricus"),
                     values = c(pac.herring.color, anchovy.color,  
                                sardine.color, pac.mack.color, jack.mack.color)) +
-  # facet_wrap(~group) + 
-  # facet_wrap(~group, scales = "free_y") + 
-  xlab("Year") + 
-  scale_y_continuous(expression(Biomass~(t)), labels = scales::comma) +
-  theme_bw() 
+  scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
+  scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
+  theme_bw() +
+  theme(legend.text = element_text(face = "italic"))
 
 # Save figure
 ggsave(biomass.ts.line, 
        filename = here("Figs/fig_biomass_ts_line.png"),
-       width = 10, height = 6)
+       width = 7, height = 3)
 
 # Create line plot - faceted
 biomass.ts.line.facet <- ggplot(biomass.ts,
-                                aes(x = factor(year), y = biomass, group = group)) +
+                                aes(x = date_start, y = biomass, group = group)) +
   geom_path() +
   geom_point() +
-  geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 0.1) +
+  geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
   facet_wrap(~group) + 
-  # facet_wrap(~group, scales = "free_y") + 
-  xlab("Year") + 
-  scale_y_continuous(expression(Biomass~(t)), labels = scales::comma) +
+  scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
+  scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
   theme_bw() +
   theme(strip.background.x   = element_blank(),
         strip.text.x         = element_text(face = "italic"),
@@ -104,20 +115,21 @@ ggsave(biomass.ts.line.facet,
 
 # Create stacked bar plot
 biomass.ts.bar <- ggplot(biomass.ts, 
-                         aes(x = factor(year), y = biomass, fill = group)) + 
-  geom_bar(colour = "black", position = "stack", stat = "identity", width = 0.6) +
+                         aes(x = date_start, y = biomass, fill = group)) + 
+  geom_bar(colour = "black", position = "stack", stat = "identity") +
   scale_fill_manual(name = 'Species (Stock)',
-                    labels = c("Clupea pallasii", "Engraulis mordax (Southern)", "Sardinops sagax (Northern)",
+                    labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Sardinops sagax (Northern)",
                                "Scomber japonicus", "Trachurus symmetricus"),
                     values = c(pac.herring.color, anchovy.color,  
                                sardine.color, pac.mack.color, jack.mack.color)) +
-  xlab("Year") + 
-  scale_y_continuous(expression(Biomass~(t)), labels = scales::comma) +
-  ylab(expression(Biomass~(t))) +
+  scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
+  scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
+  ylab(expression(Biomass~(italic(t)))) +
   theme_bw() + 
-  theme(axis.text.y = element_text(angle = 0))
+  theme(axis.text.y = element_text(angle = 0),
+        legend.text = element_text(face = "italic"))
 
 # Save figure
 ggsave(biomass.ts.bar, 
        filename = here("Figs/fig_biomass_ts_bar.png"),
-       width = 10, height = 4)
+       width = 8, height = 4)
