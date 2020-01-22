@@ -142,7 +142,6 @@ transects.even <- filter(transects, Transect %% 2 == 0) %>%
 # Create route for planning
 empty <- st_as_sfc("POINT(EMPTY)")
 
-
 # Create route plan for the FSV -------------------------------------------
 # Combine even and odd transects into one continuous route
 route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>% 
