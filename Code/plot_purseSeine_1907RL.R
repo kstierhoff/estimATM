@@ -222,7 +222,7 @@ set.pies <- base.map +
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                pac.herring.color, pac.mack.color, sardine.color)) +
   geom_point(data = set.zero, aes(X, Y)) +
-  ggtitle("CPS Proportions in Purse Seines") +
+  # ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
@@ -250,7 +250,7 @@ nasc.map.ns.lm <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("CPS Backscatter-Lisa Marie") +
+  # ggtitle("CPS Backscatter-Lisa Marie") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
@@ -317,7 +317,7 @@ set.pies <- base.map +
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                pac.herring.color, pac.mack.color, sardine.color)) +
   geom_point(data = set.zero, aes(X, Y)) +
-  ggtitle("CPS Proportions in Purse Seines") +
+  # ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
@@ -348,7 +348,7 @@ nasc.map.ns.lbc <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("CPS Backscatter-Long Beach Carnage") +
+  # ggtitle("CPS Backscatter-Long Beach Carnage") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
@@ -444,7 +444,7 @@ haul.pies <- base.map +
                                pac.herring.color, pac.mack.color, sardine.color)) +
   geom_point(data = filter(haul.zero, haul %in% nasc.nearshore$haul), 
              aes(X, Y)) +
-  ggtitle("CPS Proportions in Trawl Hauls") +
+  # ggtitle("CPS Proportions in Trawl Hauls") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8),
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
@@ -472,7 +472,7 @@ nasc.map.ns.sd <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("CPS Backscatter-USV") +
+  # ggtitle("CPS Backscatter-USV") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
            ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
