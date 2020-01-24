@@ -209,7 +209,7 @@ if (save.figs) {
     #                 aes(X, Y, label = cluster, colour = sample.type), 
     #                 size = 2, bg.colour = "white", fontface = "bold") +
     # Plot panel label
-    ggtitle("Integrated NASC Clusters-Nearshore") +
+    # ggtitle("Integrated NASC Clusters-Nearshore") +
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
