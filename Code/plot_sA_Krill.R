@@ -23,7 +23,7 @@ nasc.map.krill <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  ggtitle("Krill Backscatter") +
+  # ggtitle("Krill Backscatter") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))

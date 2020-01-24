@@ -22,7 +22,7 @@ if (nrow(cluster.pos) > 0) {
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Proportions in Trawl Clusters") +
+    # ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -36,7 +36,7 @@ if (nrow(cluster.pos) > 0) {
     geom_point(data = cluster.zero, aes(X, Y), 
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Proportions in Trawl Clusters") +
+    # ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))

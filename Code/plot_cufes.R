@@ -22,7 +22,7 @@ cufes.density.all <- base.map +
                     values = cufes.sizes.all,labels = cufes.labels.all) +
   scale_colour_manual(name = 'Species', values = cufes.colors.all, labels = cufes.spp.labels.all) +
   # Format axes and titles
-  ggtitle("CUFES Egg Densities") +
+  # ggtitle("CUFES Egg Densities") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -45,7 +45,7 @@ cufes.density.facet <- base.map +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold")) +
   # Format axes and titles
-  ggtitle("CUFES Egg Densities") +
+  # ggtitle("CUFES Egg Densities") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
