@@ -41,6 +41,7 @@ uctd.spacing   <- 15
 
 # Number of transects to remove from the start (if near Mexico)
 rm.n.transects <- 0
+rm.i.transects <- c(paste(90:117, "Nearshore")) # Remove specific transects from plan; else NA
 
 # Randomize
 do.random <- FALSE

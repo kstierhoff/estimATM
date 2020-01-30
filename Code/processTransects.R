@@ -17,7 +17,7 @@ wpts <- route$waypoints %>%
 wpts.sf <- wpts %>% 
   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
 
-# extract transect waypoints
+# Extract transect waypoints
 transects <- wpts %>% 
   filter(!str_detect(name, "UCTD")) %>% 
   mutate(
@@ -38,7 +38,13 @@ transects <- wpts %>%
   select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group) %>% 
   filter(!is.na(Type), !is.na(Transect))
 
-# get inshore most waypoint of compulsory and adaptive transects
+# If specific transects are to be removed manually
+if (!is.na(rm.i.transects)) {
+  transects <- transects %>% 
+    filter(!group %in% rm.i.transects)
+}
+
+# Get inshore most waypoint of compulsory and adaptive transects
 starts <- transects %>% 
   group_by(Type, Transect, group) %>% 
   summarise(
