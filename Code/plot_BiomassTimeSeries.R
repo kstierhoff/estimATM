@@ -1,5 +1,5 @@
-library(odbc)
-library(tidyverse)
+# library(odbc)
+# library(tidyverse)
 
 if (get.db) {
   # Configure ODBC connection to AST database ------------------------------------
@@ -70,6 +70,15 @@ biomass.ts <- biomass.ts %>%
            TRUE ~ "Summer")) %>% 
   filter(!group %in% c("Sardinops sagax-Southern","Engraulis mordax-Northern")) %>% 
   filter(!biomass == 0)
+
+# Summarize community biomass by year
+biomass.comm.summ <- biomass.ts %>% 
+  filter(group != "Sardinops sagax-Southern") %>% 
+  group_by(year) %>% 
+  summarise(biomass.total = sum(biomass))
+
+save(biomass.ts, biomass.comm.summ, 
+     file = here("Output/biomass_timeseries_data.Rdata"))
 
 # Create plot ------------------------------------------------------------------
 # Create line plot - single
