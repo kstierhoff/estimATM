@@ -179,10 +179,6 @@ jacksmelt.color    <- '#A020F0'
 pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 
-# Load cmocean colormaps
-load(here("Code/cmocean.Rdata"))
-ocean.pal <- colors
-
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus")
