@@ -23,7 +23,7 @@ save.csv  <- FALSE
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
-survey.name.long       <- "Summer 2019 California Current Ecosystem (CCE) Survey"
+survey.name.long       <- "Summer 2019 California Current Ecosystem Survey"
 survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
