@@ -23,7 +23,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2020-03-24", "2020-04-19")))
 # Survey planning ---------------------------------------------------------
 ## Used by makeTransects.Rmd ------------------------
 # Transect spacing (nautical miles)
-tx.spacing.fsv  <- 15.1 # For Lasker 
+tx.spacing.fsv  <- 20.1 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
 tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
 
