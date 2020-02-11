@@ -24,7 +24,12 @@ if (get.db) {
   load(here("Output/biomass_database.Rdata"))
 }
 
-# source(here::here("Doc/settings/settings_1907RL.R"))
+# Load present year estimates
+load(here("Output/biomass_timeseries_export.Rdata"))
+
+# Combine with current survey results
+biomass.ts <- biomass.ts %>% 
+  bind_rows(be.db.export)
 
 # Summarise results across regions
 biomass.ts.var <- biomass.ts %>% 
@@ -46,19 +51,6 @@ biomass.ts <- biomass.ts %>%
   summarise_all(list(sum)) %>% 
   left_join(biomass.ts.var) %>% 
   mutate(biomass_cv = biomass_sd/biomass*100)
-# 
-# biomass.ts %>% 
-#   left_join(select(survey.info, survey, date_start)) %>% 
-#   mutate(group = paste(species, stock, sep = "-"),
-#          year  = year(date_start),
-#          season = case_when(
-#            month(date_start) < 6 ~ "Spring",
-#            TRUE ~ "Summer")) %>% 
-#   filter(year < 2013) %>% 
-#   View()
-
-
-# Combine most recent estimates ------------------------------------------------
 
 # Format data ------------------------------------------------------------------
 biomass.ts <- biomass.ts %>% 
@@ -78,7 +70,7 @@ biomass.comm.summ <- biomass.ts %>%
   summarise(biomass.total = sum(biomass))
 
 save(biomass.ts, biomass.comm.summ, 
-     file = here("Output/biomass_timeseries_data.Rdata"))
+     file = here("Output/biomass_timeseries_final.Rdata"))
 
 # Create plot ------------------------------------------------------------------
 # Create line plot - single

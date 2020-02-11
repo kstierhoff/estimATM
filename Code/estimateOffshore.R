@@ -1477,6 +1477,11 @@ write.csv(be.os,
 save(be.os, 
      file = here("Output/biomass_bootstrap_estimates_final_os.Rdata"))
 
+# Create data frame for database export
+be.os %>% 
+  mutate(region = "Offshore") %>% 
+  bind_rows(be.db.export) -> be.db.export
+
 # Get rows with estimates from all strata
 be.stratum.all.os <- which(be.os$Stratum == "All")
 

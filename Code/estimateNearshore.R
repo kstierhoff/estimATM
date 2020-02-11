@@ -1916,6 +1916,11 @@ write.csv(be.ns,
 save(be.ns, 
      file = here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
 
+# Create data frame for database export
+be.ns %>% 
+  mutate(region = "Nearshore") %>% 
+  bind_rows(be.db.export) -> be.db.export
+
 # Get rows with estimates from all strata
 be.stratum.all.ns <- which(be.ns$Stratum == "All")
 

@@ -6152,6 +6152,10 @@ write.csv(be,
           quote = F, row.names = F)
 save(be,  file = here("Output/biomass_bootstrap_estimates_final.Rdata"))
 
+# Create data frame for database export
+be.db.export <- be %>% 
+  mutate(region = "Core")
+
 # Get rows with estimates from all strata
 be.stratum.all <- which(be$Stratum == "All")
 
@@ -6902,6 +6906,20 @@ if (combine.regions) {
   }
 }
 ```
+
+```{r export-database}
+# Format data for import to SQL server database
+be.db.export <- be.db.export %>% 
+  mutate(survey = survey.name) %>% 
+  select(survey, region, species = Species, stock = Stock, stratum = Stratum, area = Area,
+         nTransects, distance = Distance, nClusters, nIndiv, biomass = Biomass, 
+         biomass_ci_lower = lower.ci.B, biomass_ci_upper = upper.ci.B,
+         biomass_sd = biomass.sd, biomass_cv = biomass.cv)
+
+
+save(be.db.export, file = here("Output/biomass_timeseries_export.Rdata"))
+```
+
 
 ## Estimation QA/QC
 
