@@ -29,11 +29,11 @@ load(here("Output/biomass_timeseries_export.Rdata"))
 
 # Combine with current survey results
 biomass.ts <- biomass.ts %>% 
-  bind_rows(be.db.export)
+  bind_rows(filter(be.db.export, region %in% estimate.regions))
 
 # Summarise results across regions
 biomass.ts.var <- biomass.ts %>% 
-  filter(stratum == "All", !region %in% c("Offshore")) %>% 
+  filter(stratum == "All") %>% 
   select(survey, species, stock, biomass_sd) %>% 
   group_by(survey, species, stock) %>%
   summarise(biomass_sd = sqrt(sum(biomass_sd^2)))
