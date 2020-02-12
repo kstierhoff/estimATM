@@ -89,3 +89,9 @@ load(here("Output/transect_spacing.Rdata"))
 
 # Load calibration results
 load(here("Output/cal_output_table.Rdata"))
+
+# Load purse seine data
+load(here("Output/purse_seine_specimens.Rdata"))
+load(here("Output/purse_seine_sets.Rdata"))
+
+

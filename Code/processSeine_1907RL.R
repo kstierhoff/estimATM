@@ -82,6 +82,8 @@ lbc.specimens <- lbc.specimens %>%
       TRUE ~ totalLength_mm),
     K = (weightg/totalLength_mm*10^3)*100)
 
+save(lm.specimens, lbc.specimens, file = here("Output/purse_seine_specimens.Rdata"))
+
 # Summarize specimen data ------------------------------------------------
 lm.spec.summ <- lm.specimens %>%
   group_by(key.set, vessel.name, scientificName) %>% 
