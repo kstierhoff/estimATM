@@ -2062,6 +2062,18 @@ nasc.sizes.all  <- nasc.sizes[sort(nasc.levels.all)]
 nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 
 if (save.figs) {
+  # Get acoustic proportions for mapping pie charts
+  acoustic.prop.indiv.ns <- clf %>%
+    filter(cluster %in% unique(nasc.nearshore$cluster)) %>% 
+    select(cluster, lat, long, prop.anch, prop.jack, prop.her,
+           prop.mack, prop.sar) %>% 
+    replace(is.na(.), 0) %>% 
+    project_df(to = crs.proj)
+  
+  cluster.zero.ns <- clf %>%
+    filter(cluster %in% unique(nasc.nearshore$cluster),
+           CPS.wg == 0)
+  
   # Map backscatter
   nasc.map.cps.ns <- base.map +
     # Plot transects data
@@ -2092,4 +2104,43 @@ if (save.figs) {
          width = map.width, height = map.height) 
   
   save(nasc.map.cps.ns, file = here("Output/nasc_plot_cps_ns.Rdata"))
+  
+  # Create purse seine pie chart map
+  acoustic.prop.cluster.indiv.ns <- base.map +
+    # Plot transects data
+    geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
+            size = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    # plot ship track data
+    geom_sf(data = nav.paths.ns, colour = "gray50", size = 0.5, alpha = 0.5) +
+    # Plot trawl pies
+    geom_scatterpie(data = acoustic.prop.indiv.ns, 
+                    aes(X, Y, group = cluster, r = pie.radius),
+                    cols = c("prop.anch","prop.jack","prop.her",
+                             "prop.mack","prop.sar"),
+                    color = 'black', alpha = 0.8) +
+    # Plot empty trawl locations
+    geom_point(data = cluster.zero.ns, aes(X, Y),
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
+    # Configure trawl scale
+    scale_fill_manual(name = 'Species',
+                      labels = c("Anchovy", "P. herring", "J. mackerel",
+                                 "P. mackerel", "Sardine"),
+                      values = c(anchovy.color, pac.herring.color, jack.mack.color,  
+                                 pac.mack.color, sardine.color)) +
+    # Configure legend guides
+    guides(fill = guide_legend(), size = guide_legend()) +
+    # Plot panel label
+    # ggtitle("Acoustic Proportions (Number) by Cluster") +
+    coord_sf(crs = crs.proj, 
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  # Plot trawl clusters and acoustic proportions for nearshore sampling
+  nasc.trawl.acoustic.prop.ns <- plot_grid(nasc.map.cps.ns, acoustic.prop.cluster.indiv.ns,
+                                        nrow = 1, labels = c("a)", "b)"))
+  
+  ggsave(nasc.trawl.acoustic.prop.ns,
+         filename = here("Figs/fig_nasc_acoustic_cluster_ns.png"),
+         width = map.width*2, height = map.height)
 }
