@@ -199,6 +199,10 @@ set.pos <- filter(set.pie, AllCPS > 0) %>%
   replace(. == 0, 0.0000001) %>% 
   arrange(desc(X))
 
+# Save output
+save(set.pie, set.zero, set.pos, 
+     file = here("Output/purse_set_pies.Rdata"))
+
 # Select plot levels for backscatter data
 nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(transect.name, "LM"))
 
