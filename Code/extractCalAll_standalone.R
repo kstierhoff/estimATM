@@ -62,6 +62,7 @@ for (dd in 1:nrow(dirs)) {
   info <- sprintf("%d%% done", round((dd/nrow(dirs))*100))
   setWinProgressBar(pb, dd/nrow(dirs)*100, label = info)
 }
+
 close(pb)
 
 # Format results
