@@ -209,11 +209,11 @@ log.set.comp.map.jitter <- base.map +
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.6) +
-  # Plot trawl clusters
-  scatterpie::geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = radius*2.5),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
-                              color = 'black', alpha = 0.6) +
+  # # Plot trawl clusters
+  # scatterpie::geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = radius*2.5),
+  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
+  #                                      "PacHerring", "PacMack", "Sardine"),
+  #                             color = 'black', alpha = 0.6) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
@@ -228,4 +228,4 @@ log.set.comp.map.jitter <- base.map +
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]*1.1), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]*0.95))
 
-ggsave(log.set.comp.map.jitter, filename = here("Figs/fig_seine_trawl_logs_jitter.png"))
+ggsave(log.set.comp.map.jitter, filename = here("Figs/fig_seine_logs_jitter.png"))
