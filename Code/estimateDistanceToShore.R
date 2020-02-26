@@ -1,9 +1,12 @@
+# Load libraries
 library(tidyverse)
 library(here)
 library(sf)
 library(swfscMisc)
 
+# Show figures?
 plot.figs <- FALSE
+save.figs <- TRUE
 
 # Load core nasc
 load(here("Output/nasc_final.Rdata"))
@@ -39,22 +42,24 @@ shoreline <- read_csv(here("Data/GIS/shoreline_points.csv")) %>%
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
 if (plot.figs) {
-  # ggplot(shoreline) + geom_sf()
+  ggplot(shoreline) + geom_sf()
 }
 
-# Get most shoreward point for each vessel and transect
-# Process first points from each transect
-# Core region
+# Get most shoreward point for each vessel and transect ------------------------------
+# Core region -------
+# Select first points from each transect
 nasc.first <- nasc %>% 
   group_by(transect.name) %>%
   slice(1) 
 
+# Get nearest shoreline feature
 nearest.df1 <- shoreline[sf::st_nearest_feature(nasc.first, filter(shoreline, name == "mainland")), ] %>% 
   mutate(
     long = as.data.frame(st_coordinates(.))$X,
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL) 
 
+# Convert back to df
 nasc.first <- nasc.first %>% 
   ungroup() %>% 
   mutate(
@@ -62,10 +67,11 @@ nasc.first <- nasc.first %>%
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL)
 
+# Calculate distance to nearest point on shore
 tmp.df1 <- data.frame()
 
+# Calculate distance between each NASC interval and all trawl clusters
 for (i in 1:nrow(nasc.first)) {
-  # Calculate distance between each NASC interval and all trawl clusters
   temp.distance <- swfscMisc::distance(nasc.first$lat[i], nasc.first$long[i], 
                                        nearest.df1$lat[i], nearest.df1$long[i], 
                                        units = "nm")
@@ -86,12 +92,14 @@ nasc.last <- nasc %>%
   group_by(transect.name) %>%
   slice(n()) 
 
+# Get nearest shoreline feature
 nearest.df2 <- shoreline[sf::st_nearest_feature(nasc.last, filter(shoreline, name == "mainland")), ] %>% 
   mutate(
     long = as.data.frame(st_coordinates(.))$X,
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL) 
 
+# Convert to df
 nasc.last <- nasc.last %>% 
   ungroup() %>% 
   mutate(
@@ -99,10 +107,11 @@ nasc.last <- nasc.last %>%
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL)
 
+# Calculate distance to nearest point on shore
 tmp.df2 <- data.frame()
 
+# Calculate distance between each NASC interval and all trawl clusters
 for (i in 1:nrow(nasc.last)) {
-  # Calculate distance between each NASC interval and all trawl clusters
   temp.distance <- swfscMisc::distance(nasc.last$lat[i], nasc.last$long[i], 
                                        nearest.df2$lat[i], nearest.df2$long[i], 
                                        units = "nm")
@@ -118,6 +127,7 @@ for (i in 1:nrow(nasc.last)) {
                        ))
 }
 
+# Combine first and last points, and select closest to shore
 nearest.df.final <- tmp.df1 %>% 
   bind_rows(tmp.df2) %>% 
   arrange(transect.name, dist.to.shore) %>% 
@@ -126,17 +136,20 @@ nearest.df.final <- tmp.df1 %>%
   ungroup() %>% 
   select(transect.name, vessel.name, long, lat, dist.to.shore, depth)
 
-# Nearshore region
+# Nearshore region -------
+# Select first points from each transect
 nasc.ns.first <- nasc.nearshore %>% 
   group_by(transect.name) %>%
   slice(1) 
 
+# Get nearest shoreline feature
 nearest.ns.df1 <- shoreline[sf::st_nearest_feature(nasc.ns.first, shoreline), ] %>% 
   mutate(
     long = as.data.frame(st_coordinates(.))$X,
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL) 
 
+# Convert to df
 nasc.ns.first <- nasc.ns.first %>% 
   ungroup() %>% 
   mutate(
@@ -146,8 +159,8 @@ nasc.ns.first <- nasc.ns.first %>%
 
 tmp.ns.df1 <- data.frame()
 
+# Calculate distance between each NASC interval and all trawl clusters
 for (i in 1:nrow(nasc.ns.first)) {
-  # Calculate distance between each NASC interval and all trawl clusters
   temp.distance <- swfscMisc::distance(nasc.ns.first$lat[i], nasc.ns.first$long[i], 
                                        nearest.ns.df1$lat[i], nearest.ns.df1$long[i], 
                                        units = "nm")
@@ -168,12 +181,14 @@ nasc.ns.last <- nasc.nearshore %>%
   group_by(transect.name) %>%
   slice(n()) 
 
+# Get nearest shoreline feature
 nearest.ns.df2 <- shoreline[sf::st_nearest_feature(nasc.ns.last, shoreline), ] %>% 
   mutate(
     long = as.data.frame(st_coordinates(.))$X,
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL) 
 
+# Convert to df
 nasc.ns.last <- nasc.ns.last %>% 
   ungroup() %>% 
   mutate(
@@ -183,8 +198,8 @@ nasc.ns.last <- nasc.ns.last %>%
 
 tmp.ns.df2 <- data.frame()
 
+# Calculate distance between each NASC interval and all trawl clusters
 for (i in 1:nrow(nasc.ns.last)) {
-  # Calculate distance between each NASC interval and all trawl clusters
   temp.distance <- swfscMisc::distance(nasc.ns.last$lat[i], nasc.ns.last$long[i], 
                                        nearest.ns.df2$lat[i], nearest.ns.df2$long[i], 
                                        units = "nm")
@@ -200,6 +215,7 @@ for (i in 1:nrow(nasc.ns.last)) {
                        ))
 }
 
+# Combine first and last points, and select closest to shore
 nearest.ns.df.final <- tmp.ns.df1 %>% 
   bind_rows(tmp.ns.df2) %>% 
   arrange(transect.name, dist.to.shore) %>% 
@@ -213,15 +229,24 @@ nearest.df.final <- nearest.df.final %>%
   bind_rows(nearest.ns.df.final) %>%
   arrange(vessel.name, transect.name)
 
+# Convert to spatial, for plotting
 nearest.sf.final <- nearest.df.final %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
+dist.hist <- ggplot(nearest.df.final, aes(dist.to.shore)) +
+  geom_histogram() + 
+  facet_wrap(~vessel.name) +
+  xlab("Distance to shore (nmi)") + ylab("Frequency") +
+  theme_bw() 
+
+# Plot and save histograms
 if (plot.figs) {
-  ggplot(nearest.df.final, aes(dist.to.shore)) +
-    geom_histogram() + 
-    facet_wrap(~vessel.name) +
-    xlab("Distance to shore (nmi)") + ylab("Frequency") +
-    theme_bw()  
+ dist.hist
+}
+
+if (save.figs) {
+  ggsave(dist.hist, 
+         filename = here("Figs/fig_distance_to_shore_hist.png"))
 }
 
 if (plot.figs) {
@@ -233,14 +258,14 @@ if (plot.figs) {
 }
 
 # Get map data
-usa <- map_data("usa") # we already did this, but we can do it again
+usa <- map_data("usa") 
 
 # Plot Lisa Marie data
 map.bounds <- nearest.sf.final %>%
   filter(vessel.name == "LM") %>% 
   st_bbox()
 
-ggplot() +
+dist.lm <- ggplot() +
   geom_polygon(data = usa, aes(x = long, y = lat, group = group), fill = "gray50") + 
   geom_path(data = filter(nearest.df.final, vessel.name == "LM"), 
             aes(long, lat)) + 
@@ -255,12 +280,14 @@ ggplot() +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
   theme_bw()
 
+ggsave(dist.lm, filename = here("Figs/fig_distance_to_shore_LisaMarie.png"))
+
 # Plot Saildrone data
 map.bounds <- nearest.sf.final %>%
   filter(vessel.name == "SD") %>% 
   st_bbox()
 
-ggplot() +
+dist.sd <- ggplot() +
   geom_polygon(data = usa, aes(x = long, y = lat, group = group), fill = "gray50") + 
   geom_path(data = filter(nearest.df.final, vessel.name == "SD"), 
             aes(long, lat)) + 
@@ -275,12 +302,14 @@ ggplot() +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
   theme_bw()
 
+ggsave(dist.sd, filename = here("Figs/fig_distance_to_shore_Saildrone.png"))
+
 # Plot Long Beach Carnage data
 map.bounds <- nearest.sf.final %>%
   filter(vessel.name == "LBC") %>% 
   st_bbox()
 
-ggplot() +
+dist.lbc <- ggplot() +
   geom_polygon(data = usa, aes(x = long, y = lat, group = group), fill = "gray50") + 
   geom_path(data = filter(nearest.df.final, vessel.name == "LBC"), 
             aes(long, lat)) + 
@@ -294,3 +323,5 @@ ggplot() +
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
   theme_bw()
+
+ggsave(dist.lbc, filename = here("Figs/fig_distance_to_shore_LongBeachCarnage.png"))
