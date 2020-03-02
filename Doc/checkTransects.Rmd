@@ -102,7 +102,7 @@ transects <- transects %>%
          brg      = 360 + stplanr::line_bearing(.),
          label    = paste("Transect", Transect),
          popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
-                       'Distance:', distance, 'nmi<br/>'))
+                          'Distance:', distance, 'nmi<br/>'))
 
 # Add labels and popups to waypoints
 wpts <- wpt.export %>% 
@@ -141,132 +141,211 @@ imap.bounds <-  map_bounds(wpts.df$Y, wpts.df$X, pad = 0.1)
 
 # Create color palette for MPAs
 all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
-                   unique(as.character(or_mpas$Label))))
+                             unique(as.character(or_mpas$Label))))
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
+
+# Create pairovet color palette
+pairovetPal <- colorFactor(c("#FF0000", "#0000FF"), c("Compulsory", "Adaptive"))
 
 # Create color pallette for planned transects
 txPal    <- colorFactor(wpt.colors, wpt.types)
 
-# Plotting preferences ----------------------c("white", "white", "white")---------------------------------
-# Leaflet tile options; set both to T if caching
-useCachedTile  <- F # Use cached tiles
-useCrossOrigin <- F # USe cross origin
-
-# Create leaflet map
-leaflet() %>% 
-  # Enable tile caching
-  enableTileCaching() %>% 
-  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-  addProviderTiles(providers$Esri.OceanBasemap, 
-                   options = tileOptions(useCache = useCachedTile,
-                                         crossOrigin = useCrossOrigin)) %>%
-  # Add EEZs
-  addPolylines(data = eez_usa, color = "#000414", weight = 3, 
-               label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
-  addPolylines(data = eez_can, color = "#000414", weight = 3, 
-               label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
-  addPolylines(data = eez_mex, color = "#000414", weight = 3, 
-               label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
-  # Add bathymetry contours
-  addPolylines(data = bathy, color = "white", weight = 2, 
-               label = ~paste(Contour, "m"), group = "Bathymetry Contours") %>% 
-  # Add State waters
-  addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
-              opacity = 0.75,
-              label = ~htmlEscape("OR State Waters"),
-              group = "State Waters") %>%
-  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
-              opacity = 0.75,
-              label = ~htmlEscape("CA State Waters"),
-              group = "State Waters") %>%
-  # Add CA MPAs
-  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
-              fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
-  # Add OR MPAs
-  addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
-              fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
-  # Add core planned transects
-  addPolylines(data = filter(transects, Type == "Compulsory"),
-               color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)),
-               popup = ~popup,
-               group = "Planned Transects (Compulsory)") %>%
-  addPolylines(data = filter(transects, Type == "Adaptive"),
-               color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)),
-               popup = ~popup,
-               group = "Planned Transects (Adaptive)") %>%
-  addCircleMarkers(data = filter(wpts, Type == "Compulsory"),
+# Create Leaflet map ----------------------
+if (leaflet.checkTransects.simple) {
+  # Create leaflet map
+  leaflet() %>% 
+    # Enable tile caching
+    enableTileCaching() %>% 
+    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    addProviderTiles(providers$Esri.OceanBasemap, 
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
+    addPolylines(data = eez_can, color = "#000414", weight = 3, 
+                 label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
+    addPolylines(data = eez_mex, color = "#000414", weight = 3, 
+                 label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
+    # Add bathymetry contours
+    addPolylines(data = bathy, color = "white", weight = 2, 
+                 label = ~paste(Contour, "m"), group = "Bathymetry Contours") %>% 
+    # Add State waters
+    addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
+                opacity = 0.75,
+                label = ~htmlEscape("OR State Waters"),
+                group = "State Waters") %>%
+    addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
+                opacity = 0.75,
+                label = ~htmlEscape("CA State Waters"),
+                group = "State Waters") %>%
+    # Add CA MPAs
+    addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+                fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+    # Add OR MPAs
+    addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+                fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+    # Add core planned transects
+    addPolylines(data = transects,
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects") %>%
+    addCircleMarkers(data = wpts,
                    radius = 3, color = "#000414", stroke = F, opacity = 0.5,
                    fillOpacity = 0.5, fillColor =  ~txPal(Type), 
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
-                   group = "Planned Transects (Compulsory)") %>%
-  addCircleMarkers(data = filter(wpts, Type == "Adaptive"),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
-                   popup = ~popup,
-                   group = "Planned Transects (Adaptive)") %>%
-  # Add ancillary planned transects 
-  addPolylines(data = filter(transects, Type == "Nearshore"),
-               color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)),
-               popup = ~popup,
-               group = "Planned Transects (Nearhore)") %>%
-  addCircleMarkers(data = filter(wpts, Type == "Nearshore"),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
-                   popup = ~popup,
-                   group = "Planned Transects (Nearshore)") %>%
-  # addPolylines(data = filter(transects, Type == "Offshore"),
-  #              color = ~txPal(Type), weight = 3, opacity = 0.5,
-  #              label = ~htmlEscape(paste(Type, Transect)),
-  #              popup = ~popup,
-  #              group = "Planned Transects (Offshore)") %>%
-  # addCircleMarkers(data = filter(wpts, Type == "Offshore"),
-  #                  radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-  #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-  #                  label = ~htmlEscape(paste(Type, Waypoint)),
-  #                  popup = ~popup,
-  #                  group = "Planned Transects (Offshore)") %>%
-  addPolylines(data = filter(transects, Type == "Transit"),
-               color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)),
-               popup = ~popup,
-               group = "Planned Transects (Transits)") %>%
-  addCircleMarkers(data = filter(wpts, Type == "Transit"),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
-                   popup = ~popup,
-                   group = "Planned Transects (Transits)") %>%
-  # Add UCTD statiosn
-  addCircleMarkers(data = uctds,
-                   radius = 3, color = "#000000", stroke = TRUE, weight = 2,
-                   fillOpacity = 1, fillColor =  "white",
-                   group = "UCTD Stations") %>%
-  # Add scale bar
-  addScaleBar(position = "bottomright") %>%
-  # Add map coordinates
-  addMouseCoordinates() %>% 
-  # Add measurement tool
-  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
-             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
-             position = "topleft") %>% 
-  # Add layer controls
-  addLayersControl(
-    overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
-                      "Bathymetry Contours",
-                      "Planned Transects (Compulsory)", "Planned Transects (Adaptive)",
-                      "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
-                      "Planned Transects (Transits)", "UCTD Stations"),
-    options = layersControlOptions(collapsed = FALSE)) %>%  
-  hideGroup(c("UCTD Stations")) %>% 
-  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
-            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+                   group = "Planned Transects") %>%
+    # Add UCTD stations
+    addCircleMarkers(data = uctds,
+                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     fillOpacity = 1, fillColor =  "white",
+                     # label = ~htmlEscape(name),
+                     # popup = ~name,
+                     group = "UCTD Stations") %>%
+    # Add Pairovet stations
+    addCircleMarkers(data = pairovets,
+                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     fillOpacity = 0.5, fillColor =  ~pairovetPal(type), 
+                     label = ~htmlEscape(name),
+                     popup = ~name,
+                     group = "Pairovet Stations") %>%
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft") %>% 
+    # Add layer controls
+    addLayersControl(
+      overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+                        "Bathymetry Contours", "Planned Transects", 
+                        "UCTD Stations", "Pairovet Stations"),
+      options = layersControlOptions(collapsed = FALSE)) %>%  
+    hideGroup(c("UCTD Stations", "Pairovet Stations")) %>% 
+    fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+              imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+  
+} else {
+  # Create leaflet map
+  leaflet() %>% 
+    # Enable tile caching
+    enableTileCaching() %>% 
+    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    addProviderTiles(providers$Esri.OceanBasemap, 
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
+    addPolylines(data = eez_can, color = "#000414", weight = 3, 
+                 label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
+    addPolylines(data = eez_mex, color = "#000414", weight = 3, 
+                 label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
+    # Add bathymetry contours
+    addPolylines(data = bathy, color = "white", weight = 2, 
+                 label = ~paste(Contour, "m"), group = "Bathymetry Contours") %>% 
+    # Add State waters
+    addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
+                opacity = 0.75,
+                label = ~htmlEscape("OR State Waters"),
+                group = "State Waters") %>%
+    addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
+                opacity = 0.75,
+                label = ~htmlEscape("CA State Waters"),
+                group = "State Waters") %>%
+    # Add CA MPAs
+    addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+                fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+    # Add OR MPAs
+    addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+                fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+    # Add core planned transects
+    addPolylines(data = filter(transects, Type == "Compulsory"),
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects (Compulsory)") %>%
+    addPolylines(data = filter(transects, Type == "Adaptive"),
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects (Adaptive)") %>%
+    addCircleMarkers(data = filter(wpts, Type == "Compulsory"),
+                     radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects (Compulsory)") %>%
+    addCircleMarkers(data = filter(wpts, Type == "Adaptive"),
+                     radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects (Adaptive)") %>%
+    # Add ancillary planned transects 
+    addPolylines(data = filter(transects, Type == "Nearshore"),
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects (Nearhore)") %>%
+    addCircleMarkers(data = filter(wpts, Type == "Nearshore"),
+                     radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects (Nearshore)") %>%
+    addPolylines(data = filter(transects, Type == "Offshore"),
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects (Offshore)") %>%
+    addCircleMarkers(data = filter(wpts, Type == "Offshore"),
+                     radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type),
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects (Offshore)") %>%
+    addPolylines(data = filter(transects, Type == "Transit"),
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects (Transits)") %>%
+    addCircleMarkers(data = filter(wpts, Type == "Transit"),
+                     radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects (Transits)") %>%
+    # Add UCTD stations
+    addCircleMarkers(data = uctds,
+                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     fillOpacity = 1, fillColor =  "white",
+                     group = "UCTD Stations") %>%
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft") %>% 
+    # Add layer controls
+    addLayersControl(
+      overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+                        "Bathymetry Contours",
+                        "Planned Transects (Compulsory)", "Planned Transects (Adaptive)",
+                        "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
+                        "Planned Transects (Transits)", "UCTD Stations"),
+      options = layersControlOptions(collapsed = FALSE)) %>%  
+    hideGroup(c("UCTD Stations")) %>% 
+    fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+              imap.bounds$range.lon[2], imap.bounds$range.lat[2]) 
+}
 ```  
 
 ## Static map  
@@ -323,12 +402,33 @@ wpts %>%
 ## UCTD Stations
 
 ```{r uctd-wpts-table}
-uctds %>% 
-  select(Station = station, Region, Depth) %>% 
-  arrange(Station) %>%
-  mutate(
-    Long = as.data.frame(st_coordinates(.))$X,
-    Lat = as.data.frame(st_coordinates(.))$Y) %>% 
-  st_set_geometry(NULL) %>% 
-  datatable(rownames = FALSE)
+if (nrow(uctds) > 0) {
+  uctds %>% 
+    select(Station = station, Region, Depth) %>% 
+    arrange(Station) %>%
+    mutate(
+      Long = as.data.frame(st_coordinates(.))$X,
+      Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+    st_set_geometry(NULL) %>% 
+    datatable(rownames = FALSE)  
+} else {
+  print("No UCTD stations planned.")
+}
+```
+
+## Pairovet Stations
+
+```{r pairovet-wpts-table}
+if (nrow(pairovets) > 0) {
+  pairovets %>% 
+    select(Station = station, Region, Depth) %>% 
+    arrange(Station) %>%
+    mutate(
+      Long = as.data.frame(st_coordinates(.))$X,
+      Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+    st_set_geometry(NULL) %>% 
+    datatable(rownames = FALSE) 
+} else {
+  print("No Pairovet stations planned.")
+}
 ```

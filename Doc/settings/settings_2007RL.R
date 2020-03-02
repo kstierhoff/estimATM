@@ -149,17 +149,15 @@ mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Pos
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
-crs.proj <- 3310 # Califoria Albers Equal Area
+crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
 map.height <- 10
 
-# Configure mapview options
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
-
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
 useCrossOrigin <- F # USe cross origin
+leaflet.checkTransects.simple  <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)

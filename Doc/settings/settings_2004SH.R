@@ -39,6 +39,7 @@ uctd.spacing   <- 15
 
 # Number of transects to remove from the start (if near Mexico)
 rm.n.transects <- 0
+rm.i.transects <- NA # Remove specific transects from plan; else NA
 
 # Randomize
 do.random <- FALSE
@@ -47,7 +48,7 @@ save.csv  <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20200325_LASKER_SpringCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints_alt.gpx"
+gpx.file         <- "rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -142,17 +143,15 @@ mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Pos
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
-crs.proj <- 3310 # Califoria Albers Equal Area
+crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
 map.height <- 10
 
-# Configure mapview options
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
-
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
 useCrossOrigin <- F # USe cross origin
+leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
