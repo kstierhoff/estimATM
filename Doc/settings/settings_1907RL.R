@@ -109,12 +109,10 @@ crs.proj <- 3310 # Califoria Albers Equal Area
 # Default map height
 map.height <- 10
 
-# Configure mapview options
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
-
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
 useCrossOrigin <- F # USe cross origin
+leaflet.checkTransects.simple <- FALSE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)

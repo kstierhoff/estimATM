@@ -14,22 +14,20 @@ wpts <- route$waypoints %>%
   arrange(name) %>% 
   write_csv(here("Output/waypoints/all_waypoints.csv"))
 
-wpts.sf <- wpts %>% 
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog)
-
 # Extract transect waypoints
 transects <- wpts %>% 
-  filter(!str_detect(name, "UCTD")) %>% 
+  filter(!str_detect(name, "UCTD")) %>%
+  filter(!str_detect(name, "Pairovet")) %>% 
   mutate(
     type = case_when(
-      str_detect(name, "A") ~ "Adaptive",
-      str_detect(name, "C") ~ "Compulsory",
-      str_detect(name, "S") ~ "Nearshore",
-      str_detect(name, "M") ~ "Mammal",
-      str_detect(name, "E") ~ "Extra",
-      str_detect(name, "T") ~ "Transit",
-      str_detect(name, "N") ~ "Nearshore",
-      str_detect(name, "O") ~ "Offshore",
+      str_detect(name, "A+$") ~ "Adaptive",
+      str_detect(name, "C+$") ~ "Compulsory",
+      str_detect(name, "S+$") ~ "Nearshore",
+      str_detect(name, "M+$") ~ "Mammal",
+      str_detect(name, "E+$") ~ "Extra",
+      str_detect(name, "T+$") ~ "Transit",
+      str_detect(name, "N+$") ~ "Nearshore",
+      str_detect(name, "O+$") ~ "Offshore",
       TRUE ~ "Unknown"),
     Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}")),
     Transect = floor(Waypoint)) %>%
@@ -89,6 +87,9 @@ transects <- left_join(transects, select(starts, group)) %>%
   left_join(select(transect.regions, group, Region)) %>% 
   arrange(Type, Transect, Waypoint) 
 
+wpts.sf <- transects %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
 # extract UCTD stations
 uctds <- wpts %>% 
   filter(str_detect(name, "UCTD")) %>% 
@@ -101,6 +102,30 @@ uctds <- wpts %>%
            loc == 4 ~ "Vancouver Is.",
            TRUE ~ "Other")),
          Region = fct_reorder(Region, loc)) %>% 
+  arrange(station) 
+
+# Extract Pairovet stations
+pairovets <- wpts %>% 
+  filter(str_detect(name, "Pairovet")) %>% 
+  mutate(station = name,
+         loc = cut(lat, region.vec, labels = FALSE),
+         Region = as.factor(case_when(
+           loc == 1 ~ "S. CA Bight",
+           loc == 2 ~ "Central CA",
+           loc == 3 ~ "WA/OR",
+           loc == 4 ~ "Vancouver Is.",
+           TRUE ~ "Other")),
+         Region = fct_reorder(Region, loc)) %>% 
+  mutate(transect = as.numeric(str_sub(name, 1, 3))) %>%
+  group_by(transect) %>% 
+  mutate(station.order = seq_along(transect)) %>% 
+  ungroup() %>% 
+  mutate(type = case_when(
+    station.order%%2 == 1 ~ "Compulsory",
+    TRUE ~ "Adaptive"),
+    name = case_when(
+      type == "Adaptive" ~ str_replace(name, "C", "A"),
+      TRUE ~ name)) %>% 
   arrange(station) 
 
 # Import landmarks
@@ -232,6 +257,10 @@ if (nrow(uctds) > 0) {
   uctds$Depth     <- get.depth(noaa.bathy, uctds$lon, uctds$lat, locator = F, distance = T)$depth
 }
 
+if (nrow(pairovets) > 0) {
+  pairovets$Depth     <- get.depth(noaa.bathy, pairovets$lon, pairovets$lat, locator = F, distance = T)$depth
+}
+
 # Extract bathymetry info
 if (extract.bathy) {
   source(here("Code/extractBathy.R"))
@@ -254,6 +283,10 @@ transects.sf <- transects %>%
 uctds.sf <- uctds %>% 
   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
 
+# Convert Pairovets to sf
+pairovets.sf <- pairovets %>% 
+  st_as_sf(coords = c("lon","lat"), crs = crs.geog)
+
 # export tables to csv
 wpt.export <- select(transects, -group, -Leg)
 
@@ -268,7 +301,7 @@ if (nrow(filter(wpt.export, Type == "Adaptive")) > 0) {
 if (nrow(filter(wpt.export, Type == "Compulsory")) > 0) {
   write_csv(filter(wpt.export, Type == "Compulsory"),  here("Output/tables/waypoints_compulsory.csv"))  
 }
-# Write saildrone waypoints
+# Write Saildrone waypoints
 if (nrow(filter(wpt.export, Type == "Saildrone")) > 0) {
   write_csv(filter(wpt.export, Type == "Saildrone"),  here("Output/tables/waypoints_saildrone.csv"))  
 }
@@ -301,14 +334,26 @@ wpt.plan <- wpt.export %>%
   write_csv(here("Output/tables/waypoint_plan.csv"))
 
 if (nrow(uctds) > 0) {
-  # format UCTDs for export
+  # format UCTD stations for export
   uctd.export <- uctds %>% 
     select(Name = name, Latitude = lat, Longitude = lon, Region, Depth)
   
   # export to csv
-  # Write saildrone waypoints
+  # Write UCTD waypoints
   if (nrow(uctd.export) > 0) {
     write_csv(uctd.export,  here("Output/tables/waypoints_uctd.csv"))  
+  }  
+}
+
+if (nrow(pairovets) > 0) {
+  # format Pairovet stations for export
+  pairovet.export <- pairovets %>% 
+    select(Name = name, Type = type, Latitude = lat, Longitude = lon, Region, Depth)
+  
+  # export to csv
+  # Write Pairovet waypoints
+  if (nrow(pairovet.export) > 0) {
+    write_csv(pairovet.export,  here("Output/tables/waypoints_pairovet.csv"))  
   }  
 }
 
@@ -318,10 +363,14 @@ survey.map <- base.map +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", 
                                                   "Nearshore","Offshore", "Transit")),
           aes(linetype = Type, colour = Type), show.legend = "line") +
-  scale_colour_manual(name = "Type", values = c("Adaptive" = "red","Compulsory" = "blue",
+  scale_colour_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
                                                 "Offshore" = "green", "Nearshore" = "#F08C09",
                                                 "Transit" = "cyan")) +
-  geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
+  scale_fill_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
+                                                "Offshore" = "green", "Nearshore" = "#F08C09",
+                                                "Transit" = "cyan")) +
+  geom_sf(data = uctds.sf, shape = 21, size = 2, fill = "white") +
+  geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 2) +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
                                                   "Mammal" = "dashed", "Nearshore" = "solid",
                                                   "Offshore" = "solid","Transit" = "dashed")) +
@@ -334,7 +383,8 @@ survey.map <- base.map +
 ggsave(survey.map, filename = here("Figs/fig_survey_plan_map.png"), 
        height = map.height, width = map.width)
 
-uctds <- st_as_sf(uctds, coords = c("lon","lat"), crs = crs.geog)
+uctds     <- st_as_sf(uctds, coords = c("lon","lat"), crs = crs.geog)
+pairovets <- st_as_sf(pairovets, coords = c("lon","lat"), crs = crs.geog)
 
 # Save results for use with checkTransects.Rmd
 save(transects, wpts, uctds, wpt.export,
