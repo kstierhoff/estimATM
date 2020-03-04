@@ -42,7 +42,7 @@ if (doc.type == "latex") {
 
 ```{r user-settings}
 # User-specified settings
-get.nav <- TRUE
+get.nav <- FALSE
 ```
 
 ```{r project-settings}
@@ -214,7 +214,8 @@ haul.bad <- haul.all %>%
 # Classify hauls by season (spring or summer)
 haul.all <- haul.all %>% 
   # Remove bad trawls
-  filter(!trawlPerformance %in% trawl.performance) %>% 
+  filter(!trawlPerformance %in% trawl.performance,
+         cruise %in% cruise.name) %>% 
   mutate(season = case_when(
     month(equilibriumTime) < 6 ~ "spring",
     TRUE ~ "summer"),
@@ -328,7 +329,6 @@ haul.catch <- haul.summ.wt %>%
 haul.catch <- project_sf(haul.catch, crs = crs.proj)
 ```
 
-
 ```{r summarise-hauls}
 # Create haul paths from starts and ends
 haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
@@ -348,16 +348,23 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
                      'Jack mackerel:', JackMack, 'kg<br/>',
                      'P. herring:', PacHerring, 'kg<br/>',
                      'P. mackerel:', PacMack, 'kg<br/>',
-                     'All CPS:', AllCPS, 'kg')) %>% 
-  left_join(select(haul.all, haul, 
-                   startLatDeg   = startLatitudeDegrees,
-                   startLatMin   = startLatitudeMinutes,
-                   startLongDeg  = startLongitudeDegrees,
-                   startLongMin  = startLongitudeMinutes,
-                   stopLatDeg    = stopLatitudeDegrees,
-                   stopLatMin    = stopLatitudeMinutes,
-                   stopLongDeg   = stopLongitudeDegrees,
-                   stopLongMin   = stopLongitudeMinutes))
+                     'All CPS:', AllCPS, 'kg')) 
+
+# Add coordinates if using the Access database (columns do not exist in SQL database)
+if (trawl.source == "Access") {
+  haul.paths <- haul.paths %>% 
+    left_join(select(haul, haul, 
+                     startLatDeg   = startLatitudeDegrees,
+                     startLatMin   = startLatitudeMinutes,
+                     startLongDeg  = startLongitudeDegrees,
+                     startLongMin  = startLongitudeMinutes,
+                     stopLatDeg    = stopLatitudeDegrees,
+                     stopLatMin    = stopLatitudeMinutes,
+                     stopLongDeg   = stopLongitudeDegrees,
+                     stopLongMin   = stopLongitudeMinutes))  
+} else {
+  # Do nothing for now
+}
 
 haul.locs.sf <- haul.mid %>% 
   mutate(label = paste("Haul", haul)) %>% 
@@ -458,19 +465,36 @@ lengths.all <- lengths.all  %>%
 lengths.all  <- lengths.all %>%
   mutate(
     totalLength_mm = case_when(
-      scientificName == "Clupea pallasii"       ~ -0.323 + 1.110*forkLength_mm,
-      scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
-      scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
-      scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
-      scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm,
+      scientificName == "Clupea pallasii"       ~ convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Engraulis mordax"      ~ convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+      scientificName == "Sardinops sagax"       ~ convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+      scientificName == "Scomber japonicus"     ~ convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Trachurus symmetricus" ~ convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
-    missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ F),
+    missing.weight = case_when(is.na(weightg)   ~ TRUE, TRUE ~ FALSE),
     missing.length = case_when(
-      is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
-      is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
-      TRUE ~ F)) %>% 
+      is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ TRUE,
+      is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ TRUE,
+      TRUE ~ FALSE)) %>% 
   mutate(totalLength_mm = round(totalLength_mm),
          mantleLength_mm = round(mantleLength_mm))
+
+# lengths.all  <- lengths.all %>%
+#   mutate(
+#     totalLength_mm = case_when(
+#       scientificName == "Clupea pallasii"       ~ -0.323 + 1.110*forkLength_mm,
+#       scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
+#       scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
+#       scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
+#       scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm,
+#       scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
+#     missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ F),
+#     missing.length = case_when(
+#       is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
+#       is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
+#       TRUE ~ F)) %>% 
+#   mutate(totalLength_mm = round(totalLength_mm),
+#          mantleLength_mm = round(mantleLength_mm))
 
 # Get max TL for plotting L/W models
 L.max <- lengths.all %>% 
@@ -507,12 +531,12 @@ for (i in unique(L.max$scientificName)) {
 # Add a and b to length data frame and calculate missing lengths/weights
 lengths.all <- lengths.all %>% 
   left_join(select(lw.models, -commonName), by = 'scientificName') %>% 
-  mutate(
+   mutate(
     weightg = case_when(
-      is.na(weightg) ~ a*totalLength_mm^b,
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
       TRUE  ~ weightg),
     totalLength_mm = case_when(
-      is.na(totalLength_mm) ~ round((weightg/a)^(1/b)),
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
     K = case_when(
       !scientificName == "Doryteuthis (Loligo) opalescens" ~ round((weightg/totalLength_mm*10^3)*100),
