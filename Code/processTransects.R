@@ -1,7 +1,4 @@
 # Configure document parameters -------------------------------------------
-# Set ggplot2 theme
-theme_set(theme_bw())
-
 # Create directory to store tables
 dir_create(here("Output/tables"))
 dir_create(here("Figs"))
@@ -10,9 +7,9 @@ dir_create(here("Figs"))
 route <- readGPX(here("Data/Nav", gpx.file))
 
 # Create data frame of waypoints
-wpts <- route$waypoints %>% 
-  arrange(name) %>% 
-  write_csv(here("Output/waypoints/all_waypoints.csv"))
+wpts <- route$waypoints 
+
+write_csv(wpts, here("Output/waypoints/all_waypoints.csv"))
 
 # Extract transect waypoints
 transects <- wpts %>% 
@@ -33,7 +30,7 @@ transects <- wpts %>%
     Transect = floor(Waypoint)) %>%
   mutate(group = paste(Transect, type)) %>% 
   arrange(type, Transect, Waypoint) %>% 
-  select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group) %>% 
+  select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
   filter(!is.na(Type), !is.na(Transect))
 
 # If specific transects are to be removed manually
@@ -53,12 +50,12 @@ starts <- transects %>%
 
 # Calculate daylength across survey area ----------------------------------
 daylength.max <- day_length(date = min(leg.ends),
-                         geocode = data.frame(lat = max(starts$lat), lon = max(starts$long)),
-                         twilight = "none")
+                            geocode = data.frame(lat = max(starts$lat), lon = max(starts$long)),
+                            twilight = "none")
 
 daylength.min <- day_length(date = max(leg.ends),
-                         geocode = data.frame(lat = min(starts$lat), lon = min(starts$long)),
-                         twilight = "none")
+                            geocode = data.frame(lat = min(starts$lat), lon = min(starts$long)),
+                            twilight = "none")
 
 daylength.df <- data.frame(Transect = seq(1, max(starts$Transect)),
                            daylength = seq(daylength.min, daylength.max,
@@ -102,6 +99,7 @@ uctds <- wpts %>%
            loc == 4 ~ "Vancouver Is.",
            TRUE ~ "Other")),
          Region = fct_reorder(Region, loc)) %>% 
+  rename(Latitude = lat, Longitude = lon) %>% 
   arrange(station) 
 
 # Extract Pairovet stations
@@ -126,6 +124,7 @@ pairovets <- wpts %>%
     name = case_when(
       type == "Adaptive" ~ str_replace(name, "C", "A"),
       TRUE ~ name)) %>% 
+  rename(Latitude = lat, Longitude = lon) %>% 
   arrange(station) 
 
 # Import landmarks
@@ -236,17 +235,17 @@ transects <- transects %>%
 # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
 if (get.bathy) {
   noaa.bathy <- getNOAA.bathy(lon1 = min(transects$Longitude - 1), 
-                             lon2 = max(transects$Longitude + 1),
-                             lat1 = max(transects$Latitude) + 1, 
-                             lat2 = min(transects$Latitude) - 1, 
-                             resolution = 1)
+                              lon2 = max(transects$Longitude + 1),
+                              lat1 = max(transects$Latitude) + 1, 
+                              lat2 = min(transects$Latitude) - 1, 
+                              resolution = 1)
   # Save bathy results
   save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
                                 survey.name,".Rdata", sep = "")) 
   
 } else {
   load(paste(here("Data/GIS"), "/bathy_data_",
-            survey.name,".Rdata", sep = ""))
+             survey.name,".Rdata", sep = ""))
   
 }
 
@@ -254,11 +253,11 @@ if (get.bathy) {
 transects$Depth <- get.depth(noaa.bathy, transects$Longitude, transects$Latitude, locator = F, distance = T)$depth
 
 if (nrow(uctds) > 0) {
-  uctds$Depth     <- get.depth(noaa.bathy, uctds$lon, uctds$lat, locator = F, distance = T)$depth
+  uctds$Depth     <- get.depth(noaa.bathy, uctds$Longitude, uctds$Latitude, locator = F, distance = T)$depth
 }
 
 if (nrow(pairovets) > 0) {
-  pairovets$Depth     <- get.depth(noaa.bathy, pairovets$lon, pairovets$lat, locator = F, distance = T)$depth
+  pairovets$Depth     <- get.depth(noaa.bathy, pairovets$Longitude, pairovets$Latitude, locator = F, distance = T)$depth
 }
 
 # Extract bathymetry info
@@ -279,16 +278,17 @@ transects.sf <- transects %>%
 
 # mapview(transects.sf, zcol = "Type")
 
-# Convert uctds to sf
-uctds.sf <- uctds %>% 
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog)
-
-# Convert Pairovets to sf
-pairovets.sf <- pairovets %>% 
-  st_as_sf(coords = c("lon","lat"), crs = crs.geog)
+# # Convert uctds to sf
+# uctds.sf <- uctds %>% 
+#   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
+# 
+# # Convert Pairovets to sf
+# pairovets.sf <- pairovets %>% 
+#   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
 
 # export tables to csv
-wpt.export <- select(transects, -group, -Leg)
+wpt.export <- select(transects, Transect, name, everything(), -group, -Leg, -Waypoint) %>% 
+  rename(Waypoint = name)
 
 # Write all waypoints
 write_csv(wpt.export, here("Output/tables/waypoints_all.csv"))
@@ -336,7 +336,7 @@ wpt.plan <- wpt.export %>%
 if (nrow(uctds) > 0) {
   # format UCTD stations for export
   uctd.export <- uctds %>% 
-    select(Name = name, Latitude = lat, Longitude = lon, Region, Depth)
+    select(Name = name, Latitude, Longitude, Region, Depth)
   
   # export to csv
   # Write UCTD waypoints
@@ -348,7 +348,7 @@ if (nrow(uctds) > 0) {
 if (nrow(pairovets) > 0) {
   # format Pairovet stations for export
   pairovet.export <- pairovets %>% 
-    select(Name = name, Type = type, Latitude = lat, Longitude = lon, Region, Depth)
+    select(Name = name, Type = type, Latitude, Longitude, Region, Depth)
   
   # export to csv
   # Write Pairovet waypoints
@@ -356,6 +356,10 @@ if (nrow(pairovets) > 0) {
     write_csv(pairovet.export,  here("Output/tables/waypoints_pairovet.csv"))  
   }  
 }
+
+# Convert stations to sf
+uctds.sf     <- st_as_sf(uctds, coords = c("Longitude","Latitude"), crs = crs.geog)
+pairovets.sf <- st_as_sf(pairovets, coords = c("Longitude","Latitude"), crs = crs.geog)
 
 # Create the map with all transects --------------------------------------------
 survey.map <- base.map +
@@ -367,8 +371,8 @@ survey.map <- base.map +
                                                 "Offshore" = "green", "Nearshore" = "#F08C09",
                                                 "Transit" = "cyan")) +
   scale_fill_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
-                                                "Offshore" = "green", "Nearshore" = "#F08C09",
-                                                "Transit" = "cyan")) +
+                                              "Offshore" = "green", "Nearshore" = "#F08C09",
+                                              "Transit" = "cyan")) +
   geom_sf(data = uctds.sf, shape = 21, size = 2, fill = "white") +
   geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 2) +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
@@ -383,11 +387,8 @@ survey.map <- base.map +
 ggsave(survey.map, filename = here("Figs/fig_survey_plan_map.png"), 
        height = map.height, width = map.width)
 
-uctds     <- st_as_sf(uctds, coords = c("lon","lat"), crs = crs.geog)
-pairovets <- st_as_sf(pairovets, coords = c("lon","lat"), crs = crs.geog)
-
 # Save results for use with checkTransects.Rmd
-save(transects, wpts, uctds, wpt.export,
+save(transects, wpts, uctds, wpt.export, pairovets,
      file = (here("Output/process_transects_output.Rdata")))
 
 # Create the map with all transects --------------------------------------------
@@ -429,3 +430,81 @@ survey.map.region = base.map +
 # Save the map
 ggsave(survey.map.region, filename = here("Figs/fig_survey_map_region.png"), 
        height = map.height, width = map.width)  
+
+# Update route files
+if (update.routes) {
+  # Recombine acoustic transects and sampling stations
+  updated.route <- transects %>% 
+    bind_rows(uctds) %>% 
+    bind_rows(pairovets) %>% 
+    mutate(
+      Transect = case_when(
+        is.na(Transect) ~ transect,
+        TRUE ~ Transect),
+      transect.name = str_sub(name, 1, 3)) %>% 
+    arrange(transect.name, desc(Longitude))
+  
+  # Create output directories
+  dir_create(here("Output/routes_updated"))
+  
+  # Write waypoints from individual files to multiple CSV to create single routes
+  for (i in unique(updated.route$transect.name)) {
+    wpts.sub <- updated.route %>% 
+      filter(transect.name == i) %>%
+      select(id = name, Latitude, Longitude) 
+    
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes_updated", paste(i, ".csv", sep = "")))  
+    }
+  }
+  
+  for (i in unique(updated.route$transect.name)) {
+    wpts.sub <- updated.route %>% 
+      filter(transect.name == i, Type == "Adaptive") %>% 
+      select(id = name, Latitude, Longitude) 
+    
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "C.csv", sep = "")))  
+    }
+  }
+  
+  for (i in unique(waypoints.final.csv$transect)) {
+    wpts.sub <- waypoints.final.csv %>% 
+      filter(transect == i, type == "Adaptive") %>% 
+      select(id, lat, long) 
+    
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "A.csv", sep = "")))  
+    }
+  }
+  
+  # Write waypoints from individual files to multiple CSV to create single routes
+  for (i in unique(waypoints.final.sd.csv$transect)) {
+    wpts.sub <- waypoints.final.sd.csv %>% 
+      filter(transect == i) %>% 
+      select(id, lat, long) 
+    
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Saildrone", paste(i, "S.csv", sep = "")))
+    }
+  }
+  
+  # Write waypoints from individual files to multiple CSV to create single routes
+  for (i in unique(waypoints.final.ns.csv$transect)) {
+    wpts.sub <- waypoints.final.ns.csv %>% 
+      filter(transect == i) %>% 
+      select(id, lat, long) 
+    
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes/Nearshore", paste(i, "N.csv", sep = ""))) 
+    }
+  }
+  
+  # Write waypoints to CSV file
+  uctd.final.csv <- uctd.final.df %>% 
+    mutate(order = seq_along(id),
+           id    = paste("UCTD", order)) %>% 
+    select(id, lat, long)
+  
+  write_csv(uctd.final.csv, here("Output/waypoints/uctd_wpts.csv"))  
+}
