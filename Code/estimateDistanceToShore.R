@@ -8,7 +8,7 @@ library(swfscMisc)
 plot.figs <- FALSE
 save.figs <- TRUE
 
-# Load core nasc
+# Load core NASC
 load(here("Output/nasc_final.Rdata"))
 
 # Arrange nasc by longitude, to solve problems with multiple EV files
@@ -51,6 +51,7 @@ nasc.all <- select(nasc, transect.name, vessel.name, depth) %>%
   rbind(select(nasc.nearshore, transect.name, vessel.name, depth))
 
 nearest.df.final <- data.frame()
+farthest.df.final <- data.frame()
 
 # Process each vessel
 for (v in unique(nasc.all$vessel.name)) {
@@ -163,23 +164,38 @@ for (v in unique(nasc.all$vessel.name)) {
     ungroup() %>% 
     select(transect.name, vessel.name, long, lat, dist.to.shore, depth)
   
+  farthest.df.tmp <- tmp.df1 %>% 
+    bind_rows(tmp.df2) %>% 
+    arrange(transect.name, dist.to.shore) %>% 
+    group_by(transect.name) %>% 
+    slice(n()) %>% 
+    ungroup() %>% 
+    select(transect.name, vessel.name, long, lat, dist.to.shore, depth)
+  
   # Combine all vessels
   nearest.df.final <- bind_rows(nearest.df.final, nearest.df.tmp)
+  farthest.df.final <- bind_rows(farthest.df.final, farthest.df.tmp)
 }
 
 # Convert to spatial, for plotting
 nearest.sf.final <- nearest.df.final %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
-dist.hist <- ggplot(nearest.df.final, aes(dist.to.shore)) +
+dist.hist.near <- ggplot(nearest.df.final, aes(dist.to.shore)) +
   geom_histogram() + 
   facet_wrap(~vessel.name) +
   xlab("Distance to shore (nmi)") + ylab("Frequency") +
   theme_bw() 
 
+dist.hist.far <- ggplot(farthest.df.final, aes(dist.to.shore)) +
+  geom_histogram() + 
+  facet_wrap(~vessel.name, scales = "free_x") +
+  xlab("Distance offshore (nmi)") + ylab("Frequency") +
+  theme_bw() 
+
 # Plot and save histograms
 if (plot.figs) {
- dist.hist
+ dist.hist.near
 }
 
 if (save.figs) {
