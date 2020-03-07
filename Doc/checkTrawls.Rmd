@@ -214,16 +214,18 @@ haul.bad <- haul.all %>%
 # Classify hauls by season (spring or summer)
 haul.all <- haul.all %>% 
   # Remove bad trawls
-  filter(!trawlPerformance %in% trawl.performance,
-         cruise %in% cruise.name) %>% 
+  filter(!trawlPerformance %in% trawl.performance) %>% 
   mutate(season = case_when(
     month(equilibriumTime) < 6 ~ "spring",
-    TRUE ~ "summer"),
-    duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-    cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+    TRUE ~ "summer"))
+
+# Get only hauls from current survey
+haul <- filter(haul.all, cruise %in% cruise.name) %>% 
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
 
 # Find midpoint of each haul as the mean lat/lon
-haul.mid <- haul.all %>% 
+haul.mid <- haul %>% 
   group_by(cluster, haul) %>% 
   summarise(
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
@@ -243,7 +245,7 @@ catch <- catch.all %>%
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-  left_join(select(haul.all, haul, cluster)) %>% 
+  left_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg)
 
@@ -331,8 +333,8 @@ haul.catch <- project_sf(haul.catch, crs = crs.proj)
 
 ```{r summarise-hauls}
 # Create haul paths from starts and ends
-haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
-  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
   arrange(haul) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(haul) %>% 
@@ -461,7 +463,7 @@ lengths.all <- lengths.all  %>%
   left_join(select(haul.all, cruise, ship, haul, season)) %>% 
   filter(scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens"))
 
-# Convert lengths to totalLength_mm for TS estimates ---------------------------
+# Convert lengths to total length for TS estimates ---------------------------
 lengths.all  <- lengths.all %>%
   mutate(
     totalLength_mm = case_when(
@@ -471,30 +473,15 @@ lengths.all  <- lengths.all %>%
       scientificName == "Scomber japonicus"     ~ convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Trachurus symmetricus" ~ convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
-    missing.weight = case_when(is.na(weightg)   ~ TRUE, TRUE ~ FALSE),
+    missing.weight = case_when(
+      is.na(weightg)   ~ TRUE, 
+      TRUE ~ FALSE),
     missing.length = case_when(
       is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ TRUE,
       is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ TRUE,
       TRUE ~ FALSE)) %>% 
   mutate(totalLength_mm = round(totalLength_mm),
          mantleLength_mm = round(mantleLength_mm))
-
-# lengths.all  <- lengths.all %>%
-#   mutate(
-#     totalLength_mm = case_when(
-#       scientificName == "Clupea pallasii"       ~ -0.323 + 1.110*forkLength_mm,
-#       scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
-#       scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
-#       scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
-#       scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm,
-#       scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
-#     missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ F),
-#     missing.length = case_when(
-#       is.na(totalLength_mm) & !scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
-#       is.na(mantleLength_mm) & scientificName == "Doryteuthis (Loligo) opalescens" ~ T,
-#       TRUE ~ F)) %>% 
-#   mutate(totalLength_mm = round(totalLength_mm),
-#          mantleLength_mm = round(mantleLength_mm))
 
 # Get max TL for plotting L/W models
 L.max <- lengths.all %>% 
@@ -506,11 +493,6 @@ L.max.sq <- lengths.all %>%
   filter(scientificName == "Doryteuthis (Loligo) opalescens") %>% 
   group_by(scientificName) %>% 
   summarise(max.ML = max(mantleLength_mm, na.rm = TRUE))
-
-# Real length/weight relationship models for each species
-lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>%
-  filter(model_type == model.type, season == model.season) %>%
-  select(-season)
 
 # Data frame for storing results
 lw.df <- data.frame()
@@ -530,7 +512,6 @@ for (i in unique(L.max$scientificName)) {
 # Estimate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
 lengths.all <- lengths.all %>% 
-  left_join(select(lw.models, -commonName), by = 'scientificName') %>% 
    mutate(
     weightg = case_when(
       is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
@@ -552,10 +533,9 @@ bad.lengths <-  lengths.all %>%
 
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
-  # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens") & 
-           toupper(isRandomSample) == "Y") #%>%   filter(!is.na(K))
+           toupper(isRandomSample) == "Y")
 
 # Summarize Fulton's condition factor (K) for identifying outliers
 K.summ <- lengths %>%
@@ -602,7 +582,7 @@ outliers <- lengths %>%
 lengths <- lengths %>% 
   mutate(key = paste(collection, species, specimenNumber)) %>% 
   left_join(outliers) %>% 
-  left_join(select(haul.all, haul, datetime = equilibriumTime)) %>% 
+  left_join(select(haul, haul, datetime = equilibriumTime)) %>% 
   mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = F))
 ```
 
@@ -799,7 +779,7 @@ scientificName.sub <- "Sardinops sagax"
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
-                          season ==  survey.season)
+                          season ==  tolower(survey.season))
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
@@ -845,7 +825,7 @@ scientificName.sub <- "Engraulis mordax"
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
-                          season ==  survey.season)
+                          season ==  tolower(survey.season))
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
@@ -891,7 +871,7 @@ scientificName.sub <- "Scomber japonicus"
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
-                          season ==  survey.season)
+                          season ==  tolower(survey.season))
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
@@ -937,7 +917,7 @@ scientificName.sub <- "Trachurus symmetricus"
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
-                          season ==  survey.season)
+                          season ==  tolower(survey.season))
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
@@ -983,7 +963,7 @@ scientificName.sub <- "Clupea pallasii"
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
-                          season ==  survey.season)
+                          season ==  tolower(survey.season))
 lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
 
 if (nrow(lengths.sub) > 0) {
@@ -1020,6 +1000,7 @@ if (nrow(lengths.sub) > 0) {
 ```
 
 ## Market squid
+
 Unlike other species, the dashed line represents the results of a Loess smoother on the length and weight data from this survey, not the length-weight model from all specimens. 
 
 ```{r squid-data}
@@ -1030,14 +1011,14 @@ scientificName.sub <- "Doryteuthis (Loligo) opalescens"
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
-                          season ==  survey.season)
+                          season ==  tolower(survey.season))
 
 if (nrow(lengths.sub) > 0) {
   # Plot L/W data from past and current survey -----------------------------------
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub,
-               aes(mantleLength_mm),
+               aes(mantleLength_mm, weightg),
                colour = "gray70", alpha = 0.3) +
     # Plot L/W data for current survey
     geom_point(data = lengths.sub, aes(mantleLength_mm, weightg, fill = sex, 
@@ -1108,7 +1089,8 @@ Hauls removed due to trawl performance issues (e.g., aborted, bad, poor, etc.).
 
 ```{r bad-hauls}
 haul.bad %>% 
-  select(haul, trawlDate, orderOcc, trawlPerformance) %>% 
+  filter(cruise %in% cruise.name) %>%
+  select(haul, trawlDate = netInWaterTime, orderOcc, trawlPerformance) %>% 
   mutate(trawlDate = date(trawlDate)) %>% 
   datatable(rownames = FALSE)
 ```
@@ -1124,7 +1106,8 @@ haul.paths %>%
   mutate(distance = cell_spec(
     distance, knitr.format, color = "black",
     background = ifelse(distance <= 5, "white", "orange"))) %>%
-  select(haul, distance, startLatMin:stopLongMin) %>%
+  # select(haul, distance, startLatMin:stopLongMin) %>%
+  select(haul, distance) %>%
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("c")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
@@ -1175,7 +1158,7 @@ Trawl haul information is summarized by cluster. Those clusters where the differ
 
 ```{r check-trawl-clusters}
 # Summarize trawl clusters
-cluster.check <- haul.all %>% 
+cluster.check <- haul %>% 
   group_by(cluster) %>% 
   summarise(
     firstHaul      = min(haul),
@@ -1216,12 +1199,12 @@ summ.lengths <- lengths %>%
     binnedLengths    = sum(binned)) %>% 
   mutate(key = paste(haul, scientificName)) 
 
-catch.all <- catch.all %>% 
-  left_join(select(spp.codes,species,scientificName,commonName)) %>% 
+catch <- catch %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(scientificName %in% cps.spp)
 
 # Merge catch table with weight summary and arrange by species and haul
-catch.comp <- left_join(select(catch.all, haul, scientificName, subSampleWtkg, subSampleCount),
+catch.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSampleCount),
                         select(summ.lengths, haul, scientificName, totalWtSpecimens,
                                totalCtSpecimens, binnedLengths)) %>%
   arrange(scientificName, haul) %>% 
