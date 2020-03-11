@@ -42,7 +42,8 @@ if (doc.type == "latex") {
 
 ```{r user-settings}
 # User-specified settings
-get.nav <- FALSE
+get.nav <- F # Download vessel nav from ERDDAP
+get.db  <- F # Extract data from trawl database (F for testing)
 ```
 
 ```{r project-settings}
@@ -128,34 +129,45 @@ if (get.nav) {
 ```
 
 ```{r get-trawl-data}
-# Copy trawl Access database
-haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
-                  regexp = trawl.db.access)
-
-file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
-
-if (trawl.source == "SQL") {
-  # Configure ODBC connection to TRAWL database
-  trawl.con  <- dbConnect(odbc(), 
-                          Driver = "SQL Server", 
-                          Server = "161.55.235.187", 
-                          Database = "Trawl", 
-                          Trusted_Connection = "True")
-} else if (trawl.source == "Access") {
-  trawl.con  <- dbConnect(odbc(), 
-                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                          DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+if (get.db) {
+  if (trawl.source == "SQL") {
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "SQL Server", 
+                            Server = "161.55.235.187", 
+                            Database = "Trawl", 
+                            Trusted_Connection = "True")
+  } else if (trawl.source == "Access") {
+    # Copy trawl Access database
+    haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                      regexp = trawl.db.access)
+    
+    file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+    
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                            DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+  }
+  # Import trawl database tables
+  catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
+  haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+  lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
+  lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+  spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+  
+  # Close database channel
+  dbDisconnect(trawl.con)
+  
+  # Save trawl data
+  save(catch.all, haul.all, lengths.all, lengthFreq.all, spp.codes,
+       file = here("Data/Trawl/checkTrawl_data.Rdata"))
+  
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/checkTrawl_data.Rdata"))
+  
 }
-
-# Import trawl database tables
-catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
-haul.all       <- tbl(trawl.con,"Haul") %>% collect()
-lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
-spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
-
-# Close database channel
-dbDisconnect(trawl.con)
 ```
 
 ```{r modify-data}
@@ -469,11 +481,16 @@ lengths.all <- lengths.all  %>%
 lengths.all  <- lengths.all %>%
   mutate(
     totalLength_mm = case_when(
-      scientificName == "Clupea pallasii"       ~ convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Engraulis mordax"      ~ convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
-      scientificName == "Sardinops sagax"       ~ convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
-      scientificName == "Scomber japonicus"     ~ convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Trachurus symmetricus" ~ convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Clupea pallasii" ~ 
+        convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Engraulis mordax" ~ 
+        convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+      scientificName == "Sardinops sagax" ~ 
+        convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+      scientificName == "Scomber japonicus" ~ 
+        convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Trachurus symmetricus" ~ 
+        convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
     missing.weight = case_when(
       is.na(weightg)   ~ TRUE, 
@@ -512,7 +529,7 @@ for (i in unique(L.max$scientificName)) {
 }
 
 # Estimate missing weights from lengths -------------------------------------------------------
-# Add a and b to length data frame and calculate missing lengths/weights
+# Use Palance et al. 2019 models to estimate missing L and W
 lengths.all <- lengths.all %>% 
   mutate(
     weightg = case_when(

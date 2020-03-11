@@ -2106,12 +2106,17 @@ save(lengths.all, file = here("Output/lengths_all.Rdata"))
 lengths.all  <- lengths.all %>%
   mutate(
     totalLength_mm = case_when(
-      scientificName == "Clupea pallasii"       ~ -0.323 + 1.110*forkLength_mm,
-      scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
-      scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
-      scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
-      scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm),
-    missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ FALSE),
+      scientificName == "Clupea pallasii" ~ 
+        convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Engraulis mordax" ~ 
+        convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+      scientificName == "Sardinops sagax" ~ 
+        convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+      scientificName == "Scomber japonicus" ~ 
+        convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Trachurus symmetricus" ~ 
+        convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
     missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
   filter(scientificName %in% cps.spp)
 
@@ -2120,41 +2125,33 @@ L.max <- lengths.all %>%
   group_by(scientificName) %>% 
   summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
 
-# Real length/weigth relationship models for each species
-lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
-  filter(model_type == model.type, season == model.season) %>% 
-  select(-season)
-
-# Dataframe for storing results
+# Data frame for storing results
 lw.df <- data.frame()
 
 # Generate length/weight curves
-for (i in unique(lw.models$scientificName)) {
-  # Subset model
-  model.temp <- filter(lw.models, scientificName == i)
-  
+for (i in unique(L.max$scientificName)) {
   # Create a length vector for each species
   L <- seq(0, L.max$max.TL[L.max$scientificName == i])
   
-  # Calculate weights from lenths
-  W <- model.temp$a*L^model.temp$b
+  # Calculate weights from lengths
+  W <- estimate_weight(i, L, season = tolower(survey.season))
   
   # Combine results
-  lw.df <- bind_rows(lw.df, data.frame(model.temp, L, W))
+  lw.df <- bind_rows(lw.df, data.frame(scientificName = i, L, W))
 }
 
 # Estimate missing weights from lengths -------------------------------------------------------
-# Add a and b to length data frame and calculate missing lengths/weights
+# Estimate missing weights from lengths -------------------------------------------------------
+# Use Palance et al. 2019 models to estimate missing L and W
 lengths.all <- lengths.all %>% 
-  left_join(lw.models, by = 'scientificName') %>% 
   mutate(
     weightg = case_when(
-      is.na(weightg) ~ a*totalLength_mm^b,
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
       TRUE  ~ weightg),
     totalLength_mm = case_when(
-      is.na(totalLength_mm) ~ (weightg/a)^(1/b),
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = (weightg/totalLength_mm*10^3)*100)
+    K = round((weightg/mantleLength_mm*10^3)*100))
 
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
