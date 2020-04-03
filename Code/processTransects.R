@@ -153,7 +153,7 @@ map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$
 map.width  <- map.height*map.aspect
 
 # Create base map -------------------------------------------
-base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+base.map <- get_basemap(transects, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
