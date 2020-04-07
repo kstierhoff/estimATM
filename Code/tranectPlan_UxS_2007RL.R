@@ -31,7 +31,8 @@ base.map <- ggplot() +
                   fontface = "bold", hjust = 0, nudge_x = 0.2, nudge_y = 0.05, angle = 25, bg.colour = "white") +
   coord_map(xlim = c(-129,-116), ylim = c(32, 50.5))
 
-base.map +  geom_path(data = transects, aes(Longitude, Latitude, group = group, colour = Type))
+base.map +  geom_path(data = transects, aes(Longitude, Latitude, group = group, colour = Type)) + 
+  geom_point(data = transects, aes(Longitude, Latitude, colour = Type))
 
 # Make all adaptive transects compulsory
 transects <- transects %>% 
@@ -43,7 +44,8 @@ transects <- transects %>%
   filter(!group %in% paste(c(seq(110,128)),"Adaptive")) %>% 
   filter(Type != "Transit")
 
-base.map +  geom_path(data = transects, aes(Longitude, Latitude, group = group, colour = type2))
+base.map +  geom_path(data = transects, aes(Longitude, Latitude, group = group, colour = type2)) + 
+  geom_point(data = transects, aes(Longitude, Latitude, colour = type2))
 
 # Make all even transects south of Cape Flattery FSV
 # Make all odd transects south of Cape Flattery Saildrone
@@ -55,12 +57,14 @@ transects <- transects %>%
     TRUE ~ "Saildrone")) %>% 
   mutate(type2 = case_when(
     type2 == "FSV1" & Transect <= 59 ~ "FSV2",
-    TRUE ~ type2))
+    TRUE ~ type2)) %>% 
+  mutate(group2 = paste(Transect, type2))
 
 # Create final map for proposal
 base.map +  
   geom_path(data = transects, 
             aes(Longitude, Latitude, group = group, colour = type2)) +
+  geom_point(data = transects, aes(Longitude, Latitude, colour = type2)) +
   scale_colour_manual("Vessel", values = c("FSV1" = "blue", "FSV2" = "cyan",
                                            "Nearshore" = "orange", "Saildrone" = "red",
                                            "Transit" = "magenta")) +
@@ -72,3 +76,5 @@ base.map +
 
 ggsave(here("Figs/fig_survey_plan_uxs.png"),
        width = 6, height = 12)
+
+write_csv(transects, here("Output/transects_uxs.csv"))
