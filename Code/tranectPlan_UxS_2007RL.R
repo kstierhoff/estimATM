@@ -58,22 +58,25 @@ transects <- transects %>%
   mutate(type2 = case_when(
     type2 == "FSV1" & Transect <= 59 ~ "FSV2",
     TRUE ~ type2)) %>% 
-  mutate(group2 = paste(Transect, type2)) %>% 
-  arrange(type2, Transect)
+  mutate(group2 = paste(Transect, type2)) 
 
 # Create final map for proposal
 base.map +  
   geom_path(data = transects, 
             aes(Longitude, Latitude, group = group2, colour = type2)) +
-  geom_point(data = transects, aes(Longitude, Latitude, colour = type2)) +
+  # geom_point(data = transects, aes(Longitude, Latitude, colour = type2)) +
   scale_colour_manual("Vessel", values = c("FSV1" = "blue", "FSV2" = "cyan",
-                                           "Nearshore" = "orange", "Saildrone" = "red",
+                                           "Nearshore" = "black", "Saildrone" = "red",
                                            "Transit" = "magenta")) +
   scale_linetype_manual("Vessel", values = c("FSV1" = "solid", "FSV2" = "solid",
                                              "Nearshore" = "solid", "Saildrone" = "solid",
                                              "Transit" = "dotted")) + 
   xlab("Longitude") +
-  ylab("Latitude")
+  ylab("Latitude") + 
+  theme(legend.position      =  c(0,0),
+        legend.justification = c(0,0),
+        legend.background    = element_blank(),
+        strip.background.x = element_blank())
 
 ggsave(here("Figs/fig_survey_plan_uxs.png"),
        width = 6, height = 12)
