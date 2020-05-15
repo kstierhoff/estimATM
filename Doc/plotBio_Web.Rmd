@@ -49,6 +49,7 @@ settings.files <- dir(here("Doc/settings"))
 
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+
 source(here("Doc/settings", prj.settings))
 ```
 
@@ -57,62 +58,66 @@ source(here("Doc/settings", prj.settings))
 save.figs       <- T # Resave figures
 get.nav         <- T # Download nav data from ERDDAP
 get.nav.sd      <- F # Download nav data from ERDDAP
-copy.files      <- T # Copy data files from data to plotBio directory
+copy.files      <- F # Copy data files from data to plotBio directory
 overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
 process.csv     <- T # Process acoustic backscatter files
 
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- T # Process all CSV files (F = new files only)
+process.csv.all <- F # Process all CSV files (F = new files only)
 save.imap       <- T # Save interactive map using mapshot
 ```
 
-```{r plot-settings}
-# Define plotting parameters -------------------------
-# Set species colors
-sardine.color      <- '#FF0000'
-anchovy.color      <- '#00CD66'
-jack.mack.color    <- '#0000FF'
-jacksmelt.color    <- '#A020F0'
-pac.mack.color     <- '#00FFFF'
-pac.herring.color  <- '#F5DEB3'
-cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
-                       "Scomber japonicus","Trachurus symmetricus")
-# CUFES
-# For legend objects
-cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
-cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
-                        "50-250", "250-500", ">500")
-cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6, 7)
-cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
-cufes.colors       <- c("AnchovyEggs"      = anchovy.color, 
-                        "JackMackerelEggs" = jack.mack.color, 
-                        "SardineEggs"      = sardine.color)
-cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
-                        "JackMackerelEggs" = "J. mackerel",
-                        "SardineEggs"      = "Sardine")
-# Trawl
-# For legend objects
-trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) 
-trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
-trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
+```{r config-project}
+dir_create(here(), c("Output", "Figs"))
+```
 
-# NASC
-# For legend objects
-nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000)
-nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
-                        "5000-20,000", "20,000-50,000", ">50,000")
-nasc.scale         <- 0.7 # Scale percentage (smaller for larger scale)
-nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
-nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
-                        "#FF0000", "#FFC0CB", "#FFFFFF")
-
-# Catch map
-# For legend objects
-catch.breaks       <- c(0,10,100,500,1000)
-catch.labels       <- c("0-10","10-100", "100-500", "500-1000")
-catch.pie.sizes    <- c(1,2,3,4,5,6)
+```{r plot-settings,eval=FALSE}
+# # Define plotting parameters -------------------------
+# # Set species colors
+# sardine.color      <- '#FF0000'
+# anchovy.color      <- '#00CD66'
+# jack.mack.color    <- '#0000FF'
+# jacksmelt.color    <- '#A020F0'
+# pac.mack.color     <- '#00FFFF'
+# pac.herring.color  <- '#F5DEB3'
+# cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+#                        "Scomber japonicus","Trachurus symmetricus")
+# # CUFES
+# # For legend objects
+# cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
+# cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
+#                         "50-250", "250-500", ">500")
+# cufes.sizes        <- c(0.5, 1, 2, 3, 4, 5, 6, 7)
+# cufes.plot.spp     <- c("AnchovyEggs","JackMackerelEggs","SardineEggs")
+# cufes.colors       <- c("AnchovyEggs"      = anchovy.color, 
+#                         "JackMackerelEggs" = jack.mack.color, 
+#                         "SardineEggs"      = sardine.color)
+# cufes.spp.labels   <- c("AnchovyEggs"      = "Anchovy",
+#                         "JackMackerelEggs" = "J. mackerel",
+#                         "SardineEggs"      = "Sardine")
+# # Trawl
+# # For legend objects
+# trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000) 
+# trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
+# trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
+# 
+# # NASC
+# # For legend objects
+# nasc.breaks        <- c(0, 200, 500, 2000, 5000, 20000, 50000, 20000000)
+# nasc.labels        <- c("0-200", "200-500", "500-2000", "2000-5000", 
+#                         "5000-20,000", "20,000-50,000", ">50,000")
+# nasc.scale         <- 0.7 # Scale percentage (smaller for larger scale)
+# nasc.sizes         <- c(0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
+# nasc.colors        <- c("#000000", "#1E90FF", "#FFFF00", "#FF8C00", 
+#                         "#FF0000", "#FFC0CB", "#FFFFFF")
+# 
+# # Catch map
+# # For legend objects
+# catch.breaks       <- c(0,10,100,500,1000)
+# catch.labels       <- c("0-10","10-100", "100-500", "500-1000")
+# catch.pie.sizes    <- c(1,2,3,4,5,6)
 ```
 
 ```{r copy-files, include=F}
@@ -918,7 +923,7 @@ map.width  <- map.height*map.aspect
 
 # Create base map
 base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
-  # Add scalebar
+  # Add scale bar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
 # Save the basemap
@@ -933,7 +938,7 @@ if (save.figs) {
   # Create maps of backscatter, trawl catch, and CUFES egg density
   source(here("Code/plot_sA_CPS.R"))
   source(here("Code/plot_sA_Krill.R"))
-  source(here("Code/plot_CUFES.R"))
+  source(here("Code/plot_cufes.R"))
   source(here("Code/plot_haul_proportion_wt.R"))
   source(here("Code/plot_cluster_proportion_wt.R"))
   
@@ -1154,16 +1159,16 @@ i.map <- leaflet() %>%
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
                    group = "Planned Transects (Core)") %>%
-  # Add ancillary planned transects 
+  # Add ancillary planned transects
   addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)), 
+               # label = ~htmlEscape(paste(Type, Transect)),
                popup = ~popup,
                group = "Planned Transects (Ancillary)") %>%
   addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
                    radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
+                   fillOpacity = 0.5, fillColor =  ~txPal(Type),
+                   # label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
                    group = "Planned Transects (Ancillary)") %>%
   # Add nav data

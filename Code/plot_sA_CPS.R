@@ -25,8 +25,8 @@ nasc.map.cps <- base.map +
   # Plot title
   # ggtitle("CPS Backscatter") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 # Save nasc plot
 ggsave(nasc.map.cps,

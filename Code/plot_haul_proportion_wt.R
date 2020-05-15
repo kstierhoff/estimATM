@@ -24,8 +24,8 @@ if (nrow(haul.pos) > 0) {
     # Plot panel label
     # ggtitle("CPS Proportions in Trawl Hauls") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 } else {
   # Create trawl figure
   trawl.pie.haul.wt <- base.map +
@@ -38,8 +38,8 @@ if (nrow(haul.pos) > 0) {
     # Plot panel label
     # ggtitle("CPS Proportions in Trawl Hauls") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 }
 
 # save trawl plot

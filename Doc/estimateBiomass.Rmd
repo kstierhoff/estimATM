@@ -106,24 +106,25 @@ get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
-save.imap         <- F # Save Leaflet maps
-do.bootstrap      <- F # Generate bootstrap estimates
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
+save.imap         <- T # Save Leaflet maps
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 
 # Sometimes F
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.cal       <- F # Process calibration results
+process.cal       <- T # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
-estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
-estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
+estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.krill <- T # Process krill backscatter data
 process.offshore  <- F # Process offshore backscatter data
 process.nearshore <- F # Process near backscatter data
-combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
 process.seine     <- F # Process purse seine data
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
@@ -362,6 +363,8 @@ wpts.sf <- wpts %>%
     popup    = paste('<b>Transect:</b>', Transect, Type)
   )
 
+if(is.null(wpts.sf$Region)) wpts.sf$Region = "All"
+
 # Create transect lines from waypoint files and add line bearing
 transects.sf <- wpts.sf %>% 
   group_by(Type, Transect, Region) %>% 
@@ -546,8 +549,8 @@ base.map.bw <- ggplot() +
   # Format axes and titles
   xlab("Longitude") + ylab("Latitude") + 
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"]))) +
   theme_bw() + 
   theme(axis.text.x  = element_blank(),
         axis.text.y  = element_blank(),
@@ -586,8 +589,8 @@ survey.plan <- base.map +
                                    Offshore = "dashed", Nearshore = "solid",
                                    transit = "dashed")) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 # save survey plan map
 ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
@@ -749,7 +752,7 @@ if (process.csv) {
           # Remove based on transit pattern
           filter(str_detect(transect.orig, nasc.pattern.transit[i])) %>%
           # Remove inter-transects e.g., 102.5
-          filter(str_detect(transect.orig, "\\d\\.5"))
+          filter(!str_detect(transect.orig, "\\d\\.5"))
         
         if (nrow(nasc.transit) > 0) {
           saveRDS(nasc.transit, 
@@ -986,6 +989,10 @@ nasc.summ <- nasc %>%
 save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
 ```
 
+```{r process-backscatter-krill}
+source(here("Code/process_NASC-krill.R"))
+```
+
 ```{r export-backscatter-ctd-app, include=FALSE}
 # Export CSV files for CTD.app -------------------------------------------------
 # Create directory for output
@@ -1114,8 +1121,8 @@ if (save.figs) {
     # Configure legend guides
     guides(colour = guide_legend(), size = guide_legend()) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Save and display figure
   ggsave(nasc.daynight.plot, filename = here("Figs/fig_nasc_daynight.png"), 
@@ -1225,8 +1232,8 @@ if (save.figs) {
     # Plot title
     ggtitle("CPS Backscatter") +
     coord_sf(crs = crs.proj,
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Map backscatter - label with transect number
   nasc.map.tx.num <- base.map +
@@ -1252,8 +1259,8 @@ if (save.figs) {
     # Plot title
     ggtitle("CPS Backscatter") +
     coord_sf(crs = crs.proj,
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Save individual maps 
   ggsave(nasc.map.tx.name, 
@@ -1550,8 +1557,8 @@ if (save.figs) {
     # Plot panel label
     ggtitle("Trawl clusters") +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Save trawl plot
   ggsave(trawl.cluster.plot,
@@ -1787,8 +1794,8 @@ if (nrow(herring.hauls) > 0) {
       scale_size_area("Catch (kg)") + 
       ggtitle("Herring trawl locations") +
       coord_sf(crs = crs.proj, 
-               xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-               ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+               xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+               ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
     
     # Save map
     ggsave(herring.map, filename = here("Figs/fig_herring_trawls.png"),
@@ -1871,8 +1878,8 @@ if (save.figs) {
                     size = 2, bg.colour = "white", fontface = "bold") +
     scale_colour_discrete(name = "Species") +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Save haul.ts map
   ggsave(haul.ts.map, 
@@ -1972,8 +1979,8 @@ if (save.figs) {
     # Plot panel label
     # ggtitle("Integrated NASC Clusters") +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # save trawl plot
   ggsave(nasc.cluster.plot,
@@ -3027,8 +3034,8 @@ if (save.figs) {
     # Plot panel label
     ggtitle("Acoustic Proportions (Number) by Cluster") +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Create trawl figure
   acoustic.prop.cluster.wg <- base.map +
@@ -3055,8 +3062,8 @@ if (save.figs) {
     # Plot panel label
     ggtitle("Acoustic Proportions (Weight) by Cluster") +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Combine acoustic proportion maps
   acoustic.prop.comparison <- plot_grid(acoustic.prop.cluster.indiv, acoustic.prop.cluster.wg,
@@ -3107,8 +3114,8 @@ acoustic.prop.cluster.final <- base.map +
   # Plot panel label
   # ggtitle("Acoustic Proportions by Cluster") +
   coord_sf(crs = crs.proj, 
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 if (save.figs) {
   nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
@@ -3329,8 +3336,8 @@ if (save.figs) {
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic")) +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Save map
   ggsave(here("Figs/fig_nasc_acoustic_proportions.png"), map.prop.all,
@@ -4510,8 +4517,8 @@ if (save.figs) {
           strip.text.x       = element_text(face = "italic"),
           legend.background  = element_blank()) +
     coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Save figure
   ggsave(here("Figs/fig_nasc_acoustic_proportions_strata.png"), map.stratum.all,
@@ -4586,8 +4593,8 @@ if (save.figs) {
                fill   = guide_legend(order = 2), 
                size   = guide_legend(order = 2)) +
         coord_sf(crs = crs.proj, 
-                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+                 xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+                 ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
       
       # Save figures
       ggsave(biomass.dens, 
@@ -5189,8 +5196,8 @@ if (save.figs) {
                     size = 2, bg.colour = "white", fontface = "bold") + 
     scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
     coord_sf(crs = crs.proj,
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Plot all CTDs and UCTDs, labeled by transect assignment
   map.ctd.tx <- base.map + 
@@ -5201,8 +5208,8 @@ if (save.figs) {
                     size = 2, bg.colour = "white", fontface = "bold") + 
     scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
     coord_sf(crs = crs.proj,
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Combine plots into two panels
   map.ctd.all <- plot_grid(map.ctd.uctd, map.ctd.tx, 

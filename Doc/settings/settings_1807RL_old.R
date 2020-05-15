@@ -1,0 +1,404 @@
+# Survey information ------------------------------------------------------
+# Full survey name; only used in report title
+survey.name.long       <- "Summer 2018 California Current Ecosystem Survey"
+survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
+survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
+survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
+survey.name            <- "1807RL"        # SWFSC/AST survey name
+survey.start.erddap    <- "2018-06-26"    # Start of survey for ERDDAP vessel data query
+survey.end.erddap      <- "2018-09-23"    # End of survey for ERDDAP vessel data query
+survey.vessel.erddap   <- "WTEG"          # Lasker == WTEG; Shimada == WTED
+survey.start           <- "26 June"       # Survey start date
+survey.end             <- "23 September"  # Survey end date
+survey.year            <- "2018"          # Survey year, for report
+survey.season          <- "Summer"        # Survey season, for report
+survey.das             <- 80              # Days at sea allocated
+survey.landmark.n      <- "Cape Scott, British Columbia" # Landmark - N extent of survey
+survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
+survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
+survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
+survey.twilight.remove <- F               # Remove twilight period (T/F)
+daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
+
+# Saildrone info -----------------------------------------------
+# Select Saildrone numbers
+sd.numbers <- c("1024")
+
+# Set Saildrone filter method
+sd.buffer.type   <- c("saildrone")
+sd.buffer.dist   <- 1.5 # buffer distance (nmi) around planned transects to classify SD intervals
+sd.filter.method <- "manual" # Options are c("buffer","manual")
+sd.nasc.name     <- "cps_nasc_SD.csv"
+
+# Define Saildrone sampling dates
+survey.start.sd        <- "2018-08-19"    # Start of Saildrone survey
+survey.end.sd          <- "2018-09-28"    # End of Saildrone survey
+
+# Set date range
+survey.start.erddap.sd <- "2018-06-24T00%3A00%3A00Z"
+survey.end.erddap.sd   <- "2018-10-15T19%3A59%3A00Z"
+
+# Configure columns and classes
+erddap.headers.sd    <- c("saildrone", "lat", "long", "COG","HDG","time")
+erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
+
+# Inport dates for classifying data by cruise leg (if desired) -----------------
+leg.breaks <- as.numeric(as.POSIXct(c("2018-06-24", "2018-07-20", 
+                                      "2018-08-13", "2018-09-05",
+                                      "2018-09-24"),
+                                    format = "%F"))
+
+# Filter variables for TRAWL and CUFES data on SQL Server ----------------------
+cruise.name            <- 201807 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.ship            <- "RL"   # May be a character or character vector (e.g., c("RL","SH",...))
+
+# Growth model parameters ------------------------------------------------------
+model.season           <- "summer"        # spring or summer; for selecting growth model parameters
+model.type             <- "glm"            # lm, nlm, or glm; for selecting growth model
+
+# Mapping preferences -----------------------------------------------------
+# Define map height and width (inches) for saved images
+# map.height             <-  10      # e.g., 8 for spring surveys, 10 for summer surveys
+# map.width              <-  6      # e.g., 8 for spring surveys, 6 for summer surveys
+pie.scale              <-  0.0125   # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
+
+# Species, stock and strata for nearshore biomass plots -------------------
+spp.common.ns <- "Northern Anchovy"
+spp.ns        <- "Engraulis mordax"
+stock.ns      <- "Northern"
+strata.ns     <- 4
+
+# Figure preferences ------------------------------------------------------
+annotation.size        <-  2.5    # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
+
+# Data sources ------------------------------------------------------------
+# Backscatter data info
+nasc.vessels           <- c("RL", "SD") # Survey vesslels that collected acoustic data (a vector of two letter vessel abbreviations)
+nasc.interval          <-  100    # Interval length (m); from Echoview
+nasc.summ.interval     <- 2000/nasc.interval # number of intervals over which to summarize NASC
+# Location of survey data on AST1, AST2, etc. (a vector of file paths)
+sounder.type           <- c(RL = "EK60",
+                            SD = "EK80") # Echosounder type; e.g., EK60, EK80, other
+# Root directory where survey data are stored; other paths relative to this
+if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
+  survey.dir           <- c(RL = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20180626_LASKER_SummerCPS",
+                            SD = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20180626_LASKER_SummerCPS")   
+} else {
+  survey.dir           <- c(RL = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20180626_LASKER_SummerCPS",
+                            SD = "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20180626_LASKER_SummerCPS")
+}
+nasc.dir               <- c(RL = "PROCESSED/EV/CSV",
+                            SD = "PROCESSED/EV/CSV/SAILDRONE") # Backscatter data (within survey.dir, typically; a vector of file paths)
+nasc.file.pattern      <- c(RL = "*Final 38 kHz CPS.csv",
+                            SD = "*CPS-Final CPS.csv")
+source.cps.nasc        <- c(RL = T,
+                            SD = F) # If T, read cps.nasc from file; else use NASC.50 
+data.cps.nasc          <- c(RL = here("Data/CPS_NASC/cps_nasc_1807RL.csv"),
+                            SD = NA) # File containing CPS nasc from CTD app
+tx.char.pattern        <- c(RL = "[^0-9]",
+                            SD = "[^0-9]") # regex for matching character pattern
+strip.tx.nums          <- c(RL = F,
+                            SD = F) # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
+strip.tx.chars         <- c(RL = F,
+                            SD = F) # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
+rm.transit             <- c(RL = T,
+                            SD = F) # If T, removes transects with names including "transit"
+rm.offshore            <- c(RL = T,
+                            SD = F) # If T, removes transects with names including "offshore"
+rm.nearshore           <- c(RL = T,
+                            SD = F) # If T, removes transects with names including "nearshore"
+rm.surface             <- c(RL = F,
+                            SD = F) # If T, subtracts NASC.5 from cps.nasc
+tx.num.pattern         <- c(RL = "-\\d{1}",
+                            SD = "-\\d{1}") # regex for matching number pattern
+use.tx.number          <- c(RL = F,
+                            SD = F) # Use transect names for transect numbers
+tx.rm                  <- c(RL = c("090"),
+                            SD = NA) # Data frame of transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
+min.tx.length          <- c(RL = 3,
+                            SD = 1)  # Minimum acoustic transect length (nmi)
+# CUFES database
+cufes.source           <- "SQLite" # "SQL" or "SQLite"
+cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary],"DATA/BIOLOGICAL/CUFES")
+cufes.db.sqlite        <- dir(cufes.dir.sqlite,pattern = "*.sqlite") # CUFES SQLite database
+# Trawl database
+trawl.source           <- "Access" # "SQL" or "Access"
+trawl.dsn              <- "TRAWL" # System DSN for Trawl database on SQL server
+trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
+trawl.db.access        <- "TrawlDataEntry1807RL.accdb"
+# CTD data
+ctd.dir                <- unique(file.path(survey.dir,"DATA/CTD"))
+ctd.hdr.pattern        <- ".*hdr"
+ctd.cast.pattern       <- ".*_processed.asc"
+ctd.depth              <- 350
+# UCTD data   
+uctd.dir               <- unique(file.path(survey.dir,"DATA/UCTD"))
+uctd.hdr.pattern       <- "\\d{3}.asc"
+uctd.cast.pattern      <- ".*_processed.asc"
+
+# Biomass estimation settings ------------------------------------------
+# Species to generate point estimates
+point.est.spp          <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+                            "Scomber japonicus","Trachurus symmetricus")
+# Species to generate point estimates
+bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
+                            "Scomber japonicus","Trachurus symmetricus")
+
+# Number of bootstrap samples
+boot.num <- 1000 # 1000 during final
+
+# Generate biomass length frequencies
+do.lf    <- T
+
+# Estimate biomass in nearshore and offshore strata
+estimate.nearshore <- TRUE
+estimate.offshore  <- TRUE
+
+# Stratum pruning settings
+nIndiv.min    <- 10
+nClusters.min <- 2
+
+# Use manually defined strata?
+stratify.manually <- TRUE
+
+# Manually define sampling strata for each species
+# Create a new data frame with each species, stratum, and vector containing transects
+strata.manual <- bind_rows(
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 1,
+    transect = 60:64),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 2,
+    transect = 66:99),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 3,
+    transect = 100:107),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 1,
+    transect = 1:16),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 2,
+    transect = 17:19),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 20:39),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 4,
+    transect = 67:90),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 5,
+    transect = 94:96),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 6,
+    transect = 98:101),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 7,
+    transect = 111:149),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 1,
+    transect = 2:16),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 2,
+    transect = 23:34),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 3,
+    transect = 50:85),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 4,
+    transect = 94:96),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 5,
+    transect = 98:101),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 6,
+    transect = 125:127),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 7,
+    transect = 136:139),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 1,
+    transect = 2:16),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 2,
+    transect = 20:28),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 3,
+    transect = 50:72),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 4,
+    transect = 74:86),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 5,
+    transect = 94:96),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 6,
+    transect = 97:101),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 1,
+    transect = 1:16),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 2,
+    transect = 20:33),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 3,
+    transect = 38:40),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 4,
+    transect = 41:46),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 5,
+    transect = 47:85),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 6,
+    transect = 87:96),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 7,
+    transect = 97:99),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 8,
+    transect = 124:129),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 9,
+    transect = 136:139)
+)
+
+# Offshore strata
+strata.manual.os <- bind_rows(
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 1,
+    transect = 1:8),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 1,
+    transect = 1:3),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 2,
+    transect = 4:8),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 1,
+    transect = 1:8),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 1,
+    transect = 1:8),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 1,
+    transect = 1:8),
+)
+
+# Stock boundaries --------------------------------------------------------
+stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
+stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
+
+# Data collection settings ------------------------------------------------
+# ER60 file info
+raw.prefix    <- "1807RL_EK60"
+raw.size      <-  50   # file size in megabytes (MB)
+raw.log.range <- 350  # depth of ER60 logging (m)
+
+# Echoview settings
+er60.version  <- "V2.4.3" # ER60 version
+ek80.version  <- "V1.10.3" # EK80 version
+ev.version    <- "V9.0.318.34509" # Echoview version
+int.start        <-   5  # Integration start line depth (m)
+int.stop         <- 650  # Integration start line depth (m)
+cps.depth        <-  70  # Integration depth for CPS (m)
+krill.depth      <- 350  # Integration depth for krill (m)
+hake.depth       <- 750  # integration depth for hake (m)
+speed.filter     <-   5  # Speed filter threshold (kn)
+vmr.krill        <- -45  # VMR value for krill formula operator (dB)
+vmr.cps          <- -45  # VMR value for CPS (with swim bladders) formula operator (dB)
+bin.depth        <-   5  # Integration bin depth (m)
+bin.length       <- 100  # Integration bin width (m)
+adz.range        <-   3  # Range (m) of acoustic dead zone
+nasc.freq        <-  38  # Echosounder frequency used to estimate CPS biomass
+
+# Adaptive sampling information ------------------------------------------
+compulsory.spacing      <- 20  # minimum transect spacing (nmi) for compulsory acoustic transects
+adaptive.spacing        <- 10  # minimum transect spacing (nmi) for adaptive acoustic transects
+adaptive.cluster.size   <- 5   # minimum number of consecutive transects to define a cluster
+cufes.threshold.anchovy <- 1   # egg density, eggs per minute
+cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
+
+# # Calibration information ------------------------------------------------
+cal.vessels        <- "RL"
+cal.dir            <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20170619_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
+cal.datetime       <- "30 May to 4 June 2018" # Date/time of calibration
+cal.plot.date      <- "2018-06-04" # Date of the calibration, used to plot cal time series
+cal.window         <- 5            # Number of days around calibration date to look for results
+cal.group          <- "SWFSC"      # Group conducting the calibration
+cal.personnel      <- "J. Renfree, T. Sessions, D. Murfin, and D. Palance" # Calibration participants
+cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
+cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
+cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
+cal.lat            <- dd2decmin(cal.lat.dd)
+cal.lon            <- dd2decmin(cal.lon.dd)
+cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material" # Cal sphere info
+cal.sphere.name    <- "_Lasker_ sphere #1"
+cal.sphere.z       <- 6 # Nominal depth of calibration sphere below the transducer
+cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about impedance analyzer
+# Other notes about calibration
+cal.notes          <- "Calibration while alongside at the 10th Avenue pier, just north of the Coronado Bridge. Lasker calibration sphere #1"
+
+# # Physical conditions during calibration
+cal.temp           <-   18.5   # enter water temperature
+cal.sal            <-   33.7   # enter salinity
+cal.c              <- 1515.7   # enter sound speed (m/s)
+cal.min.z          <-    8     # enter minimum water depth below transducers
+cal.max.z          <-   12     # enter maximum water depth below transducers
+ 
+# Enter ambient noise estimates (dB re 1 W) for each vessel
+# Lowest to highest frequency
+cal.noise          <- list(RL = c(-128,-145,-154,-160,-161,-137))
+
+# Vessel echosounder info  ------------------------------------------------
+if (survey.vessel.primary == "SH") {
+  echo.freqs      <- "18, 38, 70, 120, and 200" # list of echosounder frequencies for Shimada
+  echo.freqs.dash <- "18-, 38-, 70-, 120-, and 200-" # list of echosounder frequencies for Shimada
+  echo.models     <- "ES18-11, ES38B, ES70-7C, ES120-7C, and ES200-7C" # list of echosounder models for Shimada
+} else if (survey.vessel.primary == "RL") {
+  echo.freqs      <- "18, 38, 70, 120, 200, and 333" # list of echosounder frequencies for Lasker
+  echo.freqs.dash <- "18-, 38-, 70-, 120-, 200-, and 333-" # list of echosounder frequencies for Lasker
+  echo.models     <- "ES18-11, ES38B, ES70-7C, ES120-7C, ES200-7C, and ES333-7C" # list of echosounder models for Shimada
+}
+
+# nominal centerboard positions
+cb.retracted    <- 5
+cb.intermediate <- 7
+cb.extended     <- 9

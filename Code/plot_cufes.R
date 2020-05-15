@@ -24,8 +24,8 @@ cufes.density.all <- base.map +
   # Format axes and titles
   # ggtitle("CUFES Egg Densities") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 cufes.density.facet <- base.map +
   # Plot transects data
@@ -47,8 +47,8 @@ cufes.density.facet <- base.map +
   # Format axes and titles
   # ggtitle("CUFES Egg Densities") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 # Save cufes plot
 ggsave(cufes.density.all,
@@ -60,20 +60,20 @@ ggsave(cufes.density.facet,
        filename = here("Figs/fig_cufes_egg_density_facet.png"),
        width = map.width*3, height = map.height)
 
-# Plot combined map in 3D
-ggdiamonds = ggplot(diamonds) +
-  stat_density_2d(aes(x = x, y = depth, fill = stat(nlevel)), 
-                  geom = "polygon", n = 100, bins = 10, contour = TRUE) +
-  facet_wrap(clarity~.) +
-  scale_fill_viridis_c(option = "A")
-
-par(mfrow = c(1, 2))
-
-plot_gg(ggdiamonds, width = 5, height = 5, raytrace = FALSE, preview = TRUE)
-plot_gg(ggdiamonds, width = 5, height = 5, multicore = TRUE, scale = 250, 
-        zoom = 0.7, theta = 10, phi = 30, windowsize = c(800, 800))
-Sys.sleep(0.2)
-render_snapshot(clear = TRUE)
+# # Plot combined map in 3D
+# ggdiamonds = ggplot(diamonds) +
+#   stat_density_2d(aes(x = x, y = depth, fill = stat(nlevel)), 
+#                   geom = "polygon", n = 100, bins = 10, contour = TRUE) +
+#   facet_wrap(clarity~.) +
+#   scale_fill_viridis_c(option = "A")
+# 
+# par(mfrow = c(1, 2))
+# 
+# plot_gg(ggdiamonds, width = 5, height = 5, raytrace = FALSE, preview = TRUE)
+# plot_gg(ggdiamonds, width = 5, height = 5, multicore = TRUE, scale = 250, 
+#         zoom = 0.7, theta = 10, phi = 30, windowsize = c(800, 800))
+# Sys.sleep(0.2)
+# render_snapshot(clear = TRUE)
 
 # cufes.density.3d <- ggplot() +
 #   # Plot all cufes samples, including zeros
