@@ -56,7 +56,7 @@ source(here("Doc/settings", prj.settings))
 ```{r processing-controls}
 # Control script behavior (usually T)
 save.figs       <- T # Resave figures
-get.nav         <- T # Download nav data from ERDDAP
+get.nav         <- F # Download nav data from ERDDAP
 get.nav.sd      <- F # Download nav data from ERDDAP
 copy.files      <- F # Copy data files from data to plotBio directory
 overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
@@ -184,7 +184,7 @@ wpts.sf <- wpts %>%
   )
 
 transects.sf <- wpts.sf %>% 
-  group_by(Type, Transect) %>% 
+  group_by(Type, Transect, Region) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   ungroup() %>% 
@@ -644,7 +644,7 @@ if (process.csv) {
     # Load already processed files
     load(here("Output/nasc_cps.Rdata")) 
     # List only new CSV files
-    csv.files.cps <- csv.files.cps[!csv.files.cps %in% processed.cps]
+    csv.files.cps <- csv.files.cps[!fs::path_file(csv.files.cps) %in% processed.cps]
   }
   
   if (length(csv.files.cps) > 0) {
@@ -725,7 +725,7 @@ nasc.tx.labels.cps <- nasc.cps %>%
   )
 
 # List already processed CSV files and save
-processed.cps <- unique(nasc.cps$filename)
+processed.cps <- unique(fs::path_file(nasc.cps$filename))
 save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 ```
 
@@ -736,6 +736,7 @@ if (process.csv) {
     load(here("Output/processed_krill.Rdata"))
   }
   
+  processed.krill
   # List local CSV files
   csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
                             regex = nasc.pattern.krill[survey.vessel.primary])
@@ -747,7 +748,7 @@ if (process.csv) {
     # Load already processed files
     load(here("Output/nasc_krill.Rdata")) 
     # List only new CSV files
-    csv.files.krill <- csv.files.krill[!csv.files.krill %in% processed.krill]
+    csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]
   }
   
   if (length(csv.files.krill) > 0) {
@@ -828,7 +829,7 @@ nasc.tx.labels.krill <- nasc.krill %>%
   )
 
 # List already processed CSV files and save
-processed.krill <- unique(nasc.krill$filename)
+processed.krill <- unique(fs::path_file(nasc.krill$filename))
 save(processed.krill, file =  here("Output/processed_krill.Rdata"))
 
 # Select plot levels for backscatter data
@@ -882,10 +883,6 @@ map.width  <- map.height*map.aspect
 
 # Create base map
 base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) 
-
-# base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
-#   # Add scale bar
-#   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
 # Save the basemap
 ggsave(base.map, file = here("Figs/fig_basemap.png"), 
