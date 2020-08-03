@@ -2160,7 +2160,7 @@ lengths.all <- lengths.all %>%
     totalLength_mm = case_when(
       is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = round((weightg/mantleLength_mm*10^3)*100))
+    K = round((weightg/totalLength_mm*10^3)*100))
 
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
@@ -2403,7 +2403,7 @@ $$L = (W/a)^{(1/b)}\text{.}$$
 
 Coefficients used to estimate total length (TL, mm) or weight in the equations above. Model types are: 'lm' = linear model, 'nlm' = naive linear model, and 'glm' = general linear model (Palance et al., in prep). Season is presently either spring or summer, and is defined in the survey info file.    
 
-```{r lw-model-table}
+```{r lw-model-table, eval = FALSE}
 # Filter table of L/W models used
 lw.models %>% 
   arrange(scientificName) %>% 
@@ -2442,9 +2442,9 @@ lw.plot <- ggplot() +
   geom_point(data = filter(lengths, missing.length == TRUE), 
              aes(totalLength_mm, weightg),
              shape = 21, fill = 'red',  size = 2.5) +
-  geom_point(data = filter(lengths, missing.weight == TRUE), 
-             aes(totalLength_mm, weightg),
-             shape = 21, fill = 'blue', size = 2.5) +
+  # geom_point(data = filter(lengths, missing.weight == TRUE), 
+  #            aes(totalLength_mm, weightg),
+  #            shape = 21, fill = 'blue', size = 2.5) +
   # Facet by species
   facet_wrap(~scientificName, scales = "free") +
   # Format plot
@@ -2474,9 +2474,9 @@ lw.plot.leg <- ggplot() +
   geom_point(data = filter(lengths, missing.length == TRUE), 
              aes(totalLength_mm, weightg),
              shape = 21, fill = 'red',  size = 2.5) +
-  geom_point(data = filter(lengths, missing.weight == TRUE), 
-             aes(totalLength_mm, weightg),
-             shape = 21, fill = 'blue', size = 2.5) +
+  # geom_point(data = filter(lengths, missing.weight == TRUE), 
+  #            aes(totalLength_mm, weightg),
+  #            shape = 21, fill = 'blue', size = 2.5) +
   # Facet by species
   facet_wrap(~scientificName, scales = "free") +
   # Format plot
@@ -2589,7 +2589,7 @@ write.csv(cufes, file = here("Output/cufes_data.csv"),
 ```{r map-cufes-egg-density,fig.cap='(ref:cufes-egg-densities)'}
 if (save.figs) {
   # Plot CUFES for sardine, anchovy, and jack mackerel -------------------------  
-  source(here("Code/plot_CUFES.R"))
+  source(here("Code/plot_cufes.R"))
   
   save(cufes.density.all, cufes.density.facet,
        file = here("Output/cufes_egg_density_maps.Rdata"))
@@ -3313,8 +3313,7 @@ nasc.prop.all <- nasc %>%
          `Sardinops sagax`       = cps.nasc*prop.sar,
          `Trachurus symmetricus` = cps.nasc*prop.jack,
          `Scomber japonicus`     = cps.nasc*prop.mack,
-         `Clupea pallasii`       = cps.nasc*prop.her) %>% 
-  project_df(to = crs.proj)
+         `Clupea pallasii`       = cps.nasc*prop.her) # %>% project_df(to = crs.proj)
 
 # Prepare nasc.prop.all for facet plotting
 nasc.prop.spp <- nasc.prop.all %>% 
@@ -3823,7 +3822,7 @@ landmarks <- data.frame(
 
 # Get max density for setting y limits
 max.tx.dens.log <- ceiling(max(log(nasc.density.summ$density + 1), na.rm = TRUE))
-max.tx.dens <- ceiling(max(nasc.density.summ$density, na.rm = TRUE))
+max.tx.dens     <- ceiling(max(nasc.density.summ$density, na.rm = TRUE))
 
 if (nrow(strata.summ.rm) > 0) {
   # If strata were removed
@@ -3942,13 +3941,13 @@ if (nrow(strata.summ.rm) > 0) {
   # If no strata were removed
   # Biomass density by species and transect, showing stratum breaks
   biomass.dens.plot.lat <- ggplot(strata.summ) + 
-    geom_rect(aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens, 
+    geom_rect(aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens.log, 
                   group = stratum, colour = factor(stratum)), 
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
     geom_vline(xintercept = c(34.448266, 40.430520, 48.490), linetype = "dashed") +
     geom_text(data = landmarks, 
-              aes(lat.start, max.tx.dens, label = name), 
+              aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
               fontface = "italic", alpha = 0.5) +
     geom_path(data = nasc.density.summ,  
@@ -3980,7 +3979,7 @@ if (nrow(strata.summ.rm) > 0) {
   # Original plot, based on transect number on the x-axis
   biomass.dens.plot.tx <- ggplot(strata.summ) +
     geom_rect(aes(xmin = start - 0.4, xmax = end + 0.4, 
-                  ymin = 0, ymax = max.tx.dens, 
+                  ymin = 0, ymax = max.tx.dens.log, 
                   group = stratum, colour = factor(stratum)),
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
@@ -3998,7 +3997,7 @@ if (nrow(strata.summ.rm) > 0) {
     facet_wrap(~scientificName,ncol = 1) +
     xlab("Transect") + 
     scale_y_continuous(expression(Biomass~density~(log(t+1)~nmi^-2)), 
-                       limits = c(-0.5,max.tx.dens), expand = c(0,0)) +
+                       limits = c(-0.5,max.tx.dens.log), expand = c(0,0)) +
     theme_bw() +
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic"))
@@ -4563,8 +4562,7 @@ if (save.figs) {
       pos.cluster.txt <- pos.clusters %>% 
         filter(scientificName == i, stock == j, !duplicated(cluster), 
                cluster %in% pos.cluster.summ$cluster[pos.cluster.summ$scientificName == i]) %>%
-        ungroup() %>% 
-        project_df(to = crs.proj)
+        ungroup() # %>% project_df(to = crs.proj)
       
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens <- base.map +
