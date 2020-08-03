@@ -18,7 +18,6 @@ nav.paths.2018 <- nav.sf %>%
 
 # 2019 data
 load("E:/CODE/R_packages/estimATM/1907RL/Data/Nav/nav_data.Rdata")
-
 nav.paths.2019 <- nav.paths.sf %>% 
   mutate(cruise = 2019)
 
@@ -75,9 +74,7 @@ map.height <- 10
 map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
 map.width  <- map.height*map.aspect
 
-base.map <- get_basemap(nav.all, states, countries, locations, bathy, map.bounds, crs = 3310) +
-  # Add scalebar
-  ggspatial::annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+base.map <- get_basemap(nav.all, states, countries, locations, bathy, map.bounds, crs = 3310) 
 
 # Load proportion data ----------------------------
 # Calculate pie radius based on latitude range
@@ -86,26 +83,24 @@ pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
 
 # Get acoustic proportions for mapping
 prop.2017 <- read_csv("E:/CODE/R_packages/EstimateCPS/1707RL/Output/clf_ts_proportions.csv") %>% 
-  select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-         prop.mack, prop.sar) %>% 
+  select(cluster, lat, long, prop.anch, prop.jack, prop.her, prop.mack, prop.sar) %>% 
   replace(is.na(.), 0) %>% 
   mutate(cruise = 2017) %>% 
   atm::project_df(to = 3310)
 
 prop.2018 <- read_csv("E:/CODE/R_packages/EstimateCPS/1807RL/Output/clf_ts_proportions.csv")%>% 
-  select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-         prop.mack, prop.sar) %>% 
+  select(cluster, lat, long, prop.anch, prop.jack, prop.her, prop.mack, prop.sar) %>%
   replace(is.na(.), 0) %>% 
   mutate(cruise = 2018) %>%
   atm::project_df(to = 3310)
 
 prop.2019 <- read_csv("E:/CODE/R_packages/estimATM/1907RL/Output/clf_ts_proportions.csv")%>% 
-  select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-         prop.mack, prop.sar) %>% 
+  select(cluster, lat, long, prop.anch, prop.jack, prop.her, prop.mack, prop.sar) %>%
   replace(is.na(.), 0) %>% 
   mutate(cruise = 2019) %>% 
   atm::project_df(to = 3310)
 
+# Combine data from all years
 prop.all <- prop.2017 %>% bind_rows(prop.2018) %>% bind_rows(prop.2019) %>% 
   mutate(prop.tot = prop.anch + prop.jack + prop.her + prop.mack + prop.sar)
 
@@ -117,43 +112,14 @@ jacksmelt.color    <- '#A020F0'
 pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 
-# Combine transects
-transects.all <- rbind(transects.all, transects.sf)
-
-# Create trawl haul figure
-trawl.pie.cluster.wt <- base.map +
-  # Plot transects data
-  geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
-          alpha = 0.75, linetype = "dashed") +
-  # plot ship track data
-  geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
-  # Plot trawl pies
-  geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
-                  cols = c("Anchovy", "JackMack", "Jacksmelt",
-                           "PacHerring", "PacMack", "Sardine"),
-                  color = 'black', alpha = 0.8) +
-  # Configure trawl scale
-  scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
-  # Plot empty cluster locations
-  geom_point(data = cluster.zero, aes(X, Y),
-             size = 3, shape = 21, fill = 'black', colour = 'white') +
-  # Plot panel label
-  # ggtitle("CPS Proportions in Trawl Clusters") +
-  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-
+# Create trawl cluster map
 combo.map <- base.map + 
   # Plot transects data
   geom_sf(data = transects.all, size = 0.5, colour = "gray70", 
           alpha = 0.75, linetype = "dashed") +
   # plot ship track data
   geom_sf(data = nav.all, colour = "gray50", size = 0.5, alpha = 0.5) +
-  geom_scatterpie(data = prop.all, 
+  geom_scatterpie(data = filter(prop.all, prop.tot != 0), 
                   aes(X, Y, group = cluster, r = pie.radius),
                   cols = c("prop.anch","prop.jack","prop.her",
                            "prop.mack","prop.sar"),
