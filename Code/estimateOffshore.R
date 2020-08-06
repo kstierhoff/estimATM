@@ -1,12 +1,15 @@
 # Estimate offshore biomass -----------------------------------------------
 # Remove any existing offshore backscatter data from memory
-if (exists("nasc.offshore")) {rm(nasc.offshore)}
+if (exists("nasc.offshore")) rm(nasc.offshore)
 
 # Process offshore backscatter data
 if (process.offshore) {
   # List offshore backscatter files
   offshore.files <- dir_ls(here("Data/Backscatter"), recurse = TRUE,
-                           regexp = "offshore.rds")
+                           regexp = "offshore.rds") 
+  
+  # Remove krill files
+  offshore.files <- offshore.files[-grep("krill", offshore.files)]
   
   # Import all offshore backscatter data
   for (oo in offshore.files) {
@@ -50,17 +53,20 @@ if (process.offshore) {
   
   # Apply cps.nasc, or use a fixed integration depth
   if (source.cps.nasc["OS"]) {
-    # Use exteranlly supplied cps.nasc with variable integration depth (from CTD.app)
+    # Use externally supplied cps.nasc with variable integration depth (from CTD.app)
     # Read file and create unique key for joining with nasc.vessel
+    # Instead of unique key, join using time.align
     cps.nasc.temp <- read.csv(data.cps.nasc["OS"]) %>% 
       mutate(key = paste(lat, long, dist_m),
-             datetime = ymd_hms(paste(date, time))) %>% 
+             datetime      = ymd_hms(paste(date, time), tz = "UTC"),
+             time.align  = align.time(datetime, 1)) %>% 
       # Remove data from krill files (1807RL)
       filter(!str_detect(tolower(filename), "krill")) 
     
     # Join nasc.vessel and cps.nasc on datetime
     nasc.offshore <- nasc.offshore %>% 
-      left_join(select(cps.nasc.temp, datetime, cps.nasc))
+      mutate(time.align  = align.time(datetime, 1)) %>% 
+      left_join(select(cps.nasc.temp, time.align, cps.nasc))
     
   } else {
     nasc.offshore <- nasc.offshore %>%
@@ -77,7 +83,7 @@ if (process.offshore) {
   nasc.offshore <- filter(nasc.offshore, id %in% nasc.offshore.diff$id)
   
   # Assign backscatter to trawl clusters ------------------------------------
-  # Create varialble for nearest cluster and minumum distance
+  # Create variable for nearest cluster and minumum distance
   cluster.distance.os <- data.frame(cluster = rep(NA, nrow(nasc.offshore)),
                                     cluster.distance = rep(NA, nrow(nasc.offshore)))
   # Configure progress bar
@@ -243,7 +249,7 @@ nasc.offshore <- nasc.offshore %>%
 # Save results
 save(nasc.offshore, file = here("Output/cps_nasc_prop_os.Rdata"))
 
-# Summarise nasc data
+# Summarize nasc data
 nasc.summ.os <- nasc.offshore %>% 
   group_by(vessel.orig, transect.name, transect) %>% 
   summarise(
@@ -420,7 +426,7 @@ tx.start.labels.os <- tx.labels.tmp.os %>%
 
 tx.labels.os <- project_df(tx.start.labels.os, to = crs.proj)
 
-# Summarise biomass density by transect and species
+# Summarize biomass density by transect and species
 nasc.density.summ.os <- nasc.density.os %>% 
   group_by(scientificName, transect, transect.name) %>% 
   summarise(density = sum(density)) %>% 
@@ -956,7 +962,7 @@ if (save.figs) {
          width = map.width*2.6, height = map.height*1.5)
 }
 
-# Convet nasc.density to sf and project
+# Convert nasc.density to sf and project
 nasc.density.os <- ungroup(nasc.density.os) %>% 
   project_df(to = crs.proj)
 
@@ -991,8 +997,7 @@ if (save.figs) {
       pos.cluster.txt <- pos.clusters.os %>% 
         filter(scientificName == i, stock == j,
                cluster %in% nasc.os.clusters) %>% 
-        ungroup() %>% 
-        project_df(to = crs.proj)
+        ungroup() 
       
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens.os <- base.map +
@@ -1077,10 +1082,6 @@ for (i in cps.spp) {
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.offshore, file = here("Output/nasc_offshore_final.Rdata"))
 
-# Create new list for computing biomass estimates
-point.estimates.offshore <- data.frame()
-nasc.summ.strata.os      <- data.frame()
-
 # Calculate point estimates for each species
 for (i in unique(strata.final.os$scientificName)) {
   # Subset strata for species i
@@ -1116,8 +1117,13 @@ for (i in unique(strata.final.os$scientificName)) {
     select(scientificName, everything())
   
   # Combine nasc summaries
-  nasc.summ.strata.os <- bind_rows(nasc.summ.strata.os, 
+  if (exists("nasc.summ.strata.os")) {
+    nasc.summ.strata.os <- bind_rows(nasc.summ.strata.os, 
                                 nasc.os.temp.summ)
+  } else {
+    nasc.summ.strata.os <- nasc.os.temp.summ
+  }
+  
   
   # Create data frame with stratum and area (m^2)
   stratum.info.offshore <- strata.offshore %>% 
@@ -1128,9 +1134,14 @@ for (i in unique(strata.final.os$scientificName)) {
   
   # Compute point estimates
   # Currently has na.rm = TRUE for calculting biomass
-  point.estimates.offshore <- bind_rows(point.estimates.offshore,
+  if (exists("point.estimates.offshore")) {
+    point.estimates.offshore <- bind_rows(point.estimates.offshore,
                                          data.frame(scientificName = i,
                                                     estimate_point(nasc.os.temp, stratum.info.offshore, species = i)))
+  } else {
+    point.estimates.offshore <- data.frame(scientificName = i,
+                                           estimate_point(nasc.os.temp, stratum.info.offshore, species = i))
+  }
 }
 
 save(point.estimates.offshore, 
@@ -1167,17 +1178,6 @@ write_csv(pe.os, here("Output/biomass_point_estimates_os_final.csv"))
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
-  # Create data frame for biomass estimates
-  bootstrap.estimates.os <- data.frame()
-  # Create data frame for abundance estimates by length
-  abundance.estimates.os <- data.frame()
-  # Create data frame for stratum summaries
-  survey.summary.os <- data.frame()
-  # Create data frame for catch summaries
-  catch.summary.os <- data.frame()
-  # Create data frame for stratum summaries
-  stratum.summary.os <- data.frame()
-  
   # Configure progress bar
   pb1 <- tkProgressBar("R Progress Bar", 
                        "Multiple Bootstrap Estimation (Offshore) - Species", 0, 100, 0)
@@ -1277,7 +1277,11 @@ if (do.bootstrap) {
                               Sample = seq(1,boot.num), boot.df[2:nrow(boot.df), ])
 
       # Combine results
-      bootstrap.estimates.os <- bind_rows(bootstrap.estimates.os, boot.temp)
+      if (exists("bootstrap.estimates.os")) {
+        bootstrap.estimates.os <- bind_rows(bootstrap.estimates.os, boot.temp)
+      } else {
+        bootstrap.estimates.os <- boot.temp
+      }
 
       # Calculate abundance by length class using bootstrap function ----
       abund.vec <- estimate_bootstrap(nasc.offshore, cluster.final[[i]], j, 
@@ -1288,7 +1292,11 @@ if (do.bootstrap) {
       abundance.temp <- data.frame(Species = i, Stratum = j,
                                    SL = L.vec, freq = abund.vec)
       # Combine results
-      abundance.estimates.os <- bind_rows(abundance.estimates.os, abundance.temp)
+      if (exists("abundance.estimates.os")) {
+        abundance.estimates.os <- bind_rows(abundance.estimates.os, abundance.temp)
+      } else {
+        abundance.estimates.os <- abundance.temp
+      }
       
       # Update the progress bar
       pb.prog2 <- round(stratum.counter/n_distinct(nasc.temp$stratum)*100)
@@ -1310,11 +1318,25 @@ if (do.bootstrap) {
     # Update the species counter
     spp.counter     <- spp.counter + 1
     # Combine survey summary by species
-    survey.summary.os  <- bind_rows(survey.summary.os, survey.summ.temp)
+    if (exists("survey.summary.os")) {
+      survey.summary.os <- bind_rows(survey.summary.os, survey.summ.temp)
+    } else {
+      survey.summary.os <- survey.summ.temp
+    }
+    
     # Combine survey summary by species
-    catch.summary.os   <- bind_rows(catch.summary.os, catch.summ.temp)
+    if (exists("catch.summary.os")) {
+      catch.summary.os   <- bind_rows(catch.summary.os, catch.summ.temp)
+    } else {
+      catch.summary.os <- catch.summ.temp
+    }
+    
     # Combine stratum summary
-    stratum.summary.os <- bind_rows(stratum.summary.os, pos.cluster.spp)
+    if (exists("stratum.summary.os")) {
+      stratum.summary.os <- bind_rows(stratum.summary.os, pos.cluster.spp)
+    } else {
+      stratum.summary.os <- pos.cluster.spp
+    }
   }
   
   # Close the species counter
@@ -1336,7 +1358,7 @@ catch.summary.os <- catch.summary.os %>%
   left_join(strata.summ.offshore) %>%
   rename(Stock = stock)
 
-# Summarise abundance across strata
+# Summarize abundance across strata
 abund.summ.os <- abundance.estimates.os %>%
   left_join(strata.summ.offshore, by = c("Species" = "scientificName",
                                           "Stratum" = "stratum")) %>%

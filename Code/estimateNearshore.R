@@ -1,6 +1,6 @@
 # Estimate nearshore biomass -----------------------------------------------
 # Remove any existing nearshore backscatter data from memory
-if (exists("nasc.nearshore")) {rm(nasc.nearshore)}
+if (exists("nasc.nearshore")) rm(nasc.nearshore)
 
 # Process offshore backscatter data
 if (process.nearshore) {
@@ -148,7 +148,7 @@ nav.paths.ns.sf <- nav.ns.sf %>%
   st_cast("LINESTRING") %>% 
   ungroup()
 
-# Summarise nasc for plotting ---------------------------------------------
+# Summarize nasc for plotting ---------------------------------------------
 nasc.plot.ns <- nasc.nearshore %>% 
   select(filename, vessel.name, transect, transect.name, int, lat, long, cps.nasc) %>% 
   group_by(filename, vessel.name, transect.name, transect, int) %>% 
@@ -286,8 +286,8 @@ nasc.nearshore <- nasc.nearshore %>%
 # Save results
 save(nasc.nearshore, file = here("Output/cps_nasc_prop_ns.Rdata"))
 
-# Summarise transects -----------------------------------------------------
-# Summarise nasc data
+# Summarize transects -----------------------------------------------------
+# Summarize nasc data
 nasc.summ.ns <- nasc.nearshore %>% 
   group_by(vessel.name, transect.name, transect) %>% 
   summarise(
@@ -434,9 +434,6 @@ tx.mid.ns <- nasc.nearshore %>%
     lat  = mean(lat, na.rm = TRUE),
     long = mean(long, na.rm = TRUE))
 
-# Create a data frame for results
-tx.nn.ns <- data.frame()
-
 for (i in unique(tx.mid.ns$transect.name)) {
   # Get the mid lat/long for each transect
   tx.nn.i      <- filter(tx.mid.ns, transect.name == i)
@@ -450,9 +447,15 @@ for (i in unique(tx.mid.ns$transect.name)) {
   min.dist  <- nn.dist[which.min(nn.dist)]
   nn.lat    <- nasc.temp$lat[which.min(nn.dist)]
   nn.long   <- nasc.temp$long[which.min(nn.dist)]
+  
   # Add to results
-  tx.nn.ns     <- bind_rows(tx.nn.ns, 
+  if (exists("tx.nn.ns")) {
+    tx.nn.ns     <- bind_rows(tx.nn.ns, 
                             data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long))
+  } else {
+    tx.nn.ns <- data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long)
+  }
+  
 }
 
 # Bin transects by spacing
@@ -484,14 +487,12 @@ nasc.density.summ.ns <- nasc.density.summ.ns %>%
 # If the region is an island, use transect waypoints to draw strata
 
 # Remove nearshore strata, if exists
-if (exists("tx.ends.ns")) rm(tx.ends.ns) # inshore- and offshore-most intervals
-if (exists("strata.ns")) rm(strata.ns) 
+if (exists("tx.ends.ns"))       rm(tx.ends.ns) # inshore- and offshore-most intervals
+if (exists("strata.ns"))        rm(strata.ns) 
 if (exists("strata.points.ns")) rm(strata.points.ns) 
 
 # Assign transects to region based on latitude
 # Because some duplicate transect numbers exist, can't do a straight join
-nasc.region <- data.frame()
-
 for (v in unique(nasc.nearshore$vessel.name)) {
   # Get latitude range for backscatter data
   nasc.nearshore.summ <- nasc.nearshore %>% 
@@ -760,7 +761,11 @@ for (v in unique(nasc.nearshore$vessel.name)) {
   }
   
   # Combine nasc used to create strata polygons
-  nasc.region <- bind_rows(nasc.region, nasc.region.temp)
+  if (exists("nasc.region")) {
+    nasc.region <- bind_rows(nasc.region, nasc.region.temp)
+  } else {
+    nasc.region <- nasc.region.temp
+  }
 }
 
 # Summarize transects by region, to be used later for stratification
@@ -801,18 +806,18 @@ if (stratify.manually.ns) {
     mutate(stratum.orig = stratum)
   
 } else {
-  # Define strata automatically
-  strata.final.ns <- data.frame()
-  
+  # Define strata automatically------------
   # Define strata boundaries and transects for each species
   for (i in unique(nasc.density.summ.ns$scientificName)) {
     for (j in unique(nasc.density.summ.ns$vessel.name)) {
       # Select positive transects and calculate differences between transect numbers
-      # diffs >= 2 define stratum breaks
+      # diffs >= max.diff define stratum breaks
       temp.spp <- nasc.density.summ.ns %>% 
         filter(scientificName == i, vessel.name == j, positive == TRUE) %>% 
         ungroup() %>% 
         mutate(diff = c(1, diff(transect)))
+      
+      strata.df <- data.frame()
       
       if (nrow(temp.spp) > 0) {
         # Find the start of each positive stratum
@@ -820,66 +825,70 @@ if (stratify.manually.ns) {
           # mutate(diff = c(1, diff(transect))) %>%
           filter(diff > max.diff)
         
-        # If the start of the stratum == 1, stratum start is 1, else min transect number
-        survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
-        
-        # A vector of stratum starts
-        stratum.start <- c(survey.start, spp.starts$transect - 1)
-        
-        # If the end of the stratum is the last transect in the survey,
-        # select the last, else the last transect + 1
-        survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
-                             max(nasc.density.summ$transect),
-                             max(temp.spp$transect) + 1)
-        
-        # A vector of stratum ends
-        stratum.end <- c(temp.spp$transect[which(temp.spp$diff > max.diff) - 1] + 1,
-                         survey.end)
-        
-        # Combine starts and ends in to a data frame for plotting and generating stratum vectors
-        strata.spp <- data.frame(scientificName = i,
-                                 vessel.name = j,
-                                 stratum = seq(1, length(stratum.start)),
-                                 start = stratum.start,
-                                 end = stratum.end) # %>% mutate(n.tx = end - start + 1)
-        
-        # Create stratum vectors
-        strata.df <- data.frame()
-        
-        for (kk in 1:nrow(strata.spp)) {
-          # Create a vector of transects from start to end
-          transect <- seq(strata.spp$start[kk], strata.spp$end[kk])
+        if (nrow(spp.starts) > 0) {
+          # If the start of the stratum == 1, stratum start is 1, else min transect number
+          survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
           
-          # Combine results
-          strata.df <- bind_rows(strata.df,
-                                 data.frame(scientificName = i,
-                                            stratum = kk,
-                                            transect))
+          # A vector of stratum starts
+          stratum.start <- c(survey.start, spp.starts$transect - 1)
+          
+          # If the end of the stratum is the last transect in the survey,
+          # select the last, else the last transect + 1
+          survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
+                               max(nasc.density.summ$transect),
+                               max(temp.spp$transect) + 1)
+          
+          # A vector of stratum ends
+          stratum.end <- c(temp.spp$transect[which(temp.spp$diff > max.diff) - 1] + 1,
+                           survey.end)
+          
+          # Combine starts and ends in to a data frame for plotting and generating stratum vectors
+          strata.spp <- data.frame(scientificName = i,
+                                   vessel.name = j,
+                                   stratum = seq(1, length(stratum.start)),
+                                   start = stratum.start,
+                                   end = stratum.end) # %>% mutate(n.tx = end - start + 1)
+          
+          # Create stratum vectors
+          for (kk in 1:nrow(strata.spp)) {
+            # Create a vector of transects from start to end
+            transect <- seq(strata.spp$start[kk], strata.spp$end[kk])
+            
+            # Combine results
+            strata.df <- bind_rows(strata.df,
+                                   data.frame(scientificName = i,
+                                              stratum = kk,
+                                              transect))
+          }
+          
+          # Add vessel name and distance bin to strata.df for final cuts
+          strata.df <- strata.df %>%
+            left_join(filter(select(nasc.density.summ.ns, scientificName, vessel.name, transect, dist.bin),
+                             scientificName == i, vessel.name == j)) %>%
+            filter(!is.na(vessel.name)) %>%
+            mutate(stratum.key = factor(paste(stratum, dist.bin)))
+          
+          # Summarize strata by key, remove strata with less than 3 transects,
+          # and reassign stratum numbers
+          strata.df.summ <- strata.df %>%
+            group_by(stratum.key) %>%
+            summarise(n.tx = n()) %>%
+            filter(n.tx >= nTx.min) %>%
+            mutate(stratum = seq(1, n()))
+          
+          # Remove strata with less than minimum number of transects
+          strata.df <- strata.df %>%
+            rename(stratum.orig = stratum) %>%
+            filter(stratum.key %in% strata.df.summ$stratum.key) %>%
+            left_join(select(strata.df.summ, stratum.key, stratum))
+          
+          # Combine with stratum vectors for other species
+          if (exists("strata.final.ns")) {
+            strata.final.ns <- bind_rows(strata.final.ns, strata.df)
+          } else {
+            strata.final.ns <- strata.df
+          }
         }
-        
-        # Add vessel name and distance bin to strata.df for final cuts
-        strata.df <- strata.df %>%
-          left_join(filter(select(nasc.density.summ.ns, scientificName, vessel.name, transect, dist.bin),
-                           scientificName == i, vessel.name == j)) %>%
-          filter(!is.na(vessel.name)) %>%
-          mutate(stratum.key = factor(paste(stratum, dist.bin)))
-        
-        # Summarise strata by key, remove strata with less than 3 transects,
-        # and reassign stratum numbers
-        strata.df.summ <- strata.df %>%
-          group_by(stratum.key) %>%
-          summarise(n.tx = n()) %>%
-          filter(n.tx >= nTx.min) %>%
-          mutate(stratum = seq(1, n()))
-        
-        # Remove strata with less than minimum number of transects
-        strata.df <- strata.df %>%
-          rename(stratum.orig = stratum) %>%
-          filter(stratum.key %in% strata.df.summ$stratum.key) %>%
-          left_join(select(strata.df.summ, stratum.key, stratum))
-        
-        # Combine with stratum vectors for other species
-        strata.final.ns <- bind_rows(strata.final.ns, strata.df)
       }
     }
   }
@@ -919,9 +928,6 @@ nearshore.spp <- nasc.prop.spp.ns %>%
   tally()
 
 # Create final strata and calculate area
-# Create df for transect-level stock info
-nasc.stock.ns <- data.frame()
-
 if (exists("strata.nearshore")) rm(strata.nearshore)
 
 for (i in unique(nearshore.spp$scientificName)) {
@@ -949,7 +955,11 @@ for (i in unique(nearshore.spp$scientificName)) {
       ungroup()
     
     # Combine results
-    nasc.stock.ns <- bind_rows(nasc.stock.ns, nasc.stock.temp)  
+    if (exists("nasc.stock.ns")) {
+      nasc.stock.ns <- bind_rows(nasc.stock.ns, nasc.stock.temp)  
+    } else {
+      nasc.stock.ns <- nasc.stock.temp  
+    }
     
     for (k in sort(unique(strata.sub$stratum))) {
       # Create offshore stratum polygons ----------------------------------------
@@ -1184,7 +1194,7 @@ strata.nearshore <- strata.nearshore %>%
   mutate(key = paste(scientificName, stock, vessel.name, stratum)) %>% 
   select(scientificName, stock, vessel.name, everything(), -stratum) %>% 
   left_join(strata.nearshore.fac, by = "key") %>% 
-  rename(stratum = strata.fac)
+  select(everything(), stratum = strata.fac)
 
 # Add new strata factor to nearshore stratum polygons
 # Create join key in nasc.stock.ns, for use in stratification later
@@ -1204,7 +1214,7 @@ nasc.stock.ns <- nasc.stock.ns %>%
 # mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
 
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
-# Summarise strata transects
+# Summarize strata transects
 strata.summ.ns <- strata.final.ns %>% 
   left_join(nasc.stock.ns) %>% 
   group_by(scientificName, stock, vessel.name, stratum) %>% 
@@ -1249,8 +1259,8 @@ nasc.density.ns.sf <- nasc.density.ns %>%
   )
 
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax")) +
-#   mapview(filter(strata.nearshore2, scientificName == "Engraulis mordax"),zcol = "stock") +
-#   mapview(filter(nasc.density.ns.sf, scientificName == "Engraulis mordax"), cex = "bin.level", zcol = "bin.level")
+# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"),zcol = "stock") +
+# mapview(filter(nasc.density.ns.sf, scientificName == "Engraulis mordax"), cex = "bin.level", zcol = "bin.level")
 
 # mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "vessel.name")
@@ -1460,10 +1470,6 @@ strata.final.ns <- strata.final.ns %>%
   left_join(strata.nearshore.fac) %>% 
   rename(stratum = strata.fac)
 
-# Create new list for computing biomass estimates
-point.estimates.ns  <- data.frame()
-nasc.summ.strata.ns <- data.frame()
-
 # Calculate point estimates for each species
 for (i in unique(strata.final.ns$scientificName)) {
   for (j in unique(strata.final.ns$vessel.name[strata.final.ns$scientificName == i])) {
@@ -1491,8 +1497,12 @@ for (i in unique(strata.final.ns$scientificName)) {
         select(scientificName, vessel.name, everything())
       
       # Combine nasc summaries
-      nasc.summ.strata.ns <- bind_rows(nasc.summ.strata.ns, 
-                                       nasc.ns.temp.summ)
+      if (exists("nasc.summ.strata.ns")) {
+        nasc.summ.strata.ns <- bind_rows(nasc.summ.strata.ns, 
+                                         nasc.ns.temp.summ)  
+      } else {
+        nasc.summ.strata.ns <- nasc.ns.temp.summ
+      }
       
       # Create data frame with stratum and area (m^2)
       stratum.info.nearshore <- strata.nearshore %>% 
@@ -1502,10 +1512,15 @@ for (i in unique(strata.final.ns$scientificName)) {
         st_set_geometry(NULL)
       
       # Compute point estimates
-      # Currently has na.rm = TRUE for calculting biomass
-      point.estimates.ns <- bind_rows(point.estimates.ns,
+      # Currently has na.rm = TRUE for calculating biomass
+      if (exists("point.estimates.ns")) {
+        point.estimates.ns <- bind_rows(point.estimates.ns,
                                       data.frame(scientificName = i, vessel.name = j,
                                                  estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i)))  
+      } else {
+        point.estimates.ns <- data.frame(scientificName = i, vessel.name = j,
+                                         estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i))
+      }
     }
   }
 }
@@ -1555,17 +1570,6 @@ if (use.seine.data) {
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
-  # Create data frame for biomass estimates
-  bootstrap.estimates.ns <- data.frame()
-  # Create data frame for abundance estimates by length
-  abundance.estimates.ns <- data.frame()
-  # Create data frame for stratum summaries
-  survey.summary.ns <- data.frame()
-  # Create data frame for catch summaries
-  catch.summary.ns <- data.frame()
-  # Create data frame for stratum summaries
-  stratum.summary.ns <- data.frame()
-  
   # Configure progress bar
   pb1 <- tkProgressBar("Bootstrap - Species", 
                        "Bootstrap Estimation (NS) - Species", 0, 100, 0)
@@ -1695,7 +1699,11 @@ if (do.bootstrap) {
                                 Sample = seq(1, boot.num), boot.df[2:nrow(boot.df), ])
         
         # Combine results
-        bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
+        if (exists("bootstrap.estimates.ns")) {
+          bootstrap.estimates.ns <- bind_rows(bootstrap.estimates.ns, boot.temp)
+        } else {
+          bootstrap.estimates.ns <- boot.temp
+        }
         
         # Calculate abundance by length class using bootstrap function ----
         abund.vec <- estimate_bootstrap(nasc.temp, cluster.final.ns, k, 
@@ -1706,7 +1714,11 @@ if (do.bootstrap) {
         abundance.temp <- data.frame(Species = i, Vessel = j, Stratum = k,
                                      SL = L.vec, freq = abund.vec)
         # Combine results
-        abundance.estimates.ns <- bind_rows(abundance.estimates.ns, abundance.temp)
+        if (exists("abundance.estimates.ns")) {
+          abundance.estimates.ns <- bind_rows(abundance.estimates.ns, abundance.temp)
+        } else {
+          abundance.estimates.ns <- abundance.temp
+        }
         
         # Update the progress bar
         pb.prog2 <- round(stratum.counter/n_distinct(nasc.temp$stratum)*100)
@@ -1728,11 +1740,25 @@ if (do.bootstrap) {
       vessel.counter <- vessel.counter + 1
       
       # Combine survey summary by species
-      survey.summary.ns  <- bind_rows(survey.summary.ns, survey.summ.temp)
+      if (exists("survey.summary.ns")) {
+        survey.summary.ns  <- bind_rows(survey.summary.ns, survey.summ.temp)
+      } else {
+        survey.summary.ns  <- survey.summ.temp
+      }
+      
       # Combine survey summary by species
-      catch.summary.ns   <- bind_rows(catch.summary.ns, catch.summ.temp)
+      if (exists("catch.summary.ns")) {
+        catch.summary.ns   <- bind_rows(catch.summary.ns, catch.summ.temp)
+      } else {
+        catch.summary.ns   <- catch.summ.temp
+      }
+      
       # Combine stratum summary
-      stratum.summary.ns <- bind_rows(stratum.summary.ns, pos.cluster.spp)
+      if (exists("stratum.summary.ns")) {
+        stratum.summary.ns <- bind_rows(stratum.summary.ns, pos.cluster.spp)
+      } else {
+        stratum.summary.ns <- pos.cluster.spp
+      }
     }
     # Close the vessel counter
     close(pb3)

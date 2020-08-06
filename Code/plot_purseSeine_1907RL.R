@@ -136,8 +136,8 @@ set.pie <- set.summ.wt %>%
 # Load nearshore backscatter data -----------------------------------------
 load(here("Output/cps_nasc_prop_ns.Rdata"))
 
-# Summarise transects -----------------------------------------------------
-# Summarise nasc data
+# Summarize transects -----------------------------------------------------
+# Summarize nasc data
 nasc.summ.ns <- nasc.nearshore %>% 
   group_by(vessel.name, transect.name, transect) %>% 
   summarise(
@@ -153,7 +153,7 @@ nasc.summ.ns <- nasc.nearshore %>%
 
 save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 
-# Summarise nasc for plotting
+# Summarize nasc for plotting
 nasc.plot.ns <- nasc.nearshore %>%
   select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
   group_by(filename, transect, transect.name, int) %>%
@@ -332,7 +332,6 @@ ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LongBeachCarn
        height = 6, width = 10)
 
 # Map backscatter
-# Map backscatter
 nasc.map.ns.lbc <- base.map +
   # Plot transects data
   geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
@@ -396,8 +395,7 @@ for (i in 1:nrow(nasc.nearshore)) {
 close(pb)
 
 # Add haul distances to nasc
-nasc.nearshore <- bind_cols(nasc.nearshore, haul.distance.ns) %>% 
-  project_df(to = crs.proj)
+nasc.nearshore <- bind_cols(nasc.nearshore, haul.distance.ns) 
 
 # Use nav data to resize map to survey progress
 map.bounds.ns <- nasc.paths.ns %>%
@@ -501,61 +499,51 @@ nasc.ns.combo <- plot_grid(nasc.map.ns.lm, nasc.map.ns.sd, nasc.map.ns.lbc,
 ggsave(nasc.ns.combo, filename = here("Figs/fig_backscatter_cps_AllNearshore.png"),
        height = 10, width = 20)
 
-# Real length/weigth relationship models for each species
-lw.models <- read.csv(here("Data/Trawl/cps_lw_relationships.csv")) %>% 
-  filter(model_type == "glm", season == "summer") %>% 
-  select(-season)
-
 # Get max TL for plotting L/W models
 L.max <- select(lm.specimens, scientificName, totalLength_mm) %>%
   bind_rows(select(lbc.specimens, scientificName, totalLength_mm)) %>% 
   group_by(scientificName) %>% 
   summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
 
-# Dataframe for storing results
+# Data frame for storing results
 lw.df <- data.frame()
 
 # Generate length/weight curves
 for (i in unique(L.max$scientificName)) {
-  # Subset model
-  model.temp <- filter(lw.models, scientificName == i)
-  
   # Create a length vector for each species
   L <- seq(0, L.max$max.TL[L.max$scientificName == i])
   
-  # Calculate weights from lenths
-  W <- model.temp$a*L^model.temp$b
+  # Calculate weights from lengths
+  W <- estimate_weight(i, L, season = tolower(survey.season))
   
   # Combine results
-  lw.df <- bind_rows(lw.df, data.frame(model.temp, L, W))
+  lw.df <- bind_rows(lw.df, data.frame(scientificName = i, L, W))
 }
 
 # Estimate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
 lm.specimens <- lm.specimens %>% 
-  left_join(lw.models, by = 'scientificName') %>% 
   mutate(
     weightg = case_when(
-      is.na(weightg) ~ a*totalLength_mm^b,
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
       TRUE  ~ weightg),
     totalLength_mm = case_when(
-      is.na(totalLength_mm) ~ (weightg/a)^(1/b),
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = (weightg/totalLength_mm*10^3)*100)
+    K = round((weightg/totalLength_mm*10^3)*100))
 
 lbc.specimens <- lbc.specimens %>% 
-  left_join(lw.models, by = 'scientificName') %>% 
   mutate(
     weightg = case_when(
-      is.na(weightg) ~ a*totalLength_mm^b,
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
       TRUE  ~ weightg),
     totalLength_mm = case_when(
-      is.na(totalLength_mm) ~ (weightg/a)^(1/b),
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = (weightg/totalLength_mm*10^3)*100)
+    K = round((weightg/totalLength_mm*10^3)*100))
 
 
-# Plot speciment L/W for Lisa Marie ----------------------------- 
+# Plot specimen L/W for Lisa Marie ----------------------------- 
 lw.plot.lm <- ggplot() + 
   # Plot seasonal length models for each species
   geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
@@ -598,3 +586,4 @@ ggsave(lw.plot.lbc, filename = here("Figs/fig_LW_plots_LongBeachCarnage.png"),
        width = 10, height = 7)
 
 # ggplotly(lw.plot.lbc)
+

@@ -197,6 +197,7 @@ lf.ncols <- 6
 nasc.vessels           <- c("RL","LM", "SD", "LBC") 
 nasc.vessels.offshore  <- c("RL","SD")
 nasc.vessels.nearshore <- c("LBC","LM","SD")
+nasc.vessels.krill     <- "RL"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
@@ -253,10 +254,10 @@ nasc.pattern.cps       <- c(RL  = "-Final 38 kHz CPS.csv",
                             SD  = "_CPS*.*-Final 38 kHz CPS.csv",
                             LBC = "-Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*Juan Krill Final 120.csv",
-                            LM  = "*Juan Krill Final 120.csv",
-                            SD  = "*Juan Krill Final 120.csv",
-                            LBC = "*Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "-Juan Krill Final 120.csv",
+                            LM  = "-Juan Krill Final 120.csv",
+                            SD  = "-Juan Krill Final 120.csv",
+                            LBC = "-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
@@ -425,7 +426,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 10 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE

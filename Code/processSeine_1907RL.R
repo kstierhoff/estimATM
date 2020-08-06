@@ -61,26 +61,24 @@ lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
 # Estimate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
 lm.specimens <- lm.specimens %>% 
-  left_join(lw.models, by = 'scientificName') %>% 
   mutate(
     weightg = case_when(
-      is.na(weightg) ~ a*totalLength_mm^b,
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
       TRUE  ~ weightg),
     totalLength_mm = case_when(
-      is.na(totalLength_mm) ~ (weightg/a)^(1/b),
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = (weightg/totalLength_mm*10^3)*100)
+    K = round((weightg/totalLength_mm*10^3)*100))
 
 lbc.specimens <- lbc.specimens %>% 
-  left_join(lw.models, by = 'scientificName') %>% 
   mutate(
     weightg = case_when(
-      is.na(weightg) ~ a*totalLength_mm^b,
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
       TRUE  ~ weightg),
     totalLength_mm = case_when(
-      is.na(totalLength_mm) ~ (weightg/a)^(1/b),
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = (weightg/totalLength_mm*10^3)*100)
+    K = round((weightg/totalLength_mm*10^3)*100))
 
 save(lm.specimens, lbc.specimens, file = here("Output/purse_seine_specimens.Rdata"))
 
@@ -484,6 +482,9 @@ for (i in cps.spp) {
 }
 
 # Save results
-save(n.summ.set, l.summ.set, file = here("Output/seine_summaries.Rdata"))
-save(cluster.final.seine, file = here("Output/cluster_length_frequency_all_seine.Rdata"))
-save(lf.final.seine,      file = here("Output/cluster_length_frequency_tables_seine.Rdata"))
+save(n.summ.set, l.summ.set, 
+     file = here("Output/seine_summaries.Rdata"))
+save(cluster.final.seine, 
+     file = here("Output/cluster_length_frequency_all_seine.Rdata"))
+save(lf.final.seine,      
+     file = here("Output/cluster_length_frequency_tables_seine.Rdata"))
