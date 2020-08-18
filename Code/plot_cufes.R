@@ -59,3 +59,24 @@ ggsave(cufes.density.all,
 ggsave(cufes.density.facet,
        filename = here("Figs/fig_cufes_egg_density_facet.png"),
        width = map.width*3, height = map.height)
+
+if (doc.name == "simulateBiomass.Rmd") {
+  # Save nasc plot
+  ggsave(cufes.density.all,
+         filename = here("Simulation/Figs/fig_cufes_egg_density.png"),
+         width = map.width, height = map.height) 
+  
+  ggsave(cufes.density.facet,
+         filename = here("Simulation/Figs/fig_cufes_egg_density_facet.png"),
+         width = map.width, height = map.height) 
+  
+} else {
+  # Save nasc plot
+  ggsave(cufes.density.all,
+         filename = here("Figs/fig_cufes_egg_density.png"),
+         width = map.width, height = map.height) 
+  
+  ggsave(cufes.density.facet,
+         filename = here("Figs/fig_cufes_egg_density_facet.png"),
+         width = map.width, height = map.height) 
+}

@@ -15,7 +15,7 @@ nasc.map.cps <- base.map +
   # Plot NASC data
   geom_point(data = nasc.plot.cps, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
-  # Configure size and colour scales
+  # Configure size and color scales
   scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
                     values = nasc.sizes.all,labels = nasc.labels.all) +
   scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
@@ -28,9 +28,19 @@ nasc.map.cps <- base.map +
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
-# Save nasc plot
-ggsave(nasc.map.cps,
-       filename = here("Figs/fig_backscatter_cps.png"),
-       width = map.width, height = map.height) 
+if (doc.name == "simulateBiomass.Rmd") {
+  # Save nasc plot
+  ggsave(nasc.map.cps,
+         filename = here("Simulation/Figs/fig_backscatter_cps.png"),
+         width = map.width, height = map.height) 
+  
+  save(nasc.map.cps, file = here("Simulation/Output/nasc_plot_cps.Rdata"))  
+} else {
+  # Save nasc plot
+  ggsave(nasc.map.cps,
+         filename = here("Figs/fig_backscatter_cps.png"),
+         width = map.width, height = map.height) 
+  
+  save(nasc.map.cps, file = here("Output/nasc_plot_cps.Rdata"))
+}
 
-save(nasc.map.cps, file = here("Output/nasc_plot_cps.Rdata"))
