@@ -33,7 +33,7 @@ pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
                beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
                leaflet.extras,maptools,mapview,photobiology,fs,plotly,
                concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,
-               rworldmap,rworldxtra,data.table,stplanr,ggspatial)
+               rworldmap,rworldxtra,data.table,stplanr,ggspatial,gt)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -6100,5 +6100,56 @@ if (file.exists(here("Simulation/Figs/fig_cluster_relative_length_frequency_Clup
 ```{r work-complete}
 beep(4)
 ```
+
+# Compare real and simlulated estimates
+
+Biomass estimates from the survey are graphically compared with those from the simulation. 
+
+```{r compare-estimates-fig}
+# Create copies of simulated biomass data
+be.sim <- be %>% 
+  # select(Species, Stock, everything()) %>% 
+  filter(!Stratum == "All") %>% 
+  mutate(type = "Simulated")
+
+load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
+
+be.actual <- be %>% 
+  # select(Species, Stock, Region, everything()) %>% 
+  filter(!Stratum == "All") %>% 
+  mutate(type = "Actual")
+
+
+be.comp <- be.actual %>% 
+  left_join(select(be.sim, Species, Stock, Stratum, Biomass, lower.ci.B, upper.ci.B, biomass.cv),
+            by = c("Species", "Stock", "Stratum")) %>% 
+  mutate(
+    # Species = paste(Species, Stock, sep = "-"),
+    B.lower.x = abs(Biomass.x - lower.ci.B.x),
+    B.lower.y = abs(Biomass.y - lower.ci.B.y),
+    B.upper.x = abs(Biomass.x - upper.ci.B.x),
+    B.upper.y = abs(Biomass.y - upper.ci.B.y))
+
+b.comp.plot <- ggplot(be.comp) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_point(aes(Biomass.x, Biomass.y, fill = Stock), size = 4, shape = 21) +
+  geom_errorbar(aes(x = Biomass.x, ymin = lower.ci.B.y, ymax = upper.ci.B.y)) + 
+  geom_errorbarh(aes(y = Biomass.y, xmin = lower.ci.B.x, xmax = upper.ci.B.x))  +
+  facet_wrap(~Species, scales = "free") +
+  theme_bw() +
+  labs(x = "Actual biomass",
+       y = "Simulated biomass",
+       title = "Comparison of actual and simulated biomass (+/- CIs)")
+
+ggsave(b.comp.plot, filename = here("Simulation/Figs/fig_simulated_biomass_comparison.png"),
+       height = 8, width = 12)
+
+include_graphics(here("Simulation/Figs/fig_simulated_biomass_comparison.png"))
+```
+
+```{r compare-estimates-tab}
+
+```
+
 
 # Literature cited  
