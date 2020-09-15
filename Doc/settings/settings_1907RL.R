@@ -1,3 +1,11 @@
+# Processing controls ----------------------------------------------------
+estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.offshore  <- T # Process offshore backscatter data
+process.nearshore <- T # Process near backscatter data
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
+process.seine     <- T # Process purse seine data
+
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10.1 # For Lasker 

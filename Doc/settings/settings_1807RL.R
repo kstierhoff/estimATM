@@ -1,3 +1,11 @@
+# Processing controls ----------------------------------------------------
+estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.offshore  <- F # Process offshore backscatter data
+process.nearshore <- F # Process near backscatter data
+combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+process.seine     <- F # Process purse seine data
+
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10.1 # For Lasker 
@@ -129,7 +137,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
 stock.ns      <- "Northern"
-stratum.ns    <- 4
+stratum.ns    <- 3
 
 # Figure preferences ------------------------------------------------------
 # Set species colors

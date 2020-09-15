@@ -111,25 +111,18 @@ get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
 save.figs         <- F # Draw new figures and maps
-save.imap         <- F # Save Leaflet maps
 do.bootstrap      <- F # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
-do.imap           <- F # Create interactive Leaflet map
+do.imap           <- T # Create interactive Leaflet map
+save.imap         <- F # Save Leaflet maps
 
 # Sometimes F
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.cal       <- F # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
-estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
-
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- F # Process krill backscatter data
-process.offshore  <- F # Process offshore backscatter data
-process.nearshore <- F # Process near backscatter data
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
-process.seine     <- F # Process purse seine data
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -5235,33 +5228,13 @@ include_graphics(here("Figs/fig_ctd_map_all.png"))
 
 (ref:all-casts-mapview) An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click points for more information about each cast.
 
-```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)',eval=FALSE}
+```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)'}
 # Create interactive map of CTD locations
 mapview(nav.paths.sf, color = "black", alpha = 0.5, 
         layer.name = "Vessel track", col.regions = "black",
         legend = FALSE) +
   mapview(ctd.info.sf, cex = 4, zcol = "leg",
           layer.name = "CTD Casts", legend = TRUE)
-
-# leaflet() %>% 
-#   # Enable tile caching
-#   enableTileCaching() %>% 
-#   # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-#   addProviderTiles(providers$Esri.OceanBasemap, 
-#                    options = tileOptions(useCache = useCachedTile,
-#                                          crossOrigin = useCrossOrigin)) %>%
-#   addCircleMarkers(data = nav.paths.sf,
-#                    radius = 4, color = "#000414", stroke = FALSE, opacity = 0.5,
-#                    fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-#                    label = ~htmlEscape(paste(Type, Waypoint)),
-#                    popup = ~popup,
-#                    group = "Planned Transects (Core)") %>% 
-#     addCircleMarkers(data = nav.paths.sf,
-#                    radius = 4, color = "#000414", stroke = FALSE, opacity = 0.5,
-#                    fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-#                    label = ~htmlEscape(paste(Type, Waypoint)),
-#                    popup = ~popup,
-#                    group = "Planned Transects (Core)")
 ```
 
 ## Calculate mixed-layer depth for each CTD cast  
@@ -5396,7 +5369,7 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 
 (ref:interactive-data-explorer) Interactively explore acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.
 
-```{r interactive-data-explorer, fig.cap='(ref:interactive-data-explorer)',echo=FALSE}
+```{r interactive-data-explorer, fig.align='left', fig.cap='(ref:interactive-data-explorer)',echo=FALSE}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
 
@@ -5423,10 +5396,10 @@ cpsPal <- colorFactor(
     "Sardinops sagax", "Scomber japonicus", "Trachurus symmetricus"))
 
 # Create color pallette for planned transects
-txPal    <- colorFactor(c("red","blue","orange","green"), 
-                        c("Adaptive","Compulsory","Nearshore","Offshore"))
+txPal    <- colorFactor(c("red","blue","orange","green", "yellow"), 
+                        c("Adaptive","Compulsory","Nearshore","Offshore", "Transit"))
 
-# Create color pallette for trawls casts (presently unused)
+# Create color palette for trawls casts (presently unused)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
 
@@ -5490,30 +5463,42 @@ if (do.imap) {
     # Add OR MPAs
     addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
                 fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
-    # Add core planned transects
-    addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+    # Add planned transects
+    addPolylines(data = transects.sf,
                  color = ~txPal(Type), weight = 3, opacity = 0.5,
                  label = ~htmlEscape(paste(Type, Transect)),
                  popup = ~popup,
                  group = "Planned Transects (Core)") %>%
-    addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
+    addCircleMarkers(data = wpts.sf,
                      radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
                      fillOpacity = 0.5, fillColor =  ~txPal(Type), 
                      label = ~htmlEscape(paste(Type, Waypoint)),
                      popup = ~popup,
-                     group = "Planned Transects (Core)") %>%
+                     group = "Planned Transects") %>%
+    # Add core planned transects
+    # addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+    #              color = ~txPal(Type), weight = 3, opacity = 0.5,
+    #              label = ~htmlEscape(paste(Type, Transect)),
+    #              popup = ~popup,
+    #              group = "Planned Transects (Core)") %>%
+    # addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
+    #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
+    #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+    #                  label = ~htmlEscape(paste(Type, Waypoint)),
+    #                  popup = ~popup,
+    #                  group = "Planned Transects (Core)") %>%
     # # Add ancillary planned transects 
     # addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
     #              color = ~txPal(Type), weight = 3, opacity = 0.5,
     #              label = ~htmlEscape(paste(Type, Transect)), 
     #              popup = ~popup,
     #              group = "Planned Transects (Ancillary)") %>%
-    addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
-                     radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
-                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                     label = ~htmlEscape(paste(Type, Waypoint)),
-                     popup = ~popup,
-                     group = "Planned Transects (Ancillary)") %>%
+    # addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+    #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
+    #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+    #                  label = ~htmlEscape(paste(Type, Waypoint)),
+    #                  popup = ~popup,
+    #                  group = "Planned Transects (Ancillary)") %>%
     # Add nearshore stratum polygons
     addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
                 weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
@@ -5674,7 +5659,7 @@ if (do.imap) {
     addLayersControl(
       overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours",
-                        "Planned Transects (Core)", "Planned Transects (Ancillary)",
+                        "Planned Transects",
                         "Vessel Track", "Vessel Positions", "Trawls", 
                         "Trawl Cluster Polygons", "CTD Casts",
                         "Backscatter-CPS", "Backscatter-CPS (Small)",
@@ -5690,7 +5675,7 @@ if (do.imap) {
       "Backscatter (Large)", "Backscatter-Krill", 
       "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
       "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
-      "Planned Transects (Ancillary)", "Trawl Cluster Polygons",
+      "Trawl Cluster Polygons",
       "Biomass (Anchovy)", "Biomass (Sardine)",
       "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
       "Biomass (Herring)", "CTD Casts")) %>% 
