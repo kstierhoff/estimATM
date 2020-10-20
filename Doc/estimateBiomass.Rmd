@@ -86,6 +86,10 @@ prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", pr
 source(here("Doc/settings", prj.settings))
 ```
 
+```{r create-dirs}
+dir_create(here(), c("Code","Data", "Doc", "Figs", "Images", "Output", "References", "Simulation"))
+```
+
 ```{r at-methods-overview, child='Background/ATM_Methods.Rmd', eval=FALSE}
 # Calls child document that contains background information about the 
 # Acoustic Trawl Method employed by the SWFSC to survey coastal pelagic fishes
@@ -109,20 +113,20 @@ get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
+process.csv       <- F # Process Echoview files
 save.figs         <- F # Draw new figures and maps
-do.bootstrap      <- T # Generate bootstrap estimates
+do.bootstrap      <- F # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
-do.imap           <- T # Create interactive Leaflet map
+do.imap           <- F # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 
 # Sometimes F
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- T # Process krill backscatter data
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.krill <- F # Process krill backscatter data
 process.cal       <- F # Process calibration results
-process.ctd       <- T # Process CTD and UCTD casts
+process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -173,7 +177,8 @@ if (copy.files) {
     
     csv.files.cps <- dir_ls(file.path(survey.dir[dd], 
                                       nasc.dir[dd]), 
-                            regex = nasc.pattern.cps[dd])
+                            regex = nasc.pattern.cps[dd],
+                            recurse = nasc.recurse[dd])
     
     file_copy(csv.files.cps, here("Data/Backscatter", dd), 
               overwrite = overwrite.csv)  
@@ -295,6 +300,8 @@ if (get.nav) {
     
     # Get new erddap start date from max date
     erddap.survey.start <- max(date(nav$time)) - days(1)
+  } else {
+    nav.lag <- 25
   }
   
   if (nav.lag > 24) {
@@ -845,19 +852,50 @@ if (process.csv) {
         if (source.cps.nasc[i]) {
           # Use externally supplied cps.nasc with variable integration depth (from CTD.app)
           # Read file and create unique key for joining with nasc.vessel
-          cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
-            mutate(key = paste(lat, long, dist_m),
-                   datetime      = ymd_hms(paste(date, time), tz = "UTC"),
-                   time.align  = align.time(datetime, 1)) %>% 
-            # Remove data from krill files (1807RL)
-            filter(!str_detect(tolower(filename), "krill")) 
+          if (survey.name %in% c("1507SH")) {
+            cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
+              mutate(key = paste(transect, interval))
+              # mutate(key = paste(interval, round(dist_m, 6))) 
+            
+            # Join nasc.vessel and cps.nasc on datetime
+            nasc.vessel <- nasc.vessel %>% 
+              mutate(time.align  = align.time(datetime, 1),
+                     transect.num = as.numeric(substr(transect.name, 4, 5)),
+                     key = paste(transect.num, Interval)) %>% 
+              filter(!str_detect(tolower(filename), "krill")) %>% 
+              left_join(select(cps.nasc.temp, key, cps.nasc)) %>% 
+              mutate(cps.nasc.diff = NASC.50 - cps.nasc) %>% 
+              mutate(cps.nasc = case_when(
+                is.na(cps.nasc) ~ NASC.50,
+                TRUE ~ cps.nasc))
+            
+            # cps.nasc.temp$NASC.50.Juan <- cps.nasc.temp$NASC.50
+            # 
+            # nasc.vessel <- nasc.vessel %>% 
+            #    left_join(select(cps.nasc.temp, key, NASC.50.Juan))
+            # 
+            # ggplot(nasc.vessel, aes(NASC.50, NASC.50.Juan)) + geom_point()
+            # 
+            # 
+            # nasc.vessel <- nasc.vessel %>% 
+            #   mutate(nasc.diff2 = NASC.50 - NASC.50.Juan)
+            
+          } else {
+            cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
+              mutate(key = paste(lat, long, dist_m),
+                     datetime      = ymd_hms(paste(date, time), tz = "UTC"),
+                     time.align  = align.time(datetime, 1)) %>% 
+              # Remove data from krill files (1807RL)
+              filter(!str_detect(tolower(filename), "krill")) 
+            
+            # Join nasc.vessel and cps.nasc on datetime
+            nasc.vessel <- nasc.vessel %>% 
+              mutate(time.align  = align.time(datetime, 1)) %>% 
+              # select(-cps.nasc) %>% 
+              filter(!str_detect(tolower(filename), "krill")) %>% 
+              left_join(select(cps.nasc.temp, time.align, cps.nasc))  
+          }
           
-          # Join nasc.vessel and cps.nasc on datetime
-          nasc.vessel <- nasc.vessel %>% 
-            mutate(time.align  = align.time(datetime, 1)) %>% 
-            # select(-cps.nasc) %>% 
-            filter(!str_detect(tolower(filename), "krill")) %>% 
-            left_join(select(cps.nasc.temp, time.align, cps.nasc))
           
         } else {
           # Use fixed integration depth (NASC.50), with or without surface noise removal
@@ -879,7 +917,6 @@ if (process.csv) {
         } else {
           nasc <- nasc.vessel
         }
-        
       }
       
       # Combine processed.csv.vessel
@@ -990,7 +1027,7 @@ nasc.summ <- nasc %>%
 save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
 ```
 
-```{r process-backscatter-krill}
+```{r process-backscatter-krill, eval=FALSE}
 source(here("Code/process_NASC-krill.R"))
 ```
 
@@ -1017,6 +1054,10 @@ The top 100 backscatter (NASC) values are plotted and labeled with the transect 
 (ref:plot-nasc-outliers) The top 100 backscatter (NASC) values labeled with the transect name and corresponding interval.
 
 ```{r plot-nasc-outliers,fig.cap='(ref:plot-nasc-outliers)'}
+if (!is.na(nasc.max)) {
+  nasc <- filter(nasc, cps.nasc < nasc.max)
+}
+
 # Select top 100 nasc values and look for outliers
 big.nasc <- nasc %>%
   arrange(desc(cps.nasc)) %>%
@@ -1745,17 +1786,18 @@ if (nrow(herring.hauls) > 0) {
   # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
   if (get.bathy) {
     # Get boundaries for bathymetry grid
-    bathy.bounds <- transects.sf %>% 
+    bathy.bounds <- herring.hauls %>%
+      st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
       st_bbox() 
     
     # Download bathy grid
     noaa.bathy <- getNOAA.bathy(
-      lon1 = bathy.bounds$xmin - 1, 
-      lon2 = bathy.bounds$xmax + 1,
-      lat1 = bathy.bounds$ymax + 1, 
-      lat2 = bathy.bounds$ymin - 1, 
-      resolution = 10)
-    
+      lon1 = floor(bathy.bounds$xmin) - 1, 
+      lon2 = floor(bathy.bounds$xmax) + 1,
+      lat1 = floor(bathy.bounds$ymax) + 1, 
+      lat2 = floor(bathy.bounds$ymin) - 1, 
+      resolution = 4)
+
     # Save bathy results
     save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
                                   survey.name,".Rdata", sep = ""))  
@@ -2104,10 +2146,26 @@ if (survey.name == "1807RL") {
         TRUE ~ standardLength_mm))  
 }
 
+if (survey.name == "1507SH") {
+  # In summer 2015, some herring were measured to SL and some to TL. The code requires fork length
+  # as the native length, and there is not a conversion for SL to FL, so SL must first be converted to TL,
+  # then TL can be converted to FL
+  
+  saveRDS(lengths.all, file = here("Output/lengths_all_1507SH.rds"))
+  
+  lengths.all <- lengths.all %>% 
+    mutate(totalLength_mm = case_when(
+      scientificName == "Clupea pallasii" & cruise == "201507" & !is.na(standardLength_mm) ~ 
+        convert_length("Clupea pallasii", .$standardLength_mm, "SL", "TL"),
+      TRUE ~ totalLength_mm)) %>% 
+    mutate(forkLength_mm = case_when(
+      scientificName == "Clupea pallasii" & cruise == "201507" & is.na(forkLength_mm) ~ 
+        convert_length("Clupea pallasii", .$totalLength_mm, "TL", "FL"),
+      TRUE ~ forkLength_mm))
+}
+
 # Save length data to file
 save(lengths.all, file = here("Output/lengths_all.Rdata"))
-
-# load(here("Output/lengths_all.Rdata"))
 
 # Convert lengths to totalLength_mm for TS estimates ---------------------------
 lengths.all  <- lengths.all %>%
@@ -3018,7 +3076,7 @@ if (save.figs) {
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.indiv, 
                     aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("prop.anch","prop.jack","prop.her",
+                    cols = c("prop.anch","prop.her","prop.jack",
                              "prop.mack","prop.sar"),
                     color = 'black', alpha = 0.8) +
     # Plot empty trawl locations
@@ -3046,7 +3104,7 @@ if (save.figs) {
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.wg, 
                     aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("prop.anch.wg","prop.jack.wg","prop.her.wg",
+                    cols = c("prop.anch.wg","prop.her.wg","prop.jack.wg",
                              "prop.mack.wg","prop.sar.wg"),
                     color = 'black', alpha = 0.8) +
     # Plot empty trawl locations
@@ -3098,7 +3156,7 @@ acoustic.prop.cluster.final <- base.map +
   # Plot trawl pies
   geom_scatterpie(data = acoustic.prop.indiv, 
                   aes(X, Y, group = cluster, r = pie.radius),
-                  cols = c("prop.anch","prop.jack","prop.her",
+                  cols = c("prop.anch","prop.her","prop.jack",
                            "prop.mack","prop.sar"),
                   color = 'black', alpha = 0.8) +
   # Plot empty trawl locations
@@ -3412,6 +3470,8 @@ pos.clusters <- n.summ.haul %>%
     scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
     scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
     scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))
+
+# ggplot(pos.clusters, aes(long, lat, label = cluster, colour = stock)) + geom_point() + coord_map() + facet_wrap(~scientificName)
 ```  
 
 ## Examine distances between acoustic intervals and positve trawl clusters 
@@ -4559,9 +4619,13 @@ if (save.figs) {
       
       # Filter positive clusters
       pos.cluster.txt <- pos.clusters %>% 
-        filter(scientificName == i, stock == j, !duplicated(cluster), 
-               cluster %in% pos.cluster.summ$cluster[pos.cluster.summ$scientificName == i]) %>%
-        ungroup() # %>% project_df(to = crs.proj)
+        filter(scientificName == i, stock == j, !duplicated(cluster)) %>%
+        ungroup()
+      
+      # pos.cluster.txt <- pos.clusters %>% 
+      #   filter(scientificName == i, stock == j, !duplicated(cluster), 
+      #          cluster %in% pos.cluster.summ$cluster[pos.cluster.summ$scientificName == i]) %>%
+      #   ungroup()
       
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens <- base.map +
@@ -4595,8 +4659,8 @@ if (save.figs) {
       
       # Save figures
       ggsave(biomass.dens, 
-             filename = paste(here("Figs/fig_biomass_dens_"), i, "-", j, ".png",sep = ""),
-             width  = map.width,height = map.height)
+             filename = paste0(here("Figs/fig_biomass_dens_"), i, "-", j, ".png"),
+             width  = map.width, height = map.height)
       
       # Save plot to list
       biomass.dens.figs[[i]][[j]] <- biomass.dens
@@ -4768,7 +4832,9 @@ if (process.ctd) {
          file = here("Data/UCTD/uctd_data.Rdata"))
   }  
 } else {
-  load(here("Data/UCTD/uctd_data.Rdata"))
+  if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
+    load(here("Data/UCTD/uctd_data.Rdata"))
+  }
 }
 ```  
 
@@ -4777,25 +4843,29 @@ if (process.ctd) {
 Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard _`r survey.vessel`_.   
 
 ```{r summarize-uctd-casts}
-# Make a copy of uctd.summ
-uctd.table <- uctd.summ %>% 
-  select("Cast" = cast.num, "Filename" = cast, "Date" = cast.date, 
-         "Lat" = lat, "Long" = long, "Dutation" = time, "Depth" = max.depth,
-         "Class" = class, "Lag" = lag) %>% 
-  mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S"))
-
-# Print table
-uctd.table %>% 
-  filter(!is.na(Lag)) %>% 
-  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                         background = ifelse(Lag <= 30,"white","orange"))) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        digits = c(0,0,0,4,4,0,0,0,0),
-        align = c("c","l","c","r","r","r","r","c","r")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "500px")
+if (exists("uctd.summ")) {
+  # Make a copy of uctd.summ
+  uctd.table <- uctd.summ %>% 
+    select("Cast" = cast.num, "Filename" = cast, "Date" = cast.date, 
+           "Lat" = lat, "Long" = long, "Dutation" = time, "Depth" = max.depth,
+           "Class" = class, "Lag" = lag) %>% 
+    mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S"))
+  
+  # Print table
+  uctd.table %>% 
+    filter(!is.na(Lag)) %>% 
+    mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
+                           background = ifelse(Lag <= 30,"white","orange"))) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          digits = c(0,0,0,4,4,0,0,0,0),
+          align = c("c","l","c","r","r","r","r","c","r")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    scroll_box(height = "500px")
+} else {
+  print("No UCTD casts present.")
+}
 ```
 
 ### UCTD cast plots  
@@ -4803,75 +4873,78 @@ uctd.table %>%
 Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all UCTD casts.
 
 ```{r plot-uctd-casts}
-# Plot temperature data
-uctd.T <- ggplot(data = all.uctd.casts,
-                 aes(T, Z, group = cast, colour = factor(cast))) +
-  geom_path(alpha = 0.75) +
-  xlab("\nTemperature (C)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.uctd.casts$T),0) - 1,
-                                round(max(all.uctd.casts$T),0) + 1),
-                     breaks = seq(round(min(all.uctd.casts$T),0) - 1, 
-                                  round(max(all.uctd.casts$T),0) + 1, 2),
-                     expand = c(0,0)) + 
-  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
-                     breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
-                     expand = c(0,0)) +
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Temperature")
-
-# Plot salinity data
-uctd.S <- ggplot(data = all.uctd.casts,
-                 aes(S, Z, group = cast, colour = factor(cast))) +
-  geom_path(alpha = 0.75) +
-  xlab("\nSalinity") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.uctd.casts$S),2) - 0.1,
-                                round(max(all.uctd.casts$S),2) + 0.1),
-                     breaks = seq(round(min(all.uctd.casts$S),2) - 0.1, 
-                                  round(max(all.uctd.casts$S),2) + 0.1, 1),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
-                     breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Salinity")
-
-# Plot salinity data
-uctd.Sv <- ggplot(data = all.uctd.casts,
-                  aes(Sv, Z, group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nSound speed (m/s)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.uctd.casts$Sv),0) - 1,
-                                round(max(all.uctd.casts$Sv),0) + 1),
-                     breaks = seq(round(min(all.uctd.casts$Sv),0) - 1, 
-                                  round(max(all.uctd.casts$Sv),0) + 1, 10),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
-                     breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Sound speed")
-
-if (save.figs) {
-  # Arrange and save temperature, salinity, and sound speed plots
-  all.uctd.plots <- plot_grid(uctd.T, uctd.S, uctd.Sv, 
-                              nrow = 1, labels = c("a)","b)","c)"))
-  ggsave(here("Figs/fig_uctd_cast_plots.png"), all.uctd.plots, 
-         height = 5, width = 9)
+if (exists("all.uctd.casts")) {
+  # Plot temperature data
+  uctd.T <- ggplot(data = all.uctd.casts,
+                   aes(T, Z, group = cast, colour = factor(cast))) +
+    geom_path(alpha = 0.75) +
+    xlab("\nTemperature (C)") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.uctd.casts$T),0) - 1,
+                                  round(max(all.uctd.casts$T),0) + 1),
+                       breaks = seq(round(min(all.uctd.casts$T),0) - 1, 
+                                    round(max(all.uctd.casts$T),0) + 1, 2),
+                       expand = c(0,0)) + 
+    scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
+                       breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
+                       expand = c(0,0)) +
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Temperature")
+  
+  # Plot salinity data
+  uctd.S <- ggplot(data = all.uctd.casts,
+                   aes(S, Z, group = cast, colour = factor(cast))) +
+    geom_path(alpha = 0.75) +
+    xlab("\nSalinity") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.uctd.casts$S),2) - 0.1,
+                                  round(max(all.uctd.casts$S),2) + 0.1),
+                       breaks = seq(round(min(all.uctd.casts$S),2) - 0.1, 
+                                    round(max(all.uctd.casts$S),2) + 0.1, 1),
+                       expand = c(0,0)) +  
+    scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                       breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
+                       expand = c(0,0)) + 
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Salinity")
+  
+  # Plot salinity data
+  uctd.Sv <- ggplot(data = all.uctd.casts,
+                    aes(Sv, Z, group = cast, colour = factor(cast))) + 
+    geom_path(alpha = 0.75) +
+    xlab("\nSound speed (m/s)") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.uctd.casts$Sv),0) - 1,
+                                  round(max(all.uctd.casts$Sv),0) + 1),
+                       breaks = seq(round(min(all.uctd.casts$Sv),0) - 1, 
+                                    round(max(all.uctd.casts$Sv),0) + 1, 10),
+                       expand = c(0,0)) +  
+    scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                       breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
+                       expand = c(0,0)) + 
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Sound speed")
+  
+  if (save.figs) {
+    # Arrange and save temperature, salinity, and sound speed plots
+    all.uctd.plots <- plot_grid(uctd.T, uctd.S, uctd.Sv, 
+                                nrow = 1, labels = c("a)","b)","c)"))
+    ggsave(here("Figs/fig_uctd_cast_plots.png"), all.uctd.plots, 
+           height = 5, width = 9)
+  }
+  include_graphics(here("Figs/fig_uctd_cast_plots.png"))
+} else {
+  print("No UCTD casts present.")
 }
-
-include_graphics(here("Figs/fig_uctd_cast_plots.png"))
 ```  
 
 ## Process CTD cast files  
@@ -5011,24 +5084,28 @@ if (length(ctd.hdr) == 0) {
 Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r summarize-ctd-casts}
-# make a copy of uctd.summ
-ctd.table <- all.ctd.hdr %>% 
-  select("Cast" = cast.num,  "Filename" = cast, "Date" = cast.date, 
-         "Lat" = lat, "Long" = long, "Depth" = max.depth, "Class" = class, 
-         "Lag" = lag) %>% 
-  mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S")) 
-
-# Print table
-ctd.table %>%
-  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                         background = ifelse(Lag <= 30, "white", "orange"))) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        digits = c(0,0,0,2,2,0,0,0,0),
-        align = c("c","l","c","r","r","r","c","r")) %>% 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "500px")
+if (exists("all.ctd.hdr")) {
+  # make a copy of uctd.summ
+  ctd.table <- all.ctd.hdr %>% 
+    select("Cast" = cast.num,  "Filename" = cast, "Date" = cast.date, 
+           "Lat" = lat, "Long" = long, "Depth" = max.depth, "Class" = class, 
+           "Lag" = lag) %>% 
+    mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S")) 
+  
+  # Print table
+  ctd.table %>%
+    mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
+                           background = ifelse(Lag <= 30, "white", "orange"))) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          digits = c(0,0,0,2,2,0,0,0,0),
+          align = c("c","l","c","r","r","r","c","r")) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    scroll_box(height = "500px") 
+} else {
+  print("No CTD casts present.")
+}
 ```  
 
 ### CTD cast plots  
@@ -5036,100 +5113,108 @@ ctd.table %>%
 Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all CTD casts.
 
 ```{r plot-ctd-casts}
-# Plot temperature data
-ctd.T <- ggplot(data = all.ctd.casts, 
-                aes(T, Z, group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nTemperature (C)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.ctd.casts$T),0) - 1, 
-                                round(max(all.ctd.casts$T),0) + 1),
-                     breaks = seq(round(min(all.ctd.casts$T),0) - 1, 
-                                  round(max(all.ctd.casts$T),0) + 1, 2),
-                     expand = c(0,0)) + 
-  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
-                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
-                     expand = c(0,0)) +
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Temperature")
-
-# Plot salinity data
-ctd.S <- ggplot(data = all.ctd.casts,
-                aes(S,Z,group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nSalinity") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.ctd.casts$S),2) - 0.1, 
-                                round(max(all.ctd.casts$S),2) + 0.1),
-                     breaks = seq(round(min(all.ctd.casts$S),2) - 0.1, 
-                                  round(max(all.ctd.casts$S),2) + 0.1, 1),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
-                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Salinity")
-
-# Plot salinity data
-ctd.Sv <- ggplot(data = all.ctd.casts, 
-                 aes(Sv, Z, group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nSound speed (m/s)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.ctd.casts$Sv),0) - 1,
-                                round(max(all.ctd.casts$Sv),0) + 1),
-                     breaks = seq(round(min(all.ctd.casts$Sv),0) - 1, 
-                                  round(max(all.ctd.casts$Sv),0) + 1, 10),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1),0),
-                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1),0,25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Sound speed")
-
-if (save.figs) {
-  # Arrange and save temperature, salinity, and sound speed plots
-  all.ctd.plots <- plot_grid(ctd.T, ctd.S,ctd.Sv, 
-                             nrow = 1, labels = c("a)","b)","c)"))
+if (exists("all.ctd.casts")) {
+  # Plot temperature data
+  ctd.T <- ggplot(data = all.ctd.casts, 
+                  aes(T, Z, group = cast, colour = factor(cast))) + 
+    geom_path(alpha = 0.75) +
+    xlab("\nTemperature (C)") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.ctd.casts$T),0) - 1, 
+                                  round(max(all.ctd.casts$T),0) + 1),
+                       breaks = seq(round(min(all.ctd.casts$T),0) - 1, 
+                                    round(max(all.ctd.casts$T),0) + 1, 2),
+                       expand = c(0,0)) + 
+    scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                       breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
+                       expand = c(0,0)) +
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Temperature")
   
-  ggsave(here("Figs/fig_ctd_cast_plots.png"),all.ctd.plots,
-         height = 5,width = 9)
+  # Plot salinity data
+  ctd.S <- ggplot(data = all.ctd.casts,
+                  aes(S,Z,group = cast, colour = factor(cast))) + 
+    geom_path(alpha = 0.75) +
+    xlab("\nSalinity") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.ctd.casts$S),2) - 0.1, 
+                                  round(max(all.ctd.casts$S),2) + 0.1),
+                       breaks = seq(round(min(all.ctd.casts$S),2) - 0.1, 
+                                    round(max(all.ctd.casts$S),2) + 0.1, 1),
+                       expand = c(0,0)) +  
+    scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                       breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
+                       expand = c(0,0)) + 
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Salinity")
+  
+  # Plot salinity data
+  ctd.Sv <- ggplot(data = all.ctd.casts, 
+                   aes(Sv, Z, group = cast, colour = factor(cast))) + 
+    geom_path(alpha = 0.75) +
+    xlab("\nSound speed (m/s)") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.ctd.casts$Sv),0) - 1,
+                                  round(max(all.ctd.casts$Sv),0) + 1),
+                       breaks = seq(round(min(all.ctd.casts$Sv),0) - 1, 
+                                    round(max(all.ctd.casts$Sv),0) + 1, 10),
+                       expand = c(0,0)) +  
+    scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1),0),
+                       breaks = seq(round(min(all.ctd.casts$Z),digits = -1),0,25),
+                       expand = c(0,0)) + 
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Sound speed")
+  
+  if (save.figs) {
+    # Arrange and save temperature, salinity, and sound speed plots
+    all.ctd.plots <- plot_grid(ctd.T, ctd.S,ctd.Sv, 
+                               nrow = 1, labels = c("a)","b)","c)"))
+    
+    ggsave(here("Figs/fig_ctd_cast_plots.png"),all.ctd.plots,
+           height = 5,width = 9)
+  }
+  
+  include_graphics(here("Figs/fig_ctd_cast_plots.png"))
+} else {
+  print("No CTD casts present.")
 }
-
-include_graphics(here("Figs/fig_ctd_cast_plots.png"))
 ```  
 
 ## Combine CTD/UCTD cast data
 
 ```{r combine-cast-data}
-# Combine all CTD and UCTD cast info in one data frame
-ctd.info.all <- all.ctd.hdr %>% 
-  bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
-  mutate(type = case_when(
-    str_detect(cast, "UCTD") ~ "UCTD",
-    TRUE ~ "CTD")) %>% 
-  filter(!is.na(lat), !is.na(long))
-
-# Combine all CTD and UCTD cast data in one data frame
-ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>%
-  left_join(select(ctd.info.all, cast, lat, long)) %>% 
-  filter(cast %in% ctd.info.all$cast)
-
-# Save to CSV file
-write.csv(ctd.data.all, file = here("Output/all_ctd_data.csv"), 
-          quote = FALSE, row.names = FALSE)
-
-write.csv(ctd.info.all, file = here("Output/all_ctd_info.csv"), 
-          quote = FALSE, row.names = FALSE)
+if (exists("all.ctd.hdr") & exists("uctd.summ")) {
+  # Combine all CTD and UCTD cast info in one data frame
+  ctd.info.all <- all.ctd.hdr %>% 
+    bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
+    mutate(type = case_when(
+      str_detect(cast, "UCTD") ~ "UCTD",
+      TRUE ~ "CTD")) %>% 
+    filter(!is.na(lat), !is.na(long))
+  
+  # Combine all CTD and UCTD cast data in one data frame
+  ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>%
+    left_join(select(ctd.info.all, cast, lat, long)) %>% 
+    filter(cast %in% ctd.info.all$cast)
+  
+  # Save to CSV file
+  write.csv(ctd.data.all, file = here("Output/all_ctd_data.csv"), 
+            quote = FALSE, row.names = FALSE)
+  
+  write.csv(ctd.info.all, file = here("Output/all_ctd_info.csv"), 
+            quote = FALSE, row.names = FALSE) 
+} else {
+  print("No CTD/UCTD casts present.")
+}
 ```
 
 ## Assign CTD casts to acoustic transects  
@@ -5167,15 +5252,20 @@ if (process.ctd) {
   save(ctd.info.all, file = here("Output/all_ctd_info.Rdata"))
   
 } else {
-  # Load ctd.info.all
+  if (file.exists(here("Output/all_ctd_info.Rdata"))) {
+    # Load ctd.info.all
   load(here("Output/all_ctd_info.Rdata"))
+  }
 }
-# Project CTD info table
+
+if (exists("ctd.info.all")) {
+  # Project CTD info table
 ctd.info.all <- project_df(ctd.info.all, to = 3310)
 
 # Convert CTD dataframe so sf for mapping
 ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = crs.geog) %>% 
   mutate(cast.type = type)
+}
 ```
 
 ## Map CTD/UCTD cast locations  
@@ -5183,58 +5273,67 @@ ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = crs.geog) 
 Maps of CTD (blue) and UCTD (purple) cast locations, labeled by a) cast number and b) sequential acoustic transect number (not transect names from Echoview templates). Panel b) is used to check whether CTD casts are being assigned to the appropriate acoustic transects.
 
 ```{r map-ctd-casts}
-if (save.figs) {
-  # Plot all CTDs and UCTDs, labeled by cast number
-  map.ctd.uctd <- base.map + 
-    # Plot vessel track
-    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
-    # Plot CTD cast locations
-    geom_shadowtext(data = ctd.info.all, aes(X, Y, label = cast.num, colour = type),
-                    size = 2, bg.colour = "white", fontface = "bold") + 
-    scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
-    coord_sf(crs = crs.proj,
-             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+if (exists("ctd.info.all")) {
+  if (save.figs) {
+    # Plot all CTDs and UCTDs, labeled by cast number
+    map.ctd.uctd <- base.map + 
+      # Plot vessel track
+      geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+      # Plot CTD cast locations
+      geom_shadowtext(data = ctd.info.all, aes(X, Y, label = cast.num, colour = type),
+                      size = 2, bg.colour = "white", fontface = "bold") + 
+      scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
+      coord_sf(crs = crs.proj,
+               xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+               ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+    
+    # Plot all CTDs and UCTDs, labeled by transect assignment
+    map.ctd.tx <- base.map + 
+      # Plot vessel track
+      geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+      # Plot CTD cast locations
+      geom_shadowtext(data = ctd.info.all, aes(X, Y, label = transect, colour = type),
+                      size = 2, bg.colour = "white", fontface = "bold") + 
+      scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
+      coord_sf(crs = crs.proj,
+               xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+               ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+    
+    # Combine plots into two panels
+    map.ctd.all <- plot_grid(map.ctd.uctd, map.ctd.tx, 
+                             nrow = 1, labels = c("a)","b)"))
+    
+    # Save maps
+    ggsave(here("Figs/fig_ctd_uctd_map.png"), map.ctd.uctd, 
+           width = map.width, height = map.height)
+    
+    ggsave(here("Figs/fig_ctd_tx_map.png"),   map.ctd.tx,   
+           width = map.width, height = map.height)
+    
+    ggsave(here("Figs/fig_ctd_map_all.png"),  map.ctd.all,  
+           width = map.width*2, height = map.height)
+  }
   
-  # Plot all CTDs and UCTDs, labeled by transect assignment
-  map.ctd.tx <- base.map + 
-    # Plot vessel track
-    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
-    # Plot CTD cast locations
-    geom_shadowtext(data = ctd.info.all, aes(X, Y, label = transect, colour = type),
-                    size = 2, bg.colour = "white", fontface = "bold") + 
-    scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
-    coord_sf(crs = crs.proj,
-             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-  
-  # Combine plots into two panels
-  map.ctd.all <- plot_grid(map.ctd.uctd, map.ctd.tx, 
-                           nrow = 1, labels = c("a)","b)"))
-  
-  # Save maps
-  ggsave(here("Figs/fig_ctd_uctd_map.png"), map.ctd.uctd, 
-         width = map.width, height = map.height)
-  
-  ggsave(here("Figs/fig_ctd_tx_map.png"),   map.ctd.tx,   
-         width = map.width, height = map.height)
-  
-  ggsave(here("Figs/fig_ctd_map_all.png"),  map.ctd.all,  
-         width = map.width*2, height = map.height)
+  include_graphics(here("Figs/fig_ctd_map_all.png"))
+} else {
+  print("No CTD casts present.")
 }
 
-include_graphics(here("Figs/fig_ctd_map_all.png"))
 ```  
 
 (ref:all-casts-mapview) An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click points for more information about each cast.
 
 ```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)'}
-# Create interactive map of CTD locations
-mapview(nav.paths.sf, color = "black", alpha = 0.5, 
-        layer.name = "Vessel track", col.regions = "black",
-        legend = FALSE) +
-  mapview(ctd.info.sf, cex = 4, zcol = "leg",
-          layer.name = "CTD Casts", legend = TRUE)
+if (exists("ctd.info.sf")) {
+  # Create interactive map of CTD locations
+  mapview(nav.paths.sf, color = "black", alpha = 0.5, 
+          layer.name = "Vessel track", col.regions = "black",
+          legend = FALSE) +
+    mapview(ctd.info.sf, cex = 4, zcol = "leg",
+            layer.name = "CTD Casts", legend = TRUE)  
+} else {
+  print("No CTD casts present.")
+}
 ```
 
 ## Calculate mixed-layer depth for each CTD cast  
@@ -5258,15 +5357,17 @@ big.nasc.sf <- big.nasc %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 # Convert CTD and UCTD cast data to sf -----------------------------------
-ctd.sf <- ctd.info.all %>%
-  # bind_rows(all.uctd.hdr) %>% 
-  mutate(name = paste(type, cast.num),
-         label = paste("Cast:", cast),
-         popup = paste('<b>Cast:', cast, '</b><br/>',
-                       'Transect name:', transect.name, '<br/>',
-                       'Max. depth:', max.depth, 'm<br/>')) %>% 
-  select(name, lat, long, max.depth, type, label, popup) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+if (exists("ctd.info.all")) {
+  ctd.sf <- ctd.info.all %>%
+    # bind_rows(all.uctd.hdr) %>% 
+    mutate(name = paste(type, cast.num),
+           label = paste("Cast:", cast),
+           popup = paste('<b>Cast:', cast, '</b><br/>',
+                         'Transect name:', transect.name, '<br/>',
+                         'Max. depth:', max.depth, 'm<br/>')) %>% 
+    select(name, lat, long, max.depth, type, label, popup) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+}
 
 # Convert haul catch to sf and create labels ----------------------------------
 cluster.catch.sf <- cluster.pie %>%
@@ -5693,7 +5794,9 @@ if (do.imap) {
   
   # Display map
   i.map
-}
+} else {
+   print("No interactive map created. Check \"do.imap\" if unexpected.")
+ }
 ```  
 
 # Match intervals for comparing EK60 and EK80 data (optional)
@@ -7891,9 +7994,9 @@ nasc.density.nse <- nasc.nse.final %>%
   project_df(to = crs.proj)
 
 # Create maps of nearshore biomass
-if (save.figs) {
-  source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))  
-}
+# if (save.figs) {
+#   source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))  
+# }
 ```
 
 ## Results for anchovy (_Engraulis mordax_)
@@ -8018,7 +8121,7 @@ cal.params <- cal.res %>%
 # add noise estimates
 # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
 if (is.na(cal.noise[cal.vessels])) { 
-  cal.params$noise <- rep("N/A", length(cal.files))
+  cal.params$noise <- rep("N/A", nrow(cal.res))
 }else{
   cal.params$noise <- unlist(cal.noise[cal.vessels])
 }
@@ -8098,7 +8201,7 @@ write.csv(all.output,
 
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80).
 
-```{r cal-results,results='asis'}
+```{r cal-results,results='asis', eval=FALSE}
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(all.output)
