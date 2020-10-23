@@ -113,9 +113,9 @@ get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
-do.bootstrap      <- F # Generate bootstrap estimates
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 do.imap           <- F # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
@@ -634,10 +634,6 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 ## Read and summarize CSV files from Echoview  
 For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 50 m depth (NASC.50) is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned.
 
-# Process backscatter data
-## Read and summarize CSV files from Echoview  
-For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 70 m depth (NASC.70) is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned. Nearshore and offshore transects are processed but excluded from the primary analysis, but are available for further analysis if desired (e.g., `estimate.os = TRUE`, `estimate.ns = TRUE`, etc.).
-
 ```{r process-backscatter}
 if (process.csv) {
   if (!process.csv.all) {
@@ -822,7 +818,7 @@ if (process.csv) {
         }
       }
       
-      # Indentify acoustic transects to include in processing, based on length
+      # Identify acoustic transects to include in processing, based on length
       tx.include <- nasc.vessel %>% 
         group_by(transect) %>% 
         summarise(L = length(Interval)/10*0.539957) %>%
@@ -852,32 +848,46 @@ if (process.csv) {
         if (source.cps.nasc[i]) {
           # Use externally supplied cps.nasc with variable integration depth (from CTD.app)
           # Read file and create unique key for joining with nasc.vessel
-          if (survey.name %in% c("1507SH")) {
+          if (survey.name %in% c("1507SH","1606RL")) {
             cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
               mutate(key = paste(transect, interval))
               # mutate(key = paste(interval, round(dist_m, 6))) 
             
-            # Join nasc.vessel and cps.nasc on datetime
-            nasc.vessel <- nasc.vessel %>% 
-              mutate(time.align  = align.time(datetime, 1),
-                     transect.num = as.numeric(substr(transect.name, 4, 5)),
-                     key = paste(transect.num, Interval)) %>% 
-              filter(!str_detect(tolower(filename), "krill")) %>% 
-              left_join(select(cps.nasc.temp, key, cps.nasc)) %>% 
-              mutate(cps.nasc.diff = NASC.50 - cps.nasc) %>% 
-              mutate(cps.nasc = case_when(
-                is.na(cps.nasc) ~ NASC.50,
-                TRUE ~ cps.nasc))
+            if (survey.name == c("1507SH")) {
+              # Join nasc.vessel and cps.nasc on transect number and interval
+              nasc.vessel <- nasc.vessel %>% 
+                mutate(time.align  = align.time(datetime, 1),
+                       transect.num = as.numeric(substr(transect.name, 4, 5)),
+                       key = paste(transect.num, Interval)) %>% 
+                filter(!str_detect(tolower(filename), "krill")) %>% 
+                left_join(select(cps.nasc.temp, key, cps.nasc)) %>% 
+                mutate(cps.nasc.diff = NASC.50 - cps.nasc) %>% 
+                mutate(cps.nasc = case_when(
+                  is.na(cps.nasc) ~ NASC.50,
+                  TRUE ~ cps.nasc))  
+            } else if (survey.name == c("1606RL")) {
+              # Join nasc.vessel and cps.nasc on transect number and interval
+              nasc.vessel <- nasc.vessel %>% 
+                mutate(time.align  = align.time(datetime, 1),
+                       transect.num = as.numeric(substr(transect.name, 4, 6)),
+                       key = paste(transect.num, Interval)) %>% 
+                filter(!str_detect(tolower(filename), "krill")) %>% 
+                left_join(select(cps.nasc.temp, key, cps.nasc)) %>% 
+                mutate(cps.nasc.diff = NASC.50 - cps.nasc) %>% 
+                mutate(cps.nasc = case_when(
+                  is.na(cps.nasc) ~ NASC.50,
+                  TRUE ~ cps.nasc))
+            }
             
             # cps.nasc.temp$NASC.50.Juan <- cps.nasc.temp$NASC.50
             # 
-            # nasc.vessel <- nasc.vessel %>% 
+            # nasc.vessel <- nasc.vessel %>%
             #    left_join(select(cps.nasc.temp, key, NASC.50.Juan))
             # 
             # ggplot(nasc.vessel, aes(NASC.50, NASC.50.Juan)) + geom_point()
             # 
             # 
-            # nasc.vessel <- nasc.vessel %>% 
+            # nasc.vessel <- nasc.vessel %>%
             #   mutate(nasc.diff2 = NASC.50 - NASC.50.Juan)
             
           } else {
@@ -895,8 +905,6 @@ if (process.csv) {
               filter(!str_detect(tolower(filename), "krill")) %>% 
               left_join(select(cps.nasc.temp, time.align, cps.nasc))  
           }
-          
-          
         } else {
           # Use fixed integration depth (NASC.50), with or without surface noise removal
           if (rm.surface[i]) {
@@ -965,8 +973,8 @@ for (i in nasc.vessels) {
       mutate(rank.lat  = rank(max.lat), 
              rank.long = rev(rank(min.long)), 
              diff      = rank.lat - rank.long,
-             transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
-             rank.final = rank.lat) %>% 
+             rank.final = rank.lat,
+             transect.num = rank.final) %>%
       arrange(rank.final)
   }
   
@@ -1145,8 +1153,8 @@ nasc <- nasc %>%
   left_join(select(nasc.daynight, sun_key, period)) %>% 
   mutate(day_night = case_when(
     period == "sunrise" ~ "Day",
-    period == "sunset" ~ "Night")) %>% 
-  filter(!is.na(day_night))
+    period == "sunset" ~ "Night",
+    TRUE ~ "Other")) 
 
 # Create date labels
 nasc.sun.labels <- nasc.sun %>% 
@@ -1158,8 +1166,8 @@ if (save.figs) {
     geom_point(data = nasc, aes(X, Y, colour = day_night, size = day_night)) +
     geom_shadowtext(data = nasc.sun.labels, aes(X, Y, label = date), 
                     color = "black", bg.colour = "white", size = 2) +
-    scale_colour_manual(name = "Time of day", values = c("Day" = "orange", "Night" = "black")) +
-    scale_size_manual(name = "Time of day", values = c("Day" = 1, "Night" = 2)) +
+    scale_colour_manual(name = "Time of day", values = c("Day" = "orange", "Night" = "black", "Other" = "green")) +
+    scale_size_manual(name = "Time of day", values = c("Day" = 1, "Night" = 2, "Other" = 2.5)) +
     # Configure legend guides
     guides(colour = guide_legend(), size = guide_legend()) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -2137,6 +2145,24 @@ lengths.all <- lengths.all  %>%
   # Add season from haul
   left_join(select(haul.all, cruise, ship, haul, season)) 
 
+if (survey.name %in% c("1507SH")) {
+  # In summer 2015, some herring were measured to SL and some to TL. The code requires fork length
+  # as the native length, and there is not a conversion for SL to FL, so SL must first be converted to TL,
+  # then TL can be converted to FL
+  
+  saveRDS(lengths.all, file = here("Output", paste0("lengths_all_", survey.name, ".rds")))
+  
+  lengths.all <- lengths.all %>% 
+    mutate(totalLength_mm = case_when(
+      scientificName == "Clupea pallasii" & cruise == cruise.name & !is.na(standardLength_mm) ~ 
+        convert_length("Clupea pallasii", .$standardLength_mm, "SL", "TL"),
+      TRUE ~ totalLength_mm)) %>% 
+    mutate(forkLength_mm = case_when(
+      scientificName == "Clupea pallasii" & cruise == cruise.name & is.na(forkLength_mm) ~ 
+        convert_length("Clupea pallasii", .$totalLength_mm, "TL", "FL"),
+      TRUE ~ forkLength_mm))
+}
+
 if (survey.name == "1807RL") {
   # Estimate SL from FL for Anchovy during 1807RL
   lengths.all <- lengths.all %>% 
@@ -2144,24 +2170,6 @@ if (survey.name == "1807RL") {
       standardLength_mm = case_when(
         is.na(standardLength_mm) & scientificName == "Engraulis mordax" ~ (0.965*forkLength_mm - 5.736), 
         TRUE ~ standardLength_mm))  
-}
-
-if (survey.name == "1507SH") {
-  # In summer 2015, some herring were measured to SL and some to TL. The code requires fork length
-  # as the native length, and there is not a conversion for SL to FL, so SL must first be converted to TL,
-  # then TL can be converted to FL
-  
-  saveRDS(lengths.all, file = here("Output/lengths_all_1507SH.rds"))
-  
-  lengths.all <- lengths.all %>% 
-    mutate(totalLength_mm = case_when(
-      scientificName == "Clupea pallasii" & cruise == "201507" & !is.na(standardLength_mm) ~ 
-        convert_length("Clupea pallasii", .$standardLength_mm, "SL", "TL"),
-      TRUE ~ totalLength_mm)) %>% 
-    mutate(forkLength_mm = case_when(
-      scientificName == "Clupea pallasii" & cruise == "201507" & is.na(forkLength_mm) ~ 
-        convert_length("Clupea pallasii", .$totalLength_mm, "TL", "FL"),
-      TRUE ~ forkLength_mm))
 }
 
 # Save length data to file
@@ -3361,7 +3369,7 @@ write.csv(nasc, file = here("Output/cps_nasc_prop.csv"),
 
 For each species, the relative proportion of acoustic backscatter (e.g., `prop.anch`) is mapped along with the acoustic backscatter from all CPS (i.e., `cps.nasc`).  
 
-(ref:apportion-backscatter) Proportion of backscatter from each species (red points) relative to the total backscatter from all species (blac points).
+(ref:apportion-backscatter) Proportion of backscatter from each species (red points) relative to the total backscatter from all species (black points).
 
 ```{r apportion-backscatter,fig.cap='(ref:apportion-backscatter)'}
 # Create data frame for plotting acoustic proportions by species
@@ -3789,7 +3797,7 @@ for (i in unique(strata.final$scientificName)) {
   strata.summ.all <- bind_rows(strata.summ.all, strata.summ.spp)
 }
 
-# Filter stata.final using strata.filter
+# Filter strata.final using strata.filter
 strata.final <- strata.final %>% 
   mutate(key = paste(scientificName, stratum)) %>% 
   select(-stratum) %>% 
