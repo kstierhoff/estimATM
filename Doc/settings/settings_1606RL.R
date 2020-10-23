@@ -365,7 +365,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 500 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
