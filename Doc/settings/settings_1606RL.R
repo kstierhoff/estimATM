@@ -135,7 +135,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
-stock.ns      <- "Northern"
+stock.ns      <- "Central"
 stratum.ns    <- 2
 
 # Figure preferences ------------------------------------------------------
@@ -509,7 +509,7 @@ raw.log.range <- 1000  # depth of ER60 logging (m)
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
 ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v10.0" # Echoview version
+ev.version    <- "v7.1" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <- 1000  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
