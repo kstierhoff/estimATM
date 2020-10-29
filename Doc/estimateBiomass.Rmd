@@ -114,8 +114,8 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
-do.bootstrap      <- F # Generate bootstrap estimates
+save.figs         <- T # Draw new figures and maps
+do.bootstrap      <- T # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
 do.imap           <- F # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
@@ -3658,7 +3658,7 @@ biomass density. For a stratum to be included in the analysis, it must:
 * Have a transect with zero biomass at the beginning and end,
 * Have no more than two consecutive zero biomass transects. 
 
-If the strata are unable to be defined automatically using the rules above, the analyst may define them manually in the appropriate survey info file (e.g., `Code/survey_info_XXXXYY.R`). 
+If the strata are unable to be defined automatically using the rules above, the analyst may define them manually in the appropriate survey info file (e.g., `r paste("Code/survey_info_", survey.name,".R")`). 
 
 ```{r stratify-sampling}
 # Define sampling strata
@@ -4434,6 +4434,38 @@ strata.primary <- strata.primary %>%
   mutate(area = st_area(.)) %>% 
   left_join(select(strata.summ, 
                    scientificName, stratum, vessel.name))
+
+# Manually substitute stratum polygons
+if (survey.name == "1606RL") {
+  
+  source(here("Sandbox/externalStrata.R"))
+  
+  # area.orig <- filter(strata.primary, scientificName == "Sardinops sagax", stock == "Northern") %>% 
+  #   select(stratum, area) %>% 
+  #   st_set_geometry(NULL)
+  # 
+  # area.juan <- filter(strata.polygon.final) %>% 
+  #   select(stratum, area) %>% 
+  #   st_set_geometry(NULL)
+  # 
+  # area.comp <- area.orig %>% 
+  #   left_join(select(area.juan, stratum, area.juan = area))
+  # 
+  # ggplot(area.comp, aes(as.numeric(area), as.numeric(area.juan), label = stratum)) + 
+  #   geom_text() + 
+  #   geom_abline(slope = 1, intercept = 0) + 
+  #   coord_equal()
+  # 
+  
+  strata.primary <- strata.primary %>%
+    mutate(key = paste(scientificName, stock, stratum)) %>% 
+    filter(!key %in% strata.polygon.final$key) %>% 
+    bind_rows(strata.polygon.final) %>% 
+    arrange(key)
+}
+
+# Ensure that strata are ordered by number
+strata.primary <- arrange(strata.primary, scientificName, stratum)
 
 # Save clipped primary polygons
 save(strata.primary, 
@@ -5882,13 +5914,13 @@ for (i in unique(strata.final$scientificName)) {
     filter(scientificName == i) %>%
     select(stratum, area) %>%
     mutate(area = as.numeric(area)) %>%
-    st_set_geometry(NULL)
+    st_set_geometry(NULL) 
   
   stratum.info.nse <- strata.nse %>% 
     filter(scientificName == i) %>% 
     select(stratum, area) %>%
     mutate(area = as.numeric(area)) %>% 
-    st_set_geometry(NULL)
+    st_set_geometry(NULL) 
   
   # Get nearshore nasc data
   nasc.nse <- estimate_inshore(nasc.temp, bathy_5m_df) %>% 
@@ -6051,7 +6083,7 @@ if (do.bootstrap) {
     stratum.info <- strata.primary %>% 
       select(scientificName, stratum, area) %>%
       mutate(area = as.numeric(area)) %>% 
-      st_set_geometry(NULL)
+      st_set_geometry(NULL) 
     
     # Subset strata for species i
     strata.temp <- filter(strata.final, scientificName == i) %>% 
@@ -6429,7 +6461,7 @@ include_graphics(here("Figs/fig_biomass_histogram_survey.png"))
 
 Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species throughout the entire survey area, the mean (solid vertical line), and 95% confidence intervals (dashed vertical lines) (**Note: differences in x- and y-axis limits**).
 
-```{r biomass-bootstrap-estimates-nearshore, include=FALSE}
+```{r biomass-bootstrap-estimates-nse, include=FALSE}
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
   # Create data frame for biomass estimates

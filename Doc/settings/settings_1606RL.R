@@ -365,7 +365,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 500 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -430,11 +430,15 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 23:28),
+    transect = 23:30),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 39:51),
+    transect = 33:41),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 4,
+    transect = 42:50),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 5,
@@ -442,7 +446,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 6,
-    transect = 72:84),
+    transect = 71:84),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 7,
