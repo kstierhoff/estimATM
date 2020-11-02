@@ -135,8 +135,8 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
-stock.ns      <- "Northern"
-stratum.ns    <- 2
+stock.ns      <- "Central"
+stratum.ns    <- 1
 
 # Figure preferences ------------------------------------------------------
 # Set species colors
