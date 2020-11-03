@@ -449,12 +449,12 @@ stock.break.source <- "primary"
 # ER60 file info
 raw.prefix    <- "1507SH_EK60"
 raw.size      <-  50   # file size in megabytes (MB)
-raw.log.range <- 1000  # depth of ER60 logging (m)
+raw.log.range <- 700  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
 ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v10.0" # Echoview version
+ev.version    <- "v6.1.40" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <- 1000  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
@@ -483,9 +483,9 @@ cal.plot.date      <- "2015-06-19" # Date of the calibration, used to plot cal t
 cal.window         <- 50            # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "J. Renfree, T. Sessions, D. Murfin, and D. Palance" # Calibration participants
-cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
-cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
-cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
+cal.loc            <- "Shelter Island, San Diego Bay" # Location name
+cal.lat.dd         <-   32.7135    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
+cal.lon.dd         <- -117.2227   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
 cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1; _Lasker_ sphere #1)" # Cal sphere info
