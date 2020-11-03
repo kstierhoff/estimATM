@@ -135,8 +135,8 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
-stock.ns      <- "Northern"
-stratum.ns    <- 2
+stock.ns      <- "Central"
+stratum.ns    <- 1
 
 # Figure preferences ------------------------------------------------------
 # Set species colors
@@ -384,47 +384,64 @@ max.diff <- 3
 nTx.min <- 3
 
 # Stratum pruning settings
-nIndiv.min    <- 10
-nClusters.min <- 2
+nIndiv.min    <- 1
+nClusters.min <- 1
 
 # Use manually defined strata?
-stratify.manually    <- FALSE
+stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects
-# strata.manual <- bind_rows(
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 1,
-#     transect = 60:64)
-# )
-# 
-# Offshore strata
-strata.manual.os <- bind_rows(
+strata.manual <- bind_rows(
   data.frame(
-    scientificName = "Engraulis mordax",
+    scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 1:8),
+    transect = 37:60),
   data.frame(
-    scientificName = "Sardinops sagax",
+    scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:3),
+    transect = 2:26),
   data.frame(
-    scientificName = "Scomber japonicus",
-    stratum = 1,
-    transect = 1:8),
+    scientificName = "Engraulis mordax", 
+    stratum = 2,
+    transect = 49:58),
   data.frame(
-    scientificName = "Trachurus symmetricus",
+    scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 1:8)
+    transect = 10:23),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 2,
+    transect = 36:42),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 1,
+    transect = 25:28),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 2,
+    transect = 38:47),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 1,
+    transect = 2:8),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 2,
+    transect = 12:21),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 3,
+    transect = 27:62)
 )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 33.9 # Latitude of Pt. Conception (or change based on SST)
+stock.break.sar  <- 34.4 # Latitude of Pt. Conception (or change based on SST)
 # Transects used to define stock boundaries (primary or other)
+
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 
 
