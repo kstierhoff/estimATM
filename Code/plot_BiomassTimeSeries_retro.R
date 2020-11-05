@@ -134,3 +134,4 @@ biomass.ts.bar <- ggplot(biomass.ts,
 ggsave(biomass.ts.bar, 
        filename = here("Figs/fig_biomass_ts_bar.png"),
        width = 8, height = 4)
+
