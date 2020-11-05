@@ -142,12 +142,12 @@ ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordin
 # Combine main and inset maps
 nearshore.map.final <- ggdraw() +
   draw_plot(nearshore.map) +
-  draw_plot(inset.map, 0.7, 0.72, 0.25, 0.25) 
+  draw_plot(inset.map, 0.6, 0.72, 0.25, 0.25) 
 
 # Save combined maps
 ggsave(nearshore.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*2, height = map.height*.65)
+       width  = (map.height*ns.aspect)*1, height = map.height*.65)
 
 # Northern anchovy-Central -------------------------------------------------------------
 i = "Engraulis mordax"
