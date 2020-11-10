@@ -29,6 +29,7 @@ load(here("Output/biomass_timeseries_export.Rdata"))
 
 # Combine with current survey results
 biomass.ts <- biomass.ts %>% 
+  filter(!survey %in% unique(be.db.export$survey)) %>%
   bind_rows(filter(be.db.export, region %in% estimate.regions))
 
 # Summarise results across regions

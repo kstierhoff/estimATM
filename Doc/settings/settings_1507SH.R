@@ -381,11 +381,11 @@ estimate.regions   <- c("Core")
 # Defines breaks between strata
 max.diff <- 3
 # Defines minimum number of transects in a stratum
-nTx.min <- 3
+nTx.min <- 2
 
 # Stratum pruning settings
-nIndiv.min    <- 1
-nClusters.min <- 1
+nIndiv.min    <- 0
+nClusters.min <- 0
 
 # Use manually defined strata?
 stratify.manually    <- TRUE
@@ -402,44 +402,68 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 2:26),
+    transect = 1:28),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 49:58),
+    transect = 30:35),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 36:39),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 4,
+    transect = 40:58),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 1,
+  #   transect = 1:4),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 2,
+  #   transect = 6:8),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 10:23),
+    transect = 10:24),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 36:42),
+    transect = 33:42),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 3,
+    transect = 46:49),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 25:28),
+    transect = 24:28),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
+    transect = 33:36),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 3,
     transect = 38:47),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 2:8),
+    transect = 1:8),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 12:21),
+    transect = 12:22),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 3,
-    transect = 27:62)
+    transect = 24:62)
 )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.4 # Latitude of Pt. Conception (or change based on SST)
+stock.break.sar  <- 34.3 # Latitude of Pt. Conception (or change based on SST)
 # Transects used to define stock boundaries (primary or other)
 
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
