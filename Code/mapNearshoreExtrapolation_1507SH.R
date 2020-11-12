@@ -142,12 +142,12 @@ ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordin
 # Combine main and inset maps
 nearshore.map.final <- ggdraw() +
   draw_plot(nearshore.map) +
-  draw_plot(inset.map, 0.6, 0.72, 0.25, 0.25) 
+  draw_plot(inset.map, 0.68, 0.735, 0.25, 0.25) 
 
 # Save combined maps
 ggsave(nearshore.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*1, height = map.height*.65)
+       width  = (map.height*ns.aspect)*2, height = map.height*.65)
 
 # Northern anchovy-Central -------------------------------------------------------------
 i = "Engraulis mordax"
@@ -320,12 +320,12 @@ ns.aspect <- diff(nearshore.map$coordinates$limits$x)/diff(nearshore.map$coordin
 # Combine main and inset maps
 nearshore.map.final <- ggdraw() +
   draw_plot(nearshore.map) +
-  draw_plot(inset.map, 0.33, 0.78, 0.2, 0.2) 
+  draw_plot(inset.map, 0.55, 0.78, 0.2, 0.2) 
 
 # Save combined maps
 ggsave(nearshore.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*1.35, height = map.height*.75)
+       width  = (map.height*ns.aspect)*1.7, height = map.height*.75)
 
 # # Pacific sardine-Southern -------------------------------------------------------------
 # i = "Sardinops sagax"
@@ -495,12 +495,13 @@ nearshore.map <- base.map +
 # Combine main and inset maps
 nearshore.map.final <- ggdraw() +
   draw_plot(nearshore.map) +
-  draw_plot(inset.map, 0.25, 0.73, 0.25, 0.25) 
+  # draw_plot(inset.map, 0.25, 0.73, 0.25, 0.25)
+  draw_plot(inset.map, 0.7, 0.69, 0.3, 0.3) 
 
 # Save combined maps
 ggsave(nearshore.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*1.25, height = map.height*.75)
+       width  = (map.height*ns.aspect)*1.4, height = map.height*.75)
 
 # Jack mackerel-All ---------------------------------------------------------
 i = "Trachurus symmetricus"
@@ -589,7 +590,7 @@ nearshore.map.final <- ggdraw() +
 # Save combined maps
 ggsave(nearshore.map.final, 
        filename = paste(here("Figs/fig_biomass_dens_nse_"), i, "-", j, ".png",sep = ""),
-       width  = (map.height*ns.aspect)*1.65, height = map.height*1.05)
+       width  = (map.height*ns.aspect)*1.4, height = map.height*0.75)
 
 # Pacific herring-All ---------------------------------------------------------
 i = "Clupea pallasii"
