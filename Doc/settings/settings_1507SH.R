@@ -197,7 +197,7 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 
 # Cluster relative length frequency
 # Set number of columns in facet plot
-lf.ncols <- 6
+lf.ncols <- 5
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
