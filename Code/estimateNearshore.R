@@ -75,10 +75,10 @@ if (process.nearshore) {
       
       lf.final <- lf.final %>% 
         bind_rows(lf.final.seine)
-
+      
       # Combine super.clusters and super.clusters.ns
       super.clusters <- bind_rows(super.clusters, super.clusters.ns)
-
+      
     }
   } else {
     load(here("Output/seine_summaries.Rdata"))
@@ -450,7 +450,7 @@ for (i in unique(tx.mid.ns$transect.name)) {
   # Add to results
   if (exists("tx.nn.ns")) {
     tx.nn.ns     <- bind_rows(tx.nn.ns, 
-                            data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long))
+                              data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long))
   } else {
     tx.nn.ns <- data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long)
   }
@@ -1514,8 +1514,8 @@ for (i in unique(strata.final.ns$scientificName)) {
       # Currently has na.rm = TRUE for calculating biomass
       if (exists("point.estimates.ns")) {
         point.estimates.ns <- bind_rows(point.estimates.ns,
-                                      data.frame(scientificName = i, vessel.name = j,
-                                                 estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i)))
+                                        data.frame(scientificName = i, vessel.name = j,
+                                                   estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i)))
       } else {
         point.estimates.ns <- data.frame(scientificName = i, vessel.name = j,
                                          estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i))
@@ -1800,7 +1800,7 @@ catch.summary.ns <- catch.summary.ns %>%
 abund.summ.ns <- abundance.estimates.ns %>%
   filter(!is.nan(freq)) %>% # Remove abundance vectors with NaN values
   left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
-                                         "Stratum" = "stratum")) %>%
+                                          "Stratum" = "stratum")) %>%
   group_by(Species, Stock = stock, SL) %>% 
   summarise(abundance = sum(freq)) %>% 
   mutate(TL = SL) %>% 
@@ -1832,7 +1832,7 @@ save(L.abund.table.ns, abund.summ.ns, file = here("Output/abundance_table_all_ns
 # Add stock designations to bootstrap estimates
 bootstrap.estimates.ns <- bootstrap.estimates.ns %>% 
   left_join(strata.summ.nearshore, by = c("Species" = "scientificName",
-                                         "Stratum" = "stratum")) %>% 
+                                          "Stratum" = "stratum")) %>% 
   rename(Stock = stock)
 
 # Remove rows where stock is NA
@@ -2159,7 +2159,7 @@ if (save.figs) {
   
   # Plot trawl clusters and acoustic proportions for nearshore sampling
   nasc.trawl.acoustic.prop.ns <- plot_grid(nasc.map.cps.ns, acoustic.prop.cluster.indiv.ns,
-                                        nrow = 1, labels = c("a)", "b)"))
+                                           nrow = 1, labels = c("a)", "b)"))
   
   ggsave(nasc.trawl.acoustic.prop.ns,
          filename = here("Figs/fig_nasc_acoustic_cluster_ns.png"),

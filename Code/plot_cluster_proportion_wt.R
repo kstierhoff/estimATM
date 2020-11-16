@@ -42,7 +42,16 @@ if (nrow(cluster.pos) > 0) {
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 }
 
-# save trawl plot
-ggsave(trawl.pie.cluster.wt,
-       filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
-       width = map.width, height = map.height)
+if (doc.name == "simulateBiomass.Rmd") {
+  # Save nasc plot
+  ggsave(trawl.pie.cluster.wt,
+         filename = here("Simulation/Figs/fig_trawl_proportion_cluster_wt.png"),
+         width = map.width, height = map.height) 
+  
+} else {
+  # Save nasc plot
+  ggsave(trawl.pie.cluster.wt,
+         filename = here("Figs/fig_trawl_proportion_cluster_wt.png"),
+         width = map.width, height = map.height) 
+  
+}

@@ -1,10 +1,10 @@
 # Processing controls ----------------------------------------------------
-estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
-estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
-process.offshore  <- T # Process offshore backscatter data
-process.nearshore <- T # Process near backscatter data
-combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
-process.seine     <- T # Process purse seine data
+estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.offshore  <- F # Process offshore backscatter data
+process.nearshore <- F # Process near backscatter data
+combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+process.seine     <- F # Process purse seine data
 
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
@@ -31,16 +31,16 @@ save.csv  <- FALSE
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
-survey.name.long       <- "Summer 2019 California Current Ecosystem Survey"
-survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
-survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
-survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
-survey.name            <- "1907RL"        # SWFSC/AST survey name
-survey.start           <- "13 June"       # Survey start date
-survey.end             <- "9 September"   # Survey end date
-survey.year            <- "2019"          # Survey year, for report
+survey.name.long       <- "Summer 2015 Sardine-Hake (SaKe) Survey"
+survey.vessel.long     <- "Bell M. Shimada" # Full vessel name: e.g., Bell M. Shimada
+survey.vessel          <- "Shimada"        # Short vessel name; e.g., Shimada
+survey.vessel.primary  <- "SH"            # Primary vessel abbreviation 
+survey.name            <- "1507SH"        # SWFSC/AST survey name
+survey.start           <- "20 June"       # Survey start date
+survey.end             <- "10 September"   # Survey end date
+survey.year            <- "2015"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
-survey.das             <- 77              # Days at sea allocated
+survey.das             <- 80              # Days at sea allocated
 survey.landmark.n      <- "Cape Scott, British Columbia" # Landmark - N extent of survey
 survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
@@ -49,14 +49,14 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2019-06-12", "2019-07-06", 
-                                          "2019-07-29", "2019-08-20",
-                                          "2019-09-10")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2015-06-19", "2015-07-04", 
+                                          "2015-07-27", "2015-08-21",
+                                          "2015-09-11")))
 
 # Define ERDDAP data variables
-erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2019-06-12" # Start of survey for ERDDAP vessel data query
-erddap.survey.end    <- "2019-09-10" # End of survey for ERDDAP vessel data query
+erddap.vessel        <- "WTED"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.survey.start  <- "2015-06-19" # Start of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2015-09-11" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
 erddap.classes       <- c("factor", "numeric", "numeric", "numeric","numeric")
 erddap.headers       <- c("time", "lat", "long", "SST", "SOG")
@@ -64,7 +64,7 @@ survey.lat           <- c(32,51)
 survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_1907RL.csv"
+wpt.filename         <- "waypoints_1507SH.csv"
 wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
 wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500") 
 
@@ -79,8 +79,8 @@ sd.filter.method <- "manual" # Options are c("buffer","manual")
 sd.nasc.name     <- "cps_nasc_SD.csv"
 
 # Define Saildrone sampling dates
-survey.start.sd  <- "2019-06-13" # Start of Saildrone survey
-survey.end.sd    <- "2019-09-09" # End of Saildrone survey
+survey.start.sd  <- NA_character_ # Start of Saildrone survey
+survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
 erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2019"
@@ -100,8 +100,8 @@ sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
 sd.time.offset   <- 7 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
-cruise.name <- 201907 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
-cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL","SH",...))
+cruise.name <- 201507 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.ship <- "SH"   # May be a character or character vector (e.g., c("RL","SH",...))
 
 # Growth model parameters ------------------------------------------------------
 model.season  <- "summer" # spring or summer; for selecting growth model parameters
@@ -135,8 +135,8 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
-stock.ns      <- "Northern"
-stratum.ns    <- 2
+stock.ns      <- "Central"
+stratum.ns    <- 1
 
 # Figure preferences ------------------------------------------------------
 # Set species colors
@@ -197,26 +197,26 @@ annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys
 
 # Cluster relative length frequency
 # Set number of columns in facet plot
-lf.ncols <- 6
+lf.ncols <- 5
 
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL","LM", "SD", "LBC") 
-nasc.vessels.offshore  <- c("RL","SD")
-nasc.vessels.nearshore <- c("LBC","LM","SD")
-nasc.vessels.krill     <- "RL"
+nasc.vessels           <- c("SH") 
+nasc.vessels.offshore  <- NA_character_
+nasc.vessels.nearshore <- NA_character_
+nasc.vessels.krill     <- "SH"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
-seine.vessels          <- c("LM")
+seine.vessels          <- NA_character_
 # Use seine data to apportion backscatter
-use.seine.data         <- TRUE
+use.seine.data         <- FALSE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata?
-merge.vessels <- c(OS  = TRUE,
+merge.vessels <- c(OS  = FALSE,
                    NS = FALSE)
 
 # Combine data from all regions?
@@ -224,7 +224,7 @@ merge.vessels <- c(OS  = TRUE,
 # However, for LBC in 1907RL, Islands are stratified separately from mainland transects,
 # so regions for that vessel are not merged
 # Used in estimateNearshore.R
-merge.regions <- c("SD", "LM")
+merge.regions <- NA_character_
 
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
@@ -233,149 +233,80 @@ nasc.interval          <-  100
 nasc.summ.interval     <- 2000/nasc.interval 
 
 # Echosounder type; e.g., EK60, EK80, other
-sounder.type           <- c(RL  = "EK80",
-                            LM  = "EK60",
-                            SD  = "EK80",
-                            LBC = "EK60") 
+sounder.type           <- c(SH  = "EK60") 
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] == "SWC-KSTIERHOF-D") {
-  survey.dir           <- c(RL  = "C:/SURVEY/1907RL",
-                            LM  = "C:/SURVEY/1907RL",
-                            SD  = "C:/SURVEY/1907RL",
-                            LBC = "C:/SURVEY/1907RL")   
+if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
+  survey.dir           <- c(SH  = "C:/SURVEY/1507SH")   
 } else {
-  survey.dir           <- c(RL  = "C:/SURVEY/1907RL",
-                            LM  = "C:/SURVEY/1907RL",
-                            SD  = "C:/SURVEY/1907RL",
-                            LBC = "C:/SURVEY/1907RL")
+  survey.dir           <- c(SH  = "//swc-storage1/AST1/SURVEYS/20150615_SHIMADA_SummerCCE")
 }
+
 # Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
-                            LM  = "PROCESSED/EV/CSV/LISA_MARIE",
-                            SD  = "PROCESSED/EV/CSV/SAILDRONE",
-                            LBC = "PROCESSED/EV/CSV/CARNAGE") 
+nasc.dir               <- c(SH  = "PROCESSED/EV/CSV/SHIMADA") 
+
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "-Final 38 kHz CPS.csv",
-                            LM  = "_CPS-Final CPS.csv",
-                            SD  = "_CPS*.*-Final 38 kHz CPS.csv",
-                            LBC = "-Final 38 kHz CPS.csv")
+nasc.pattern.cps       <- c(SH  = "-Final_38kHz_CPS-ACIN.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "-Juan Krill Final 120.csv",
-                            LM  = "-Juan Krill Final 120.csv",
-                            SD  = "-Juan Krill Final 120.csv",
-                            LBC = "-Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(SH  = "*-Final_38_kHz_Krill-ACIN.csv")
 # Regex pattern for identifying nearshore transects
-nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
-                            LM  = "\\d{3}N",
-                            SD  = "\\d{3}N",
-                            LBC = "\\d{3}N")
+nasc.pattern.nearshore <- c(SH  = "\\d{3}N")
 # Regex pattern for identifying offshore transects
-nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
-                            LM  = "\\d{3}O",
-                            SD  = "\\d{3}O",
-                            LBC = "\\d{3}O")
+nasc.pattern.offshore  <- c(SH  = "\\d{3}O")
 # Regex pattern for identifying offshore transects
-nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
-                            LM  = "\\d{3}I",
-                            SD  = "\\d{3}I",
-                            LBC = "\\d{3}I")
+nasc.pattern.inshore   <- c(SH  = "\\d{3}I")
 # Regex pattern for identifying transits
-nasc.pattern.transit   <- c(RL  = "\\d{3}T",
-                            LM  = "\\d{3}T",
-                            SD  = "\\d{3}T",
-                            LBC = "\\d{3}T")
+nasc.pattern.transit   <- c(SH  = "\\d{3}T")
+# Recursively search NASC directories
+nasc.recurse           <- c(SH = TRUE)
+# Max NASC value for removing outliers
+nasc.max               <- 10000*19
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = TRUE,
-                            LM  = FALSE,
-                            SD  = FALSE,
-                            LBC = FALSE,
-                            OS  = TRUE, # in the offshore strata
-                            NS  = FALSE) # in the neashore strata
+source.cps.nasc        <- c(SH  = TRUE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
-data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_1907RL.csv"),
-                            LM  = NA,
-                            SD  = NA,
-                            LBC = NA,
-                            OS  = here("Data/Backscatter/nasc_cps_OS_1907RL.csv"), # in the offshore strata
-                            NS  = NA) # in the neashore strata 
+data.cps.nasc          <- c(SH  = here("Data/Backscatter/nasc_cps_SH_1507SH.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL  = "[^0-9]",
-                            LM  = "[^0-9]",
-                            SD  = "[^0-9]",
-                            LBC = "[^0-9]") 
+tx.char.pattern        <- c(SH  = "[^0-9]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = FALSE,
-                            LBC = FALSE) 
+strip.tx.nums          <- c(SH  = TRUE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = FALSE,
-                            LM  = FALSE,
-                            SD  = FALSE,
-                            LBC = FALSE) 
+strip.tx.chars         <- c(SH  = FALSE) 
 
 # If T, removes transects with names including "transit"
-rm.transit             <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = TRUE,
-                            LBC = TRUE) 
+rm.transit             <- c(SH  = TRUE) 
 
 # If T, removes transects with names including "offshore"
-rm.offshore            <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = TRUE,
-                            LBC = TRUE)
+rm.offshore            <- c(SH  = TRUE)
 
 # If T, removes transects with names including "inshore"
-rm.inshore             <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = TRUE,
-                            LBC = TRUE)
+rm.inshore             <- c(SH  = TRUE)
 
 # If T, removes transects with names including "nearshore"
-rm.nearshore           <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = TRUE,
-                            LBC = TRUE) 
+rm.nearshore           <- c(SH  = TRUE) 
 
 # If T, subtracts NASC.5 from cps.nasc
-rm.surface             <- c(RL  = FALSE,
-                            LM  = FALSE,
-                            SD  = FALSE,
-                            LBC = FALSE) 
+rm.surface             <- c(SH  = FALSE) 
 
 # regex for matching number pattern
-tx.num.pattern         <- c(RL  = "-\\d{1}",
-                            LM  = "-\\d{1}",
-                            SD  = "-\\d{1}",
-                            LBC = "-\\d{1}") 
+tx.num.pattern         <- c(SH  = "-\\d{1}") 
 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            SD  = TRUE,
-                            LBC = TRUE) 
+use.tx.number          <- c(SH  = TRUE) 
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- list(RL = c("SF2VI1", "SF2VI2"),
-                            LM  = NA,
-                            SD  = paste("SD", c(134:211)),
-                            LBC = NA)
+tx.rm                  <- list(SH = c(75:116, 1009))
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 3,
-                            LM  = 1,
-                            SD  = 1,
-                            LBC = 1)
+min.tx.length          <- c(SH  = 3)
+
 # Enforce nearest trawl cluster distance limits?
-limit.cluster.dist     <- c(OS  = TRUE,
+limit.cluster.dist     <- c(OS  = FALSE,
                             NS  = FALSE) 
 
 # Maximum distance to trawl clusters
@@ -398,8 +329,8 @@ scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes201907RL.sqlite" # CUFES SQLite database
-cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
+cufes.db.sqlite        <- "cufes201507SH.sqlite" # CUFES SQLite database
+cufes.date.format      <- "ymd" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl data
 trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
@@ -409,8 +340,8 @@ trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl 
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
-ctd.hdr.pattern        <- "1907\\d{3}.hdr"
-ctd.cast.pattern       <- ".*_processed.asc"
+ctd.hdr.pattern        <- "dCTD*.*hdr"
+ctd.cast.pattern       <- "dCTD*.*asc"
 ctd.depth              <- 350
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
@@ -434,7 +365,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -444,69 +375,110 @@ estimate.nearshore <- FALSE
 estimate.offshore  <- FALSE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core", "Nearshore")
+estimate.regions   <- c("Core")
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata
 max.diff <- 3
 # Defines minimum number of transects in a stratum
-nTx.min <- 3
+nTx.min <- 2
 
 # Stratum pruning settings
-nIndiv.min    <- 10
-nClusters.min <- 2
+nIndiv.min    <- 0
+nClusters.min <- 0
 
 # Use manually defined strata?
-stratify.manually    <- FALSE
+stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects
-# strata.manual <- bind_rows(
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 1,
-#     transect = 60:64)
-# )
-# 
-# Offshore strata
-strata.manual.os <- bind_rows(
+strata.manual <- bind_rows(
   data.frame(
-    scientificName = "Engraulis mordax",
+    scientificName = "Clupea pallasii", 
+    stratum = 1,
+    transect = 37:60),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 1,
+    transect = 1:28),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 2,
+    transect = 30:35),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 36:39),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 4,
+    transect = 40:58),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 1,
+  #   transect = 1:4),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 2,
+  #   transect = 6:8),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 1,
+    transect = 10:24),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 2,
+    transect = 33:42),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 3,
+    transect = 46:49),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 1,
+    transect = 24:28),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 2,
+    transect = 33:36),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 3,
+    transect = 38:47),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
     stratum = 1,
     transect = 1:8),
   data.frame(
-    scientificName = "Sardinops sagax",
-    stratum = 1,
-    transect = 1:3),
+    scientificName = "Trachurus symmetricus", 
+    stratum = 2,
+    transect = 12:22),
   data.frame(
-    scientificName = "Scomber japonicus",
-    stratum = 1,
-    transect = 1:8),
-  data.frame(
-    scientificName = "Trachurus symmetricus",
-    stratum = 1,
-    transect = 1:8)
+    scientificName = "Trachurus symmetricus", 
+    stratum = 3,
+    transect = 24:62)
 )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
+stock.break.sar  <- 34.3 # Latitude of Pt. Conception (or change based on SST)
 # Transects used to define stock boundaries (primary or other)
+
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
-raw.prefix    <- "1907RL_EK60"
+raw.prefix    <- "1507SH_EK60"
 raw.size      <-  50   # file size in megabytes (MB)
-raw.log.range <- 1000  # depth of ER60 logging (m)
+raw.log.range <- 700  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
 ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v10.0" # Echoview version
+ev.version    <- "v6.1.40" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <- 1000  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
@@ -528,16 +500,16 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- "RL"
-cal.dir            <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20190613_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
-cal.datetime       <- "30 April and 4 May" # Date/time of calibration
-cal.plot.date      <- "2019-05-01" # Date of the calibration, used to plot cal time series
+cal.vessels        <- "SH"
+cal.dir            <- "//swc-storage1.nmfs.local/AST1/SURVEYS/20150615_SHIMADA_SummerCCE/DATA/EK60/CALIBRATION/RESULTS/San Diego"
+cal.datetime       <- "19 June" # Date/time of calibration
+cal.plot.date      <- "2015-06-19" # Date of the calibration, used to plot cal time series
 cal.window         <- 50            # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "J. Renfree, T. Sessions, D. Murfin, and D. Palance" # Calibration participants
-cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
-cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
-cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
+cal.loc            <- "Shelter Island, San Diego Bay" # Location name
+cal.lat.dd         <-   32.7135    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
+cal.lon.dd         <- -117.2227   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
 cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1; _Lasker_ sphere #1)" # Cal sphere info
@@ -545,7 +517,7 @@ cal.sphere.name    <- "_Lasker_ sphere #1"
 cal.sphere.z       <- 6 # Nominal depth of calibration sphere below the transducer
 cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about impedance analyzer
 # Other notes about calibration
-cal.notes          <- "Calibration while alongside at the 10th Avenue pier, just north of the Coronado Bridge. Lasker calibration sphere #1"
+cal.notes          <- "UPDATE CAL LOCATION. Lasker calibration sphere #1"
 
 # Physical conditions during calibration
 cal.temp           <-   18.7   # enter water temperature
@@ -556,7 +528,7 @@ cal.max.z          <-    8     # enter maximum water depth below transducers
  
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
-cal.noise          <- list(RL = c(-128,-142,-148,-155,-140,-138))
+cal.noise          <- list(SH = NA)
 
 # Axis options for calibration plots
 cal.scales    <- "free"  # fixed or free

@@ -1,21 +1,11 @@
 # Load output from estimateBiomass ----------------------------------------
 # Load biomass estimate tables
 load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
-load(here("Output/biomass_bootstrap_estimates_final_os.Rdata"))
-load(here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
 load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 
 # Get survey estiamtes for all strata
 be.all     <- be %>% 
   mutate(Region = "Core") %>% 
-  select(Species, Stock, Region, everything()) %>% 
-  filter(Stratum == "All")
-be.all.os  <- be.os %>% 
-  mutate(Region = "Offshore") %>% 
-  select(Species, Stock, Region, everything()) %>% 
-  filter(Stratum == "All")
-be.all.ns  <- be.ns %>% 
-  mutate(Region = "Nearshore") %>% 
   select(Species, Stock, Region, everything()) %>% 
   filter(Stratum == "All")
 be.all.nse <- be.nse %>% 
@@ -25,14 +15,12 @@ be.all.nse <- be.nse %>%
 
 # Summarise biomass for all regions included in the final estimates
 be.all.var <- be.all %>% 
-  bind_rows(be.all.ns) %>% 
   select(Species, Stock, biomass.sd) %>% 
   group_by(Species, Stock) %>%
   summarise(biomass.sd = sqrt(sum(biomass.sd^2)))
 
 # Combine core and nearshore biomass
 be.all.summ <- be.all %>% 
-  bind_rows(be.all.ns) %>% 
   group_by(Species, Stock) %>% 
   select(-Region, -Stratum, -biomass.sd, -biomass.cv) %>% 
   summarise_all(list(sum)) %>% 
@@ -43,8 +31,6 @@ be.all.summ <- be.all %>%
 # load(here("Output/length_summary_all.Rdata")) # Length and weight ranges
 load(here("Output/length_frequency_summary.Rdata"))
 load(here("Output/abundance_table_all.Rdata"))
-load(here("Output/abundance_table_all_os.Rdata"))
-load(here("Output/abundance_table_all_ns.Rdata"))
 
 # Summarise length-disaggregated abundances to describe length ranges
 length.summ <- abund.summ %>% 
@@ -56,16 +42,14 @@ length.summ <- abund.summ %>%
 # Combine abundance summaries for tables
 abund.summ.all <- abund.summ %>% 
   mutate(Region = "Core") %>% 
-  bind_rows(abund.summ.ns) %>% 
-  bind_rows(abund.summ.os) %>% 
   filter(!is.nan(abundance)) %>% 
   ungroup() %>% 
   select(Species, Stock, Region, SL, abundance) %>%
   pivot_wider(names_from = Region, 
               values_from = abundance, 
               values_fn = list(abundance = sum)) %>% 
-  select(Species, Stock, SL, all_of(estimate.regions)) 
-  
+  select(Species, Stock, SL, all_of(estimate.regions))
+
 # Load trawl information
 load(here("Output/haul_info.Rdata"))
 load(here("Output/catch_info.Rdata"))
@@ -89,9 +73,5 @@ load(here("Output/transect_spacing.Rdata"))
 
 # Load calibration results
 load(here("Output/cal_output_table.Rdata"))
-
-# Load purse seine data
-load(here("Output/purse_seine_specimens.Rdata"))
-load(here("Output/purse_seine_sets.Rdata"))
 
 

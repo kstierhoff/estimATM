@@ -75,16 +75,19 @@ panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOption
 ```{r loop-controls}
 # User-defined loop controls
 combine.regions  <- T # Combine core and nearshore biomass plots
-plot.time.series <- T # Plot biomass time series 
-get.db           <- T # Query biomass estimates from AST database
+plot.time.series <- F # Plot biomass time series 
+get.db           <- F # Query biomass estimates from AST database
+copy.files       <- F # Copy bib and CSL from AST server; requires internet
 ```
 
 ```{r copy-bib,include=F,eval=T}
-# Copy bibliography
-file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
-          here("Doc/csl"), overwrite = TRUE)
-file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
-          here("Doc/bib"), overwrite = TRUE)
+if (copy.files) {
+  # Copy bibliography
+  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
+            here("Doc/csl"), overwrite = TRUE)
+  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
+            here("Doc/bib"), overwrite = TRUE)  
+}
 ```
 
 ```{r user-input}
@@ -100,100 +103,6 @@ source(here("Doc/settings", prj.settings))
 prj.output <- settings.files[str_detect(settings.files, paste0("output_", prj.name, ".R"))]
 source(here("Doc/settings", prj.output))
 ```  
-
-```{r load-output,eval=FALSE}
-# # Load biomass estimate tables
-# load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
-# load(here("Output/biomass_bootstrap_estimates_final_os.Rdata"))
-# load(here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
-# load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
-# 
-# # Get survey estiamtes for all strata
-# be.all     <- be %>% 
-#   mutate(Region = "Core") %>% 
-#   select(Species, Stock, Region, everything()) %>% 
-#   filter(Stratum == "All")
-# be.all.os  <- be.os %>% 
-#   mutate(Region = "Offshore") %>% 
-#   select(Species, Stock, Region, everything()) %>% 
-#   filter(Stratum == "All")
-# be.all.ns  <- be.ns %>% 
-#   mutate(Region = "Nearshore") %>% 
-#   select(Species, Stock, Region, everything()) %>% 
-#   filter(Stratum == "All")
-# be.all.nse <- be.nse %>% 
-#   mutate(Region = "NSE") %>% 
-#   select(Species, Stock, Region, everything()) %>% 
-#   filter(Stratum == "All")
-# 
-# # Summarise biomass for all regions included in the final estimates
-# be.all.var <- be.all %>% 
-#   bind_rows(be.all.ns) %>% 
-#   select(Species, Stock, biomass.sd) %>% 
-#   group_by(Species, Stock) %>%
-#   summarise(biomass.sd = sqrt(sum(biomass.sd^2)))
-# 
-# # Combine core and nearshore biomass
-# be.all.summ <- be.all %>% 
-#   bind_rows(be.all.ns) %>% 
-#   group_by(Species, Stock) %>% 
-#   select(-Region, -Stratum, -biomass.sd, -biomass.cv) %>% 
-#   summarise_all(list(sum)) %>% 
-#   left_join(be.all.var) %>% 
-#   mutate(biomass.cv = biomass.sd/Biomass*100)
-# 
-# # Load abundance and length summaries
-# # load(here("Output/length_summary_all.Rdata")) # Length and weight ranges
-# load(here("Output/length_frequency_summary.Rdata"))
-# load(here("Output/abundance_table_all.Rdata"))
-# load(here("Output/abundance_table_all_os.Rdata"))
-# load(here("Output/abundance_table_all_ns.Rdata"))
-# 
-# # Summarise length-disaggregated abundances to describe length ranges
-# length.summ <- abund.summ %>% 
-#   filter(biomass != 0) %>% 
-#   group_by(scientificName = Species, stock = Stock) %>% 
-#   summarise(L.min = min(TL),
-#             L.max = max(TL))
-# 
-# # Combine abundance summaries for tables
-# abund.summ.all <- abund.summ %>% 
-#   mutate(Region = "Core") %>% 
-#   bind_rows(abund.summ.ns) %>% 
-#   bind_rows(abund.summ.os) %>% 
-#   filter(!is.nan(abundance)) %>% 
-#   ungroup() %>% 
-#   select(Species, Stock, Region, SL, abundance) %>%
-#   pivot_wider(names_from = Region, 
-#               values_from = abundance, 
-#               values_fn = list(abundance = sum)) %>% 
-#   select(Species, Stock, SL, estimate.regions) 
-# 
-# # Load trawl information
-# load(here("Output/haul_info.Rdata"))
-# load(here("Output/catch_info.Rdata"))
-# load(here("Output/species_codes.Rdata"))
-# 
-# # Load NASC summaries
-# load(here("Output/nasc_summ_tx.Rdata"))
-# 
-# if (file.exists(here("Output/nasc_summ_tx_os.Rdata"))) {
-#   load(here("Output/nasc_summ_tx_os.Rdata"))
-#   nasc.summ.sd.os <- filter(nasc.summ.os, str_detect(vessel.name, "SD"))
-#   nasc.summ.rl.os <- filter(nasc.summ.os, str_detect(vessel.name, "RL"))  
-# }
-# 
-# if (file.exists(here("Output/nasc_summ_tx_ns.Rdata"))) {
-#   load(here("Output/nasc_summ_tx_ns.Rdata"))
-# }
-# 
-# # Load transect spacing
-# load(here("Output/transect_spacing.Rdata"))
-# 
-# # Load calibration results
-# load(here("Output/cal_output_table.Rdata"))
-```  
-
 
 \pagenumbering{arabic}
 
@@ -465,15 +374,15 @@ Trawl locations were selected using the following criteria, in descending priori
 If the total volume of the trawl catch was five 35-l baskets (~175 l) or less, all target species were separated from the catch, sorted by species, weighed, and enumerated. If the volume of the entire catch was more than five baskets, a five-basket random subsample that included non-target species was collected, sorted by species, weighed, and enumerated; the remainder of the total catch was weighed. In these cases, the weight of the entire catch was calculated as the sum of the subsample and remainder weights. The weight of the $e$-th species in the total catch ($C_{T,e}$) was obtained by summing the catch weight of the respective species in the subsample ($C_{S,e}$) and the corresponding catch in the remainder ($C_{R,e}$), which was calculated as:  
 
 \begin{equation}
- C_{R,e} = C_R*P_{w,e}\text{,}
- (\#eq:remainder-catch-weight)
+C_{R,e} = C_R*P_{w,e}\text{,}
+(\#eq:remainder-catch-weight)
 \end{equation}
 
 where $P_{w,e} = C_{S,e}/\sum_1^sC_{S,e}$, is the proportion in weight of the $e$-th species in the subsample. The number of specimens of the $e$-th species in the total catch ($N_{T,e}$) was estimated by:  
 
 \begin{equation}
- N_{T,e} = \frac{C_{T,e}}{\overline{w}_e}\text{,}
- (\#eq:number-specimens-catch)
+N_{T,e} = \frac{C_{T,e}}{\overline{w}_e}\text{,}
+(\#eq:number-specimens-catch)
 \end{equation}
 
 where $\overline{w}_e$ is the mean weight of the $e$-th species in the subsample. For each of the target species with 50 specimens or less, individual measurements of length in mm (standard length, $L_S$, for Pacific Sardine and Northern Anchovy, and fork length, $L_F$, for Pacific Herring and Jack and Pacific Mackerels) and total weight ($w$) in g were recorded. In addition, sex and maturity were recorded for up to 50 specimens from all species. Ovaries were preserved for up to 10 specimens of each CPS species except Pacific Herring. Fin clips were removed from 50 Pacific Sardine and Northern Anchovy specimens from five different geographic zones (designated by J. Hyde and M. Craig, SWFSC) and preserved in ethanol for genetic analysis. Otoliths were removed from all 50 Pacific Sardine in the subsample; for other CPS species, 25 otoliths were removed "as equally as possible" from the range of sizes present. The combined catches in up to three trawls per night (i.e., trawl cluster) were used to estimate the proportions of species contributing to the nearest samples of acoustic backscatter.  
@@ -534,7 +443,7 @@ if (doc.type == "docx") {
           digits = c(0,0,7,7),
           align = c("l","l","r","r"),
           caption = '(ref:lw-conversions)') %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+    kable_styling(bootstrap_options = c("hover","condensed"),
                   latex_options = c("hold_position"),
                   full_width = F) %>%
     row_spec(0, align = c("c")) %>%
@@ -565,7 +474,7 @@ if (doc.type == "docx") {
           digits = c(0,0,0,8,5,0),
           align = c("l","l","l","r","r","l"),
           caption = '(ref:lw-coeff)') %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+    kable_styling(bootstrap_options = c("hover","condensed"),
                   latex_options = c("hold_position"),
                   full_width = F) %>%
     row_spec(0, align = c("c")) %>%
@@ -599,8 +508,8 @@ The calibrated echosounder data from each transect were processed using commerci
 Depth derived from pressure in CTD casts was used to bin samples into 1-m depth increments. Sound speed in each increment ($c_{w,i}$, m s^-1^) was estimated from the average salinity, density, and pH [if measured, else pH = 8; @Chen1977;@Seabird2013]. The harmonic sound speed in the water column ($\overline{c}_w$, m s^-1^) was calculated over the upper 70 m as:  
 
 \begin{equation}
- \overline{c}_w = \frac{\sum_{i=1}^{N} \Delta r_i}{\sum_{i=1}^{N} \Delta r_i/c_{w,i}}\text{,}
- (\#eq:time-avg-sound-speed)
+\overline{c}_w = \frac{\sum_{i=1}^{N} \Delta r_i}{\sum_{i=1}^{N} \Delta r_i/c_{w,i}}\text{,}
+(\#eq:time-avg-sound-speed)
 \end{equation}
 
 where $\Delta r$ is the depth of increment $i$ [@Seabird2013]. Measurements of seawater temperature ($t_w$, $^{\circ}\textrm{C}$), salinity ($s_w$, psu), depth, pH, and $\overline{c}_w$ are also used to calculate the mean species-specific absorption coefficients ($\overline{\alpha}_a$, dB m^-1^) over the entire profile using equations in Francois and Garrison [-@Francois1982a], Ainslie and McColm [-@Ainslie1998], and Doonan et al. [-@Doonan2003]. Both $\overline{c}_w$ and $\overline{\alpha}_a$ are later used to estimate ranges to the sound scatterers to compensate the echo signal for spherical spreading and attenuation during propagation of the sound pulse from the transducer to the scatterer range and back [@Simmonds2005]. The CTD rosette, when cast, also provides measures of fluorescence and dissolved oxygen concentration versus depth, which may be used to estimate the vertical dimension of Pacific Sardine potential habitat [@Zwolinski2011], particularly the depth of the upper-mixed layer where most epipelagic CPS reside. The latter information is used to inform echo classification (see **Section \@ref(methods-echo-classification)**).  
@@ -705,37 +614,37 @@ if (doc.type == "docx") {
 For fishes with swimbladders, the acoustic backscattering cross-section of an individual ($\sigma_{bs}$, m^2^) depends on many factors but mostly on the acoustic wavelength and the swimbladder size and orientation relative to the incident sound pulse. For echosounder sampling conducted in this survey, $\sigma_{bs}$ is a function of the dorsal-surface area of the swimbladder and was approximated by a function of fish length, i.e.:
 
 \begin{equation}
-  \sigma_{bs} = 10^{\frac{m\,\log_{10}(L)+b}{10}}\text{,}
-  (\#eq:sigma-bs)
+\sigma_{bs} = 10^{\frac{m\,\log_{10}(L)+b}{10}}\text{,}
+(\#eq:sigma-bs)
 \end{equation}
 
 where $m$ and $b$ are frequency and species-specific parameters that are obtained theoretically or experimentally (see references below). $TS$, a logarithmic representation of $\sigma_{bs}$, is defined as:
 
 \begin{equation}
-  TS = 10\,\log_{10}(\sigma_{bs}) = m\,\log_{10}(L) + b\text{.}
-  (\#eq:ts-sigma-bs-equation)
+TS = 10\,\log_{10}(\sigma_{bs}) = m\,\log_{10}(L) + b\text{.}
+(\#eq:ts-sigma-bs-equation)
 \end{equation}
 
 $TS$ has units of dB re 1 m^2^ if defined for an individual, or dB re 1 m^2^ kg^-1^ if defined by weight. The following equations for $TS_{38\mathrm{kHz}}$ were used in this analysis:  
 
 \begin{equation}
-  TS_{\mathrm{38kHz}} = -14.90 \times \log_{10} (L_T) - 13.21 \text{, for Pacific Sardine;}
-  (\#eq:tl-ts-sardine)
+TS_{\mathrm{38kHz}} = -14.90 \times \log_{10} (L_T) - 13.21 \text{, for Pacific Sardine;}
+(\#eq:tl-ts-sardine)
 \end{equation}
 
 \begin{equation}
-  TS_{\mathrm{38kHz}} = -11.97 \times \log_{10} (L_T) - 11.58561 \text{, for Pacific Herring;}
-  (\#eq:tl-ts-herring)
+TS_{\mathrm{38kHz}} = -11.97 \times \log_{10} (L_T) - 11.58561 \text{, for Pacific Herring;}
+(\#eq:tl-ts-herring)
 \end{equation}
 
 \begin{equation}
-  TS_{\mathrm{38kHz}} = -13.87 \times \log_{10} (L_T) - 11.797 \text{, for Northern Anchovy; and}
-  (\#eq:tl-ts-anchovy)
+TS_{\mathrm{38kHz}} = -13.87 \times \log_{10} (L_T) - 11.797 \text{, for Northern Anchovy; and}
+(\#eq:tl-ts-anchovy)
 \end{equation}
 
 \begin{equation}
-  TS_{\mathrm{38kHz}} = -15.44 \times \log_{10} (L_T) - 7.75 \text{, for Pacific and Jack Mackerels,}
-  (\#eq:tl-ts-mackerel)
+TS_{\mathrm{38kHz}} = -15.44 \times \log_{10} (L_T) - 7.75 \text{, for Pacific and Jack Mackerels,}
+(\#eq:tl-ts-mackerel)
 \end{equation}
 
 where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.  
@@ -769,7 +678,7 @@ if (doc.type == "docx") {
           digits = c(0,7,7,7,7),
           align = c("l","r","r","r","r"),
           caption = '(ref:ll-conversions)') %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+    kable_styling(bootstrap_options = c("hover","condensed"), 
                   full_width = F) %>%
     row_spec(0, align = c("c")) %>%
     column_spec(1, italic = T)
@@ -779,15 +688,15 @@ if (doc.type == "docx") {
 The proportions of species in a trawl cluster were considered representative of the proportions of species in the vicinity of the cluster. Therefore, the proportion of the echo-integral from the $e$-th species ($P_e$) in an ensemble of $s$ species can be calculated from the species catches $N_1, N_2,..., N_s$ and the respective average backscattering cross-sections $\sigma_{bs_1}, \sigma_{bs_2},...,\sigma_{bs_s}$ [@Nakken1975]. The acoustic proportion for the $e$-th species in the $a$-th trawl ($P_{ae}$) is:
 
 \begin{equation}
- P_{ae} = \frac{N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae}}{\sum_{e=1}^{s_a} (N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae})}\text{, }
-  (\#eq:acoustic-prop-spp)
+P_{ae} = \frac{N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae}}{\sum_{e=1}^{s_a} (N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae})}\text{, }
+(\#eq:acoustic-prop-spp)
 \end{equation}
 
 where $\overline{\sigma}_{bs,ae}$ is the arithmetic counterpart of the average target strength ($\overline{TS}_{ae}$) averaged for all $n_{ae}$ individuals of species $e$ in the random sample of trawl $a$:  
 
 \begin{equation}
-  \overline{\sigma}_{bs,ae} = \frac{\sum_{i=1}^{n_{ae}}10^{(TS_i/10)}}{n_{ae}}\text{, }
-  (\#eq:avg-ts-all-spp)
+\overline{\sigma}_{bs,ae} = \frac{\sum_{i=1}^{n_{ae}}10^{(TS_i/10)}}{n_{ae}}\text{, }
+(\#eq:avg-ts-all-spp)
 \end{equation}
 
 and $\overline{w}_{ae}$ is the average weight: $\overline{w}_{ae} = \sum_{i=1}^{n_{ae}}{w_{aei}}/{n_{ae}}$. The total number of individuals of species $e$ in a trawl $a$ ($N_{ae}$) is obtained by: $N_{ae}=\frac{n_{ae}}{w_{s,ae}} \times w_{t,ae}$, where $w_{s,ae}$ is the weight of the $n_{ae}$ individuals sampled randomly, and $w_{t,ae}$ is the total weight of the respective species' catch.  
@@ -795,22 +704,22 @@ and $\overline{w}_{ae}$ is the average weight: $\overline{w}_{ae} = \sum_{i=1}^{
 The trawls within a cluster were combined to reduce sampling variability (see **Section \@ref(methods-trawl-clustering)**), and the number of individuals caught from the $e$-th species in a cluster $g$ ($N_{ge}$) was obtained by summing the catches across the $h$ trawls in the cluster: $N_{ge}=\sum_{a=1}^{h_g}N_{ae}$.  The backscattering cross-section for species $e$ in the $g$-th cluster with $a$ trawls is then given by:  
 
 \begin{equation}
-  \overline{\sigma}_{bs,ge}=\frac{\sum_{a=1}^{h_g} N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae}}{\sum_{a=1}^{s_g} N_{ae} \times \overline{w}_{ae}}\text{, }
-  (\#eq:sigma-spp-j)
+\overline{\sigma}_{bs,ge}=\frac{\sum_{a=1}^{h_g} N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae}}{\sum_{a=1}^{s_g} N_{ae} \times \overline{w}_{ae}}\text{, }
+(\#eq:sigma-spp-j)
 \end{equation}
 
 where:  
 
 \begin{equation}
-  \overline{w}_{ge} = \frac{\sum_{a=1}^{h_g} N_{ae} \times \overline{w}_{ae}}{\sum_{a=1}^{h_g} N_{ae}}\text{, }
-  (\#eq:w-spp-j)
+\overline{w}_{ge} = \frac{\sum_{a=1}^{h_g} N_{ae} \times \overline{w}_{ae}}{\sum_{a=1}^{h_g} N_{ae}}\text{, }
+(\#eq:w-spp-j)
 \end{equation}
 
 and the proportion ($P_{ge}$) is;
 
 \begin{equation}
-  P_{ge} = \frac{N_{ge} \times \overline{w}_{ge} \times \overline{\sigma}_{bs,ae}}{\sum_{e=1}^{s}(N_{ge} \times \overline{w}_{ge} \times \overline{\sigma}_{bs,ge})}\text{.}
-  (\#eq:prop-spp-j)
+P_{ge} = \frac{N_{ge} \times \overline{w}_{ge} \times \overline{\sigma}_{bs,ae}}{\sum_{e=1}^{s}(N_{ge} \times \overline{w}_{ge} \times \overline{\sigma}_{bs,ge})}\text{.}
+(\#eq:prop-spp-j)
 \end{equation}  
 
 ### Trawl clustering and species proportions {#methods-trawl-clustering}  
@@ -820,8 +729,8 @@ Trawls that occurred on the same night were assigned to a trawl cluster. Biomass
 For a generic 100-m long acoustic interval, the area backscattering coefficient for species $e$: $s_{A,e} = s_{A,cps} \times P_{ge}$, where $P_{ge}$ is the species acoustic proportion of the nearest trawl cluster (Equation \@ref(eq:prop-spp-j)), was used to estimate the biomass density ($\rho_{w,e}$) [@MacLennan2002; @Simmonds2005] for every 100-m interval, using the size and species composition of the nearest (space and time) trawl cluster (**Fig. \@ref(fig:trawl-cluster-map)**):
 
 \begin{equation}
-  \rho_{w,e} = \frac{s_{A,e}}{4\pi\overline{\sigma}_{bs,e}}\text{.}
-  (\#eq:biomass-density)
+\rho_{w,e} = \frac{s_{A,e}}{4\pi\overline{\sigma}_{bs,e}}\text{.}
+(\#eq:biomass-density)
 \end{equation}  
 
 The biomass densities were converted to numerical densities using: $\rho_{n,e}=\rho_{w,e}/\overline{w}_e$, where $\overline{w}_e$ is the corresponding mean weight. Also, for each acoustic interval, the biomass or numeric densities are partitioned into length classes according to the species' length distribution in the respective trawl cluster.  
@@ -865,15 +774,15 @@ include_graphics(here("Figs/fig_nasc_acoustic_proportions_strata.png"))
 For each stratum and stock, the biomass ($\hat{B}$; kg) of each species was estimated by: 
 
 \begin{equation}
-  \hat{B} = A \times \hat{D}\text{, }
-  (\#eq:biomass-mean)
+\hat{B} = A \times \hat{D}\text{, }
+(\#eq:biomass-mean)
 \end{equation}
 
 where $A$ is the stratum area (nmi^2^) and $\hat{D}$ is the estimated mean biomass density (kg nmi^-2^):
 
 \begin{equation}
-  \hat{D} = \frac{\sum_{l=1}^{k}\overline{\rho}_{w,l} c_l}{\sum_{l=1}^{k}c_l}\text{, }
-  (\#eq:biomass-mean-density)
+\hat{D} = \frac{\sum_{l=1}^{k}\overline{\rho}_{w,l} c_l}{\sum_{l=1}^{k}c_l}\text{, }
+(\#eq:biomass-mean-density)
 \end{equation}
 
 where $\overline{\rho}_{w,l}$ is the mean biomass density of the species on transect $l$, $c_l$ is the transect length, and $k$ is the total number of transects. The variance of $\hat{B}$ is a function of the variability of the transect-mean densities and associated lengths. Treating transects as replicate samples of the underlying population [@Simmonds1996], the variance was calculated using bootstrap resampling [@Efron1981] based on transects as sampling units. Provided that each stratum has independent and identically-distributed transect means (i.e., densities on nearby transects are not correlated, and they share the same statistical distribution), bootstrap or other random-sampling estimators provide unbiased estimates of variance.
@@ -889,8 +798,8 @@ The numerical densities by length class (**Section \@ref(methods-trawl-clusterin
 The percent contribution of each cluster to the estimated abundance in a stratum (**Appendix \@ref(appendix-cluster-length-percent)**) was calculated as:  
 
 \begin{equation}
-  \frac{\Sigma_{i = 1}^{l}\overline{\rho}_{ci}}{\Sigma_{c=1}^{C}\Sigma_{i=1}^{l}\overline{\rho}_{ci}}{\text{,}}
-  (\#eq:pct-acoustic-biomass)
+\frac{\Sigma_{i = 1}^{l}\overline{\rho}_{ci}}{\Sigma_{c=1}^{C}\Sigma_{i=1}^{l}\overline{\rho}_{ci}}{\text{,}}
+(\#eq:pct-acoustic-biomass)
 \end{equation}
 
 where $\overline{\rho}_{ci}$ is the numerical density in interval $i$ represented by the nearest trawl cluster $c$.  
@@ -1116,7 +1025,7 @@ be.table.sub <- be.table %>%
 
 # Find summary rows to make bold
 bold.rows <- which(be.table.sub$Number == "All")
-  
+
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
@@ -1132,16 +1041,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-anch-n)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>%
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       # row_spec(bold.rows, bold = TRUE) %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4)) 
   }
@@ -1194,16 +1103,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-anch-c)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
@@ -1219,7 +1128,8 @@ if (nrow(be.table.sub) != 0) {
 # Print table for anchovy
 if ("Engraulis mordax" %in% unique(abund.summ.all$Species)) {
   abund.summ.table <- abund.summ.all %>% 
-    filter(Species == "Engraulis mordax", Stock == "Northern") 
+    filter(Species == "Engraulis mordax", Stock == "Northern")  %>% 
+    rename('$L_S$' = SL) 
   
   if (nrow(abund.summ.table) != 0) {
     if (doc.type == "docx") {
@@ -1228,13 +1138,13 @@ if ("Engraulis mordax" %in% unique(abund.summ.all$Species)) {
         autofit()
     } else {
       kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
+            escape = FALSE, longtable = TRUE, 
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-anch-n)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c")) 
     }
@@ -1264,9 +1174,9 @@ if ("Engraulis mordax" %in% unique(abund.summ.all$Species)) {
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-anch-c)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c"))  
     }
@@ -1407,16 +1317,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-sar-n)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
@@ -1467,16 +1377,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-sar-s)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
@@ -1506,9 +1416,9 @@ if ("Sardinops sagax" %in% unique(abund.summ.all$Species)) {
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-sar-n)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c")) 
     }
@@ -1540,9 +1450,9 @@ if ("Sardinops sagax" %in% unique(abund.summ.all$Species)) {
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-sar-s)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c"))   
     }
@@ -1683,16 +1593,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-mack)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
@@ -1716,7 +1626,7 @@ if ("Scomber japonicus" %in% unique(abund.summ.all$Species)) {
   abund.summ.table <- abund.summ.all %>% 
     filter(Species == "Scomber japonicus") %>% 
     rename('$L_F$' = SL) 
-
+  
   if (nrow(abund.summ.table) != 0) {
     if (doc.type == "docx") {
       regulartable(abund.summ.table) %>% 
@@ -1728,9 +1638,9 @@ if ("Scomber japonicus" %in% unique(abund.summ.all$Species)) {
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-mack)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c"))   
     }
@@ -1820,16 +1730,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-jack)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
@@ -1853,7 +1763,7 @@ if ("Trachurus symmetricus" %in% unique(abund.summ.all$Species)) {
   abund.summ.table <- abund.summ.all %>% 
     filter(Species == "Trachurus symmetricus") %>% 
     rename('$L_F$' = SL) 
-
+  
   if (nrow(abund.summ.table) != 0) {
     if (doc.type == "docx") {
       regulartable(abund.summ.table) %>% 
@@ -1865,9 +1775,9 @@ if ("Trachurus symmetricus" %in% unique(abund.summ.all$Species)) {
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-jack)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = TRUE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c"))   
     }
@@ -1957,16 +1867,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-her)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:3)) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
       add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
   }
 } else {
@@ -2002,9 +1912,9 @@ if ("Clupea pallasii" %in% unique(abund.summ.all$Species)) {
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-her)') %>%
-        kable_styling(latex_options = c("striped", "repeat_header")) %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
         column_spec(1, italic = TRUE) %>% 
-        collapse_rows(columns = c(1:2)) %>%
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
         add_header_above(c(" " = 3, "Region" = 2)) %>% 
         row_spec(0, align = c("c"))    
     }
@@ -2107,9 +2017,13 @@ The acoustic-trawl estimates of Pacific Herring are susceptible to uncertainty i
 
 ```{r process-biomass-ts}
 if (plot.time.series) {
-  source(here("Code/plot_BiomassTimeSeries.R"))
+  source(here("Code/plot_BiomassTimeSeries_retro.R"))
 } else {
-  load(here("Output/biomass_timeseries_final.Rdata"))
+  if (file.exists(here("Output/biomass_timeseries_final.Rdata"))) {
+    load(here("Output/biomass_timeseries_final.Rdata"))  
+  } else {
+    print("No time series data available")
+  }
 }
 ``` 
 
@@ -2117,10 +2031,7 @@ The acoustic-trawl method (ATM) has been used worldwide to monitor the biomasses
 
 Collectively, these annual or bi-annual ATM surveys provide a unique insight into the dynamics of forage fishes in the CCE, including their distributions, abundances, interactions, and environments. For example, results from 2006 through 2013 indicate that Pacific Sardine dominated the CPS assemblage, but their biomass was declining [@Demer2012a; @Zwolinski2012a] and their seasonal migration was contracting [@Zwolinski2014]. Meanwhile, harvest rates for the declining stock increased [@Demer2017], and the total forage-fish biomass decreased to less than 200,000 t in 2014 and 2015 (**Figs. \@ref(fig:biomass-ts-line), \@ref(fig:biomass-ts-bar)**). The U.S. fishery for Pacific Sardine was closed in 2015 [@NMFS2015], and there were reports of mass strandings, deaths, and reproductive failures in Brown Pelicans (_Pelecanus occidentalis_^[https://e360.yale.edu/features/brown_pelicans_a_test_case_for_the_endangered_species_act]), Common Murres (_Uria aalge_), Brandt’s Cormorants (_Phalacrocorax penicillatus_), and California sea lions (_Zalophus californianus_^[https://www.fisheries.noaa.gov/national/marine-life-distress/2013-2017-california-sea-lion-unusual-mortality-event-california]) [@McClatchie2016], all of which depend on forage species. Since 2016, the forage-fish biomass has increased, mainly due to resurgences of Jack Mackerel and the now dominant central stock of Northern Anchovy (**Figs. \@ref(fig:biomass-ts-line), \@ref(fig:biomass-ts-bar)**).  
 
-<!-- `r prettyNum(biomass.comm.summ$biomass.total[biomass.comm.summ$year == 2014],big.mark=",",digits=3)` -->
-<!-- `r prettyNum(biomass.comm.summ$biomass.total[biomass.comm.summ$year == 2015],big.mark=",",digits=3)` -->
-
-(ref:biomass-ts-line) Estimated biomasses ($t$) of CPS in the CCE since 2008. Error bars are 95% confidence intervals.  
+(ref:biomass-ts-line) Estimated biomasses ($t$) of CPS in the CCE since 2008. Error bars are 95% confidence intervals.
 
 ```{r biomass-ts-line,fig.cap='(ref:biomass-ts-line)', out.width='7in',fig.pos='H'}
 if (file.exists(here("Figs/fig_biomass_ts_line.png"))) {
@@ -2298,16 +2209,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-anch-c-os)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
       # row_spec(be.stratum.all, bold = TRUE, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
@@ -2357,16 +2268,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-sar-n-os)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
       # row_spec(be.stratum.all, bold = TRUE, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
@@ -2401,16 +2312,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-sar-s-os)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
       # row_spec(be.stratum.all, bold = TRUE, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
@@ -2471,16 +2382,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-mack-os)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
       # row_spec(be.stratum.all, bold = TRUE, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
@@ -2527,16 +2438,16 @@ if (nrow(be.table.sub) != 0) {
       align(align = "center",part = "header") %>% 
       autofit()
   } else {
-    kable(be.table.sub, format = knitr.format, booktabs = TRUE, escape = FALSE,
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c("l","c",rep("r",ncol(be) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
           caption = '(ref:biomass-jack-os)') %>% 
-      kable_styling(latex_options = c("striped","hold_position","scale_down"),
+      kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
                     font_size = 8) %>% 
       column_spec(1, italic = T) %>% 
-      collapse_rows(columns = c(1:2)) %>%
+      collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
       # row_spec(be.stratum.all, bold = TRUE, color = "black") %>% 
       add_header_above(c("Species" = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))
   }
@@ -2580,11 +2491,11 @@ if (exists("be.os")) {
           digits = c(0),
           format.args = list(big.mark = ","),
           caption = '(ref:biomass-all-os)') %>% 
-    kable_styling(latex_options = c("striped","hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>% 
+    kable_styling(latex_options = c("hold_position","scale_down"),
+                  position = "center",
+                  font_size = 8) %>% 
     column_spec(1, italic = TRUE) %>%
-    collapse_rows(columns = c(1:2)) %>%
+    collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
     add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 4))  
   
 } else {
