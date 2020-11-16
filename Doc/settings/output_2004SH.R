@@ -64,7 +64,7 @@ abund.summ.all <- abund.summ %>%
   pivot_wider(names_from = Region, 
               values_from = abundance, 
               values_fn = list(abundance = sum)) %>% 
-  select(Species, Stock, SL, estimate.regions) 
+  select(Species, Stock, SL, all_of(estimate.regions))
 
 # Load trawl information
 load(here("Output/haul_info.Rdata"))
