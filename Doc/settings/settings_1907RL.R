@@ -25,9 +25,12 @@ uctd.spacing   <- 15
 # Number of transects to remove from the start (if near Mexico)
 rm.n.transects <- 0
 
+# Locations to remove from planning (e.g., north, central, south, and mexico)
+rm.location <- NA # c("mexico")
+
 # Randomize
 do.random <- FALSE
-save.csv  <- FALSE
+save.csv  <- TRUE
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
