@@ -30,7 +30,8 @@ rm.location <- NA # c("mexico")
 
 # Randomize
 do.random <- FALSE
-save.csv  <- FALSE
+save.csv  <- TRUE
+show.maps <- TRUE
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
@@ -133,7 +134,8 @@ pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer)
 label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
                 "Newport","Point Conception","Cape Mendocino","Columbia River",
                 "Cape Blanco","Bodega Bay","Westport","Fort Bragg",
-                "Morro Bay","Long Beach","Cape Scott","San Diego")
+                "Morro Bay","Long Beach","Cape Scott","San Diego",
+                "Ensenada","Punta Eugenia","El Rosario")
 
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
@@ -243,7 +245,7 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2107RL")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage1/AST3/SURVEYS/20210702_Lasker_SaKe")
+  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SaKe")
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
