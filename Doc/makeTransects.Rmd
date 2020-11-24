@@ -279,8 +279,8 @@ states <- ne_states(
 # Buffer mainland to clip Saildrone and Lasker transects
 states.buff.sd <- rbind(
   filter(states, name %in% c("Oregon","Washington","Nevada",
-                     "British Columbia","Baja California",
-                     "Baja California Sur")),
+                             "British Columbia","Baja California",
+                             "Baja California Sur")),
   filter(states, name == "California", as.numeric(area) > 258366741)) %>% 
   summarise() %>% 
   st_buffer(sd.buffer/60)
@@ -332,7 +332,7 @@ for (i in unique(transects$loc)) {
   
   if (i %in% c("south", "mexico")) {
     tx.temp <- st_intersection(tx.temp, states.buff.fsv) %>% 
-    select(loc, id)
+      select(loc, id)
   }
   
   # Combine results
@@ -545,7 +545,7 @@ uctd.final.df <- uctd.final %>%
 
 ```{r create-region-polygons}
 if (exists("region.polygons")) rm ("region.polygons")
-  
+
 for (ii in unique(waypoints.final$loc)) {
   wpts.e <- waypoints.final %>% 
     mutate(
@@ -591,7 +591,7 @@ for (ii in unique(waypoints.final$loc)) {
 useCachedTile  <- F # Use cached tiles
 useCrossOrigin <- F # USe cross origin
 
-# Create color pallette for planned transects
+# Create color palette for planned transects
 txPal    <- colorFactor(c("red","blue","green","orange","magenta"), 
                         c("Adaptive","Compulsory","Mammal","Nearshore","Saildrone"))
 
@@ -603,7 +603,7 @@ leaflet() %>%
   # Add bathymetry contours
   addPolylines(data = bathy_contours, color = "white", weight = 2, 
                label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
-   # Add EEZ files
+  # Add EEZ files
   addPolygons(data = eez.us, color = "#000414", weight = 2, 
               fillColor = "transparent",
               label = ~htmlEscape("U.S. Exclusive Economic Zone"), group = "EEZs") %>%
@@ -697,7 +697,7 @@ leaflet() %>%
 Once created, transect lines are exported to .csv format for import to Rose Point, where they may be edited further.
 
 ```{r export-csv}
-# Creat an order vector
+# Create an order vector
 order.vec <- rep(c(1,2,2,1), nrow(waypoints.final.df))[1:nrow(waypoints.final.df)]
 
 # Write waypoints to CSV file for Rose Point import
@@ -809,7 +809,7 @@ if (do.random) {
   #          filename = here("Output/transect_wpts.gpx"), 
   #          type = "w")
   
-    # # Write baselines to GPX file
+  # # Write baselines to GPX file
   # writeOGR(as(baselines, "Spatial"),
   #          dsn             = here("Output/baselines.gpx"),
   #          driver          = "GPX",
@@ -825,6 +825,7 @@ if (do.random) {
 ```
 
 # Map regions
+## Entire survey area
 
 ```{r load-map-data,include=FALSE}
 # Get map data -------------------------------
@@ -868,28 +869,22 @@ bathy_5m_df <- bathy_5m_points %>%
   st_set_geometry(NULL)
 
 write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
-
-# Set padding around data  
-map.bounds <- transects.final %>%
-  st_transform(crs = crs.proj) %>%
-  st_bbox()  
-
-# Determine map aspect ratio and set height and width
-map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.width  <- map.height*map.aspect
-
-# Create base map
-base.map <- get_basemap(transects.final, states, countries, landmarks, bathy, map.bounds, crs = crs.proj)
-
-# Save the base map
-ggsave(base.map, file = here("Figs/fig_basemap.png"), 
-       height = map.height, width = map.width)
 ```
 
-
-# Create table with survey areas
-
 ```{r map-survey-plan,fig.cap='(ref:map-survey-plan)'}
+# Set padding around data  
+  map.bounds <- transects.final %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+  
+  # Determine map aspect ratio and set height and width
+  map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+  map.width  <- map.height*map.aspect
+  
+# Create base map
+base.map <- get_basemap(transects.final, states, countries, 
+                        landmarks, bathy, map.bounds, crs = crs.proj)
+
 # Map planned transects
 survey.plan <- base.map +    
   geom_sf(data = transects.final, aes(colour = type, linetype = type), 
@@ -911,6 +906,107 @@ ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
        height = map.height, width = map.width)
 
 include_graphics(here("Figs/fig_survey_plan.png"))
+```
+
+## By region
+
+```{r map-survey-plan-region}
+for (ii in unique(transects.final$loc)) {
+  # Set padding around data  
+  map.bounds <- transects.final %>%
+    filter(loc == ii) %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+  
+  # Determine map aspect ratio and set height and width
+  map.height.region <- 7
+  map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+  map.width  <- map.height.region*map.aspect
+  
+  # Create base map
+  base.map <- get_basemap(filter(transects.final, loc == ii), states, countries, 
+                          landmarks, bathy, map.bounds, crs = crs.proj)
+  
+  region.map <- base.map +
+    geom_sf(data = filter(transects.final, loc == ii), aes(colour = type, linetype = type), 
+            show.legend = "line") +
+    scale_colour_manual("Type", 
+                        values = c(Adaptive = "red", Compulsory = "black",
+                                   Offshore = "green", Nearshore = "magenta",
+                                   transit = "orange")) +
+    scale_linetype_manual("Type", 
+                          values = c(Adaptive = "dashed", Compulsory = "solid",
+                                     Offshore = "dashed", Nearshore = "solid",
+                                     transit = "dashed")) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+  
+  # Save the base map
+  ggsave(region.map, file = here("Figs", paste0("fig_survey_plan_", ii, ".png")), 
+         height = map.height.region, width = map.width)  
+}
+```
+
+### North
+
+```{r map-survey-plan-region-north}
+if (file.exists(here("Figs/fig_survey_plan_north.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_north.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+### Central
+
+```{r map-survey-plan-region-central}
+if (file.exists(here("Figs/fig_survey_plan_central.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_central.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+### South
+
+```{r map-survey-plan-region-south}
+if (file.exists(here("Figs/fig_survey_plan_south.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_south.png"))
+} else {
+  print("No map for this region.")
+}
+```
+### Mexico
+
+```{r map-survey-plan-region-mexico}
+if (file.exists(here("Figs/fig_survey_plan_mexico.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_mexico.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+# Create table with survey areas
+
+Area of each survey region (km^2), and the sum transect distances (km).
+
+```{r region-area-tbl}
+# Summarise transect distances (km)
+region.summ.tx <- transects.final %>% 
+  st_set_geometry(NULL) %>% 
+  group_by(Region = loc) %>% 
+  summarise(Distance = sum(distance)*1.852)
+
+# Summarize region areas (km^2)
+region.summ.polygons <- region.polygons %>% 
+  st_set_geometry(NULL) %>% 
+  select(Region = loc, Area = area) %>% 
+  mutate(Area = prettyNum(as.numeric(Area/1e6),big.mark = ",",digits = 5)) 
+
+# Print table
+left_join(region.summ.tx, region.summ.polygons) %>% 
+  kable()
 ```
 
 
