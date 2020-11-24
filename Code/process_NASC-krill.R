@@ -5,8 +5,8 @@ if (process.csv.krill) {
     
   } else {
     # Load already processed CSV files 
-    if (file.exists(here("Output/processed_csv-krill.Rdata"))) {
-      load(here("Output/processed_csv-krill.Rdata"))
+    if (file.exists(here("Output/processed_csv_krill.Rdata"))) {
+      load(here("Output/processed_csv_krill.Rdata"))
       
     }
     
@@ -351,9 +351,10 @@ nasc.krill.summ <- nasc.krill %>%
 
 # Save NASC summary
 save(nasc.krill.summ, file = here("Output/nasc_summ_tx_krill.Rdata"))
-# 
-# ggplot(nasc.krill, aes(long, lat, group = transect, colour = factor(transect))) + 
-#   geom_path() + 
+write_csv(nasc.krill, here("Output/nasc_krill.csv"))
+
+# ggplot(nasc.krill, aes(long, lat, group = transect, colour = factor(transect))) +
 #   geom_point(aes(size = NASC.70)) +
-#   coord_quickmap() + 
+#   geom_path(colour = "black") +
+#   coord_quickmap() +
 #   theme(legend.position = "none")
