@@ -1,13 +1,8 @@
 if (process.csv.krill) {
-  if (process.csv.all) {
-    # Create new data frame for backscatter data
-    nasc.krill <- data.frame() 
-    
-  } else {
+  if (!process.csv.all) {
     # Load already processed CSV files 
     if (file.exists(here("Output/processed_csv_krill.Rdata"))) {
       load(here("Output/processed_csv_krill.Rdata"))
-      
     }
     
     # Load already processed backscatter data
@@ -15,26 +10,21 @@ if (process.csv.krill) {
   }
   
   # Process CSV files for each vessel
-  for (i in "RL") {
-  # for (i in nasc.vessels) {
+  for (i in nasc.vessels.krill) {
+    # for (i in nasc.vessels) {
     # List all CSV files
     nasc.files.krill <- dir_ls(file.path(here("Data/Backscatter", i)),
-                         regex = nasc.pattern.krill[i])
+                               regex = nasc.pattern.krill[i])
     
     if (!process.csv.all) {
       # List only new CSV files
-      nasc.files.krill <- nasc.files.krill[!nasc.files.krill %in% processed.csv.krill]
+      nasc.files.krill <- nasc.files.krill[!fs::path_file(nasc.files.krill) %in% processed.csv.krill]
       
       # Load already processed vessel NASC data
       if (file.exists(here("Data/Backscatter", i, paste0("nasc_vessel_krill_", i, "_RAW.rds")))) {
         nasc.vessel.krill <- readRDS(here("Data/Backscatter", i, paste0("nasc_vessel_krill_", i, "_RAW.rds")))
-      } else {
-        nasc.vessel.krill <- data.frame()  
       }
-      
-    } else {
-      nasc.vessel.krill <- data.frame()
-    }
+    } 
     
     # Create or load vessel nasc data
     if (length(nasc.files.krill) > 0) {
@@ -50,7 +40,12 @@ if (process.csv.krill) {
                  transect = str_replace(transect, nasc.pattern.krill[i],""))
         
         # Combine results
-        nasc.vessel.krill <- bind_rows(nasc.vessel.krill, nasc.vessel.krill.temp)
+        if (exists("nasc.vessel.krill")) {
+          nasc.vessel.krill <- bind_rows(nasc.vessel.krill, nasc.vessel.krill.temp)
+        } else {
+          nasc.vessel.krill <- nasc.vessel.krill.temp
+        }
+        
         
         # Update the progress bar
         pb.prog <- round(ii/length(nasc.files.krill)*100)
@@ -61,14 +56,12 @@ if (process.csv.krill) {
       # Close progress bar
       close(pb)
       
-      beepr::beep(4)
-      
       # Save/load nasc.vessel.krill (for debugging)
       saveRDS(nasc.vessel.krill, 
               file = here("Data/Backscatter", i, 
                           paste0("nasc_vessel_krill_", i, "_RAW.rds")))
       
-      processed.csv.vessel.krill <- sort(unique(nasc.vessel.krill$filename))
+      processed.csv.vessel.krill <- unique(fs::path_file(nasc.vessel.krill$filename))
       
       # Get intervals with bad lat/long values
       bad.nasc <- filter(nasc.vessel.krill, lat == 999, long == 999) %>% 
@@ -237,37 +230,38 @@ if (process.csv.krill) {
         
         # Save processed CSV data from each survey vessel
         saveRDS(nasc.vessel.krill, file = here("Data/Backscatter", i, 
-                                         paste0("nasc_vessel_krill_", i, ".rds")))
+                                               paste0("nasc_vessel_krill_", i, ".rds")))
         
         # Combine results from different vessels
-        nasc.krill <- bind_rows(nasc.krill, nasc.vessel.krill)
+        if (exists("nasc.krill")) {
+          nasc.krill <- bind_rows(nasc.krill, nasc.vessel.krill)
+        } else {
+          nasc.krill <- nasc.vessel.krill
+        }
+        
+        # Combine processed.csv.vessel
+        if (exists("processed.csv.krill")) {
+          processed.csv.krill <- unique(sort(c(processed.csv.krill, processed.csv.vessel.krill)))
+        } else {
+          processed.csv.krill <- processed.csv.vessel.krill
+        }
       }
-      
-      # Combine processed.csv.vessel
-      if (exists("processed.csv.krill")) {
-        processed.csv.krill <- unique(sort(c(processed.csv.krill, processed.csv.vessel.krill)))
-      } else {
-        processed.csv.krill <- processed.csv.vessel.krill
-      }
-    }
-  }  
-  
-  # Save processed NASC file import
-  save(nasc.krill, file = here("Data/Backscatter/nasc_all-krill.Rdata"))
-  
-  # Save processed CSV file names
-  save(processed.csv.krill, file =  here("Output/processed_csv_krill.Rdata"))
-  
+    }  
+    
+    # Save processed NASC file import
+    save(nasc.krill, file = here("Data/Backscatter/nasc_all-krill.Rdata"))
+    
+    # Save processed CSV file names
+    save(processed.csv.krill, file =  here("Output/processed_csv_krill.Rdata"))
+  }
 } else {
   load(here("Data/Backscatter/nasc_all-krill.Rdata"))
 }
 
-# RESUME HERE
-
 # Determine transect order by min latitude/longitude
 tx.order <- data.frame()
 
-for (i in nasc.vessels) {
+for (i in nasc.vessels.krill) {
   if (use.tx.number[i]) {
     # Calculate transect order per vessel
     tx.order.temp <- nasc.krill %>%
@@ -312,13 +306,11 @@ for (i in nasc.vessels) {
 
 # Add transect numbers to NASC
 nasc.krill <- left_join(select(nasc.krill, -transect), 
-                  select(tx.order, transect.name, transect)) %>% 
+                        select(tx.order, transect.name, transect)) %>% 
   project_df(to = crs.proj)
 
-# Create survey strata polygons
-# source(here("Code/drawStrataSurvey.R"))
 
-# Remove saildrone overlap for 1807RL
+# Remove Saildrone overlap for 1807RL
 if (prj.name %in% c("1807RL")) {
   # Subset Lasker backscatter
   nasc.krill.rl <- filter(nasc.krill, vessel.name == "RL")
@@ -335,7 +327,7 @@ if (prj.name %in% c("1807RL")) {
   nasc.krill <- bind_rows(nasc.krill.rl, nasc.krill.sd)
 }
 
-# Summarise nasc data
+# Summarize nasc data
 nasc.krill.summ <- nasc.krill %>% 
   group_by(vessel.name, transect.name, transect) %>% 
   summarise(
