@@ -33,7 +33,7 @@ pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
                beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
                leaflet.extras,maptools,mapview,photobiology,fs,plotly,
                concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,
-               rworldmap,rworldxtra,data.table,stplanr,ggspatial)
+               rworldmap,rworldxtra,data.table,stplanr,ggspatial,htmlwidgets)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -45,17 +45,20 @@ pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 
 # Define method of table generation (whether kable or xtable) for best formatting
 doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+doc.name <- knitr::current_input()
 if (is.null(doc.type)) {doc.type <- "html"}
+if (is.null(doc.name)) {doc.name <- "estimateBiomass.Rmd"}
+
 ```
 
 ```{r knitr-options,echo=FALSE}
 # Set global knitr chunk options
 if (.Platform$OS.type == "unix") {
   # Do not specify Cairo device for MacOS
-  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+  knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE,
                         fig.align = 'center', dev = "png", dpi = 150)
 } else {
-  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+  knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = FALSE,
                         fig.align = 'center', dev = "png", dpi = 150,
                         dev.args = list(type = "cairo"))
 }
@@ -83,6 +86,10 @@ prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", pr
 source(here("Doc/settings", prj.settings))
 ```
 
+```{r create-dirs}
+dir_create(here(), c("Code","Data", "Doc", "Figs", "Images", "Output", "References", "Simulation"))
+```
+
 ```{r at-methods-overview, child='Background/ATM_Methods.Rmd', eval=FALSE}
 # Calls child document that contains background information about the 
 # Acoustic Trawl Method employed by the SWFSC to survey coastal pelagic fishes
@@ -106,26 +113,20 @@ get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
-process.csv       <- T # Process Echoview files
-save.figs         <- T # Draw new figures and maps
-save.imap         <- T # Save Leaflet maps
-do.bootstrap      <- T # Generate bootstrap estimates
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
+do.bootstrap      <- F # Generate bootstrap estimates
 download.hab      <- F # Download habitat map
+do.imap           <- F # Create interactive Leaflet map
+save.imap         <- F # Save Leaflet maps
 
 # Sometimes F
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.cal       <- T # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
-estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
-
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- T # Process krill backscatter data
-process.offshore  <- F # Process offshore backscatter data
-process.nearshore <- F # Process near backscatter data
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
-process.seine     <- F # Process purse seine data
+process.csv.krill <- F # Process krill backscatter data
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -176,7 +177,8 @@ if (copy.files) {
     
     csv.files.cps <- dir_ls(file.path(survey.dir[dd], 
                                       nasc.dir[dd]), 
-                            regex = nasc.pattern.cps[dd])
+                            regex = nasc.pattern.cps[dd],
+                            recurse = nasc.recurse[dd])
     
     file_copy(csv.files.cps, here("Data/Backscatter", dd), 
               overwrite = overwrite.csv)  
@@ -233,6 +235,7 @@ if (copy.files) {
             overwrite = overwrite.files)
 }
 ```  
+
 ## Get habitat map  
 
 ```{r download-habitat-maps}
@@ -297,6 +300,8 @@ if (get.nav) {
     
     # Get new erddap start date from max date
     erddap.survey.start <- max(date(nav$time)) - days(1)
+  } else {
+    nav.lag <- 25
   }
   
   if (nav.lag > 24) {
@@ -308,7 +313,7 @@ if (get.nav) {
       sep = ""))
     
     # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+    nav.temp <- data.frame(read.csv(dataURL, header = FALSE, colClasses = erddap.classes, 
                                     row.names = NULL, skip = 0))
     names(nav.temp) <- erddap.headers
     
@@ -319,8 +324,8 @@ if (get.nav) {
              datetime = ymd_hms(time),
              SST      = na_if(SST, NaN),
              leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                         leg.breaks, labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+                                         leg.breaks, labels = FALSE))) %>%
+      filter(is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
              between(lat, min(survey.lat), max(survey.lat)), 
              between(long, min(survey.long), max(survey.long)))
     
@@ -339,7 +344,7 @@ if (get.nav) {
   
   nav.paths.sf <- nav.sf %>% 
     group_by(leg) %>% 
-    summarise(do_union = F) %>% 
+    summarise(do_union = FALSE) %>% 
     st_cast("LINESTRING")
   
   # Save results
@@ -368,7 +373,7 @@ if(is.null(wpts.sf$Region)) wpts.sf$Region = "All"
 # Create transect lines from waypoint files and add line bearing
 transects.sf <- wpts.sf %>% 
   group_by(Type, Transect, Region) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING") %>% 
   ungroup() %>% 
   mutate(distance = round(as.numeric(st_length(.))/1852,1),
@@ -417,7 +422,7 @@ if (get.nav.sd) {
         "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
       
       # Download and parse ERDDAP nav data
-      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = F, 
+      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = FALSE, 
                                          colClasses = erddap.classes.sd, 
                                          row.names = NULL, skip = 0))
       names(nav.temp.sd) <- erddap.headers.sd
@@ -451,7 +456,7 @@ if (get.nav.sd) {
     # Convert saildrone nav to spatial
     nav.sd.sf <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
-      summarise(do_union = F) %>% 
+      summarise(do_union = FALSE) %>% 
       st_cast("LINESTRING") %>% 
       mutate(tracklength = st_length(.))
     
@@ -505,7 +510,7 @@ bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
 
 # Read 5m bathymetry polygon
 bathy_5m_poly <- bathy_5m_points %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("POLYGON")
 
 # Create a reduced coastline for nearshore point estimation
@@ -535,9 +540,7 @@ map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$
 map.width  <- map.height*map.aspect
 
 # Create base map
-base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
-  # Add scalebar
-  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj)
 
 # Create base map for inset maps
 base.map.bw <- ggplot() +
@@ -580,6 +583,7 @@ save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
 survey.plan <- base.map +    
   geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
           show.legend = "line") +
+  geom_sf(data = nav.paths.sf, colour = "gray50", size = 1, alpha = 0.5) +
   scale_colour_manual("Type", 
                       values = c(Adaptive = "red", Compulsory = "black",
                                  Offshore = "green", Nearshore = "magenta",
@@ -631,21 +635,12 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 ## Read and summarize CSV files from Echoview  
 For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 50 m depth (NASC.50) is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned.
 
-# Process backscatter data
-## Read and summarize CSV files from Echoview  
-For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 70 m depth (NASC.70) is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned. Nearshore and offshore transects are processed but excluded from the primary analysis, but are available for further analysis if desired (e.g., `estimate.os = TRUE`, `estimate.ns = TRUE`, etc.).
-
 ```{r process-backscatter}
 if (process.csv) {
-  if (process.csv.all) {
-    # Create new data frame for backscatter data
-    nasc <- data.frame() 
-    
-  } else {
+  if (!process.csv.all) {
     # Load already processed CSV files 
     if (file.exists(here("Output/processed_csv.Rdata"))) {
       load(here("Output/processed_csv.Rdata"))
-      
     }
     
     # Load already processed backscatter data
@@ -660,17 +655,15 @@ if (process.csv) {
     
     if (!process.csv.all) {
       # List only new CSV files
-      nasc.files <- nasc.files[!nasc.files %in% processed.csv]
+      nasc.files <- nasc.files[!fs::path_file(nasc.files) %in% processed.csv]
       
       # Load already processed vessel NASC data
       if (file.exists(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))) {
         nasc.vessel <- readRDS(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))
-      } else {
-        nasc.vessel <- data.frame()  
       }
-      
     } else {
-      nasc.vessel <- data.frame()
+      # Remove existing nasc.vessel
+      if (exists("nasc.vessel")) rm(nasc.vessel)
     }
     
     # Create or load vessel nasc data
@@ -687,7 +680,11 @@ if (process.csv) {
                  transect = str_replace(transect, nasc.pattern.cps[i],""))
         
         # Combine results
-        nasc.vessel <- bind_rows(nasc.vessel, nasc.vessel.temp)
+        if (exists("nasc.vessel")) {
+          nasc.vessel <- bind_rows(nasc.vessel, nasc.vessel.temp)
+        } else {
+          nasc.vessel <- nasc.vessel.temp
+        }
         
         # Update the progress bar
         pb.prog <- round(ii/length(nasc.files)*100)
@@ -703,7 +700,7 @@ if (process.csv) {
               file = here("Data/Backscatter", i, 
                           paste0("nasc_vessel_", i, "_RAW.rds")))
       
-      processed.csv.vessel <- sort(unique(nasc.vessel$filename))
+      processed.csv.vessel <- unique(fs::path_file(nasc.vessel$filename))
       
       # Get intervals with bad lat/long values
       bad.nasc <- filter(nasc.vessel, lat == 999, long == 999) %>% 
@@ -722,7 +719,7 @@ if (process.csv) {
       # Convert date and time to POSIXct
       nasc.vessel <- nasc.vessel %>% 
         mutate(datetime      = ymd_hms(paste(date, time), tz = "UTC"),
-               leg = cut(as.numeric(date(datetime)), leg.breaks, labels = F),
+               leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE),
                transect.orig = transect)
       
       if (i == "SD") {
@@ -822,7 +819,7 @@ if (process.csv) {
         }
       }
       
-      # Indentify acoustic transects to include in processing, based on length
+      # Identify acoustic transects to include in processing, based on length
       tx.include <- nasc.vessel %>% 
         group_by(transect) %>% 
         summarise(L = length(Interval)/10*0.539957) %>%
@@ -839,7 +836,7 @@ if (process.csv) {
         nasc.vessel <- nasc.vessel %>% 
           mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
                                          nasc.summ.interval),
-                           labels = F, include.lowest = TRUE),
+                           labels = FALSE, include.lowest = TRUE),
                  transect.name = paste(vessel.name, transect))
         
         # Filter NASC per vessel -------------------------------------------------
@@ -850,19 +847,65 @@ if (process.csv) {
         
         # Set stop integration depth
         if (source.cps.nasc[i]) {
-          # Use exteranlly supplied cps.nasc with variable integration depth (from CTD.app)
+          # Use externally supplied cps.nasc with variable integration depth (from CTD.app)
           # Read file and create unique key for joining with nasc.vessel
-          cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
-            mutate(key = paste(lat, long, dist_m),
-                   datetime = ymd_hms(paste(date, time))) %>% 
-            # Remove data from krill files (1807RL)
-            filter(!str_detect(tolower(filename), "krill")) 
-          
-          # Join nasc.vessel and cps.nasc on datetime
-          nasc.vessel <- nasc.vessel %>% 
-            filter(!str_detect(tolower(filename), "krill")) %>% 
-            left_join(select(cps.nasc.temp, datetime, cps.nasc))
-          
+          if (survey.name %in% c("1507SH","1606RL")) {
+            cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
+              mutate(key = paste(transect, interval))
+              # mutate(key = paste(interval, round(dist_m, 6))) 
+            
+            if (survey.name == c("1507SH")) {
+              # Join nasc.vessel and cps.nasc on transect number and interval
+              nasc.vessel <- nasc.vessel %>% 
+                mutate(time.align  = align.time(datetime, 1),
+                       transect.num = as.numeric(substr(transect.name, 4, 5)),
+                       key = paste(transect.num, Interval)) %>% 
+                filter(!str_detect(tolower(filename), "krill")) %>% 
+                left_join(select(cps.nasc.temp, key, cps.nasc)) %>% 
+                mutate(cps.nasc.diff = NASC.50 - cps.nasc) %>% 
+                mutate(cps.nasc = case_when(
+                  is.na(cps.nasc) ~ NASC.50,
+                  TRUE ~ cps.nasc))  
+            } else if (survey.name == c("1606RL")) {
+              # Join nasc.vessel and cps.nasc on transect number and interval
+              nasc.vessel <- nasc.vessel %>% 
+                mutate(time.align  = align.time(datetime, 1),
+                       transect.num = as.numeric(substr(transect.name, 4, 6)),
+                       key = paste(transect.num, Interval)) %>% 
+                filter(!str_detect(tolower(filename), "krill")) %>% 
+                left_join(select(cps.nasc.temp, key, cps.nasc)) %>% 
+                mutate(cps.nasc.diff = NASC.50 - cps.nasc) %>% 
+                mutate(cps.nasc = case_when(
+                  is.na(cps.nasc) ~ NASC.50,
+                  TRUE ~ cps.nasc))
+            }
+            
+            # cps.nasc.temp$NASC.50.Juan <- cps.nasc.temp$NASC.50
+            # 
+            # nasc.vessel <- nasc.vessel %>%
+            #    left_join(select(cps.nasc.temp, key, NASC.50.Juan))
+            # 
+            # ggplot(nasc.vessel, aes(NASC.50, NASC.50.Juan)) + geom_point()
+            # 
+            # 
+            # nasc.vessel <- nasc.vessel %>%
+            #   mutate(nasc.diff2 = NASC.50 - NASC.50.Juan)
+            
+          } else {
+            cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
+              mutate(key = paste(lat, long, dist_m),
+                     datetime      = ymd_hms(paste(date, time), tz = "UTC"),
+                     time.align  = align.time(datetime, 1)) %>% 
+              # Remove data from krill files (1807RL)
+              filter(!str_detect(tolower(filename), "krill")) 
+            
+            # Join nasc.vessel and cps.nasc on datetime
+            nasc.vessel <- nasc.vessel %>% 
+              mutate(time.align  = align.time(datetime, 1)) %>% 
+              # select(-cps.nasc) %>% 
+              filter(!str_detect(tolower(filename), "krill")) %>% 
+              left_join(select(cps.nasc.temp, time.align, cps.nasc))  
+          }
         } else {
           # Use fixed integration depth (NASC.50), with or without surface noise removal
           if (rm.surface[i]) {
@@ -878,7 +921,11 @@ if (process.csv) {
                                          paste0("nasc_vessel_", i, ".rds")))
         
         # Combine results from different vessels
-        nasc <- bind_rows(nasc, nasc.vessel)
+        if (exists("nasc")) {
+          nasc <- bind_rows(nasc, nasc.vessel)
+        } else {
+          nasc <- nasc.vessel
+        }
       }
       
       # Combine processed.csv.vessel
@@ -927,8 +974,8 @@ for (i in nasc.vessels) {
       mutate(rank.lat  = rank(max.lat), 
              rank.long = rev(rank(min.long)), 
              diff      = rank.lat - rank.long,
-             transect.num = as.numeric(str_extract(transect.name,"[[:digit:]]+")),
-             rank.final = rank.lat) %>% 
+             rank.final = rank.lat,
+             transect.num = rank.final) %>%
       arrange(rank.final)
   }
   
@@ -971,7 +1018,7 @@ if (prj.name %in% c("1807RL")) {
   nasc <- bind_rows(nasc.rl, nasc.sd)
 }
 
-# Summarise nasc data
+# Summarize nasc data
 nasc.summ <- nasc %>% 
   group_by(vessel.name, transect.name, transect) %>% 
   summarise(
@@ -989,7 +1036,7 @@ nasc.summ <- nasc %>%
 save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
 ```
 
-```{r process-backscatter-krill}
+```{r process-backscatter-krill, eval=FALSE}
 source(here("Code/process_NASC-krill.R"))
 ```
 
@@ -1016,6 +1063,10 @@ The top 100 backscatter (NASC) values are plotted and labeled with the transect 
 (ref:plot-nasc-outliers) The top 100 backscatter (NASC) values labeled with the transect name and corresponding interval.
 
 ```{r plot-nasc-outliers,fig.cap='(ref:plot-nasc-outliers)'}
+if (!is.na(nasc.max)) {
+  nasc <- filter(nasc, cps.nasc < nasc.max)
+}
+
 # Select top 100 nasc values and look for outliers
 big.nasc <- nasc %>%
   arrange(desc(cps.nasc)) %>%
@@ -1103,8 +1154,8 @@ nasc <- nasc %>%
   left_join(select(nasc.daynight, sun_key, period)) %>% 
   mutate(day_night = case_when(
     period == "sunrise" ~ "Day",
-    period == "sunset" ~ "Night")) %>% 
-  filter(!is.na(day_night))
+    period == "sunset" ~ "Night",
+    TRUE ~ "Other")) 
 
 # Create date labels
 nasc.sun.labels <- nasc.sun %>% 
@@ -1116,8 +1167,8 @@ if (save.figs) {
     geom_point(data = nasc, aes(X, Y, colour = day_night, size = day_night)) +
     geom_shadowtext(data = nasc.sun.labels, aes(X, Y, label = date), 
                     color = "black", bg.colour = "white", size = 2) +
-    scale_colour_manual(name = "Time of day", values = c("Day" = "orange", "Night" = "black")) +
-    scale_size_manual(name = "Time of day", values = c("Day" = 1, "Night" = 2)) +
+    scale_colour_manual(name = "Time of day", values = c("Day" = "orange", "Night" = "black", "Other" = "green")) +
+    scale_size_manual(name = "Time of day", values = c("Day" = 1, "Night" = 2, "Other" = 2.5)) +
     # Configure legend guides
     guides(colour = guide_legend(), size = guide_legend()) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -1198,7 +1249,7 @@ nasc.plot.sf <- nasc.plot %>%
 
 # Write NASC data to CSV
 write.csv(nasc.plot, file = here("Output/cps_nasc_plot.csv"), 
-          row.names = F, quote = F)
+          row.names = FALSE, quote = FALSE)
 
 # Select plot levels for backscatter data
 nasc.levels.all <- sort(unique(nasc.plot$bin.level))
@@ -1308,7 +1359,7 @@ if (save.figs) {
       st_transform(crs = crs.proj) %>% 
       st_bbox()
     
-    nasc.map.sd <- nasc.map +
+    nasc.map.sd <- nasc.map.cps +
       coord_sf(crs = crs.proj,
                xlim = c(map.bounds.sd["xmin"], map.bounds.sd["xmax"]), 
                ylim = c(map.bounds.sd["ymin"], map.bounds.sd["ymax"]))
@@ -1461,7 +1512,7 @@ haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal)
   arrange(haul) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(haul) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING") 
 
 # Find midpoint of each haul cluster as the average of haul midpoints
@@ -1491,9 +1542,9 @@ haul %>%
          trawlPerformance = cell_spec(
            trawlPerformance, knitr.format, color = "black",
            background = ifelse(!trawlPerformance %in% c(trawl.performance, "Unknown"),"white","yellow"))) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = F) %>% 
+  kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = F) %>%
+                full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>% 
   scroll_box(height = "500px")
 ```  
@@ -1522,10 +1573,10 @@ cluster.check %>%
   mutate(duration = cell_spec(
     duration, knitr.format, color = "black",
     background = ifelse(duration <= 12,"white","orange"))) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("c")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = F) %>%
+                full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>% 
   scroll_box(height = "500px")
 ```  
@@ -1744,17 +1795,18 @@ if (nrow(herring.hauls) > 0) {
   # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
   if (get.bathy) {
     # Get boundaries for bathymetry grid
-    bathy.bounds <- transects.sf %>% 
+    bathy.bounds <- herring.hauls %>%
+      st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
       st_bbox() 
     
     # Download bathy grid
     noaa.bathy <- getNOAA.bathy(
-      lon1 = bathy.bounds$xmin - 1, 
-      lon2 = bathy.bounds$xmax + 1,
-      lat1 = bathy.bounds$ymax + 1, 
-      lat2 = bathy.bounds$ymin - 1, 
-      resolution = 1)
-    
+      lon1 = floor(bathy.bounds$xmin) - 1, 
+      lon2 = floor(bathy.bounds$xmax) + 1,
+      lat1 = floor(bathy.bounds$ymax) + 1, 
+      lat2 = floor(bathy.bounds$ymin) - 1, 
+      resolution = 4)
+
     # Save bathy results
     save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
                                   survey.name,".Rdata", sep = ""))  
@@ -1767,7 +1819,7 @@ if (nrow(herring.hauls) > 0) {
   herring.depth <- get.depth(noaa.bathy, 
                              herring.hauls$long, 
                              herring.hauls$lat, 
-                             locator = F, distance = F) 
+                             locator = FALSE, distance = FALSE) 
   
   # Add depth data to herring df
   herring.hauls$depth <- herring.depth$depth
@@ -1855,7 +1907,7 @@ haul.ts <- haul %>%
   left_join(catch.ts) %>% 
   project_df(to = crs.proj)
 
-# Export haul data for single-target TS esimation
+# Export haul data for single-target TS estimation
 write_csv(haul.ts, here("Output/single_species_hauls.csv"), na = "")
 
 if (save.figs) {
@@ -1894,17 +1946,13 @@ include_graphics(here("Figs/fig_haul_target_strength_map.png"))
 
 ```{r assign-trawl-clusters}
 # Assign nearest trawl cluster to each NASC interval -------------------------------------------------------
-# Explore st_vironoi for faster assignment of clusters
-# nasc.env <- st_convex_hull(nav.sf) %>% st_transform(crs = 3310)
-# # 
-# clust <- st_transform(cluster.mid.sf, crs = 3310)
-# 
-# voronoi.clusters <- st_voronoi(clust, envelope = nasc.env)
-
 if (process.csv) {
-  # Create varialble for nearest cluster and minumum distance
-  cluster.distance <- data.frame(cluster = rep(NA, nrow(nasc)), 
-                                 cluster.distance = rep(NA, nrow(nasc)))
+  # Create variable for nearest cluster and minimum distance
+  cluster.distance <- data.frame(
+    datetime = rep(NA_POSIXct_, nrow(nasc)),
+    cluster = rep(NA, nrow(nasc)), 
+    cluster.distance = rep(NA, nrow(nasc)))
+  
   # Configure progress bar
   pb <- tkProgressBar("R Progress Bar", "Cluster Assignment", 0, 100, 0)
   
@@ -1916,7 +1964,8 @@ if (process.csv) {
                               units = "nm")
     
     # Assign cluster with minimum distance to NASC interval
-    cluster.distance$cluster[i]  <- super.clusters$cluster[which.min(temp.distance)]
+    cluster.distance$datetime[i]         <- nasc$datetime[i]
+    cluster.distance$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
     cluster.distance$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
     
     # Update progress bar
@@ -1937,7 +1986,7 @@ if (process.csv) {
 }
 
 # Add cluster distances to nasc
-nasc <- bind_cols(nasc, cluster.distance)
+nasc <- left_join(nasc, cluster.distance)
 ```
 
 ## Map trawl cluster polygons around acoustic backscatter  
@@ -1952,7 +2001,7 @@ nasc.super.clusters <- plyr::ddply(nasc, "cluster", find_hull) %>%
   select(long, lat, cluster) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(cluster) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("POLYGON")
 
 if (save.figs) {
@@ -2088,7 +2137,7 @@ lengths.all <- lengths.all  %>%
   mutate(individual_ID = as.numeric(individual_ID)) %>% 
   # Standardize sex values
   mutate(sex    = tolower(trimws(sex)),
-         binned = F) %>% 
+         binned = FALSE) %>% 
   bind_rows(lengths.expanded.final) %>% 
   # Create unique key and replace unused sex categories
   mutate(key = paste(cruise, ship, haul, collection, species, specimenNumber),
@@ -2096,6 +2145,24 @@ lengths.all <- lengths.all  %>%
          sex = str_replace(sex,"sexUnknown","unknown")) %>%
   # Add season from haul
   left_join(select(haul.all, cruise, ship, haul, season)) 
+
+if (survey.name %in% c("1507SH")) {
+  # In summer 2015, some herring were measured to SL and some to TL. The code requires fork length
+  # as the native length, and there is not a conversion for SL to FL, so SL must first be converted to TL,
+  # then TL can be converted to FL
+  
+  saveRDS(lengths.all, file = here("Output", paste0("lengths_all_", survey.name, ".rds")))
+  
+  lengths.all <- lengths.all %>% 
+    mutate(totalLength_mm = case_when(
+      scientificName == "Clupea pallasii" & cruise == cruise.name & !is.na(standardLength_mm) ~ 
+        convert_length("Clupea pallasii", .$standardLength_mm, "SL", "TL"),
+      TRUE ~ totalLength_mm)) %>% 
+    mutate(forkLength_mm = case_when(
+      scientificName == "Clupea pallasii" & cruise == cruise.name & is.na(forkLength_mm) ~ 
+        convert_length("Clupea pallasii", .$totalLength_mm, "TL", "FL"),
+      TRUE ~ forkLength_mm))
+}
 
 if (survey.name == "1807RL") {
   # Estimate SL from FL for Anchovy during 1807RL
@@ -2108,8 +2175,6 @@ if (survey.name == "1807RL") {
 
 # Save length data to file
 save(lengths.all, file = here("Output/lengths_all.Rdata"))
-
-# load(here("Output/lengths_all.Rdata"))
 
 # Convert lengths to totalLength_mm for TS estimates ---------------------------
 lengths.all  <- lengths.all %>%
@@ -2160,7 +2225,7 @@ lengths.all <- lengths.all %>%
     totalLength_mm = case_when(
       is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
-    K = round((weightg/mantleLength_mm*10^3)*100))
+    K = round((weightg/totalLength_mm*10^3)*100))
 
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
@@ -2183,7 +2248,7 @@ K.summ <- lengths %>%
 length.outliers.all <- lengths %>% 
   left_join(K.summ) %>% 
   filter(K <= K.lower | K >= K.upper) %>% 
-  filter(binned == F) %>% 
+  filter(binned == FALSE) %>% 
   select(haul, collection, scientificName, specimenNumber, standardLength_mm, 
          forkLength_mm, totalLength_mm, weightg, sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber)
@@ -2285,7 +2350,7 @@ catch.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSa
 
 # Write to CSV
 write.csv(catch.comp, file = here("Output/catch_comparison.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 
 # Display results
 catch.comp %>% 
@@ -2303,11 +2368,11 @@ catch.comp %>%
                                  background = ifelse(diffCt == 0,"white","yellow")),
     binnedLengths    = cell_spec(binnedLengths,knitr.format,color = "black",
                                  background = ifelse(binnedLengths == 0,"white","green"))) %>%
-  kable(format = knitr.format,booktabs = TRUE, escape = F,
+  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
         align = c("c","l",rep("r",ncol(catch.comp) - 2)),
         digits = c(0,0,3,3,4,0,0,0,0),
         format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
   row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
@@ -2321,7 +2386,7 @@ catch.comp.errors <- catch.comp %>%
 
 # Save output to CSV
 if (nrow(catch.comp.errors) > 0) {
-  write.csv(catch.comp.errors,file = here("Output/catch_comparison_errors.csv"),quote = F,row.names = F)
+  write.csv(catch.comp.errors,file = here("Output/catch_comparison_errors.csv"),quote = FALSE, row.names = FALSE)
 }
 ```  
 
@@ -2383,10 +2448,10 @@ if (nrow(length.outliers) == 0) {
     rename(SL = standardLength_mm, TL = totalLength_mm, FL = forkLength_mm) %>% 
     mutate(TL = round(TL)) %>% 
     replace_na(list(SL = "", TL = "", FL = "", flaggedData = "")) %>%
-    kable(format = knitr.format, booktabs = TRUE, escape = F,
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
           align = c("c","l",rep("r",ncol(length.outliers) - 2)),
           digits = c(0,0,3,3,4,0,0,0,0,0)) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(3, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     scroll_box(height = "500px")
@@ -2395,7 +2460,7 @@ if (nrow(length.outliers) == 0) {
 
 ### Examine speciment L-W data  
 
-The relationship between lenght and weight of all specimens is visually compared to those from historic surveys and also to L/W models derived from those specimens. If missing length or weight measurements are present, they are estimated from these models using the following equations and the coefficients in the table below:  
+The relationship between lenght and weight of all specimens is visually compared to those from historic surveys and also to L/W models derived from those specimens (**Insert references to Palance et al.; present equations.**). If missing length or weight measurements are present, they are estimated from these models using the following equations and the coefficients in the table below:  
 
 $$W = a*L^b\text{,  and}$$  
 
@@ -2403,7 +2468,7 @@ $$L = (W/a)^{(1/b)}\text{.}$$
 
 Coefficients used to estimate total length (TL, mm) or weight in the equations above. Model types are: 'lm' = linear model, 'nlm' = naive linear model, and 'glm' = general linear model (Palance et al., in prep). Season is presently either spring or summer, and is defined in the survey info file.    
 
-```{r lw-model-table}
+```{r lw-model-table, eval = FALSE}
 # Filter table of L/W models used
 lw.models %>% 
   arrange(scientificName) %>% 
@@ -2412,11 +2477,11 @@ lw.models %>%
   rename(`Scientific name` = scientificName,
          `Common name`     = commonName,
          `Model type`      = model_type) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = F,
+  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
         digits = c(0,0,8,5,0),
         align = c("l","l","r","r","l")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = F) %>%
+                full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>%
   column_spec(1, italic = TRUE)
 ```  
@@ -2442,9 +2507,9 @@ lw.plot <- ggplot() +
   geom_point(data = filter(lengths, missing.length == TRUE), 
              aes(totalLength_mm, weightg),
              shape = 21, fill = 'red',  size = 2.5) +
-  geom_point(data = filter(lengths, missing.weight == TRUE), 
-             aes(totalLength_mm, weightg),
-             shape = 21, fill = 'blue', size = 2.5) +
+  # geom_point(data = filter(lengths, missing.weight == TRUE), 
+  #            aes(totalLength_mm, weightg),
+  #            shape = 21, fill = 'blue', size = 2.5) +
   # Facet by species
   facet_wrap(~scientificName, scales = "free") +
   # Format plot
@@ -2460,7 +2525,7 @@ ggsave(lw.plot, filename = here("Figs/fig_LW_plots.png"),
 # Examine length differences by leg
 lengths.leg <- lengths %>% 
   left_join(select(haul, haul, datetime = equilibriumTime)) %>% 
-  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = F))
+  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE))
 
 lw.plot.leg <- ggplot() + 
   # Plot seasonal length models for each species
@@ -2474,9 +2539,9 @@ lw.plot.leg <- ggplot() +
   geom_point(data = filter(lengths, missing.length == TRUE), 
              aes(totalLength_mm, weightg),
              shape = 21, fill = 'red',  size = 2.5) +
-  geom_point(data = filter(lengths, missing.weight == TRUE), 
-             aes(totalLength_mm, weightg),
-             shape = 21, fill = 'blue', size = 2.5) +
+  # geom_point(data = filter(lengths, missing.weight == TRUE), 
+  #            aes(totalLength_mm, weightg),
+  #            shape = 21, fill = 'blue', size = 2.5) +
   # Facet by species
   facet_wrap(~scientificName, scales = "free") +
   # Format plot
@@ -2530,8 +2595,9 @@ if (get.db) {
       Year = year(Start),
       AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
     rename(lat = StartLatitude, long = StartLongitude) %>% 
+    filter(between(Start, date(erddap.survey.start), date(erddap.survey.end))) %>% 
     project_df(to = crs.proj)
-  
+
   # Close connection
   dbDisconnect(cufes.con)  
   
@@ -2579,7 +2645,7 @@ save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
 
 # Write CUFES data from current survey to CSV
 write.csv(cufes, file = here("Output/cufes_data.csv"), 
-          row.names = FALSE, quote = F)
+          row.names = FALSE, quote = FALSE)
 ```  
 
 ## Map CUFES egg densities 
@@ -2589,7 +2655,7 @@ write.csv(cufes, file = here("Output/cufes_data.csv"),
 ```{r map-cufes-egg-density,fig.cap='(ref:cufes-egg-densities)'}
 if (save.figs) {
   # Plot CUFES for sardine, anchovy, and jack mackerel -------------------------  
-  source(here("Code/plot_CUFES.R"))
+  source(here("Code/plot_cufes.R"))
   
   save(cufes.density.all, cufes.density.facet,
        file = here("Output/cufes_egg_density_maps.Rdata"))
@@ -2651,8 +2717,8 @@ lengths <- bind_cols(lengths, select(ts.df, -species, -TL)) %>%
   arrange(scientificName, collection, specimenNumber)
 
 # Save results
-write.csv(ts.df,   file = here("Output/ts_estimates.csv"), quote = F, row.names = F)
-write.csv(lengths, file = here("Output/ts_lengths.csv"),   quote = F, row.names = F)
+write.csv(ts.df,   file = here("Output/ts_estimates.csv"), quote = FALSE, row.names = FALSE)
+write.csv(lengths, file = here("Output/ts_lengths.csv"),   quote = FALSE, row.names = FALSE)
 ```  
 
 ## Plot TS estimates  
@@ -2810,13 +2876,13 @@ for (k in unique(l.summ.haul$scientificName)) {
 
 # Write results to CSV
 write.csv(n.summ.haul, file = here("Output/n_summ_haul.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 write.csv(l.summ.haul, file = here("Output/l_summ_haul.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 write.csv(l.summ.cluster, file = here("Output/l_summ_cluster.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 write.csv(trawl.ts, file = here("Output/trawl_ts_EstimateCPS.csv"), 
-          quote = F, row.names = F, na = "0")
+          quote = FALSE, row.names = FALSE, na = "0")
 
 if (save.figs) {
   # Compare results to check for errors in haul summary
@@ -2859,7 +2925,7 @@ ts.summ <- select(l.summ.cluster, cluster, scientificName,
   ungroup()
 # Save to file
 write.csv(ts.summ, file = here("Output/ts_summ_cluster.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 
 # Subset sardine results
 ts.sub.sar <- filter(ts.summ, scientificName == "Sardinops sagax") %>% 
@@ -2919,7 +2985,7 @@ clf[is.na(clf)] <- 0
 
 # Save to file
 write.csv(clf, file = here("Output/clf_cluster_summary.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 ```  
 
 ## Calculate acoustic proportions  
@@ -2962,7 +3028,7 @@ ts.proportions[atm:::is.nan.df(ts.proportions)] <- NA
 
 # Save to file
 write.csv(ts.proportions, file = here("Output/ts_proportions_raw.csv"), 
-          row.names = F, quote = F)
+          row.names = FALSE, quote = FALSE)
 
 # Add cluster weights, numbers, and TS proportions
 clf <- clf %>% 
@@ -2985,7 +3051,7 @@ clf$sigmawg.sar[clf$prop.sar      == 0] <- 1
 
 # Save to file
 write.csv(clf, file = here("Output/clf_ts_proportions.csv"),
-          row.names = F, quote = F)
+          row.names = FALSE, quote = FALSE)
 
 save(clf, file = here("Output/clf_ts_proportions.Rdata"))
 ```
@@ -3019,7 +3085,7 @@ if (save.figs) {
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.indiv, 
                     aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("prop.anch","prop.jack","prop.her",
+                    cols = c("prop.anch","prop.her","prop.jack",
                              "prop.mack","prop.sar"),
                     color = 'black', alpha = 0.8) +
     # Plot empty trawl locations
@@ -3047,7 +3113,7 @@ if (save.figs) {
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.wg, 
                     aes(X, Y, group = cluster, r = pie.radius),
-                    cols = c("prop.anch.wg","prop.jack.wg","prop.her.wg",
+                    cols = c("prop.anch.wg","prop.her.wg","prop.jack.wg",
                              "prop.mack.wg","prop.sar.wg"),
                     color = 'black', alpha = 0.8) +
     # Plot empty trawl locations
@@ -3099,7 +3165,7 @@ acoustic.prop.cluster.final <- base.map +
   # Plot trawl pies
   geom_scatterpie(data = acoustic.prop.indiv, 
                   aes(X, Y, group = cluster, r = pie.radius),
-                  cols = c("prop.anch","prop.jack","prop.her",
+                  cols = c("prop.anch","prop.her","prop.jack",
                            "prop.mack","prop.sar"),
                   color = 'black', alpha = 0.8) +
   # Plot empty trawl locations
@@ -3172,9 +3238,9 @@ for (i in unique(lengths$scientificName)) {
     # Setting right = F includes X.5 in the lower class (e.g., 14.5 = 14, 14.6 = 15)
     # Length inputs are native lengths (i.e., SL for sardine and anchovy, FL for herring and meckerels)
     if (i %in% c("Sardinops sagax", "Engraulis mordax")) {
-      f <- hist(lengths.sub$standardLength_mm/10, breaks = lf.breaks, plot = F, right = F)$density      
+      f <- hist(lengths.sub$standardLength_mm/10, breaks = lf.breaks, plot = FALSE, right = FALSE)$density      
     } else if (i %in% c("Scomber japonicus", "Trachurus symmetricus", "Clupea pallasii")) {
-      f <- hist(lengths.sub$forkLength_mm/10, breaks = lf.breaks, plot = F, right = F)$density        
+      f <- hist(lengths.sub$forkLength_mm/10, breaks = lf.breaks, plot = FALSE, right = FALSE)$density        
     }
     # Create a vector of size class
     lf.bin <- lf.breaks[1:length(lf.breaks) - 1]
@@ -3208,7 +3274,7 @@ for (i in unique(lengths$scientificName)) {
   # Calculate the estimated number of individuals in each size class
   lf.df <- lf.df %>% 
     mutate(counts = f * spp.num) %>% 
-    filter(is.na(cluster) == F)
+    filter(is.na(cluster) == FALSE)
   
   # Combine length frequency data for plotting later
   lf.final <- bind_rows(lf.final, lf.df)
@@ -3236,7 +3302,7 @@ for (i in unique(lengths$scientificName)) {
   write.csv(clf.final,
             file = paste(here("Output/cluster_length_frequency_"), 
                          i, "_",survey.name, ".csv", sep = ""),
-            row.names = F)
+            row.names = FALSE)
   
   # Add species-specific results to list of results
   cluster.final[[i]] <- clf.final
@@ -3296,7 +3362,7 @@ save(nasc, file = here("Output/cps_nasc_prop.Rdata"))
 
 # Write results to CSV
 write.csv(nasc, file = here("Output/cps_nasc_prop.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 ```  
 
 # Define sampling strata  
@@ -3304,7 +3370,7 @@ write.csv(nasc, file = here("Output/cps_nasc_prop.csv"),
 
 For each species, the relative proportion of acoustic backscatter (e.g., `prop.anch`) is mapped along with the acoustic backscatter from all CPS (i.e., `cps.nasc`).  
 
-(ref:apportion-backscatter) Proportion of backscatter from each species (red points) relative to the total backscatter from all species (blac points).
+(ref:apportion-backscatter) Proportion of backscatter from each species (red points) relative to the total backscatter from all species (black points).
 
 ```{r apportion-backscatter,fig.cap='(ref:apportion-backscatter)'}
 # Create data frame for plotting acoustic proportions by species
@@ -3313,8 +3379,7 @@ nasc.prop.all <- nasc %>%
          `Sardinops sagax`       = cps.nasc*prop.sar,
          `Trachurus symmetricus` = cps.nasc*prop.jack,
          `Scomber japonicus`     = cps.nasc*prop.mack,
-         `Clupea pallasii`       = cps.nasc*prop.her) %>% 
-  project_df(to = crs.proj)
+         `Clupea pallasii`       = cps.nasc*prop.her) # %>% project_df(to = crs.proj)
 
 # Prepare nasc.prop.all for facet plotting
 nasc.prop.spp <- nasc.prop.all %>% 
@@ -3414,6 +3479,8 @@ pos.clusters <- n.summ.haul %>%
     scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
     scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
     scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))
+
+# ggplot(pos.clusters, aes(long, lat, label = cluster, colour = stock)) + geom_point() + coord_map() + facet_wrap(~scientificName)
 ```  
 
 ## Examine distances between acoustic intervals and positve trawl clusters 
@@ -3481,10 +3548,10 @@ nasc.clust.biom <- nasc.clust.hist %>%
     dist.bin = cut(cluster.distance,
                    seq(0, ceiling(max(cluster.distance)), 
                        ceiling(max(cluster.distance)/30)),
-                   labels = F) - 1) %>% 
+                   labels = FALSE) - 1) %>% 
   group_by(species, dist.bin) %>% 
   summarise(total.density = sum(density)) %>% 
-  mutate(distance = dist.bin * ceiling(max(cluster.distance)/30))
+  mutate(distance = dist.bin * ceiling(max(cluster.distance$cluster.distance)/30))
 
 # Calculate cumulative acoustic biomass versus distance to positive clusters
 nasc.clust.biom <- nasc.clust.biom %>% 
@@ -3592,7 +3659,7 @@ biomass density. For a stratum to be included in the analysis, it must:
 * Have a transect with zero biomass at the beginning and end,
 * Have no more than two consecutive zero biomass transects. 
 
-If the strata are unable to be defined automatically using the rules above, the analyst may define them manually in the appropriate survey info file (e.g., `Code/survey_info_XXXXYY.R`). 
+If the strata are unable to be defined automatically using the rules above, the analyst may define them manually in the appropriate survey info file (e.g., `r paste("Code/survey_info_", survey.name,".R")`). 
 
 ```{r stratify-sampling}
 # Define sampling strata
@@ -3731,7 +3798,7 @@ for (i in unique(strata.final$scientificName)) {
   strata.summ.all <- bind_rows(strata.summ.all, strata.summ.spp)
 }
 
-# Filter stata.final using strata.filter
+# Filter strata.final using strata.filter
 strata.final <- strata.final %>% 
   mutate(key = paste(scientificName, stratum)) %>% 
   select(-stratum) %>% 
@@ -3785,10 +3852,10 @@ save(strata.final, strata.summ, strata.summ.rm,
 
 # Write results to .csv file
 write.csv(strata.final, file  = here("Output/strata_final.csv"),  
-          quote = F,row.names = F)
+          quote = FALSE,row.names = FALSE)
 
 write.csv(strata.summ, file   = here("Output/strata_summary.csv"),
-          quote = F,row.names = F)
+          quote = FALSE,row.names = FALSE)
 
 # Print strata summary table
 strata.summ %>% 
@@ -3800,10 +3867,10 @@ strata.summ %>%
                             background = ifelse(nClust >= nClusters.min,"green","red")),
          nIndiv = cell_spec(nIndiv, knitr.format, color = "black",
                             background = ifelse(nIndiv >= nIndiv.min,"green","red"))) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c","r","r","r","r","r")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = F) %>%
+                full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>% 
   column_spec(c(1,2), italic = TRUE) %>% 
   collapse_rows(columns = c(1,2))
@@ -3823,7 +3890,7 @@ landmarks <- data.frame(
 
 # Get max density for setting y limits
 max.tx.dens.log <- ceiling(max(log(nasc.density.summ$density + 1), na.rm = TRUE))
-max.tx.dens <- ceiling(max(nasc.density.summ$density, na.rm = TRUE))
+max.tx.dens     <- ceiling(max(nasc.density.summ$density, na.rm = TRUE))
 
 if (nrow(strata.summ.rm) > 0) {
   # If strata were removed
@@ -3847,7 +3914,7 @@ if (nrow(strata.summ.rm) > 0) {
                aes(start.lat, log(density + 1), group = scientificName,
                    fill = dist.bin), shape = 21, size = 3) +
     # Label non-zero biomass density to facilitate picking strata
-    geom_text_repel(data = filter(nasc.density.summ, log(density + 1) > 0.01),
+    geom_text_repel(data = filter(nasc.density.summ, log(density + 1) > 0),
                     aes(start.lat, log(density + 1), label = transect, group = scientificName),
                     colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1) +
     scale_colour_discrete("Stratum") +
@@ -3884,7 +3951,7 @@ if (nrow(strata.summ.rm) > 0) {
                aes(transect, log(density + 1), group = scientificName, fill = dist.bin), 
                shape = 21, size = 3) +
     # Label non-zero biomass density to facilitate picking strata
-    geom_text_repel(data = filter(nasc.density.summ,log(density + 1) > 0.01),
+    geom_text_repel(data = filter(nasc.density.summ,log(density + 1) > 0),
                     aes(transect, log(density + 1), label = transect, group = scientificName),
                     colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1) +
     scale_colour_discrete("Stratum") +
@@ -3942,13 +4009,13 @@ if (nrow(strata.summ.rm) > 0) {
   # If no strata were removed
   # Biomass density by species and transect, showing stratum breaks
   biomass.dens.plot.lat <- ggplot(strata.summ) + 
-    geom_rect(aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens, 
+    geom_rect(aes(xmin = lat.start, xmax = lat.end, ymin = 0, ymax = max.tx.dens.log, 
                   group = stratum, colour = factor(stratum)), 
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
     geom_vline(xintercept = c(34.448266, 40.430520, 48.490), linetype = "dashed") +
     geom_text(data = landmarks, 
-              aes(lat.start, max.tx.dens, label = name), 
+              aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
               fontface = "italic", alpha = 0.5) +
     geom_path(data = nasc.density.summ,  
@@ -3957,7 +4024,7 @@ if (nrow(strata.summ.rm) > 0) {
                aes(start.lat, log(density + 1), group = scientificName,
                    fill = dist.bin), shape = 21, size = 3) +
     # Label non-zero biomass density to facilitate picking strata
-    geom_text_repel(data = filter(nasc.density.summ, log(density + 1) > 0.01),
+    geom_text_repel(data = filter(nasc.density.summ, log(density + 1) > 0),
                     aes(start.lat, log(density + 1), label = transect, group = scientificName),
                     colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1) +
     scale_colour_discrete("Stratum") +
@@ -3980,7 +4047,7 @@ if (nrow(strata.summ.rm) > 0) {
   # Original plot, based on transect number on the x-axis
   biomass.dens.plot.tx <- ggplot(strata.summ) +
     geom_rect(aes(xmin = start - 0.4, xmax = end + 0.4, 
-                  ymin = 0, ymax = max.tx.dens, 
+                  ymin = 0, ymax = max.tx.dens.log, 
                   group = stratum, colour = factor(stratum)),
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
@@ -3990,7 +4057,7 @@ if (nrow(strata.summ.rm) > 0) {
                aes(transect, log(density + 1), group = scientificName, fill = dist.bin), 
                shape = 21, size = 3) +
     # Label non-zero biomass density to facilitate picking strata
-    geom_text_repel(data = filter(nasc.density.summ,log(density + 1) > 0.01),
+    geom_text_repel(data = filter(nasc.density.summ,log(density + 1) > 0),
                     aes(transect, log(density + 1), label = transect, group = scientificName),
                     colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1) +
     scale_colour_discrete("Stratum") +
@@ -3998,7 +4065,7 @@ if (nrow(strata.summ.rm) > 0) {
     facet_wrap(~scientificName,ncol = 1) +
     xlab("Transect") + 
     scale_y_continuous(expression(Biomass~density~(log(t+1)~nmi^-2)), 
-                       limits = c(-0.5,max.tx.dens), expand = c(0,0)) +
+                       limits = c(-0.5,max.tx.dens.log), expand = c(0,0)) +
     theme_bw() +
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic"))
@@ -4135,7 +4202,7 @@ strata.points.sf <- st_as_sf(strata.points, coords = c("long","lat"), crs = crs.
 # Create polygons
 strata.super.polygons <- strata.points.sf %>% 
   group_by(vessel.name) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("POLYGON") %>% 
   st_make_valid() %>% 
   st_difference(st_union(bathy_5m_poly)) %>% 
@@ -4144,7 +4211,7 @@ strata.super.polygons <- strata.points.sf %>%
 # Convert to lines
 tx.lines.sf <- strata.points.sf %>% 
   group_by(transect, grp) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING")
 
 # Create polygons for clipping nearshore strata
@@ -4268,7 +4335,7 @@ for (i in unique(strata.final$scientificName)) {
       bind_rows(primary.poly.j.n) %>% 
       st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
       group_by(stratum, stock) %>% 
-      summarise(do_union = F) %>% 
+      summarise(do_union = FALSE) %>% 
       st_cast("POLYGON") %>% 
       mutate(scientificName = i)
     
@@ -4297,7 +4364,7 @@ for (i in unique(strata.final$scientificName)) {
       bind_rows(clip.temp) %>% 
       st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
       group_by(stratum, stock) %>% 
-      summarise(do_union = F) %>% 
+      summarise(do_union = FALSE) %>% 
       st_cast("POLYGON") %>% 
       mutate(scientificName = i) %>% 
       st_make_valid()
@@ -4321,7 +4388,7 @@ for (i in unique(strata.final$scientificName)) {
       bind_rows(nearshore.temp) %>% 
       st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
       group_by(stratum, stock) %>% 
-      summarise(do_union = F) %>% 
+      summarise(do_union = FALSE) %>% 
       st_cast("POLYGON") %>% 
       mutate(scientificName = i) %>% 
       st_make_valid()
@@ -4368,6 +4435,38 @@ strata.primary <- strata.primary %>%
   mutate(area = st_area(.)) %>% 
   left_join(select(strata.summ, 
                    scientificName, stratum, vessel.name))
+
+# Manually substitute stratum polygons
+if (survey.name == "1606RL") {
+  
+  source(here("Sandbox/externalStrata.R"))
+  
+  # area.orig <- filter(strata.primary, scientificName == "Sardinops sagax", stock == "Northern") %>% 
+  #   select(stratum, area) %>% 
+  #   st_set_geometry(NULL)
+  # 
+  # area.juan <- filter(strata.polygon.final) %>% 
+  #   select(stratum, area) %>% 
+  #   st_set_geometry(NULL)
+  # 
+  # area.comp <- area.orig %>% 
+  #   left_join(select(area.juan, stratum, area.juan = area))
+  # 
+  # ggplot(area.comp, aes(as.numeric(area), as.numeric(area.juan), label = stratum)) + 
+  #   geom_text() + 
+  #   geom_abline(slope = 1, intercept = 0) + 
+  #   coord_equal()
+  # 
+  
+  strata.primary <- strata.primary %>%
+    mutate(key = paste(scientificName, stock, stratum)) %>% 
+    filter(!key %in% strata.polygon.final$key) %>% 
+    bind_rows(strata.polygon.final) %>% 
+    arrange(key)
+}
+
+# Ensure that strata are ordered by number
+strata.primary <- arrange(strata.primary, scientificName, stratum)
 
 # Save clipped primary polygons
 save(strata.primary, 
@@ -4466,7 +4565,7 @@ save(strata.nse.points,
 # Write primary stata points to CSV
 write.csv(strata.primary.points,  
           file = here("Output/strata_points_primary.csv"),
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 
 # Summarize nasc.strata by stock
 strata.summ.primary <- strata.primary %>% 
@@ -4482,11 +4581,11 @@ strata.summ.nse <- strata.nse %>%
 # Write stata summaries to CSV
 write.csv(strata.summ.primary,  
           file = here("Output/strata_summary_primary.csv"),
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 
 write.csv(strata.summ.nse,  
           file = here("Output/strata_summary_nse.csv"),
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 ```  
 
 ## Map final stratum polygons  
@@ -4501,9 +4600,9 @@ if (save.figs) {
   map.stratum.all <- base.map + 
     # Plot proportion of backscatter from each species present
     geom_point(data = nasc.prop.all, aes(X, Y, size = cps.nasc), 
-               colour = "gray20", show.legend = F) +
+               colour = "gray20", show.legend = FALSE) +
     geom_point(data = filter(nasc.prop.spp, nasc > 0),
-               aes(X, Y, size = nasc), colour = "red", show.legend = F) +
+               aes(X, Y, size = nasc), colour = "red", show.legend = FALSE) +
     # Plot final strata
     geom_sf(data = strata.primary, aes(colour = factor(stratum), 
                                        fill = stock), alpha = 0.5) +
@@ -4529,7 +4628,7 @@ include_graphics(here("Figs/fig_nasc_acoustic_proportions_strata.png"))
 ```  
 
 ```{r map-biomass-density}
-# Convet nasc.density to sf and project
+# Convert nasc.density to sf and project
 nasc.density <- ungroup(nasc.density) %>% 
   project_df(to = crs.proj)
 
@@ -4561,10 +4660,13 @@ if (save.figs) {
       
       # Filter positive clusters
       pos.cluster.txt <- pos.clusters %>% 
-        filter(scientificName == i, stock == j, !duplicated(cluster), 
-               cluster %in% pos.cluster.summ$cluster[pos.cluster.summ$scientificName == i]) %>%
-        ungroup() %>% 
-        project_df(to = crs.proj)
+        filter(scientificName == i, stock == j, !duplicated(cluster)) %>%
+        ungroup()
+      
+      # pos.cluster.txt <- pos.clusters %>% 
+      #   filter(scientificName == i, stock == j, !duplicated(cluster), 
+      #          cluster %in% pos.cluster.summ$cluster[pos.cluster.summ$scientificName == i]) %>%
+      #   ungroup()
       
       # Map biomass density, strata polygons, and positive trawl clusters
       biomass.dens <- base.map +
@@ -4598,8 +4700,8 @@ if (save.figs) {
       
       # Save figures
       ggsave(biomass.dens, 
-             filename = paste(here("Figs/fig_biomass_dens_"), i, "-", j, ".png",sep = ""),
-             width  = map.width,height = map.height)
+             filename = paste0(here("Figs/fig_biomass_dens_"), i, "-", j, ".png"),
+             width  = map.width, height = map.height)
       
       # Save plot to list
       biomass.dens.figs[[i]][[j]] <- biomass.dens
@@ -4771,7 +4873,9 @@ if (process.ctd) {
          file = here("Data/UCTD/uctd_data.Rdata"))
   }  
 } else {
-  load(here("Data/UCTD/uctd_data.Rdata"))
+  if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
+    load(here("Data/UCTD/uctd_data.Rdata"))
+  }
 }
 ```  
 
@@ -4780,25 +4884,29 @@ if (process.ctd) {
 Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard _`r survey.vessel`_.   
 
 ```{r summarize-uctd-casts}
-# Make a copy of uctd.summ
-uctd.table <- uctd.summ %>% 
-  select("Cast" = cast.num, "Filename" = cast, "Date" = cast.date, 
-         "Lat" = lat, "Long" = long, "Dutation" = time, "Depth" = max.depth,
-         "Class" = class, "Lag" = lag) %>% 
-  mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S"))
-
-# Print table
-uctd.table %>% 
-  filter(!is.na(Lag)) %>% 
-  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                         background = ifelse(Lag <= 30,"white","orange"))) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = F,
-        digits = c(0,0,0,4,4,0,0,0,0),
-        align = c("c","l","c","r","r","r","r","c","r")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = F) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "500px")
+if (exists("uctd.summ")) {
+  # Make a copy of uctd.summ
+  uctd.table <- uctd.summ %>% 
+    select("Cast" = cast.num, "Filename" = cast, "Date" = cast.date, 
+           "Lat" = lat, "Long" = long, "Dutation" = time, "Depth" = max.depth,
+           "Class" = class, "Lag" = lag) %>% 
+    mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S"))
+  
+  # Print table
+  uctd.table %>% 
+    filter(!is.na(Lag)) %>% 
+    mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
+                           background = ifelse(Lag <= 30,"white","orange"))) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          digits = c(0,0,0,4,4,0,0,0,0),
+          align = c("c","l","c","r","r","r","r","c","r")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    scroll_box(height = "500px")
+} else {
+  print("No UCTD casts present.")
+}
 ```
 
 ### UCTD cast plots  
@@ -4806,75 +4914,78 @@ uctd.table %>%
 Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all UCTD casts.
 
 ```{r plot-uctd-casts}
-# Plot temperature data
-uctd.T <- ggplot(data = all.uctd.casts,
-                 aes(T, Z, group = cast, colour = factor(cast))) +
-  geom_path(alpha = 0.75) +
-  xlab("\nTemperature (C)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.uctd.casts$T),0) - 1,
-                                round(max(all.uctd.casts$T),0) + 1),
-                     breaks = seq(round(min(all.uctd.casts$T),0) - 1, 
-                                  round(max(all.uctd.casts$T),0) + 1, 2),
-                     expand = c(0,0)) + 
-  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
-                     breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
-                     expand = c(0,0)) +
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Temperature")
-
-# Plot salinity data
-uctd.S <- ggplot(data = all.uctd.casts,
-                 aes(S, Z, group = cast, colour = factor(cast))) +
-  geom_path(alpha = 0.75) +
-  xlab("\nSalinity") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.uctd.casts$S),2) - 0.1,
-                                round(max(all.uctd.casts$S),2) + 0.1),
-                     breaks = seq(round(min(all.uctd.casts$S),2) - 0.1, 
-                                  round(max(all.uctd.casts$S),2) + 0.1, 1),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
-                     breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Salinity")
-
-# Plot salinity data
-uctd.Sv <- ggplot(data = all.uctd.casts,
-                  aes(Sv, Z, group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nSound speed (m/s)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.uctd.casts$Sv),0) - 1,
-                                round(max(all.uctd.casts$Sv),0) + 1),
-                     breaks = seq(round(min(all.uctd.casts$Sv),0) - 1, 
-                                  round(max(all.uctd.casts$Sv),0) + 1, 10),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
-                     breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Sound speed")
-
-if (save.figs) {
-  # Arrange and save temperature, salinity, and sound speed plots
-  all.uctd.plots <- plot_grid(uctd.T, uctd.S, uctd.Sv, 
-                              nrow = 1, labels = c("a)","b)","c)"))
-  ggsave(here("Figs/fig_uctd_cast_plots.png"), all.uctd.plots, 
-         height = 5, width = 9)
+if (exists("all.uctd.casts")) {
+  # Plot temperature data
+  uctd.T <- ggplot(data = all.uctd.casts,
+                   aes(T, Z, group = cast, colour = factor(cast))) +
+    geom_path(alpha = 0.75) +
+    xlab("\nTemperature (C)") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.uctd.casts$T),0) - 1,
+                                  round(max(all.uctd.casts$T),0) + 1),
+                       breaks = seq(round(min(all.uctd.casts$T),0) - 1, 
+                                    round(max(all.uctd.casts$T),0) + 1, 2),
+                       expand = c(0,0)) + 
+    scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
+                       breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
+                       expand = c(0,0)) +
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Temperature")
+  
+  # Plot salinity data
+  uctd.S <- ggplot(data = all.uctd.casts,
+                   aes(S, Z, group = cast, colour = factor(cast))) +
+    geom_path(alpha = 0.75) +
+    xlab("\nSalinity") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.uctd.casts$S),2) - 0.1,
+                                  round(max(all.uctd.casts$S),2) + 0.1),
+                       breaks = seq(round(min(all.uctd.casts$S),2) - 0.1, 
+                                    round(max(all.uctd.casts$S),2) + 0.1, 1),
+                       expand = c(0,0)) +  
+    scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                       breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
+                       expand = c(0,0)) + 
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Salinity")
+  
+  # Plot salinity data
+  uctd.Sv <- ggplot(data = all.uctd.casts,
+                    aes(Sv, Z, group = cast, colour = factor(cast))) + 
+    geom_path(alpha = 0.75) +
+    xlab("\nSound speed (m/s)") + 
+    ylab("Depth (m)\n") +
+    # Configure x- and y-axis scales
+    scale_x_continuous(limits = c(round(min(all.uctd.casts$Sv),0) - 1,
+                                  round(max(all.uctd.casts$Sv),0) + 1),
+                       breaks = seq(round(min(all.uctd.casts$Sv),0) - 1, 
+                                    round(max(all.uctd.casts$Sv),0) + 1, 10),
+                       expand = c(0,0)) +  
+    scale_y_continuous(limits = c(round(min(all.uctd.casts$Z),digits = -1),0),
+                       breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
+                       expand = c(0,0)) + 
+    theme_bw() +
+    theme(panel.grid.major = element_line(size = 0.75),
+          legend.position  = "none") +
+    ggtitle("Sound speed")
+  
+  if (save.figs) {
+    # Arrange and save temperature, salinity, and sound speed plots
+    all.uctd.plots <- plot_grid(uctd.T, uctd.S, uctd.Sv, 
+                                nrow = 1, labels = c("a)","b)","c)"))
+    ggsave(here("Figs/fig_uctd_cast_plots.png"), all.uctd.plots, 
+           height = 5, width = 9)
+  }
+  include_graphics(here("Figs/fig_uctd_cast_plots.png"))
+} else {
+  print("No UCTD casts present.")
 }
-
-include_graphics(here("Figs/fig_uctd_cast_plots.png"))
 ```  
 
 ## Process CTD cast files  
@@ -4923,89 +5034,97 @@ if (length(ctd.hdr) == 0) {
         all.ctd.casts <- bind_rows(all.ctd.casts, 
                                    extract_ctd_cast(i, type = "CTD"))
       }
+      
+      # Save results
+      save(all.ctd.casts, all.ctd.hdr, ctd.hdr, ctd.proc, 
+           file = here("Data/CTD/ctd_data.Rdata"))
+      
+    } else {
+      load(here("Data/CTD/ctd_data.Rdata"))
     }
     
-    # Save results
-    save(all.ctd.casts, all.ctd.hdr, ctd.hdr, ctd.proc, 
-         file = here("Data/CTD/ctd_data.Rdata"))
+    # Match UCTD headers to nav data
+    nav.match.ctd <- data.frame()
     
-  } else {
-    load(here("Data/CTD/ctd_data.Rdata"))
-  }
-  
-  # Match UCTD headers to nav data
-  nav.match.ctd <- data.frame()
-  
-  for (i in 1:nrow(all.ctd.hdr)) {
-    min.diff      <- which.min(abs(difftime(all.ctd.hdr$cast.date[i], nav$datetime)))
-    nav.match.ctd <- bind_rows(nav.match.ctd, nav[min.diff, ])
-  }
-  
-  # combine header and nav data
-  all.ctd.hdr <- all.ctd.hdr %>% 
-    bind_cols(nav.match.ctd) %>% 
-    mutate(
-      cast.num = seq(1, n()),
-      type = "CTD",
-      lag = difftime(cast.date, datetime, units = "secs"))
-  
-  if (nrow(all.ctd.casts) > 0) {
-    # reorder all.ctd by cast and depth
-    all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>% 
-      # filter all.ctd to remove bad temperature and salinity 
-      filter(between(T, min.T, max.T)) %>% 
-      filter(between(S, min.S, max.S)) 
+    for (i in 1:nrow(all.ctd.hdr)) {
+      min.diff      <- which.min(abs(difftime(all.ctd.hdr$cast.date[i], nav$datetime)))
+      nav.match.ctd <- bind_rows(nav.match.ctd, nav[min.diff, ])
+    }
     
-    # calculate max depth of each cast
-    ctd.depth <- all.ctd.casts %>% 
-      group_by(cast) %>% 
-      summarise(max.depth = min(Z))
-    
-    # extract cast number from filename
+    # combine header and nav data
     all.ctd.hdr <- all.ctd.hdr %>% 
-      left_join(ctd.depth)
+      bind_cols(nav.match.ctd) %>% 
+      mutate(
+        cast.num = seq(1, n()),
+        type = "CTD",
+        lag = difftime(cast.date, datetime, units = "secs"))
     
-    # summarize uctd casts for water classification
-    ctd.class <- all.ctd.casts %>% 
-      group_by(cast) %>% 
-      summarise(
-        min.T = min(T),
-        min.S = min(S),
-        max.T = max(T),
-        max.S = max(S)) %>% 
-      # assign classes based on salinity
-      mutate(class = case_when(
-        min.S <= 31.4 ~ "Type 1",
-        min.S >= 33.4 ~ "Type 2",
-        TRUE ~ "Type 3"))
-    
-    all.ctd.hdr <- all.ctd.hdr %>% 
-      left_join(select(ctd.class, cast, class)) %>% 
-      select(cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)
-    
-    # add water mass to the summary table and cast data for plotting
-    all.ctd.casts <- all.ctd.casts %>% 
-      left_join(select(ctd.class, cast, class)) %>% 
-      left_join(select(all.ctd.hdr, cast, leg))  
-    
-    # write table to CSV
-    write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
-              quote = FALSE, row.names = FALSE)
-    
-    # Remove unprocessed casts from the summary
-    ctd.missing <- all.ctd.hdr %>% 
-      filter(!cast %in% all.ctd.casts$cast)
-    
-    # Exclude bad casts
-    all.ctd.casts <- all.ctd.casts %>%
-      filter(!cast %in% exclude.ctd)
-  } else {
-    ctd.missing <- all.ctd.hdr
+    if (nrow(all.ctd.casts) > 0) {
+      # reorder all.ctd by cast and depth
+      all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>% 
+        # filter all.ctd to remove bad temperature and salinity 
+        filter(between(T, min.T, max.T)) %>% 
+        filter(between(S, min.S, max.S)) 
+      
+      # calculate max depth of each cast
+      ctd.depth <- all.ctd.casts %>% 
+        group_by(cast) %>% 
+        summarise(max.depth = min(Z))
+      
+      # extract cast number from filename
+      all.ctd.hdr <- all.ctd.hdr %>% 
+        left_join(ctd.depth)
+      
+      # summarize uctd casts for water classification
+      ctd.class <- all.ctd.casts %>% 
+        group_by(cast) %>% 
+        summarise(
+          min.T = min(T),
+          min.S = min(S),
+          max.T = max(T),
+          max.S = max(S)) %>% 
+        # assign classes based on salinity
+        mutate(class = case_when(
+          min.S <= 31.4 ~ "Type 1",
+          min.S >= 33.4 ~ "Type 2",
+          TRUE ~ "Type 3"))
+      
+      all.ctd.hdr <- all.ctd.hdr %>% 
+        left_join(select(ctd.class, cast, class)) %>% 
+        select(cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)
+      
+      # add water mass to the summary table and cast data for plotting
+      all.ctd.casts <- all.ctd.casts %>% 
+        left_join(select(ctd.class, cast, class)) %>% 
+        left_join(select(all.ctd.hdr, cast, leg))  
+      
+      # write table to CSV
+      write.csv(all.ctd.hdr, file = here("Output/cast_summary_ctd.csv"), 
+                quote = FALSE, row.names = FALSE)
+      
+      # Remove unprocessed casts from the summary
+      ctd.missing <- all.ctd.hdr %>% 
+        filter(!cast %in% all.ctd.casts$cast)
+      
+      # Exclude bad casts
+      all.ctd.casts <- all.ctd.casts %>%
+        filter(!cast %in% exclude.ctd)
+    } else {
+      ctd.missing <- all.ctd.hdr
+      
+      # Create column for depth if no casts are present
+      all.ctd.hdr <- all.ctd.hdr %>% 
+        mutate(max.depth = NA_real_,
+               class     = NA_character_,
+               lag       = NA_real_)
+    }
   }
   
   # write table to CSV
-  write.csv(ctd.missing, file = here("Output/unprocessed_ctd.csv"), 
-            quote = FALSE, row.names = FALSE)
+  if (exists("ctd.missing")) {
+    write.csv(ctd.missing, file = here("Output/unprocessed_ctd.csv"), 
+              quote = FALSE, row.names = FALSE)  
+  }
 }
 ```  
 
@@ -5014,125 +5133,140 @@ if (length(ctd.hdr) == 0) {
 Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r summarize-ctd-casts}
-# make a copy of uctd.summ
-ctd.table <- all.ctd.hdr %>% 
-  select("Cast" = cast.num,  "Filename" = cast, "Date" = cast.date, 
-         "Lat" = lat, "Long" = long, "Depth" = max.depth, "Class" = class, 
-         "Lag" = lag) %>% 
-  mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S")) 
-
-# Print table
-ctd.table %>%
-  mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                         background = ifelse(Lag <= 30, "white", "orange"))) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = F,
-        digits = c(0,0,0,2,2,0,0,0,0),
-        align = c("c","l","c","r","r","r","c","r")) %>% 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
-                full_width = F) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "500px")
+if (exists("all.ctd.hdr")) {
+  # make a copy of all.ctd.hdr
+  ctd.table <- all.ctd.hdr %>% 
+    select("Cast" = cast.num,  "Filename" = cast, "Date" = cast.date, 
+           "Lat" = lat, "Long" = long, "Depth" = max.depth, "Class" = class, 
+           "Lag" = lag) %>% 
+    mutate(Date = format(Date, "%m/%d/%Y %H:%M:%S")) 
+  
+  # Print table
+  ctd.table %>%
+    mutate(Lag = ifelse(is.na(Lag), 0, Lag)) %>%
+    mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
+                           background = ifelse(Lag <= 30, "white", "orange"))) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          digits = c(0,0,0,2,2,0,0,0,0),
+          align = c("c","l","c","r","r","r","c","r")) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    scroll_box(height = "500px") 
+} else {
+  print("No CTD casts present.")
+}
 ```  
 
 ### CTD cast plots  
 
 Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all CTD casts.
 
-```{r plot-ctd-casts}
-# Plot temperature data
-ctd.T <- ggplot(data = all.ctd.casts, 
-                aes(T, Z, group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nTemperature (C)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.ctd.casts$T),0) - 1, 
-                                round(max(all.ctd.casts$T),0) + 1),
-                     breaks = seq(round(min(all.ctd.casts$T),0) - 1, 
-                                  round(max(all.ctd.casts$T),0) + 1, 2),
-                     expand = c(0,0)) + 
-  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
-                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
-                     expand = c(0,0)) +
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Temperature")
-
-# Plot salinity data
-ctd.S <- ggplot(data = all.ctd.casts,
-                aes(S,Z,group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nSalinity") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.ctd.casts$S),2) - 0.1, 
-                                round(max(all.ctd.casts$S),2) + 0.1),
-                     breaks = seq(round(min(all.ctd.casts$S),2) - 0.1, 
-                                  round(max(all.ctd.casts$S),2) + 0.1, 1),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
-                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Salinity")
-
-# Plot salinity data
-ctd.Sv <- ggplot(data = all.ctd.casts, 
-                 aes(Sv, Z, group = cast, colour = factor(cast))) + 
-  geom_path(alpha = 0.75) +
-  xlab("\nSound speed (m/s)") + 
-  ylab("Depth (m)\n") +
-  # Configure x- and y-axis scales
-  scale_x_continuous(limits = c(round(min(all.ctd.casts$Sv),0) - 1,
-                                round(max(all.ctd.casts$Sv),0) + 1),
-                     breaks = seq(round(min(all.ctd.casts$Sv),0) - 1, 
-                                  round(max(all.ctd.casts$Sv),0) + 1, 10),
-                     expand = c(0,0)) +  
-  scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1),0),
-                     breaks = seq(round(min(all.ctd.casts$Z),digits = -1),0,25),
-                     expand = c(0,0)) + 
-  theme_bw() +
-  theme(panel.grid.major = element_line(size = 0.75),
-        legend.position  = "none") +
-  ggtitle("Sound speed")
-
-if (save.figs) {
-  # Arrange and save temperature, salinity, and sound speed plots
-  all.ctd.plots <- plot_grid(ctd.T, ctd.S,ctd.Sv, 
-                             nrow = 1, labels = c("a)","b)","c)"))
-  
-  ggsave(here("Figs/fig_ctd_cast_plots.png"),all.ctd.plots,
-         height = 5,width = 9)
+```{r plot-ctd-casts,eval=FALSE}
+if (exists("all.ctd.casts")) {
+  if (nrow(all.ctd.casts) > 0) {
+    # Plot temperature data
+    ctd.T <- ggplot(data = all.ctd.casts, 
+                    aes(T, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nTemperature (C)") + 
+      ylab("Depth (m)\n") +
+      # Configure x- and y-axis scales
+      scale_x_continuous(limits = c(round(min(all.ctd.casts$T),0) - 1, 
+                                    round(max(all.ctd.casts$T),0) + 1),
+                         breaks = seq(round(min(all.ctd.casts$T),0) - 1, 
+                                      round(max(all.ctd.casts$T),0) + 1, 2),
+                         expand = c(0,0)) + 
+      scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                         breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
+                         expand = c(0,0)) +
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75),
+            legend.position  = "none") +
+      ggtitle("Temperature")
+    
+    # Plot salinity data
+    ctd.S <- ggplot(data = all.ctd.casts,
+                    aes(S,Z,group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nSalinity") + 
+      ylab("Depth (m)\n") +
+      # Configure x- and y-axis scales
+      scale_x_continuous(limits = c(round(min(all.ctd.casts$S),2) - 0.1, 
+                                    round(max(all.ctd.casts$S),2) + 0.1),
+                         breaks = seq(round(min(all.ctd.casts$S),2) - 0.1, 
+                                      round(max(all.ctd.casts$S),2) + 0.1, 1),
+                         expand = c(0,0)) +  
+      scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1), 0),
+                         breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
+                         expand = c(0,0)) + 
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75),
+            legend.position  = "none") +
+      ggtitle("Salinity")
+    
+    # Plot salinity data
+    ctd.Sv <- ggplot(data = all.ctd.casts, 
+                     aes(Sv, Z, group = cast, colour = factor(cast))) + 
+      geom_path(alpha = 0.75) +
+      xlab("\nSound speed (m/s)") + 
+      ylab("Depth (m)\n") +
+      # Configure x- and y-axis scales
+      scale_x_continuous(limits = c(round(min(all.ctd.casts$Sv),0) - 1,
+                                    round(max(all.ctd.casts$Sv),0) + 1),
+                         breaks = seq(round(min(all.ctd.casts$Sv),0) - 1, 
+                                      round(max(all.ctd.casts$Sv),0) + 1, 10),
+                         expand = c(0,0)) +  
+      scale_y_continuous(limits = c(round(min(all.ctd.casts$Z),digits = -1),0),
+                         breaks = seq(round(min(all.ctd.casts$Z),digits = -1),0,25),
+                         expand = c(0,0)) + 
+      theme_bw() +
+      theme(panel.grid.major = element_line(size = 0.75),
+            legend.position  = "none") +
+      ggtitle("Sound speed")
+    
+    if (save.figs) {
+      # Arrange and save temperature, salinity, and sound speed plots
+      all.ctd.plots <- plot_grid(ctd.T, ctd.S,ctd.Sv, 
+                                 nrow = 1, labels = c("a)","b)","c)"))
+      
+      ggsave(here("Figs/fig_ctd_cast_plots.png"),all.ctd.plots,
+             height = 5,width = 9)
+    }
+    
+    include_graphics(here("Figs/fig_ctd_cast_plots.png")) 
+  }
+} else {
+  print("No CTD casts present.")
 }
-
-include_graphics(here("Figs/fig_ctd_cast_plots.png"))
 ```  
 
 ## Combine CTD/UCTD cast data
 
 ```{r combine-cast-data}
-# Combine all CTD and UCTD cast info in one data frame
-ctd.info.all <- all.ctd.hdr %>% 
-  bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
-  mutate(type = case_when(
-    str_detect(cast, "UCTD") ~ "UCTD",
-    TRUE ~ "CTD")) %>% 
-  filter(!is.na(lat), !is.na(long))
-
-# Combine all CTD and UCTD cast data in one data frame
-ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>%
-  left_join(select(ctd.info.all, cast, lat, long)) %>% 
-  filter(cast %in% ctd.info.all$cast)
-
-# Save to CSV file
-write.csv(ctd.data.all, file = here("Output/all_ctd_data.csv"), 
-          quote = F, row.names = F)
-
-write.csv(ctd.info.all, file = here("Output/all_ctd_info.csv"), 
-          quote = F, row.names = F)
+if (exists("all.ctd.hdr") & exists("uctd.summ")) {
+  # Combine all CTD and UCTD cast info in one data frame
+  ctd.info.all <- all.ctd.hdr %>% 
+    bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
+    mutate(type = case_when(
+      str_detect(cast, "UCTD") ~ "UCTD",
+      TRUE ~ "CTD")) %>% 
+    filter(!is.na(lat), !is.na(long))
+  
+  # Combine all CTD and UCTD cast data in one data frame
+  ctd.data.all <- bind_rows(all.ctd.casts, all.uctd.casts) %>%
+    left_join(select(ctd.info.all, cast, lat, long)) %>% 
+    filter(cast %in% ctd.info.all$cast)
+  
+  # Save to CSV file
+  write.csv(ctd.data.all, file = here("Output/all_ctd_data.csv"), 
+            quote = FALSE, row.names = FALSE)
+  
+  write.csv(ctd.info.all, file = here("Output/all_ctd_info.csv"), 
+            quote = FALSE, row.names = FALSE) 
+} else {
+  print("No CTD/UCTD casts present.")
+}
 ```
 
 ## Assign CTD casts to acoustic transects  
@@ -5140,104 +5274,120 @@ write.csv(ctd.info.all, file = here("Output/all_ctd_info.csv"),
 UCTD and CTD casts are assigned to acoustic transects so that they may be later used to determine the integration depth for estimating CPS abundance and biomass.  
 
 ```{r assign-ctd-transects}
-if (process.ctd) {
-  # Assign nearest acoustic transect to CTD/UCTD cast
-  # Create varialble for nearest cluster
-  ctd.info.all$transect.name <- NA_character_
-  ctd.info.all$transect      <- NA_real_
-  
-  # Configure progress bar
-  pb <- tkProgressBar("CTD Transect Assignment", "CTD Transect", 0, 100, 50)
-  
-  # Match CTD casts to transects
-  for (i in 1:nrow(ctd.info.all)) {
-    # Calculate distance between each CTD/UCTD and all NASC data
-    transect.distance <- distance(ctd.info.all$lat[i], ctd.info.all$long[i], 
-                                  nasc$lat, nasc$long, units = "nm")
-    # Assign trawl name and number with minimum distance to the CTD/UCTD cast
-    ctd.info.all$transect.name[i] <- nasc$transect.name[which.min(transect.distance)]
-    ctd.info.all$transect[i]      <- nasc$transect[which.min(transect.distance)]
-    # Update the progress bar
-    pb.prog <- round(i/nrow(ctd.info.all)*100)
-    info <- sprintf("%d%% done", pb.prog)
-    setTkProgressBar(pb, pb.prog, 
-                     sprintf("CTD Transect Assignment (%s)", info), info)
+  if (exists("ctd.info.all")) {
+    if (process.ctd) {
+    # Assign nearest acoustic transect to CTD/UCTD cast
+    # Create varialble for nearest cluster
+    ctd.info.all$transect.name <- NA_character_
+    ctd.info.all$transect      <- NA_real_
+    
+    # Configure progress bar
+    pb <- tkProgressBar("CTD Transect Assignment", "CTD Transect", 0, 100, 50)
+    
+    # Match CTD casts to transects
+    for (i in 1:nrow(ctd.info.all)) {
+      # Calculate distance between each CTD/UCTD and all NASC data
+      transect.distance <- distance(ctd.info.all$lat[i], ctd.info.all$long[i], 
+                                    nasc$lat, nasc$long, units = "nm")
+      # Assign trawl name and number with minimum distance to the CTD/UCTD cast
+      ctd.info.all$transect.name[i] <- nasc$transect.name[which.min(transect.distance)]
+      ctd.info.all$transect[i]      <- nasc$transect[which.min(transect.distance)]
+      # Update the progress bar
+      pb.prog <- round(i/nrow(ctd.info.all)*100)
+      info <- sprintf("%d%% done", pb.prog)
+      setTkProgressBar(pb, pb.prog, 
+                       sprintf("CTD Transect Assignment (%s)", info), info)
+    }
+    # Close progress bar
+    close(pb)
+    
+    # Save results
+    save(ctd.info.all, file = here("Output/all_ctd_info.Rdata"))
+    
+  } else {
+    if (file.exists(here("Output/all_ctd_info.Rdata"))) {
+      # Load ctd.info.all
+      load(here("Output/all_ctd_info.Rdata"))
+    }
   }
-  # Close progress bar
-  close(pb)
   
-  # Save results
-  save(ctd.info.all, file = here("Output/all_ctd_info.Rdata"))
+  # Project CTD info table
+  ctd.info.all <- project_df(ctd.info.all, to = 3310)
   
+  # Convert CTD dataframe so sf for mapping
+  ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = crs.geog) %>% 
+    mutate(cast.type = type)
 } else {
-  # Load ctd.info.all
-  load(here("Output/all_ctd_info.Rdata"))
+  print("No CTD/UCTD casts.")
 }
-# Project CTD info table
-ctd.info.all <- project_df(ctd.info.all, to = 3310)
-
-# Convert CTD dataframe so sf for mapping
-ctd.info.sf <- st_as_sf(ctd.info.all, coords = c("long","lat"), crs = crs.geog) %>% 
-  mutate(cast.type = type)
 ```
 
 ## Map CTD/UCTD cast locations  
 
 Maps of CTD (blue) and UCTD (purple) cast locations, labeled by a) cast number and b) sequential acoustic transect number (not transect names from Echoview templates). Panel b) is used to check whether CTD casts are being assigned to the appropriate acoustic transects.
 
-```{r map-ctd-casts}
-if (save.figs) {
-  # Plot all CTDs and UCTDs, labeled by cast number
-  map.ctd.uctd <- base.map + 
-    # Plot vessel track
-    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
-    # Plot CTD cast locations
-    geom_shadowtext(data = ctd.info.all, aes(X, Y, label = cast.num, colour = type),
-                    size = 2, bg.colour = "white", fontface = "bold") + 
-    scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
-    coord_sf(crs = crs.proj,
-             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+```{r map-ctd-casts,eval=FALSE}
+if (exists("ctd.info.all")) {
+  if (save.figs) {
+    # Plot all CTDs and UCTDs, labeled by cast number
+    map.ctd.uctd <- base.map + 
+      # Plot vessel track
+      geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+      # Plot CTD cast locations
+      geom_shadowtext(data = ctd.info.all, aes(X, Y, label = cast.num, colour = type),
+                      size = 2, bg.colour = "white", fontface = "bold") + 
+      scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
+      coord_sf(crs = crs.proj,
+               xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+               ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+    
+    # Plot all CTDs and UCTDs, labeled by transect assignment
+    map.ctd.tx <- base.map + 
+      # Plot vessel track
+      geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+      # Plot CTD cast locations
+      geom_shadowtext(data = ctd.info.all, aes(X, Y, label = transect, colour = type),
+                      size = 2, bg.colour = "white", fontface = "bold") + 
+      scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
+      coord_sf(crs = crs.proj,
+               xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+               ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+    
+    # Combine plots into two panels
+    map.ctd.all <- plot_grid(map.ctd.uctd, map.ctd.tx, 
+                             nrow = 1, labels = c("a)","b)"))
+    
+    # Save maps
+    ggsave(here("Figs/fig_ctd_uctd_map.png"), map.ctd.uctd, 
+           width = map.width, height = map.height)
+    
+    ggsave(here("Figs/fig_ctd_tx_map.png"),   map.ctd.tx,   
+           width = map.width, height = map.height)
+    
+    ggsave(here("Figs/fig_ctd_map_all.png"),  map.ctd.all,  
+           width = map.width*2, height = map.height)
+  }
   
-  # Plot all CTDs and UCTDs, labeled by transect assignment
-  map.ctd.tx <- base.map + 
-    # Plot vessel track
-    geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
-    # Plot CTD cast locations
-    geom_shadowtext(data = ctd.info.all, aes(X, Y, label = transect, colour = type),
-                    size = 2, bg.colour = "white", fontface = "bold") + 
-    scale_colour_manual(name = "Type", values = c(CTD = "blue", UCTD = "purple")) +
-    coord_sf(crs = crs.proj,
-             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-  
-  # Combine plots into two panels
-  map.ctd.all <- plot_grid(map.ctd.uctd, map.ctd.tx, 
-                           nrow = 1, labels = c("a)","b)"))
-  
-  # Save maps
-  ggsave(here("Figs/fig_ctd_uctd_map.png"), map.ctd.uctd, 
-         width = map.width, height = map.height)
-  
-  ggsave(here("Figs/fig_ctd_tx_map.png"),   map.ctd.tx,   
-         width = map.width, height = map.height)
-  
-  ggsave(here("Figs/fig_ctd_map_all.png"),  map.ctd.all,  
-         width = map.width*2, height = map.height)
+  include_graphics(here("Figs/fig_ctd_map_all.png"))
+} else {
+  print("No CTD casts present.")
 }
 
-include_graphics(here("Figs/fig_ctd_map_all.png"))
 ```  
 
 (ref:all-casts-mapview) An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click points for more information about each cast.
 
-```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)'}
-# Create interactive map of CTD locations
-mapview(nav.paths.sf, color = "black", alpha = 0.5, 
-        layer.name = "Vessel track", col.regions = "black",
-        legend = FALSE) +
-  mapview(ctd.info.sf, cex = 4, zcol = "leg",
-          layer.name = "CTD Casts", legend = TRUE)
+```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)',eval=FALSE}
+if (exists("ctd.info.sf")) {
+  # Create interactive map of CTD locations
+  mapview(nav.paths.sf, color = "black", alpha = 0.5, 
+          layer.name = "Vessel track", col.regions = "black",
+          legend = FALSE) +
+    mapview(ctd.info.sf, cex = 4, zcol = "leg",
+            layer.name = "CTD Casts", legend = TRUE)  
+} else {
+  print("No CTD casts present.")
+}
 ```
 
 ## Calculate mixed-layer depth for each CTD cast  
@@ -5261,15 +5411,17 @@ big.nasc.sf <- big.nasc %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
 # Convert CTD and UCTD cast data to sf -----------------------------------
-ctd.sf <- ctd.info.all %>%
-  # bind_rows(all.uctd.hdr) %>% 
-  mutate(name = paste(type, cast.num),
-         label = paste("Cast:", cast),
-         popup = paste('<b>Cast:', cast, '</b><br/>',
-                       'Transect name:', transect.name, '<br/>',
-                       'Max. depth:', max.depth, 'm<br/>')) %>% 
-  select(name, lat, long, max.depth, type, label, popup) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+if (exists("ctd.info.all")) {
+  ctd.sf <- ctd.info.all %>%
+    # bind_rows(all.uctd.hdr) %>% 
+    mutate(name = paste(type, cast.num),
+           label = paste("Cast:", cast),
+           popup = paste('<b>Cast:', cast, '</b><br/>',
+                         'Transect name:', transect.name, '<br/>',
+                         'Max. depth:', max.depth, 'm<br/>')) %>% 
+    select(name, lat, long, max.depth, type, label, popup) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+}
 
 # Convert haul catch to sf and create labels ----------------------------------
 cluster.catch.sf <- cluster.pie %>%
@@ -5372,7 +5524,7 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 
 (ref:interactive-data-explorer) Interactively explore acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.
 
-```{r interactive-data-explorer, fig.cap='(ref:interactive-data-explorer)',echo=FALSE}
+```{r interactive-data-explorer, fig.align='left', fig.cap='(ref:interactive-data-explorer)',echo=FALSE}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
 
@@ -5399,10 +5551,10 @@ cpsPal <- colorFactor(
     "Sardinops sagax", "Scomber japonicus", "Trachurus symmetricus"))
 
 # Create color pallette for planned transects
-txPal    <- colorFactor(c("red","blue","orange","green"), 
-                        c("Adaptive","Compulsory","Nearshore","Offshore"))
+txPal    <- colorFactor(c("red","blue","orange","green", "yellow"), 
+                        c("Adaptive","Compulsory","Nearshore","Offshore", "Transit"))
 
-# Create color pallette for trawls casts (presently unused)
+# Create color palette for trawls casts (presently unused)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
 
@@ -5426,257 +5578,279 @@ strata.primary.sub <- strata.primary %>%
 strata.nse.sub <- strata.nse %>% 
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
 
-# Create leaflet map
-i.map <- leaflet() %>% 
-  # Enable tile caching
-  enableTileCaching() %>% 
-  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-  addProviderTiles(providers$Esri.OceanBasemap, 
-                   options = tileOptions(useCache = useCachedTile,
-                                         crossOrigin = useCrossOrigin)) %>%
-  # Add EEZs
-  addPolylines(data = eez_usa, color = "#000414", weight = 3, 
-               label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
-  addPolylines(data = eez_can, color = "#000414", weight = 3, 
-               label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
-  addPolylines(data = eez_mex, color = "#000414", weight = 3, 
-               label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
-  # Add bathymetry contours
-  addPolylines(data = bathy, color = "white", weight = 2, 
-               label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
-  # Add State waters
-  addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
-              opacity = 0.75,
-              label = ~htmlEscape("OR State Waters"),
-              group = "State Waters") %>%
-  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
-              opacity = 0.75,
-              label = ~htmlEscape("CA State Waters"),
-              group = "State Waters") %>%
-  # Add CA MPAs
-  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
-              fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
-  # Add OR MPAs
-  addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
-              fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
-  # Add core planned transects
-  addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
-               color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)),
-               popup = ~popup,
-               group = "Planned Transects (Core)") %>%
-  addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
-                   popup = ~popup,
-                   group = "Planned Transects (Core)") %>%
-  # Add ancillary planned transects 
-  addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
-               color = ~txPal(Type), weight = 3, opacity = 0.5,
-               label = ~htmlEscape(paste(Type, Transect)), 
-               popup = ~popup,
-               group = "Planned Transects (Ancillary)") %>%
-  addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
-                   popup = ~popup,
-                   group = "Planned Transects (Ancillary)") %>%
-  # Add nearshore stratum polygons
-  addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
-              weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-              fillOpacity = 0.50, group = "Biomass (Herring)") %>%
-  addPolygons(data = filter(strata.nse.sub, scientificName == "Engraulis mordax"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-              fillOpacity = 0.50, group = "Biomass (Anchovy)") %>%
-  addPolygons(data = filter(strata.nse.sub, scientificName == "Sardinops sagax"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-              fillOpacity = 0.50, group = "Biomass (Sardine)") %>%
-  addPolygons(data = filter(strata.nse.sub, scientificName == "Scomber japonicus"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-              fillOpacity = 0.50, group = "Biomass (P. mackerel)") %>%
-  addPolygons(data = filter(strata.nse.sub, scientificName == "Trachurus symmetricus"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-              fillOpacity = 0.50, group = "Biomass (J. mackerel)") %>%
-  # Add primary stratum polygons
-  addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-              group = "Biomass (Herring)") %>%
-  addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent", 
-              group = "Biomass (Anchovy)") %>%
-  addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-              group = "Biomass (Sardine)") %>%
-  addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-              group = "Biomass (P. mackerel)") %>%
-  addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
-              weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-              group = "Biomass (J. mackerel)") %>%
-  # Add biomass density
-  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Clupea pallasii"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                   label = ~label, popup = ~popup, 
-                   group = "Biomass (Herring)") %>% 
-  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   label = ~label, popup = ~popup, 
-                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                   group = "Biomass (Anchovy)") %>% 
-  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Sardinops sagax"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   label = ~label, popup = ~popup, 
-                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                   group = "Biomass (Sardine)") %>% 
-  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Scomber japonicus"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   label = ~label, popup = ~popup, 
-                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                   group = "Biomass (P. mackerel)") %>% 
-  addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Trachurus symmetricus"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   label = ~label, popup = ~popup, 
-                   fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                   group = "Biomass (J. mackerel)") %>% 
-  # Add nav data
-  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
-               label = ~leg, group = "Vessel Track") %>%
-  # Add CUFES data
-  addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                   popup = ~popup, group = "CUFES Egg Density") %>%
-  addCircleMarkers(data = cufes.squid.sf,
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
-                   popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
-  addCircleMarkers(data = cufes.ofe.sf,
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
-                   popup = ~popup, group = "CUFES Egg Density-Other") %>% 
-  addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
-                   fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
-                   group = "CUFES (Negative)") %>%
-  # Add CTD and UCTD data
-  addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
-                   weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
-                   label = ~label, popup = ~popup, group =  "CTD Casts") %>% 
-  # Add backscatter data
-  addCircleMarkers(data = filter(nasc.plot.sf, NASC < 200), 
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  "#000414", 
-                   label = ~label, popup = ~popup, 
-                   group = "Backscatter-CPS (Small)") %>%
-  addCircleMarkers(data = filter(nasc.plot.sf, NASC >= 200), 
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
-                   label = ~label, popup = ~popup,
-                   group = "Backscatter-CPS") %>%
-  # Add trawl paths 
-  addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
-               popup = ~popup, label = ~label, 
-               group = "Trawls") %>% 
-  # Add trawl catch
-  addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
-                   opacity = 0.8, fillOpacity = 1, fillColor =  "white",
-                   popup = ~popup, label = ~label,
-                   group =  "Trawls") %>%
-  # Add NASC super clusters
-  addPolygons(data = nasc.super.clusters, 
-              weight = 2, fillColor = "#4046ED", color = "#000414", 
-              label = ~label, popup = ~popup,
-              group = "Trawl Cluster Polygons") %>% 
-  addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
-  # Add backscatter outliers
-  addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
-             group = "Backscatter (Large)") %>%
-  # Add backscatter legend
-  leaflet::addLegend("bottomleft", colors = nasc.colors.all,
-                     values = sort(unique(nasc.plot.sf$bin.level)),
-                     labels = nasc.labels.all,
-                     title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
-                     opacity = 1, group = "Backscatter-CPS") %>%
-  # Add CUFES legend
-  leaflet::addLegend("bottomleft", colors = cufes.colors,
-                     values = sort(unique(cufes.sf$Species)),
-                     labels = cufes.spp.labels,
-                     title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
-                     opacity = 1, group = "CUFES Egg Density") %>%
-  # Add biomass density legend
-  leaflet::addLegend("bottomleft", colors = dens.colors,
-                     values = sort(unique(nasc.density.sf$bin.level)),
-                     labels = dens.labels,
-                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                     opacity = 1, group = "Biomass (Anchovy)") %>%
-  leaflet::addLegend("bottomleft", colors = dens.colors,
-                     values = sort(unique(nasc.density.sf$bin.level)),
-                     labels = dens.labels,
-                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                     opacity = 1, group = "Biomass (Sardine)") %>%
-  leaflet::addLegend("bottomleft", colors = dens.colors,
-                     values = sort(unique(nasc.density.sf$bin.level)),
-                     labels = dens.labels,
-                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                     opacity = 1, group = "Biomass (J. mackerel)") %>%
-  leaflet::addLegend("bottomleft", colors = dens.colors,
-                     values = sort(unique(nasc.density.sf$bin.level)),
-                     labels = dens.labels,
-                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                     opacity = 1, group = "Biomass (P. mackerel)") %>%
-  leaflet::addLegend("bottomleft", colors = dens.colors,
-                     values = sort(unique(nasc.density.sf$bin.level)),
-                     labels = dens.labels,
-                     title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                     opacity = 1, group = "Biomass (Herring)") %>%
-  # Add scale bar
-  addScaleBar(position = "bottomright") %>%
-  # Add map coordinates
-  leafem::addMouseCoordinates() %>% 
-  # Add measurement tool
-  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
-             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
-             position = "topleft") %>% 
-  # Add layer controls
-  addLayersControl(
-    overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
-                      "Bathymetry Contours",
-                      "Planned Transects (Core)", "Planned Transects (Ancillary)",
-                      "Vessel Track", "Vessel Positions", "Trawls", 
-                      "Trawl Cluster Polygons", "CTD Casts",
-                      "Backscatter-CPS", "Backscatter-CPS (Small)",
-                      "Backscatter-Krill", "Backscatter (Large)",
-                      "CUFES Egg Density", "CUFES Egg Density-Other",
-                      "CUFES Egg Density-Squid", "CUFES (Negative)",
-                      "Biomass (Anchovy)", "Biomass (Sardine)",
-                      "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
-                      "Biomass (Herring)"),
-    options = layersControlOptions(collapsed = F)) %>%  
-  hideGroup(c(
-    "Exclusive Economic Zones",
-    "Backscatter (Large)", "Backscatter-Krill", 
-    "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
-    "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
-    "Planned Transects (Ancillary)", "Trawl Cluster Polygons",
-    "Biomass (Anchovy)", "Biomass (Sardine)",
-    "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
-    "Biomass (Herring)", "CTD Casts")) %>% 
-  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
-            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
-
-# Save Leaflet map to HTML file
-if (save.imap) {
-  mapshot(i.map, url = here("Output/estimateBiomass_explorer.HTML"))
-}
-
-# Save imap
-dir_create(here("Output/imap"))
-save(i.map, file = here("Output/imap/estimateBiomass_explorer.Rdata"))
-
-# Display map
-i.map
+if (do.imap) {
+  # Create leaflet map
+  i.map <- leaflet() %>% 
+    # Enable tile caching
+    enableTileCaching() %>% leaflet() %>% 
+    # Enable tile caching
+    enableTileCaching() %>% 
+    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    addProviderTiles(providers$Esri.OceanBasemap, 
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+    addProviderTiles(providers$Esri.OceanBasemap, 
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
+    addPolylines(data = eez_can, color = "#000414", weight = 3, 
+                 label = "EEZ-Canada", group = "Exclusive Economic Zones") %>% 
+    addPolylines(data = eez_mex, color = "#000414", weight = 3, 
+                 label = "EEZ-Mexico", group = "Exclusive Economic Zones") %>% 
+    # Add bathymetry contours
+    addPolylines(data = bathy, color = "white", weight = 2, 
+                 label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
+    # Add State waters
+    addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
+                opacity = 0.75,
+                label = ~htmlEscape("OR State Waters"),
+                group = "State Waters") %>%
+    addPolygons(data = ca_waters, weight = 2, fillColor = "transparent",
+                opacity = 0.75,
+                label = ~htmlEscape("CA State Waters"),
+                group = "State Waters") %>%
+    # Add CA MPAs
+    addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+                fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+    # Add OR MPAs
+    addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+                fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+    # Add planned transects
+    addPolylines(data = transects.sf,
+                 color = ~txPal(Type), weight = 3, opacity = 0.5,
+                 label = ~htmlEscape(paste(Type, Transect)),
+                 popup = ~popup,
+                 group = "Planned Transects") %>%
+    addCircleMarkers(data = wpts.sf,
+                     radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects") %>%
+    # Add core planned transects
+    # addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
+    #              color = ~txPal(Type), weight = 3, opacity = 0.5,
+    #              label = ~htmlEscape(paste(Type, Transect)),
+    #              popup = ~popup,
+    #              group = "Planned Transects (Core)") %>%
+    # addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
+    #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
+    #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+    #                  label = ~htmlEscape(paste(Type, Waypoint)),
+    #                  popup = ~popup,
+    #                  group = "Planned Transects (Core)") %>%
+    # # Add ancillary planned transects 
+    # addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
+    #              color = ~txPal(Type), weight = 3, opacity = 0.5,
+    #              label = ~htmlEscape(paste(Type, Transect)), 
+    #              popup = ~popup,
+    #              group = "Planned Transects (Ancillary)") %>%
+    # addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+    #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
+    #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+    #                  label = ~htmlEscape(paste(Type, Waypoint)),
+    #                  popup = ~popup,
+    #                  group = "Planned Transects (Ancillary)") %>%
+    # Add nearshore stratum polygons
+    addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
+                weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                fillOpacity = 0.50, group = "Biomass (Herring)") %>%
+    addPolygons(data = filter(strata.nse.sub, scientificName == "Engraulis mordax"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                fillOpacity = 0.50, group = "Biomass (Anchovy)") %>%
+    addPolygons(data = filter(strata.nse.sub, scientificName == "Sardinops sagax"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                fillOpacity = 0.50, group = "Biomass (Sardine)") %>%
+    addPolygons(data = filter(strata.nse.sub, scientificName == "Scomber japonicus"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                fillOpacity = 0.50, group = "Biomass (P. mackerel)") %>%
+    addPolygons(data = filter(strata.nse.sub, scientificName == "Trachurus symmetricus"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                fillOpacity = 0.50, group = "Biomass (J. mackerel)") %>%
+    # Add primary stratum polygons
+    addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                group = "Biomass (Herring)") %>%
+    addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent", 
+                group = "Biomass (Anchovy)") %>%
+    addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                group = "Biomass (Sardine)") %>%
+    addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                group = "Biomass (P. mackerel)") %>%
+    addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
+                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                group = "Biomass (J. mackerel)") %>%
+    # Add biomass density
+    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Clupea pallasii"),
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                     label = ~label, popup = ~popup, 
+                     group = "Biomass (Herring)") %>% 
+    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     label = ~label, popup = ~popup, 
+                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                     group = "Biomass (Anchovy)") %>% 
+    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Sardinops sagax"),
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     label = ~label, popup = ~popup, 
+                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                     group = "Biomass (Sardine)") %>% 
+    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Scomber japonicus"),
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     label = ~label, popup = ~popup, 
+                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                     group = "Biomass (P. mackerel)") %>% 
+    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Trachurus symmetricus"),
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     label = ~label, popup = ~popup, 
+                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                     group = "Biomass (J. mackerel)") %>% 
+    # Add nav data
+    addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+                 label = ~leg, group = "Vessel Track") %>%
+    # Add CUFES data
+    addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                     popup = ~popup, group = "CUFES Egg Density") %>%
+    addCircleMarkers(data = cufes.squid.sf,
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                     popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
+    addCircleMarkers(data = cufes.ofe.sf,
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                     popup = ~popup, group = "CUFES Egg Density-Other") %>% 
+    addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                     fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                     group = "CUFES (Negative)") %>%
+    # Add CTD and UCTD data
+    addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
+                     weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
+                     label = ~label, popup = ~popup, group =  "CTD Casts") %>% 
+    # Add backscatter data
+    addCircleMarkers(data = filter(nasc.plot.sf, NASC < 200), 
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     fillOpacity = 0.75, fillColor =  "#000414", 
+                     label = ~label, popup = ~popup, 
+                     group = "Backscatter-CPS (Small)") %>%
+    addCircleMarkers(data = filter(nasc.plot.sf, NASC >= 200), 
+                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                     fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                     label = ~label, popup = ~popup,
+                     group = "Backscatter-CPS") %>%
+    # Add trawl paths 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~popup, label = ~label, 
+                 group = "Trawls") %>% 
+    # Add trawl catch
+    addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     popup = ~popup, label = ~label,
+                     group =  "Trawls") %>%
+    # Add NASC super clusters
+    addPolygons(data = nasc.super.clusters, 
+                weight = 2, fillColor = "#4046ED", color = "#000414", 
+                label = ~label, popup = ~popup,
+                group = "Trawl Cluster Polygons") %>% 
+    addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
+    # Add backscatter outliers
+    addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
+               group = "Backscatter (Large)") %>%
+    # Add backscatter legend
+    leaflet::addLegend("bottomleft", colors = nasc.colors.all,
+                       values = sort(unique(nasc.plot.sf$bin.level)),
+                       labels = nasc.labels.all,
+                       title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
+                       opacity = 1, group = "Backscatter-CPS") %>%
+    # Add CUFES legend
+    leaflet::addLegend("bottomleft", colors = cufes.colors,
+                       values = sort(unique(cufes.sf$Species)),
+                       labels = cufes.spp.labels,
+                       title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
+                       opacity = 1, group = "CUFES Egg Density") %>%
+    # Add biomass density legend
+    leaflet::addLegend("bottomleft", colors = dens.colors,
+                       values = sort(unique(nasc.density.sf$bin.level)),
+                       labels = dens.labels,
+                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                       opacity = 1, group = "Biomass (Anchovy)") %>%
+    leaflet::addLegend("bottomleft", colors = dens.colors,
+                       values = sort(unique(nasc.density.sf$bin.level)),
+                       labels = dens.labels,
+                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                       opacity = 1, group = "Biomass (Sardine)") %>%
+    leaflet::addLegend("bottomleft", colors = dens.colors,
+                       values = sort(unique(nasc.density.sf$bin.level)),
+                       labels = dens.labels,
+                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                       opacity = 1, group = "Biomass (J. mackerel)") %>%
+    leaflet::addLegend("bottomleft", colors = dens.colors,
+                       values = sort(unique(nasc.density.sf$bin.level)),
+                       labels = dens.labels,
+                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                       opacity = 1, group = "Biomass (P. mackerel)") %>%
+    leaflet::addLegend("bottomleft", colors = dens.colors,
+                       values = sort(unique(nasc.density.sf$bin.level)),
+                       labels = dens.labels,
+                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
+                       opacity = 1, group = "Biomass (Herring)") %>%
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    leafem::addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft") %>% 
+    # Add layer controls
+    addLayersControl(
+      overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+                        "Bathymetry Contours",
+                        "Planned Transects",
+                        "Vessel Track", "Vessel Positions", "Trawls", 
+                        "Trawl Cluster Polygons", "CTD Casts",
+                        "Backscatter-CPS", "Backscatter-CPS (Small)",
+                        "Backscatter-Krill", "Backscatter (Large)",
+                        "CUFES Egg Density", "CUFES Egg Density-Other",
+                        "CUFES Egg Density-Squid", "CUFES (Negative)",
+                        "Biomass (Anchovy)", "Biomass (Sardine)",
+                        "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
+                        "Biomass (Herring)"),
+      options = layersControlOptions(collapsed = FALSE)) %>%  
+    hideGroup(c(
+      "Exclusive Economic Zones",
+      "Backscatter (Large)", "Backscatter-Krill", 
+      "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
+      "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
+      "Trawl Cluster Polygons",
+      "Biomass (Anchovy)", "Biomass (Sardine)",
+      "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
+      "Biomass (Herring)", "CTD Casts")) %>% 
+    fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+              imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+  
+  # Save Leaflet map to HTML file
+  if (save.imap) {
+    mapshot(i.map, url = here("Output/estimateBiomass_explorer.HTML"))
+  }
+  
+  # Save imap
+  dir_create(here("Output/imap"))
+  save(i.map, file = here("Output/imap/estimateBiomass_explorer.Rdata"))
+  
+  # Display map
+  i.map
+} else {
+   print("No interactive map created. Check \"do.imap\" if unexpected.")
+ }
 ```  
 
 # Match intervals for comparing EK60 and EK80 data (optional)
@@ -5708,12 +5882,6 @@ Point estimates of biomass (tons, t) for each CPS species by sampling stratum an
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc, file = here("Output/nasc_final.Rdata"))
 
-# Create new list for computing biomass estimates
-point.estimates      <- data.frame()
-point.estimates.nse  <- data.frame()
-nasc.nse.final       <- data.frame()
-nasc.summ.strata     <- data.frame()
-
 # Calculate point estimates for each species
 for (i in unique(strata.final$scientificName)) {
   # Subset strata for species i
@@ -5735,21 +5903,25 @@ for (i in unique(strata.final$scientificName)) {
     select(scientificName, everything())
   
   # Combine nasc summaries
-  nasc.summ.strata <- bind_rows(nasc.summ.strata, 
-                                nasc.temp.summ)
+  if (exists("nasc.summ.strata")) {
+    nasc.summ.strata <- bind_rows(nasc.summ.strata, 
+                                  nasc.temp.summ)
+  } else {
+    nasc.summ.strata <- nasc.temp.summ
+  }
   
   # Create data frame with stratum and area (m^2)  
   stratum.info <- strata.primary %>%
     filter(scientificName == i) %>%
     select(stratum, area) %>%
     mutate(area = as.numeric(area)) %>%
-    st_set_geometry(NULL)
+    st_set_geometry(NULL) 
   
   stratum.info.nse <- strata.nse %>% 
     filter(scientificName == i) %>% 
     select(stratum, area) %>%
     mutate(area = as.numeric(area)) %>% 
-    st_set_geometry(NULL)
+    st_set_geometry(NULL) 
   
   # Get nearshore nasc data
   nasc.nse <- estimate_inshore(nasc.temp, bathy_5m_df) %>% 
@@ -5757,17 +5929,31 @@ for (i in unique(strata.final$scientificName)) {
            key            = paste(transect, int)) %>% 
     filter(stratum %in% stratum.info.nse$stratum)
   
-  nasc.nse.final <- bind_rows(nasc.nse.final, nasc.nse)
+  if (exists("nasc.nse.final")) {
+    nasc.nse.final <- bind_rows(nasc.nse.final, nasc.nse)
+  } else {
+    nasc.nse.final <- nasc.nse
+  }
   
   # Compute point estimates
   # Currently has na.rm = TRUE for calculting biomass
-  point.estimates <- bind_rows(point.estimates,
-                               data.frame(scientificName = i,
-                                          estimate_point(nasc.temp, stratum.info, species = i)))
+  if (exists("point.estimates")) {
+    point.estimates <- bind_rows(point.estimates,
+                                 data.frame(scientificName = i,
+                                            estimate_point(nasc.temp, stratum.info, species = i)))
+  } else {
+    point.estimates <- data.frame(scientificName = i,
+                                  estimate_point(nasc.temp, stratum.info, species = i))
+  }
   
-  point.estimates.nse <- bind_rows(point.estimates.nse,
-                                   data.frame(scientificName = i,
-                                              estimate_point(nasc.nse, stratum.info.nse, species = i)))
+  if (exists("point.estimates.nse")) {
+    point.estimates.nse <- bind_rows(point.estimates.nse,
+                                     data.frame(scientificName = i,
+                                                estimate_point(nasc.nse, stratum.info.nse, species = i)))
+  } else {
+    point.estimates.nse <- data.frame(scientificName = i,
+                                      estimate_point(nasc.nse, stratum.info.nse, species = i))
+  }
 }
 
 # Save results
@@ -5812,11 +5998,11 @@ pe.stratum.all <- which(pe$Stratum == "All")
 # Format point estimates table
 pe %>% 
   rename(Biomass = biomass.mean.point) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = F,
+  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
         align = c("l","c","r","r","r"),
         digits = c(0),
         format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>% 
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = c(1))
@@ -5852,11 +6038,11 @@ write_csv(pe.nse, here("Output/biomass_point_estimates_nse_final.csv"))
 # Format point estimates table
 pe.nse %>%
   rename(Biomass = biomass.mean.point) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c","r","r","r"),
         digits = c(0),
         format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>% 
   row_spec(0, align = c("c")) %>%
   # row_spec(pe.stratum.all, bold = TRUE, color = c("#000000"),background = "#8B8C94") %>%
@@ -5898,7 +6084,7 @@ if (do.bootstrap) {
     stratum.info <- strata.primary %>% 
       select(scientificName, stratum, area) %>%
       mutate(area = as.numeric(area)) %>% 
-      st_set_geometry(NULL)
+      st_set_geometry(NULL) 
     
     # Subset strata for species i
     strata.temp <- filter(strata.final, scientificName == i) %>% 
@@ -6145,7 +6331,7 @@ be.survey <- be.sample %>%
 # Save results
 write.csv(be.survey, 
           file  = here("Output/biomass_bootstrap_estimates_survey.csv"),
-          quote = F,row.names = F)
+          quote = FALSE,row.names = FALSE)
 
 save(be.survey, file = here("Output/biomass_bootstrap_estimates_survey.Rdata"))
 ```  
@@ -6167,7 +6353,7 @@ be <- be.stratum %>%
 # Save results
 write.csv(be,
           file = here("Output/biomass_bootstrap_estimates_final.csv"),
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 save(be,  file = here("Output/biomass_bootstrap_estimates_final.Rdata"))
 
 # Create data frame for database export
@@ -6188,11 +6374,11 @@ be %>%
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
          "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c",rep("r",ncol(be) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   # row_spec(be.stratum.all, bold = TRUE, color = "black", background = "#c1c2cc") %>% 
@@ -6215,11 +6401,11 @@ be %>%
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
          "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-  kable(format = knitr.format, booktabs = TRUE,escape = F,
+  kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
         align = c("l","c",rep("r",ncol(be) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = c(1)) %>%
@@ -6276,7 +6462,7 @@ include_graphics(here("Figs/fig_biomass_histogram_survey.png"))
 
 Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species throughout the entire survey area, the mean (solid vertical line), and 95% confidence intervals (dashed vertical lines) (**Note: differences in x- and y-axis limits**).
 
-```{r biomass-bootstrap-estimates-nearshore, include=FALSE}
+```{r biomass-bootstrap-estimates-nse, include=FALSE}
 # Generate multiple bootstrap biomass estimates
 if (do.bootstrap) {
   # Create data frame for biomass estimates
@@ -6545,7 +6731,7 @@ be.survey.nse <- be.sample.nse %>%
 # Save results
 write.csv(be.survey.nse, 
           file  = here("Output/biomass_bootstrap_estimates_survey_nearshore.csv"),
-          quote = F,row.names = F)
+          quote = FALSE,row.names = FALSE)
 
 save(be.survey.nse, file = here("Output/biomass_bootstrap_estimates_survey_nearshore.Rdata"))
 ```
@@ -6570,7 +6756,7 @@ be.nse[atm:::is.nan.df(be.nse)] <- NA
 # Save results
 write.csv(be.nse,
           file = here("Output/biomass_bootstrap_estimates_final_nse.csv"),
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 
 save(be.nse, 
      file = here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
@@ -6589,11 +6775,11 @@ be.nse %>%
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
          "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c",rep("r",ncol(be.nse) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   # row_spec(be.stratum.all, bold = TRUE, color = "black", background = "#c1c2cc") %>% 
@@ -6616,11 +6802,11 @@ be.nse %>%
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
          "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c",rep("r",ncol(be.nse) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = c(1)) %>%
@@ -6693,11 +6879,11 @@ if (exists("pe.os")) {
   # Print point estimate table
   pe.os %>%
     rename(Biomass = biomass.mean.point) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F,
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
           align = c("l","c","r","r","r"),
           digits = c(0),
           format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>% 
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = c(1))
@@ -6723,11 +6909,11 @@ if (exists("be.os")) {
            CV                   = biomass.cv,
            "Lower CI$_{95\\%}$" = lower.ci.B,
            "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F,
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
           align = c("l","c",rep("r",ncol(be.os) - 2)),
           digits = c(0),
           format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     # row_spec(be.stratum.all, bold = TRUE, color = "black", background = "#c1c2cc") %>% 
@@ -6754,11 +6940,11 @@ if (exists("be.os")) {
            CV                   = biomass.cv,
            "Lower CI$_{95\\%}$" = lower.ci.B,
            "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-    kable(format = knitr.format, booktabs = TRUE,escape = F,
+    kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
           align = c("l","c",rep("r",ncol(be.os) - 2)),
           digits = c(0),
           format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = c(1)) %>%
@@ -6786,11 +6972,11 @@ if (exists("pe.ns")) {
   # Print point estimate table
   pe.ns %>%
     rename(Biomass = biomass.mean.point) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = F,
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
           align = c("l","c","r","r","r"),
           digits = c(0),
           format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>% 
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = c(1))
@@ -6816,11 +7002,11 @@ if (exists("be.ns")) {
            CV                   = biomass.cv,
            "Lower CI$_{95\\%}$" = lower.ci.B,
            "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-    kable(format = knitr.format, booktabs = TRUE,escape = F,
+    kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
           align = c("l","c",rep("r",ncol(be.ns) - 2)),
           digits = c(0),
           format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = c(1:2)) %>%
@@ -6846,11 +7032,11 @@ if (exists("be.ns")) {
            CV                   = biomass.cv,
            "Lower CI$_{95\\%}$" = lower.ci.B,
            "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-    kable(format = knitr.format, booktabs = TRUE,escape = F,
+    kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
           align = c("l","c",rep("r",ncol(be.ns) - 2)),
           digits = c(0),
           format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = F) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = c(1)) %>%
@@ -6880,7 +7066,7 @@ if (combine.regions) {
   }
   
   # Save combined nasc
-  save(nasc.combo, here("Output/nasc_combo.Rdata"))
+  save(nasc.combo, file = here("Output/nasc_combo.Rdata"))
   
   # Average cps.nasc over defined interval
   # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
@@ -7085,7 +7271,7 @@ for (i in unique(strata.final$scientificName)) {
     group_by(cluster, cluster.name) %>%
     summarise(pct = glue_collapse(unique(pct.txt), sep = ", ")) %>%
     ungroup() %>% 
-    mutate(pct = str_replace(pct,"0%","<0.1%"),
+    mutate(pct = str_replace(pct,"^0%","<0.1%"),
            cluster.name = fct_reorder(as.factor(cluster.name), cluster)) %>% 
     droplevels()
   
@@ -7098,7 +7284,7 @@ for (i in unique(strata.final$scientificName)) {
            cluster.name = paste("Cluster", cluster)) %>%
     filter(pct > 0) %>% # Remove rows with no data
     ungroup() %>% 
-    mutate(pct = str_replace(pct.txt,"0%","<0.1%"),
+    mutate(pct = str_replace(pct.txt,"^0%","<0.1%"),
            cluster.name = fct_reorder(as.factor(cluster.name), cluster)) %>% 
     droplevels()
   
@@ -7146,7 +7332,12 @@ for (i in unique(strata.final$scientificName)) {
     pull()
   
   # Set aspect ratio for saved figures
-  a.ratio <- round(n.facets)/lf.ncols
+  if (round(n.facets)/lf.ncols > 0.5) {
+    a.ratio <- round(n.facets)/lf.ncols  
+  } else {
+    a.ratio <- 0.5
+  }
+  
   
   # Save plot
   ggsave(lf.summ.plot, 
@@ -7181,7 +7372,7 @@ for (i in cps.spp) {
 # Create list for storing plots
 L.disagg.plots <- list()
 
-# Plot length-disaggrated abundance and biomass by length class for each species
+# Plot length-disaggregated abundance and biomass by length class for each species
 for (i in unique(abund.summ$Species)) {
   for (j in unique(abund.summ$Stock[abund.summ$Species == i])) {
     # Get y-axis limits for abundance and biomass plots
@@ -7243,11 +7434,11 @@ for (i in cps.spp) {
 L.abund.table <- abund.summ %>%
   ungroup() %>% 
   select(Species, Stock, SL, Abundance = abundance) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = F, longtable = TRUE,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE, longtable = TRUE,
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = F) %>%
+                full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>% 
   collapse_rows(columns = c(1)) %>% 
   scroll_box(height = "500px")
@@ -7262,10 +7453,18 @@ save(L.abund.table, abund.summ, file = here("Output/abundance_table_all.Rdata"))
 (ref:biom-dens-anch-n) Biomass densities of northern stock of Northern Anchovy (_Engraulis mordax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one anchovy. The gray line represents the vessel track.
 
 ```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.height='100%',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7273,10 +7472,18 @@ if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))) {
 
 ```{r l-disagg-anch-n,fig.cap='(ref:l-disagg-anch-n)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for anchovy
-if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7300,7 +7507,7 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-anch-n)') %>%
@@ -7321,10 +7528,18 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
 
 ```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for anchovy
-if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7332,10 +7547,18 @@ if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
 
 ```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for anchovy
-if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7359,7 +7582,7 @@ if ("Engraulis mordax" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-anch-n)') %>%
@@ -7394,10 +7617,18 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Engraulis morda
 
 ```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for sardine
-if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7405,10 +7636,18 @@ if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
 
 ```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for sardine
-if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7432,7 +7671,7 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-sar-n)') %>%
@@ -7452,11 +7691,18 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
 (ref:biom-dens-sar-s) Biomass densities of southern stock of Pacific Sardine (_Sardinops sagax_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one sardine. The gray line represents the vessel track.
 
 ```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.height='100%',fig.pos='H'}
-# Insert biomass density plot for sardine
-if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7464,10 +7710,18 @@ if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))) {
 
 ```{r l-disagg-sar-s,fig.cap='(ref:l-disagg-sar-s)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for sardine
-if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7491,7 +7745,7 @@ if ("Sardinops sagax" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-sar-s)') %>%
@@ -7525,10 +7779,18 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax
 
 ```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for P. mackerel
-if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7536,10 +7798,18 @@ if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
 
 ```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for P. mackerel
-if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7563,7 +7833,7 @@ if ("Scomber japonicus" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-mack)') %>%
@@ -7595,21 +7865,36 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Scomber japonic
 
 ```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.height='100%',fig.pos='H'}
 # Insert biomass density plot for jack mackerel
-if (file.exists(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
 (ref:l-disagg-jack) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for Jack Mackerel (_Trachurus symmetricus_) in the survey area.
 
 ```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.height='100%',fig.pos='H'}
-# Insert disaggregated abundance plots for jack mackerel
-if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7633,7 +7918,7 @@ if ("Trachurus symmetricus" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-jack)') %>%
@@ -7664,11 +7949,18 @@ if (file.exists(here("Figs/fig_cluster_relative_length_frequency_Trachurus symme
 (ref:biom-dens-her) Biomass densities of Pacific herring (_Clupea pallasii_), per strata, throughout the survey region. The blue numbers represent the locations of trawl clusters with at least one herring. The gray line represents the vessel track.
 
 ```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.height='100%',fig.pos='H'}
-# Insert biomass density plot for herring
-if (file.exists(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))) {
-  include_graphics(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Clupea pallasii-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7676,10 +7968,18 @@ if (file.exists(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))) {
 
 ```{r l-disagg-her,fig.cap='(ref:l-disagg-her)',out.height='100%',fig.pos='H'}
 # Insert disaggregated abundance plots for herring
-if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
-  include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))  
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Clupea pallasii-All.png"))  
+  } else {
+    print("No data for this stock.")
+  } 
 } else {
-  print("No data for this stock.")
+  if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))  
+  } else {
+    print("No data for this stock.")
+  }
 }
 ```
 
@@ -7703,7 +8003,7 @@ if ("Clupea pallasii" %in% unique(abund.summ$Species)) {
         #               Abundance = function(x) sprintf("%.0f", x)) %>% 
         autofit()
     } else {
-      kable(abund.summ.table, booktabs = F,escape = F,longtable = T,
+      kable(abund.summ.table, booktabs = FALSE,escape = FALSE,longtable = T,
             digits = c(0),
             format.args = list(big.mark = ","),
             caption = '(ref:l-freq-summ-her)') %>%
@@ -7754,7 +8054,7 @@ nasc.density.nse <- nasc.nse.final %>%
 
 # Create maps of nearshore biomass
 if (save.figs) {
-  source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))  
+  source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))
 }
 ```
 
@@ -7880,7 +8180,7 @@ cal.params <- cal.res %>%
 # add noise estimates
 # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
 if (is.na(cal.noise[cal.vessels])) { 
-  cal.params$noise <- rep("N/A", length(cal.files))
+  cal.params$noise <- rep("N/A", nrow(cal.res))
 }else{
   cal.params$noise <- unlist(cal.noise[cal.vessels])
 }
@@ -7955,19 +8255,19 @@ save(all.output,
 
 write.csv(all.output,
           file = here("Output/cal_output_table.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 ```
 
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80).
 
-```{r cal-results,results='asis'}
+```{r cal-results,results='asis', eval=FALSE}
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(all.output)
 } else {
   # print LaTeX table for HTML or PDF
   kable(all.output, format = knitr.format, align = c("l","l",rep("c",ncol(all.output) - 2)),
-        booktabs = T, escape = F,
+        booktabs = T, escape = FALSE,
         caption = '(ref:cal-results)') %>% 
     kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>% 
     row_spec(18, hline_after = T) %>% 

@@ -1,3 +1,11 @@
+# Processing controls ----------------------------------------------------
+estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.offshore  <- T # Process offshore backscatter data
+process.nearshore <- T # Process near backscatter data
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
+process.seine     <- T # Process purse seine data
+
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10.1 # For Lasker 
@@ -17,9 +25,12 @@ uctd.spacing   <- 15
 # Number of transects to remove from the start (if near Mexico)
 rm.n.transects <- 0
 
+# Locations to remove from planning (e.g., north, central, south, and mexico)
+rm.location <- NA # c("mexico")
+
 # Randomize
 do.random <- FALSE
-save.csv  <- FALSE
+save.csv  <- TRUE
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
@@ -46,7 +57,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2019-06-12", "2019-07-06",
                                           "2019-09-10")))
 
 # Define ERDDAP data variables
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2019-06-12" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2019-09-10" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
@@ -197,6 +208,7 @@ lf.ncols <- 6
 nasc.vessels           <- c("RL","LM", "SD", "LBC") 
 nasc.vessels.offshore  <- c("RL","SD")
 nasc.vessels.nearshore <- c("LBC","LM","SD")
+nasc.vessels.krill     <- "RL"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
@@ -253,10 +265,10 @@ nasc.pattern.cps       <- c(RL  = "-Final 38 kHz CPS.csv",
                             SD  = "_CPS*.*-Final 38 kHz CPS.csv",
                             LBC = "-Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*Juan Krill Final 120.csv",
-                            LM  = "*Juan Krill Final 120.csv",
-                            SD  = "*Juan Krill Final 120.csv",
-                            LBC = "*Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "-Juan Krill Final 120.csv",
+                            LM  = "-Juan Krill Final 120.csv",
+                            SD  = "-Juan Krill Final 120.csv",
+                            LBC = "-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
@@ -425,7 +437,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 10 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE

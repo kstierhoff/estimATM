@@ -185,7 +185,7 @@ route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>%
          distance_to_next = as.numeric(
            na.omit(c(0, st_distance(geometry,
                                     lead(geometry, 
-                                         default = empty),
+                                         default = NA),
                                     by_element = TRUE))))/1852) %>% 
   mutate(distance_to_next = c(distance_to_next[2:n()],0),
          distance_cum = cumsum(distance_to_next),

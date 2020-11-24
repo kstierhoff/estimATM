@@ -42,7 +42,14 @@ if (nrow(haul.pos) > 0) {
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 }
 
-# save trawl plot
-ggsave(trawl.pie.haul.wt,
-       filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
-       width = map.width, height = map.height)
+if (doc.name == "simulateBiomass.Rmd") {
+  # Save nasc plot
+  ggsave(trawl.pie.haul.wt,
+         filename = here("Simulation/Figs/fig_trawl_proportion_haul_wt.png"),
+         width = map.width, height = map.height) 
+} else {
+  # Save nasc plot
+  ggsave(nasc.map.cps,
+         filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
+         width = map.width, height = map.height) 
+  }

@@ -13,7 +13,9 @@ for (j in unique(nasc$vessel.name)) {
                       # left_join(select(tx.nn, transect.name, spacing = min.dist)) %>% 
                       mutate(
                         brg = swfscMisc::bearing(lat.i, long.i,
-                                                 lat.o, long.o)[1])  
+                                                 lat.o, long.o)[1]) %>% 
+    # filter(!transect.name %in% c("RL 595","RL 900")) %>% 
+    ungroup()
   
   # Get original inshore transect ends -------------------------------------------
   # Select original inshore waypoints
