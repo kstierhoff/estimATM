@@ -37,7 +37,8 @@ if (process.csv.krill) {
         nasc.vessel.krill.temp <- extract_csv(nasc.files.krill[ii]) %>% 
           mutate(vessel.name = i,
                  sounder = sounder.type[i],
-                 transect = str_replace(transect, nasc.pattern.krill[i],""))
+                 transect = str_replace(transect, nasc.pattern.krill[i],""),
+                 time.align  = align.time(datetime, 1))
         
         # Combine results
         if (exists("nasc.vessel.krill")) {
@@ -138,6 +139,8 @@ if (process.csv.krill) {
                   file = here("Data/Backscatter", i, 
                               paste0("nasc_vessel_krill_", i, "_offshore.rds")))
           
+          write_csv(nasc.offshore.krill, here("Output", paste0("nasc_offshore_krill_", i, ".csv")))
+          
           # Filter offshore transects
           nasc.vessel.krill <- nasc.vessel.krill %>% 
             filter(str_detect(transect.orig, nasc.pattern.offshore[i], negate = TRUE)) 
@@ -156,6 +159,8 @@ if (process.csv.krill) {
                   file = here("Data/Backscatter", i, 
                               paste0("nasc_vessel_krill_", i, "_inshore.rds")))
           
+          write_csv(nasc.inshore.krill, here("Output", paste0("nasc_inshore_krill_", i, ".csv")))
+          
           # Filter offshore transects
           nasc.vessel.krill <- nasc.vessel.krill %>% 
             filter(str_detect(transect.orig, nasc.pattern.inshore[i], negate = TRUE)) 
@@ -173,6 +178,8 @@ if (process.csv.krill) {
           saveRDS(nasc.nearshore.krill, 
                   file = here("Data/Backscatter", i, 
                               paste0("nasc_vessel_krill_", i, "_nearshore.rds")))
+          
+          write_csv(nasc.nearshore.krill, here("Output", paste0("nasc_nearshore_krill_", i, ".csv")))
           
           nasc.vessel.krill <- nasc.vessel.krill %>% 
             filter(str_detect(transect.orig, nasc.pattern.nearshore[i], negate = TRUE)) %>% 
@@ -204,28 +211,6 @@ if (process.csv.krill) {
         # Manually remove individual transects
         if (!is.na(tx.rm[i])) {
           nasc.vessel.krill <- filter(nasc.vessel.krill, !transect.orig %in% unlist(tx.rm[i])) 
-        }
-        
-        # Set stop integration depth
-        if (source.cps.nasc[i]) {
-          # Use externally supplied cps.nasc with variable integration depth (from CTD.app)
-          # Read file and create unique key for joining with nasc.vessel.krill
-          cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
-            mutate(key = paste(lat, long, dist_m),
-                   datetime = ymd_hms(paste(date, time))) 
-          
-          # Join nasc.vessel.krill and cps.nasc on datetime
-          nasc.vessel.krill <- nasc.vessel.krill %>% 
-            left_join(select(cps.nasc.temp, datetime, cps.nasc))
-          
-        } else {
-          # Use fixed integration depth (NASC.50), with or without surface noise removal
-          if (rm.surface[i]) {
-            # Remove surface noise, often from Saildrone backscatter
-            nasc.vessel.krill <- mutate(nasc.vessel.krill, cps.nasc = NASC.70 - NASC.5)
-          } else {
-            nasc.vessel.krill <- mutate(nasc.vessel.krill, cps.nasc = NASC.70)
-          }
         }
         
         # Save processed CSV data from each survey vessel
@@ -343,10 +328,40 @@ nasc.krill.summ <- nasc.krill %>%
 
 # Save NASC summary
 save(nasc.krill.summ, file = here("Output/nasc_summ_tx_krill.Rdata"))
-write_csv(nasc.krill, here("Output/nasc_krill.csv"))
+write_csv(nasc.krill, here("Output/nasc_final_krill.csv"))
 
-# ggplot(nasc.krill, aes(long, lat, group = transect, colour = factor(transect))) +
+# krill.plot <- ggplot(nasc.krill, aes(long, lat, group = transect, colour = factor(transect))) +
 #   geom_point(aes(size = NASC.70)) +
 #   geom_path(colour = "black") +
 #   coord_quickmap() +
 #   theme(legend.position = "none")
+# 
+# cps.plot <- ggplot(nasc, aes(long, lat, group = transect, colour = factor(transect))) +
+#   geom_point(aes(size = NASC.70)) +
+#   geom_path(colour = "black") +
+#   coord_quickmap() +
+#   theme(legend.position = "none")
+# 
+# library(patchwork)
+# 
+# krill.plot + cps.plot
+# 
+# 
+# tmp <- filter(nasc, is.na(cps.nasc))
+# 
+# ggplot(tmp, aes(long, lat)) + geom_point()
+# 
+# krill.tx <- unique(nasc.krill$transect.orig)
+# cps.tx   <- unique(nasc$transect.orig)
+
+# krill.summ <- nasc.krill %>% 
+#   group_by(transect.orig) %>% 
+#   tally(name = 'n_krill') 
+# 
+# cps.summ <- nasc %>% 
+#   group_by(transect.orig) %>% 
+#   tally(name = "n_cps")
+# 
+# all.summ <- krill.summ %>% 
+#   left_join(cps.summ) %>% 
+#   mutate(diff = n_krill - n_cps)

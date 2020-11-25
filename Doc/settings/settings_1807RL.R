@@ -267,9 +267,13 @@ nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
 # Regex pattern for identifying transits
 nasc.pattern.transit   <- c(RL  = "Transit",
                             SD  = "\\d{3}T")
+# Recursively search NASC directories
+nasc.recurse           <- c(RL = FALSE)
+# Max NASC value for removing outliers
+nasc.max               <- 10000*19
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = TRUE,
+source.cps.nasc        <- c(RL  = FALSE,
                             SD  = FALSE,
                             OS  = FALSE, # in the offshore strata
                             NS  = FALSE) # in the neashore strata

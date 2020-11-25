@@ -37,15 +37,27 @@ if (process.offshore) {
   }
   
   # Format data for processing
-  nasc.offshore <- nasc.offshore %>%
-    mutate(
-      id = seq_along(Interval),
-      transect = str_replace(transect, "O", ""),
-      transect.name = paste(vessel.name, transect),
-      stratum       = 1,
-      int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
-                              nasc.summ.interval),
-                labels = F, include.lowest = TRUE))
+  if (!survey.name == "1807RL") {
+    nasc.offshore <- nasc.offshore %>%
+      mutate(
+        id = seq_along(Interval),
+        transect = str_replace(transect, "O", ""),
+        transect.name = paste(vessel.name, transect),
+        stratum       = 1,
+        int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
+                                nasc.summ.interval),
+                  labels = F, include.lowest = TRUE))  
+  } else {
+    nasc.offshore <- nasc.offshore %>%
+      mutate(
+        id = seq_along(Interval),
+        transect = str_replace(transect, "M", ""),
+        transect.name = paste(vessel.name, transect),
+        stratum       = 1,
+        int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
+                                nasc.summ.interval),
+                  labels = F, include.lowest = TRUE))
+  }
   
   # Export data for processing using the CTD app
   write_csv(nasc.offshore, here("Output/CTDapp/CTDapp_All_Offshore.csv"))
@@ -1081,6 +1093,7 @@ for (i in cps.spp) {
 
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.offshore, file = here("Output/nasc_offshore_final.Rdata"))
+write_csv(nasc.offshore, file = here("Output/nasc_offshore_final.csv"))
 
 # Calculate point estimates for each species
 for (i in unique(strata.final.os$scientificName)) {
