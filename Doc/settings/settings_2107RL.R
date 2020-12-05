@@ -8,7 +8,7 @@ process.seine     <- F # Process purse seine data
 
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
-tx.spacing.fsv  <- 10.1 # For Lasker 
+tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
 tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
 
@@ -24,6 +24,10 @@ uctd.spacing   <- 15
 
 # Number of transects to remove from the start (if near Mexico)
 rm.n.transects <- 0
+# Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
+rm.i.transects <- NA
+# rm.i.transects <- c(paste(60:127, "Compulsory"), paste(60:127, "Adaptive"), 
+#                     paste(119:300, "Nearshore"), "1 Transit") 
 
 # Locations to remove from planning (e.g., north, central, south, and mexico)
 rm.location <- NA # c("mexico")
@@ -31,7 +35,49 @@ rm.location <- NA # c("mexico")
 # Randomize
 do.random <- FALSE
 save.csv  <- TRUE
-show.maps <- FALSE
+show.maps <- TRUE
+
+## Used by processTransects.R -----------
+# GPX file location
+gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20200629_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
+gpx.file         <- "rosepoint_waypoints.gpx"
+
+# Define transit and survey speed (kn) for estimating progress
+survey.speed     <- 9.5
+transit.speed    <- 12
+survey.direction <- "Southward" # Southward or Northward; to compute day lengths
+
+# Beginning transit length (d)
+transit.distance <- 850
+transit.duration <- ceiling(transit.distance/transit.speed/24)
+
+# Leg waste (d) due to transit, late departures, and early arrivals
+leg.waste <- c(4, 2, 2, 2)
+
+# Remove transects to adjust survey progress
+transects.rm <- NA # Numbered transects to remove
+
+# Compute leg durations and breaks ----------------------------------------
+# Define leg ends
+leg.ends <- c(ymd("2021-07-22"), ymd("2021-07-22"),
+              ymd("2021-07-25"), ymd("2021-08-22"),
+              ymd("2021-09-01"), ymd("2021-09-21"),
+              ymd("2021-09-24"), ymd("2021-10-22"))
+
+# Compute days per leg
+leg.days <- (leg.ends[seq(2, length(leg.ends), 2)] - leg.ends[seq(1,length(leg.ends) - 1, 2)]) + 1
+
+# Calculate total days at sea (DAS)
+total.das <- sum(leg.days)
+
+# Leg durations used to split transects 
+leg.length <- c(0, leg.days - leg.waste)
+
+# Leg breaks
+leg.breaks.gpx <- cumsum(as.numeric(leg.length))
+
+# Region vector used to break transects for waypoint files
+region.vec <- c(0, 32.5353, 34.7, 41.99, 48.490, 55)
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
@@ -116,15 +162,17 @@ mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Pos
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
-crs.proj <- 3310 # Califoria Albers Equal Area
+crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
 map.height <- 10
+# Map height for specific regions; used in makeTransects
+map.height.region <- 7
 
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
 useCrossOrigin <- F # USe cross origin
-leaflet.checkTransects.simple <- FALSE # Use a simple Leaflet for checkTransects
+leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
@@ -135,7 +183,8 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
                 "Newport","Point Conception","Cape Mendocino","Columbia River",
                 "Cape Blanco","Bodega Bay","Westport","Fort Bragg",
                 "Morro Bay","Long Beach","Cape Scott","San Diego",
-                "Ensenada","Punta Eugenia","El Rosario")
+                "Ensenada","Punta Eugenia","El Rosario","Cabo San Lucas",
+                "Punta Abreojos","San Carlos")
 
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"

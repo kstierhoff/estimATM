@@ -1,29 +1,29 @@
-library(here)
-library(tidyverse)
-library(marmap)
-library(sf)
+# library(here)
+# library(tidyverse)
+# library(marmap)
+# library(sf)
+# 
+# # Extract bathymetry along each transect ----------------------------------
+# get.bathy <- FALSE
+# 
+# # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
+# if (get.bathy) {
+#   noaa.bathy <- getNOAA.bathy(lon1 = min(transects$Longitude - 1),
+#                               lon2 = max(transects$Longitude + 1),
+#                               lat1 = max(transects$Latitude) + 1,
+#                               lat2 = min(transects$Latitude) - 1,
+#                               resolution = 1)
+#   # Save bathy results
+#   save(noaa.bathy, file = here("Data/GIS/bathy_data_1907RL.Rdata"))
+# } else {
+#   load(here("Data/GIS/bathy_data_1907RL.Rdata"))
+# }
 
-# Extract bathymetry along each transect ----------------------------------
-get.bathy <- FALSE
-
-# Get bathymetry data across range of nav data (plus/minus one degree lat/long)
-if (get.bathy) {
-  noaa.bathy <- getNOAA.bathy(lon1 = min(transects$Longitude - 1), 
-                              lon2 = max(transects$Longitude + 1),
-                              lat1 = max(transects$Latitude) + 1, 
-                              lat2 = min(transects$Latitude) - 1, 
-                              resolution = 1)
-  # Save bathy results
-  save(noaa.bathy, file = here("Data/GIS/bathy_data_1907RL.Rdata"))  
-} else {
-  load(here("Data/GIS/bathy_data_1907RL.Rdata"))
-}
-
-wpts <- read_csv(here("Data/Nav/waypoints_1907RL_scb.csv"))
-
-# extract transect waypoints
-transects <- wpts %>% 
-  mutate(group = paste(transect, region)) 
+# wpts <- read_csv(here("Data/Nav/waypoints_1907RL_scb.csv"))
+# 
+# # extract transect waypoints
+# transects <- wpts %>% 
+#   mutate(group = paste(transect, region)) 
 
 # Create a df for transect profiles
 tx.prof <- data.frame()
@@ -32,11 +32,11 @@ tx.prof <- data.frame()
 for (i in unique(transects$group)) {
   tx.tmp <- filter(transects, group == i)
   
-  tmp <- get.transect(bathy_dem, tx.tmp$long[1], tx.tmp$lat[1],
-                      tx.tmp$long[nrow(tx.tmp)], tx.tmp$lat[nrow(tx.tmp)],
+  tmp <- get.transect(noaa.bathy, tx.tmp$Longitude[1], tx.tmp$Latitude[1],
+                      tx.tmp$Longitude[nrow(tx.tmp)], tx.tmp$Latitude[nrow(tx.tmp)],
                       distance = TRUE) %>% 
-    mutate(transect = unique(tx.tmp$transect),
-           region = unique(tx.tmp$region)) %>% 
+    mutate(transect = unique(tx.tmp$Transect),
+           region = unique(tx.tmp$Region)) %>% 
     filter(depth < 0)
   
   tx.prof <- bind_rows(tx.prof,tmp)
@@ -60,8 +60,8 @@ ggsave(tx.ecdf.plot, filename = here("Figs/fig_transect_depth_ecdf.png"),
        height = 6, width = 10)
 
 transect.paths <- transects %>% 
-  st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
-  group_by(transect, region) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = 4326) %>% 
+  group_by(Transect, Region) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   ungroup() %>% 
@@ -73,8 +73,8 @@ bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>%
   rename(Depth = Contour) %>% 
   mutate(depth = as.factor(Depth))
 
-mapview::mapview(transect.paths) + 
-  mapview::mapview(bathy, zcol = "depth", legend = FALSE)
+# mapview::mapview(transect.paths) + 
+#   mapview::mapview(bathy, zcol = "depth")
 
 # # Same analysis, but for WA/OR nearshore transects only -------------------
 # # Restrict ECDF to nearshore transects off OR/WA
