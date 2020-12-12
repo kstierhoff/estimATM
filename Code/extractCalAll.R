@@ -1,4 +1,5 @@
 # Create output directory ------------------------------------------------------
+dir_create(here("Data/Calibration"))
 dir_create(here("Output/Calibration/All"))
 
 # Import calibartion directories -----------------------------------------------
