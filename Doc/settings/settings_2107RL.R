@@ -59,10 +59,10 @@ transects.rm <- NA # Numbered transects to remove
 
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
-leg.ends <- c(ymd("2021-07-22"), ymd("2021-07-22"),
-              ymd("2021-07-25"), ymd("2021-08-22"),
+leg.ends <- c(ymd("2021-07-02"), ymd("2021-07-22"),
+              ymd("2021-07-25"), ymd("2021-08-15"),
               ymd("2021-09-01"), ymd("2021-09-21"),
-              ymd("2021-09-24"), ymd("2021-10-22"))
+              ymd("2021-09-24"), ymd("2021-10-15"))
 
 # Compute days per leg
 leg.days <- (leg.ends[seq(2, length(leg.ends), 2)] - leg.ends[seq(1,length(leg.ends) - 1, 2)]) + 1

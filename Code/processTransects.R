@@ -397,7 +397,7 @@ survey.map.leg = base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit")),
           aes(linetype = Type), colour = "grey50", show.legend = "line") +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory"), !is.na(Leg)),
           aes(linetype = Type, colour = factor(Leg)), show.legend = "line") +
   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "dashed", "Compulsory" = "solid", 
