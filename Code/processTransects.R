@@ -99,7 +99,8 @@ uctds <- wpts %>%
            loc == 3 ~ "WA/OR",
            loc == 4 ~ "Vancouver Is.",
            TRUE ~ "Other")),
-         Region = fct_reorder(Region, loc)) %>% 
+         Region = fct_reorder(Region, loc),
+         Type = "UCTD") %>% 
   rename(Latitude = lat, Longitude = lon) %>% 
   arrange(station) 
 
@@ -114,7 +115,8 @@ pairovets <- wpts %>%
            loc == 3 ~ "WA/OR",
            loc == 4 ~ "Vancouver Is.",
            TRUE ~ "Other")),
-         Region = fct_reorder(Region, loc)) %>% 
+         Region = fct_reorder(Region, loc),
+         Type   = "Pairovet") %>% 
   mutate(transect = as.numeric(str_sub(name, 1, 3))) %>%
   group_by(transect) %>% 
   mutate(station.order = seq_along(transect)) %>% 
@@ -291,40 +293,42 @@ transects.sf <- transects %>%
 wpt.export <- select(transects, Transect, name, everything(), -group, -Leg, -Waypoint) %>% 
   rename(Waypoint = name)
 
+dir_create(here("Output/tables_updated"))
+
 # Write all waypoints
-write_csv(wpt.export, here("Output/tables/waypoints_all.csv"))
+write_csv(wpt.export, here("Output/tables_updated/waypoints_all.csv"))
 
 # Write adaptive waypoints
 if (nrow(filter(wpt.export, Type == "Adaptive")) > 0) {
-  write_csv(filter(wpt.export, Type == "Adaptive"),  here("Output/tables/waypoints_adaptive.csv"))  
+  write_csv(filter(wpt.export, Type == "Adaptive"),  here("Output/tables_updated/waypoints_adaptive.csv"))  
 }
 # Write compulsory waypoints
 if (nrow(filter(wpt.export, Type == "Compulsory")) > 0) {
-  write_csv(filter(wpt.export, Type == "Compulsory"),  here("Output/tables/waypoints_compulsory.csv"))  
+  write_csv(filter(wpt.export, Type == "Compulsory"),  here("Output/tables_updated/waypoints_compulsory.csv"))  
 }
 # Write Saildrone waypoints
 if (nrow(filter(wpt.export, Type == "Saildrone")) > 0) {
-  write_csv(filter(wpt.export, Type == "Saildrone"),  here("Output/tables/waypoints_saildrone.csv"))  
+  write_csv(filter(wpt.export, Type == "Saildrone"),  here("Output/tables_updated/waypoints_saildrone.csv"))  
 }
 # Write mammal waypoints
 if (nrow(filter(wpt.export, Type == "Mammal")) > 0) {
-  write_csv(filter(wpt.export, Type == "Mammal"),  here("Output/tables/waypoints_mammal.csv"))  
+  write_csv(filter(wpt.export, Type == "Mammal"),  here("Output/tables_updated/waypoints_mammal.csv"))  
 }
 # Write nearshore waypoints
 if (nrow(filter(wpt.export, Type == "Nearshore")) > 0) {
-  write_csv(filter(wpt.export, Type == "Nearshore"),  here("Output/tables/waypoints_nearshore.csv"))  
+  write_csv(filter(wpt.export, Type == "Nearshore"),  here("Output/tables_updated/waypoints_nearshore.csv"))  
 }
 # Write transit waypoints
 if (nrow(filter(wpt.export, Type == "Transit")) > 0) {
-  write_csv(filter(wpt.export, Type == "Transit"),  here("Output/tables/waypoints_transit.csv"))  
+  write_csv(filter(wpt.export, Type == "Transit"),  here("Output/tables_updated/waypoints_transit.csv"))  
 }
 # Write offshore waypoints
 if (nrow(filter(wpt.export, Type == "Offshore")) > 0) {
-  write_csv(filter(wpt.export, Type == "Offshore"),  here("Output/tables/waypoints_offshore.csv"))  
+  write_csv(filter(wpt.export, Type == "Offshore"),  here("Output/tables_updated/waypoints_offshore.csv"))  
 }
 # Write extra waypoints
 if (nrow(filter(wpt.export, Type == "Extra")) > 0) {
-  write_csv(filter(wpt.export, Type == "Extra"),  here("Output/tables/waypoints_extra.csv"))  
+  write_csv(filter(wpt.export, Type == "Extra"),  here("Output/tables_updated/waypoints_extra.csv"))  
 }
 
 # Export survey plan for survey report -----------------------------------------
@@ -332,7 +336,7 @@ wpt.plan <- wpt.export %>%
   filter(Type %in% c("Adaptive","Compulsory")) %>% 
   select(line = Transect, wpt = Waypoint, lon = Longitude, lat = Latitude, type = Type) %>% 
   # mutate(type = tolower(type)) %>% 
-  write_csv(here("Output/tables/waypoint_plan.csv"))
+  write_csv(here("Output/tables_updated/waypoint_plan.csv"))
 
 if (nrow(uctds) > 0) {
   # format UCTD stations for export
@@ -342,7 +346,7 @@ if (nrow(uctds) > 0) {
   # export to csv
   # Write UCTD waypoints
   if (nrow(uctd.export) > 0) {
-    write_csv(uctd.export,  here("Output/tables/waypoints_uctd.csv"))  
+    write_csv(uctd.export,  here("Output/tables_updated/waypoints_uctd.csv"))  
   }  
 }
 
@@ -354,7 +358,7 @@ if (nrow(pairovets) > 0) {
   # export to csv
   # Write Pairovet waypoints
   if (nrow(pairovet.export) > 0) {
-    write_csv(pairovet.export,  here("Output/tables/waypoints_pairovet.csv"))  
+    write_csv(pairovet.export,  here("Output/tables_updated/waypoints_pairovet.csv"))  
   }  
 }
 
@@ -449,8 +453,15 @@ if (update.routes) {
       id = name) %>% 
     arrange(transect.name, desc(Longitude))
   
-  # Create output directory
+  # Create output directories
   dir_create(here("Output", c("waypoints_updated")))
+  dir_create(here("Output/routes_updated"), c("Adaptive","Compulsory","Nearshore","Saildrone"))
+  
+  # Delete existing CSV files
+  rm.csv.routes <- dir_ls(here("Output/routes_updated"), regexp = "*.csv", recurse = TRUE)
+  rm.csv.wpts <- dir_ls(here("Output/waypoints_updated"), regexp = "*.csv", recurse = TRUE)
+  file_delete(rm.csv.routes)
+  file_delete(rm.csv.wpts)
 
   # Write all waypoints to one CSV (to import one route)
   write_csv(select(updated.route, id, lat = Latitude, long = Longitude),
@@ -462,14 +473,6 @@ if (update.routes) {
   # write_csv(select(waypoints.final.ns.csv, id, lat, long), 
   #           here("Output/waypoints/transect_wpts_ns.csv"))
   
-  
-  # Create output directories
-  dir_create(here("Output/routes_updated"), c("Adaptive","Compulsory","Nearshore","Saildrone"))
-  
-  # Delete existing CSV files
-  rm.csv <- dir_ls(here("Output/routes_updated"), regexp = "*.csv", recurse = TRUE)
-  file_delete(rm.csv)
-  
   # Write waypoints from individual files to multiple CSV to create single routes
   # Compulsory transects
   for (i in unique(updated.route$transect.name)) {
@@ -478,7 +481,8 @@ if (update.routes) {
       select(id = name, Latitude, Longitude)
 
     if (nrow(wpts.sub) > 0) {
-      write_csv(wpts.sub, here("Output/routes_updated/Compulsory", paste0(i, "C.csv")))
+      write_csv(wpts.sub, here("Output/routes_updated/Compulsory", paste0(i, "C.csv")),
+                col_names = FALSE)
     }
   }
   
@@ -489,7 +493,8 @@ if (update.routes) {
       select(id = name, Latitude, Longitude)
     
     if (nrow(wpts.sub) > 0) {
-      write_csv(wpts.sub, here("Output/routes_updated/Adaptive", paste0(i, "A.csv")))
+      write_csv(wpts.sub, here("Output/routes_updated/Adaptive", paste0(i, "A.csv")),
+                col_names = FALSE)
     }
   }
   
@@ -500,34 +505,39 @@ if (update.routes) {
       select(id = name, Latitude, Longitude)
     
     if (nrow(wpts.sub) > 0) {
-      write_csv(wpts.sub, here("Output/routes_updated/Nearshore", paste0(i, "N.csv")))
+      write_csv(wpts.sub, here("Output/routes_updated/Nearshore", paste0(i, "N.csv")),
+                col_names = FALSE)
     }
   }
   
-  # Nearshore transects
+  # Saildrone transects
   for (i in unique(updated.route$transect.name)) {
     wpts.sub <- updated.route %>%
       filter(transect.name == i, Type == "Saildrone") %>%
       select(id = name, Latitude, Longitude)
     
     if (nrow(wpts.sub) > 0) {
-      write_csv(wpts.sub, here("Output/routes_updated/Saildrone", paste0(i, "S.csv")))
+      write_csv(wpts.sub, here("Output/routes_updated/Saildrone", paste0(i, "S.csv")),
+                col_names = FALSE)
     }
   }
   
-  # # Write UCTD waypoints to CSV file
-  # uctd.final.csv <- uctd.final.df %>% 
-  #   mutate(order = seq_along(id),
-  #          id    = paste("UCTD", order)) %>% 
-  #   select(id, lat, long)
-  # 
-  # write_csv(uctd.final.csv, here("Output/waypoints/uctd_wpts.csv"))  
+  # Write UCTD waypoints to CSV file
+  uctd.sub <- updated.route %>%
+    filter(transect.name == i, Type == "UCTD") %>%
+    select(id = name, Latitude, Longitude)
   
-  # # Write pairovet waypoints to CSV file
-  # pairovet.final.csv <- paiorovet.final.df %>% 
-  #   mutate(order = seq_along(id),
-  #          id    = paste("PAIROVET", order)) %>% 
-  #   select(id, lat, long)
-  # 
-  # write_csv(pairovet.final.csv, here("Output/waypoints/pairovet_wpts.csv"))  
+  if (nrow(uctd.sub) > 0) {
+    write_csv(uctd.sub, here("Output/waypoints_updated/uctd_wpts.csv"),
+              col_names = FALSE)
+  }
+
+  pairovet.sub <- updated.route %>%
+    filter(transect.name == i, Type == "Pairovet") %>%
+    select(id = name, Latitude, Longitude)
+  
+  if (nrow(uctd.sub) > 0) {
+    write_csv(uctd.sub, here("Output/waypoints_updated/pairovet_wpts.csv"),
+              col_names = FALSE)
+  }
 }
