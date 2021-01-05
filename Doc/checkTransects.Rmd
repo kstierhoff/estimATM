@@ -16,7 +16,8 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,sf,mapview,lubridate,here,knitr,DT,bookdown,
                plotKML,rnaturalearth,swfscMisc,fs,photobiology,ggspatial,
-               leaflet,leaflet.extras,leafem,htmltools,marmap,mapproj,gt)
+               leaflet,leaflet.extras,leafem,htmltools,marmap,mapproj,gt,
+               beepr)
 
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("rstudio/distill")
@@ -441,4 +442,250 @@ if (nrow(pairovets) > 0) {
 } else {
   print("No Pairovet stations planned.")
 }
+```
+
+# Create table with survey areas
+
+Area of each survey region (km^2^), and the sum transect distances (km).
+
+```{r create-region-polygons,message=FALSE, results='hide', warning=FALSE}
+# Import the 5m bathy polygon used to clip the transects on the eastern edge
+inshore.clip <- st_read(here("Data/GIS/isobath_5m_na.shp")) %>% 
+  st_make_valid()
+
+if (exists("region.polygons")) rm ("region.polygons")
+
+for (ii in unique(wpts$Region)) {
+  wpts.e <- wpts %>% 
+    filter(Type %in% c("Adaptive","Compulsory")) %>% 
+    mutate(
+      long = as.data.frame(st_coordinates(.))$X,
+      lat = as.data.frame(st_coordinates(.))$Y) %>% 
+    group_by(Transect) %>% 
+    slice(which.max(long)) %>% 
+    arrange(Transect)
+  
+  wpts.w <- wpts %>% 
+    filter(Type %in% c("Adaptive","Compulsory")) %>% 
+    mutate(
+      long = as.data.frame(st_coordinates(.))$X,
+      lat = as.data.frame(st_coordinates(.))$Y) %>% 
+    group_by(Transect) %>% 
+    slice(which.min(long)) %>% 
+    arrange(desc(Transect))
+  
+  polygon.temp <- wpts.e %>%
+    rbind(wpts.w) %>% 
+    filter(Region == ii) %>% 
+    ungroup() %>% 
+    summarise(do_union = F) %>% 
+    st_cast("POLYGON") %>% 
+    mutate(Region = ii) %>% 
+    st_make_valid() %>% 
+    st_difference(inshore.clip) %>% 
+    mutate(area = st_area(.))
+  
+  if (exists("region.polygons")) {
+    region.polygons <- bind_rows(region.polygons, polygon.temp)
+  } else {
+    region.polygons <- polygon.temp
+  }
+}
+
+# mapview(region.polygons, zcol = "Region")
+```
+
+```{r region-area-tbl}
+# Summarise transect distances (km)
+region.summ.tx <- transects %>% 
+  st_set_geometry(NULL) %>% 
+  group_by(Region) %>% 
+  summarise(Distance = sum(distance)*1.852)
+
+# Summarize region areas (km^2)
+region.summ.polygons <- region.polygons %>% 
+  st_set_geometry(NULL) %>% 
+  select(Region = Region, Area = area) %>% 
+  mutate(Area = prettyNum(as.numeric(Area/1e6),big.mark = ",",digits = 5)) 
+
+# Print table
+left_join(region.summ.tx, region.summ.polygons) %>% 
+  gt()
+```
+
+# Map regions
+## Entire survey area
+
+```{r load-map-data,include=FALSE}
+# Get map data -------------------------------
+# Import landmarks
+landmarks <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
+  project_df(to = crs.proj) %>% 
+  arrange(desc(lat))
+
+# Get land features --------------------------
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Read isoline
+bathy_5m_line <- st_read(here("Data/GIS/bathy_us_wc_5m.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = CONTOUR)
+
+# Read 5m bathymetry points shapefile
+bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
+
+# Read 5m bathymetry polygon
+bathy_5m_poly <- bathy_5m_points %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("POLYGON")
+
+# Create a reduced coastline for nearshore point estimation
+bathy_5m_df <- bathy_5m_points %>%
+  mutate(
+    long = as.data.frame(st_coordinates(.))$X,
+    lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL)
+
+write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
+```
+
+```{r map-survey-plan,fig.cap='(ref:map-survey-plan)'}
+# Rename locations
+transects <- transects %>% 
+  mutate(loc = case_when(
+    Region == "Vancouver Is." ~ "north",
+    Region %in% c("Central CA", "WA/OR") ~ "central",
+    Region == "S. CA Bight" ~ "south",
+    Region == "Mexico" ~ "mexico"
+  ))
+
+# Set padding around data  
+map.bounds <- transects %>%
+  st_transform(crs = crs.proj) %>%
+  st_bbox()  
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(transects, states, countries, 
+                        landmarks, bathy, map.bounds, crs = crs.proj)
+
+# Map planned transects
+survey.plan <- base.map +    
+  geom_sf(data = transects, aes(colour = Type, linetype = Type), 
+          show.legend = "line") +
+  scale_colour_manual("Type", 
+                      values = c(Adaptive = "red", Compulsory = "black",
+                                 Offshore = "green", Nearshore = "magenta",
+                                 transit = "orange")) +
+  scale_linetype_manual("Type", 
+                        values = c(Adaptive = "dashed", Compulsory = "solid",
+                                   Offshore = "dashed", Nearshore = "solid",
+                                   transit = "dashed")) +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+# save survey plan map
+ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
+       height = map.height, width = map.width)
+
+include_graphics(here("Figs/fig_survey_plan.png"))
+```
+
+## By region
+
+```{r map-survey-plan-region}
+for (ii in unique(transects$loc)) {
+  # Set padding around data  
+  map.bounds <- transects %>%
+    filter(loc == ii) %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+  
+  # Determine map aspect ratio and set height and width
+  map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+  map.width  <- map.height.region*map.aspect
+  
+  # Create base map
+  base.map <- get_basemap(filter(transects, loc == ii), states, countries, 
+                          landmarks, bathy, map.bounds, crs = crs.proj)
+  
+  region.map <- base.map +
+    geom_sf(data = filter(transects, loc == ii), aes(colour = Type, linetype = Type), 
+            show.legend = "line") +
+    scale_colour_manual("Type", 
+                        values = c(Adaptive = "red", Compulsory = "black",
+                                   Offshore = "green", Nearshore = "magenta",
+                                   transit = "orange")) +
+    scale_linetype_manual("Type", 
+                          values = c(Adaptive = "dashed", Compulsory = "solid",
+                                     Offshore = "dashed", Nearshore = "solid",
+                                     transit = "dashed")) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+  
+  # Save the base map
+  ggsave(region.map, file = here("Figs", paste0("fig_survey_plan_", ii, ".png")), 
+         height = map.height.region, width = map.width)  
+}
+```
+
+### North
+
+```{r map-survey-plan-region-north}
+if (file.exists(here("Figs/fig_survey_plan_north.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_north.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+### Central
+
+```{r map-survey-plan-region-central}
+if (file.exists(here("Figs/fig_survey_plan_central.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_central.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+### South
+
+```{r map-survey-plan-region-south}
+if (file.exists(here("Figs/fig_survey_plan_south.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_south.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+### Mexico
+
+```{r map-survey-plan-region-mexico}
+if (file.exists(here("Figs/fig_survey_plan_mexico.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_mexico.png"))
+} else {
+  print("No map for this region.")
+}
+```
+
+
+```{r}
+beep(4)
 ```
