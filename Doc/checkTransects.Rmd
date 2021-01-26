@@ -34,11 +34,12 @@ theme_set(theme_bw())
 
 ```{r user-input}
 # User input --------------------------------------------------------------
-copy.gpx          <- F # Copy GPX file from AST server
-process.transects <- T # Process GPX file using processTransects.R
-update.routes     <- T # Re-write route files after processing
-get.bathy         <- F # Get NOAA bathymetry (used to extract bathymetry)
-extract.bathy     <- T # Extract bathymetry profile along each transect
+copy.gpx           <- F # Copy GPX file from AST server
+process.transects  <- T # Process GPX file using processTransects.R
+renumber.transects <- T # Renumber transects to start at zero if transect are removed
+update.routes      <- T # Re-write route files after processing
+get.bathy          <- F # Get NOAA bathymetry (used to extract bathymetry)
+extract.bathy      <- T # Extract bathymetry profile along each transect
 ```
 
 ```{r project-info}
@@ -115,7 +116,7 @@ wpts <- wpt.export %>%
   mutate(
     label    = paste("Transect", Transect),
     popup    = paste('<b>Transect:</b>', Transect, Type)
-  )
+  ) 
 
 # Write objects to shapefile
 dir_create(here("Output/shapefiles"))
@@ -374,7 +375,7 @@ include_graphics(here("Figs/fig_survey_map.png"))
 wpts %>% 
   select(-label, -popup) %>% 
   filter(Type %in% c("Adaptive","Compulsory")) %>% 
-  arrange(Waypoint) %>%
+  arrange(Transect) %>%
   mutate(
     Long = as.data.frame(st_coordinates(.))$X,
     Lat = as.data.frame(st_coordinates(.))$Y) %>% 
@@ -388,7 +389,7 @@ wpts %>%
 wpts %>% 
   select(-label, -popup) %>%  
   filter(Type %in% c("Offshore")) %>% 
-  arrange(Waypoint) %>%
+  arrange(Transect) %>%
   mutate(
     Long = as.data.frame(st_coordinates(.))$X,
     Lat = as.data.frame(st_coordinates(.))$Y) %>% 
@@ -402,7 +403,7 @@ wpts %>%
 wpts %>% 
   select(-label, -popup) %>% 
   filter(Type %in% c("Nearshore")) %>% 
-  arrange(Waypoint) %>%
+  arrange(Transect) %>%
   mutate(
     Long = as.data.frame(st_coordinates(.))$X,
     Lat = as.data.frame(st_coordinates(.))$Y) %>% 
@@ -685,7 +686,6 @@ if (file.exists(here("Figs/fig_survey_plan_mexico.png"))) {
 }
 ```
 
-
-```{r}
+```{r work-complete}
 beep(4)
 ```

@@ -12,26 +12,73 @@ wpts <- route$waypoints
 write_csv(wpts, here("Output/waypoints/all_waypoints.csv"))
 
 # Extract transect waypoints
-transects <- wpts %>% 
-  filter(!str_detect(name, "UCTD")) %>%
-  filter(!str_detect(name, "Pairovet")) %>% 
-  mutate(
-    type = case_when(
-      str_detect(name, "A+$") ~ "Adaptive",
-      str_detect(name, "C+$") ~ "Compulsory",
-      str_detect(name, "S+$") ~ "Nearshore",
-      str_detect(name, "M+$") ~ "Mammal",
-      str_detect(name, "E+$") ~ "Extra",
-      str_detect(name, "T+$") ~ "Transit",
-      str_detect(name, "N+$") ~ "Nearshore",
-      str_detect(name, "O+$") ~ "Offshore",
-      TRUE ~ "Unknown"),
-    Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}")),
-    Transect = floor(Waypoint)) %>%
-  mutate(group = paste(Transect, type)) %>% 
-  arrange(type, Transect, Waypoint) %>% 
-  select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
-  filter(!is.na(Type), !is.na(Transect))
+if (!exists("renumber.transects")) {
+  # Process normally
+  transects <- wpts %>% 
+    filter(!str_detect(name, "UCTD")) %>%
+    filter(!str_detect(name, "Pairovet")) %>% 
+    mutate(
+      type = case_when(
+        str_detect(name, "A+$") ~ "Adaptive",
+        str_detect(name, "C+$") ~ "Compulsory",
+        str_detect(name, "S+$") ~ "Nearshore",
+        str_detect(name, "M+$") ~ "Mammal",
+        str_detect(name, "E+$") ~ "Extra",
+        str_detect(name, "T+$") ~ "Transit",
+        str_detect(name, "N+$") ~ "Nearshore",
+        str_detect(name, "O+$") ~ "Offshore",
+        TRUE ~ "Unknown"),
+      Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}")),
+      Transect = floor(Waypoint)) %>%
+    mutate(group = paste(Transect, type)) %>% 
+    arrange(type, Transect, Waypoint) %>% 
+    select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
+    filter(!is.na(Type), !is.na(Transect))  
+} else {
+  # Renumber transects
+  transects <- wpts %>% 
+    filter(!str_detect(name, "UCTD")) %>%
+    filter(!str_detect(name, "Pairovet")) %>% 
+    mutate(
+      type = case_when(
+        str_detect(name, "A+$") ~ "Adaptive",
+        str_detect(name, "C+$") ~ "Compulsory",
+        str_detect(name, "S+$") ~ "Nearshore",
+        str_detect(name, "M+$") ~ "Mammal",
+        str_detect(name, "E+$") ~ "Extra",
+        str_detect(name, "T+$") ~ "Transit",
+        str_detect(name, "N+$") ~ "Nearshore",
+        str_detect(name, "O+$") ~ "Offshore",
+        TRUE ~ "Unknown"),
+      Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}"))) %>% 
+    arrange(type, Waypoint)
+  
+  # Calculate waypoint adjustment
+  adjust.tx.n <- min(floor(transects$Waypoint)) - 1
+  
+  # Finish formatting transects
+  transects <- transects %>% 
+    mutate(
+      Waypoint = case_when(
+        renumber.transects ~ Waypoint - adjust.tx.n,
+        TRUE ~ Waypoint),
+      Transect = floor(Waypoint),
+      wpt.tmp = paste0(sprintf("%03d", Transect), trimws(str_extract(Waypoint,".\\d{1,3}+$"))),
+      name = case_when(
+        str_detect(name, "A+$") ~ paste0(wpt.tmp, "A"),
+        str_detect(name, "C+$") ~ paste0(wpt.tmp, "C"),
+        str_detect(name, "S+$") ~ paste0(wpt.tmp, "N"),
+        str_detect(name, "M+$") ~ paste0(wpt.tmp, "M"),
+        str_detect(name, "E+$") ~ paste0(wpt.tmp, "E"),
+        str_detect(name, "T+$") ~ paste0(wpt.tmp, "T"),
+        str_detect(name, "N+$") ~ paste0(wpt.tmp, "N"),
+        str_detect(name, "O+$") ~ paste0(wpt.tmp, "O"),
+        TRUE ~ "Unknown")) %>%
+    mutate(group = paste(Transect, type)) %>% 
+    arrange(type, Transect, Waypoint) %>% 
+    select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
+    filter(!is.na(Type), !is.na(Transect))
+}
 
 # If specific transects are to be removed manually
 if (!is.na(rm.i.transects)) {
@@ -450,8 +497,7 @@ if (update.routes) {
       transect = case_when(
         Type == "Compulsory" ~ paste0(transect.name, "C"),
         Type == "Adaptive"   ~ paste0(transect.name, "A")),
-      id = name) %>% 
-    arrange(transect.name, desc(Longitude))
+      id = name)
   
   # Create output directories
   dir_create(here("Output", c("waypoints_updated")))
@@ -541,3 +587,4 @@ if (update.routes) {
               col_names = FALSE)
   }
 }
+
