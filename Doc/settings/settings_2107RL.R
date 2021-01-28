@@ -116,7 +116,7 @@ survey.long          <- c(-130,-117)
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
 wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
-wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500") 
+wpt.colors           <- c("#FF0000", "#0000FF", "#FF33F5", "#FFA500") 
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
