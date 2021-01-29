@@ -53,32 +53,54 @@ if (!exists("renumber.transects")) {
       Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}"))) %>% 
     arrange(type, Waypoint)
   
-  # Calculate waypoint adjustment
-  adjust.tx.n <- min(floor(transects$Waypoint)) - 1
+  transects.adjusted <- data.frame()
   
-  # Finish formatting transects
-  transects <- transects %>% 
-    mutate(
-      Waypoint = case_when(
-        renumber.transects ~ Waypoint - adjust.tx.n,
-        TRUE ~ Waypoint),
-      Transect = floor(Waypoint),
-      wpt.tmp = paste0(sprintf("%03d", Transect), trimws(str_extract(Waypoint,".\\d{1,3}+$"))),
-      name = case_when(
-        str_detect(name, "A+$") ~ paste0(wpt.tmp, "A"),
-        str_detect(name, "C+$") ~ paste0(wpt.tmp, "C"),
-        str_detect(name, "S+$") ~ paste0(wpt.tmp, "N"),
-        str_detect(name, "M+$") ~ paste0(wpt.tmp, "M"),
-        str_detect(name, "E+$") ~ paste0(wpt.tmp, "E"),
-        str_detect(name, "T+$") ~ paste0(wpt.tmp, "T"),
-        str_detect(name, "N+$") ~ paste0(wpt.tmp, "N"),
-        str_detect(name, "O+$") ~ paste0(wpt.tmp, "O"),
-        TRUE ~ "Unknown")) %>%
-    mutate(group = paste(Transect, type)) %>% 
-    arrange(type, Transect, Waypoint) %>% 
-    select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
-    filter(!is.na(Type), !is.na(Transect))
+  for (kk in unique(transects$type)) {
+    if (kk %in% c("Adaptive", "Compulsory")) {
+      # Calculate waypoint adjustment
+      adjust.tx.n <- transects %>% 
+        filter(type %in% c("Adaptive","Compulsory")) %>% 
+        summarise(minTx = min(floor(Waypoint)) - 1) %>% 
+        pull()
+    } else {
+      adjust.tx.n <- transects %>% 
+        filter(type == kk) %>% 
+        summarise(minTx = min(floor(Waypoint)) - 1) %>% 
+        pull()
+    }
+    
+    # Finish formatting transects
+    tx.kk <- transects %>%
+      filter(type == kk) %>% 
+      mutate(
+        Waypoint = case_when(
+          renumber.transects ~ Waypoint - adjust.tx.n,
+          TRUE ~ Waypoint),
+        Transect = floor(Waypoint),
+        wpt.tmp = paste0(sprintf("%03d", Transect), trimws(str_extract(Waypoint,".\\d{1,3}+$"))),
+        name = case_when(
+          str_detect(name, "A+$") ~ paste0(wpt.tmp, "A"),
+          str_detect(name, "C+$") ~ paste0(wpt.tmp, "C"),
+          str_detect(name, "S+$") ~ paste0(wpt.tmp, "N"),
+          str_detect(name, "M+$") ~ paste0(wpt.tmp, "M"),
+          str_detect(name, "E+$") ~ paste0(wpt.tmp, "E"),
+          str_detect(name, "T+$") ~ paste0(wpt.tmp, "T"),
+          str_detect(name, "N+$") ~ paste0(wpt.tmp, "N"),
+          str_detect(name, "O+$") ~ paste0(wpt.tmp, "O"),
+          TRUE ~ "Unknown")) %>%
+      mutate(group = paste(Transect, type)) %>% 
+      arrange(type, Transect, Waypoint) %>% 
+      select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
+      filter(!is.na(Type), !is.na(Transect)) 
+    
+    # Combine results
+    transects.adjusted <- bind_rows(transects.adjusted, tx.kk)
+  }
 }
+
+# Replace existing data frame with new values
+transects <- transects.adjusted %>%
+  arrange(Type, Transect, Waypoint)
 
 # If specific transects are to be removed manually
 if (!is.na(rm.i.transects)) {
@@ -508,7 +530,7 @@ if (update.routes) {
   rm.csv.wpts <- dir_ls(here("Output/waypoints_updated"), regexp = "*.csv", recurse = TRUE)
   file_delete(rm.csv.routes)
   file_delete(rm.csv.wpts)
-
+  
   # Write all waypoints to one CSV (to import one route)
   write_csv(select(updated.route, id, lat = Latitude, long = Longitude),
             here("Output/waypoints_updated/transect_wpts.csv"))
@@ -525,7 +547,7 @@ if (update.routes) {
     wpts.sub <- updated.route %>%
       filter(transect.name == i, Type == "Compulsory") %>%
       select(id = name, Latitude, Longitude)
-
+    
     if (nrow(wpts.sub) > 0) {
       write_csv(wpts.sub, here("Output/routes_updated/Compulsory", paste0(i, "C.csv")),
                 col_names = FALSE)
@@ -577,7 +599,7 @@ if (update.routes) {
     write_csv(uctd.sub, here("Output/waypoints_updated/uctd_wpts.csv"),
               col_names = FALSE)
   }
-
+  
   pairovet.sub <- updated.route %>%
     filter(transect.name == i, Type == "Pairovet") %>%
     select(id = name, Latitude, Longitude)
