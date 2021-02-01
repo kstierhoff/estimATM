@@ -1,10 +1,37 @@
-# Processing controls ----------------------------------------------------
+# Processing controls (T/F) ---------------------------------------------------
+## estimateBiomass
+### Usually T
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
+download.hab      <- F # Download habitat map
+
+do.bootstrap      <- F # Generate bootstrap estimates
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 process.nearshore <- F # Process near backscatter data
 combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
 process.seine     <- F # Process purse seine data
+
+### Sometimes F
+do.imap           <- F # Create interactive Leaflet map
+save.imap         <- F # Save Leaflet maps
+overwrite.files   <- T # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.krill <- F # Process krill backscatter data
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
+copy.bib          <- F # Copy bibliography files (requires connection to AST2)
+match.intervals   <- F # Match intervals for comparing EK60 and EK80
+get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
+resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+## Other documents
 
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
