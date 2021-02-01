@@ -66,7 +66,7 @@ show.maps <- TRUE
 
 ## Used by processTransects.R -----------
 # GPX file location
-gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20200629_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
+gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210702_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
 gpx.file         <- "rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
@@ -321,7 +321,7 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2107RL")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SaKe")
+  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SummerCPS")
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
@@ -574,7 +574,7 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
 cal.vessels        <- "RL"
-cal.dir            <- "//swc-storage1.nmfs.local/AST1/SURVEYS/20150615_SHIMADA_SummerCCE/DATA/EK60/CALIBRATION/RESULTS/San Diego"
+cal.dir            <- "//swc-storage1.nmfs.local/AST1/SURVEYS/20210702_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
 cal.datetime       <- "1 July"     # Date/time of calibration
 cal.plot.date      <- "2021-07-01" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
