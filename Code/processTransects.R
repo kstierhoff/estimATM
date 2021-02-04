@@ -447,8 +447,8 @@ survey.map <- base.map +
   scale_fill_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
                                               "Offshore" = "green", "Nearshore" = "#F08C09",
                                               "Transit" = "cyan")) +
-  geom_sf(data = uctds.sf, shape = 21, size = 2, fill = "white") +
-  geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 2) +
+  geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
+  geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
                                                   "Mammal" = "dashed", "Nearshore" = "solid",
                                                   "Offshore" = "solid","Transit" = "dashed")) +
