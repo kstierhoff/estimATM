@@ -442,10 +442,10 @@ survey.map <- base.map +
                                                   "Nearshore","Offshore", "Transit")),
           aes(linetype = Type, colour = Type), show.legend = "line") +
   scale_colour_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
-                                                "Offshore" = "green", "Nearshore" = "#F08C09",
+                                                "Offshore" = "green", "Nearshore" = "#FF00FF",
                                                 "Transit" = "cyan")) +
   scale_fill_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
-                                              "Offshore" = "green", "Nearshore" = "#F08C09",
+                                              "Offshore" = "green", "Nearshore" = "#FF00FF",
                                               "Transit" = "cyan")) +
   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
   geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
@@ -514,7 +514,7 @@ if (update.routes) {
     mutate(
       Transect = case_when(
         is.na(Transect) ~ transect,
-        TRUE ~ Transect),
+        TRUE ~ as.numeric(Transect)),
       transect.name = str_sub(name, 1, 3),
       transect = case_when(
         Type == "Compulsory" ~ paste0(transect.name, "C"),

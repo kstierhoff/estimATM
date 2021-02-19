@@ -111,7 +111,7 @@ survey.long          <- c(-130,-117)
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2104RL.csv"
 wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
-wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500") 
+wpt.colors           <- c("#FF0000", "#0000FF", "#FF00FF", "#FFA500") 
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
@@ -160,7 +160,7 @@ crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
-map.height <- 10
+map.height <- 7
 # Map height for specific regions; used in makeTransects
 map.height.region <- 7
 
