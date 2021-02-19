@@ -76,8 +76,8 @@ if (!exists("renumber.transects")) {
         Waypoint = case_when(
           renumber.transects ~ Waypoint - adjust.tx.n,
           TRUE ~ Waypoint),
-        Transect = floor(Waypoint),
-        wpt.tmp = paste0(sprintf("%03d", Transect), trimws(str_extract(Waypoint,".\\d{1,3}+$"))),
+        Transect = as.integer(floor(Waypoint)),
+        wpt.tmp = paste0(sprintf("%03d", Transect), trimws(str_extract(.$Waypoint,"\\.\\d{1,3}$"))),
         name = case_when(
           str_detect(name, "A+$") ~ paste0(wpt.tmp, "A"),
           str_detect(name, "C+$") ~ paste0(wpt.tmp, "C"),

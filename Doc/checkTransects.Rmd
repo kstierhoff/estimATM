@@ -560,6 +560,10 @@ bathy_5m_df <- bathy_5m_points %>%
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL)
 
+# Read Scott Island MPA shapefile
+si.mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>% 
+  st_difference(filter(countries, name == "Canada"))
+
 write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
 ```
 
@@ -587,7 +591,8 @@ base.map <- get_basemap(transects, states, countries,
                         landmarks, bathy, map.bounds, crs = crs.proj)
 
 # Map planned transects
-survey.plan <- base.map +    
+survey.plan <- base.map +   
+  geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
   geom_sf(data = transects, aes(colour = Type, linetype = Type), 
           show.legend = "line") +
   scale_colour_manual("Type", 
@@ -628,6 +633,7 @@ for (ii in unique(transects$loc)) {
                           landmarks, bathy, map.bounds, crs = crs.proj)
   
   region.map <- base.map +
+    geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
     geom_sf(data = filter(transects, loc == ii), aes(colour = Type, linetype = Type), 
             show.legend = "line") +
     scale_colour_manual("Type", 
