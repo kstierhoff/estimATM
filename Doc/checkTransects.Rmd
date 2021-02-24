@@ -36,7 +36,6 @@ theme_set(theme_bw())
 # User input --------------------------------------------------------------
 copy.gpx           <- F # Copy GPX file from AST server
 process.transects  <- T # Process GPX file using processTransects.R
-renumber.transects <- F # Renumber transects to start at zero if transect are removed
 update.routes      <- T # Re-write route files after processing
 get.bathy          <- F # Get NOAA bathymetry (used to extract bathymetry)
 extract.bathy      <- T # Extract bathymetry profile along each transect
@@ -72,7 +71,14 @@ if (process.transects) {
 ```
 
 ```{r read-tables, include = FALSE}
+# Read bathymetry shapefile -----------------------------------------
 if (!exists("bathy")) {bathy <- st_read(here("Data/GIS/bathy_contours.shp"))}
+
+# Read MPA shapefiles  -----------------------------------------
+scott_islands_mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = "Scott Islands Protected Marine Area") %>% 
+  st_difference(filter(countries, name == "Canada"))
 
 ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
   st_transform(crs.geog) %>% 
@@ -192,6 +198,9 @@ if (leaflet.checkTransects.simple) {
                 opacity = 0.75,
                 label = ~htmlEscape("CA State Waters"),
                 group = "State Waters") %>%
+    # Add Canadian MPAs
+    addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
+                label = ~htmlEscape(MPA), group = "MPAs") %>%
     # Add CA MPAs
     addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
                 fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
@@ -270,6 +279,9 @@ if (leaflet.checkTransects.simple) {
                 opacity = 0.75,
                 label = ~htmlEscape("CA State Waters"),
                 group = "State Waters") %>%
+    # Add Canadian MPAs
+    addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
+                label = ~htmlEscape(MPA), group = "MPAs") %>%
     # Add CA MPAs
     addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
                 fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
