@@ -124,6 +124,13 @@ wpts <- wpt.export %>%
     popup    = paste('<b>Transect:</b>', Transect, Type)
   ) 
 
+uctds <- uctds %>% 
+  as.tibble() %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
+pairovets <- pairovets %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
 # Write objects to shapefile
 dir_create(here("Output/shapefiles"))
 
@@ -172,7 +179,7 @@ txPal    <- colorFactor(wpt.colors, wpt.types)
 # Create Leaflet map ----------------------
 if (leaflet.checkTransects.simple) {
   # Create leaflet map
-  leaflet() %>% 
+  i.map <- leaflet() %>% 
     # Enable tile caching
     enableTileCaching() %>% 
     # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
@@ -219,13 +226,13 @@ if (leaflet.checkTransects.simple) {
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
                    group = "Planned Transects") %>%
-    # Add UCTD stations
-    addCircleMarkers(data = uctds,
-                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
-                     fillOpacity = 1, fillColor =  "white",
-                     label = ~htmlEscape(name),
-                     popup = ~name,
-                     group = "UCTD Stations") %>%
+    # # Add UCTD stations
+    # addCircleMarkers(data = uctds,
+    #                  # radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+    #                  # fillOpacity = 1, fillColor =  "white",
+    #                  # label = ~htmlEscape(name),
+    #                  # popup = ~name,
+    #                  group = "UCTD Stations") %>%
     # Add Pairovet stations
     # addCircleMarkers(data = pairovets,
     #                  radius = 3, color = "#000000", stroke = TRUE, weight = 2,
@@ -253,7 +260,7 @@ if (leaflet.checkTransects.simple) {
   
 } else {
   # Create leaflet map
-  leaflet() %>% 
+  i.map <- eaflet() %>% 
     # Enable tile caching
     enableTileCaching() %>% 
     # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
@@ -345,13 +352,13 @@ if (leaflet.checkTransects.simple) {
                      label = ~htmlEscape(paste(Type, Waypoint)),
                      popup = ~popup,
                      group = "Planned Transects (Transits)") %>%
-    # Add UCTD stations
-    addCircleMarkers(data = uctds,
-                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
-                     fillOpacity = 1, fillColor =  "white",
-                     label = ~htmlEscape(name),
-                     popup = ~name,
-                     group = "UCTD Stations") %>%
+    # # Add UCTD stations
+    # addCircleMarkers(data = uctds,
+    #                  radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+    #                  fillOpacity = 1, fillColor =  "white",
+    #                  label = ~htmlEscape(name),
+    #                  popup = ~name,
+    #                  group = "UCTD Stations") %>%
     # Add scale bar
     addScaleBar(position = "bottomright") %>%
     # Add map coordinates
@@ -372,6 +379,31 @@ if (leaflet.checkTransects.simple) {
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2]) 
 }
+
+if (nrow(uctds) > 0) {
+  i.map <- i.map %>% 
+  # Add UCTD stations
+  addCircleMarkers(data = uctds,
+                   radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                   fillOpacity = 1, fillColor =  "white",
+                   label = ~htmlEscape(name),
+                   popup = ~name,
+                   group = "UCTD Stations")   
+}
+
+if (nrow(pairovets) > 0) {
+  i.map <- i.map %>% 
+  # Add Pairovet stations
+  addCircleMarkers(data = pairovets,
+                   radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                   fillOpacity = 0.5, fillColor =  ~pairovetPal(type),
+                   label = ~htmlEscape(name),
+                   popup = ~name,
+                   group = "Pairovet Stations")
+}
+
+# Print i.map
+i.map
 ```  
 
 ## Static map  
