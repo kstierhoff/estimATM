@@ -110,7 +110,7 @@ survey.lat           <- c(32,51)
 survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2104RL.csv"
+wpt.filename         <- "waypoints_2103RL.csv"
 wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
 wpt.colors           <- c("#FF0000", "#0000FF", "#FF00FF", "#FFA500") 
 
@@ -146,7 +146,7 @@ sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
 sd.time.offset   <- 7 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
-cruise.name <- 202104 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.name <- 202103 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
 cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL",",...))
 
 # Growth model parameters ------------------------------------------------------
@@ -286,9 +286,9 @@ sounder.type           <- c(RL  = "EK80")
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2107RL")   
+  survey.dir           <- c(RL  = "C:/SURVEY/2103RL")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SaKe")
+  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS")
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
@@ -315,7 +315,7 @@ nasc.max               <- 10000*19
 source.cps.nasc        <- c(RL  = TRUE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
-data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv")) # in the nearshore strata 
+data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2103RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]") 
@@ -377,13 +377,13 @@ scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes2107RL.sqlite" # CUFES SQLite database
+cufes.db.sqlite        <- "cufes2103RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "ymd" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl data
-trawl.source           <- "SQL" # "SQL" or "Access"
+trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
-trawl.db.access        <- "TrawlDataEntry2107RL.accdb"
+trawl.db.access        <- "TrawlDataEntry2104RL_Test.accdb"
 trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
@@ -511,7 +511,7 @@ stock.break.source <- "primary"
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
-raw.prefix    <- "2107RL_EK80"
+raw.prefix    <- "2103RL_EK80"
 raw.size      <-  50   # file size in megabytes (MB)
 raw.log.range <- 350  # depth of ER60 logging (m)
 
