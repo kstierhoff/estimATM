@@ -8,6 +8,8 @@ output:
     toc_float: yes
     number_sections: yes
 css: css/ast.css
+bibliography: bib/ast_bib.bib
+csl: csl/ices-journal-of-marine-science.csl
 ---
 
 ```{r set-up, echo=F, message=F, error=F, warning=F}
@@ -43,7 +45,7 @@ if (doc.type == "latex") {
 ```{r user-settings}
 # User-specified settings
 get.nav <- F # Download vessel nav from ERDDAP
-get.db  <- T # Extract data from trawl database (F for testing)
+get.db  <- F # Extract data from trawl database (F for testing)
 ```
 
 ```{r project-settings}
@@ -685,26 +687,9 @@ lengths %>%
         strip.text.x = element_text(face = "italic"))
 ```
 
-## Outlier table-All  
-
-Other specimens may have been flagged by trawl personnel. The table below lists all specimens identified as potential outliers, regardless of whether they've been flagged or reviewed (see `flaggedData`).   
-
-```{r outlier-table-all}
-# Select outliers
-lengths %>% 
-  left_join(K.summ) %>% 
-  filter(K <= K.lower | K >= K.upper) %>% 
-  filter(binned == FALSE) %>% 
-  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
-         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, weightg, 
-         sex, K, flaggedData) %>%
-  arrange(scientificName, haul, specimenNumber) %>% 
-  datatable(rownames = FALSE)
-```
-
 ## Outlier table-New  
 
-Only show those specimens identified as outliers based on $K$ that have not yet been flagged (`flaggedData` = N). 
+Only show "new" outliers -- i.e., those specimens identified as outliers based on the distribution of $K$ and have not yet been flagged or reviewed in the database (`flaggedData` = `NA` or is blank). 
 
 ```{r outlier-table-new}
 # Select only outliers that have not yet been flagged
@@ -717,6 +702,23 @@ lengths %>%
   select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm,
          weightg, sex, K, flaggedData) %>%
+  arrange(scientificName, haul, specimenNumber) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Outlier table-All  
+
+All specimens identified as potential outliers that may or may not have been flagged and/or reviewed by trawl personnel (see the `flaggedData` column).  
+
+```{r outlier-table-all}
+# Select outliers
+lengths %>% 
+  left_join(K.summ) %>% 
+  filter(K <= K.lower | K >= K.upper) %>% 
+  filter(binned == FALSE) %>% 
+  select(haul, collection, scientificName, specimenNumber, SL = standardLength_mm, 
+         FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, weightg, 
+         sex, K, flaggedData) %>%
   arrange(scientificName, haul, specimenNumber) %>% 
   datatable(rownames = FALSE)
 ```
@@ -787,6 +789,8 @@ lengths %>%
 
 # Interactive plots
 The plots below provide information about trawl specimens (e.g., length, weigth, haul, collection, and specimen number) when you hover over points with the mouse. You may zoom, pan, toggle spike-lines, etc using the menu above each graph (available when the mouse is in the plot area). **<span style="color:red">Red</span>** and **<span style="color:blue">blue</span>** points are specimens that had missing length and weight measurements, respectively. Points with **bold black** outlines have already been "flagged" in the database but may or may not have been corrected.  
+
+The dashed lines represent the season-specific (in this case, `r survey.season`) relationship between length and weight as described in Palance et al. [-@Palance2019]. Missing length or weight entries are estimated using the same relationships.  
 
 ## Sardine
 
@@ -1310,3 +1314,6 @@ if (nrow(catch.comp.errors) > 0) {
 }
 ```
 
+# References
+
+<div id = 'refs'></div> 
