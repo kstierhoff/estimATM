@@ -17,7 +17,7 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse,sf,mapview,lubridate,here,knitr,DT,bookdown,
                plotKML,rnaturalearth,swfscMisc,fs,photobiology,ggspatial,
                leaflet,leaflet.extras,leafem,htmltools,marmap,mapproj,gt,
-               beepr)
+               beepr,shadowtext)
 
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("rstudio/distill")
@@ -120,8 +120,12 @@ transects <- transects %>%
 wpts <- wpt.export %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   mutate(
+    long = as.data.frame(st_coordinates(.))$X,
+    lat = as.data.frame(st_coordinates(.))$Y,
     label    = paste("Transect", Transect),
-    popup    = paste('<b>Transect:</b>', Transect, Type)
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                     '<b>Latitude:</b>', lat, '<br/>',
+                     '<b>Longitude:</b>', long, '<br/>')
   ) 
 
 uctds.sf <- uctds %>% 
@@ -222,11 +226,11 @@ if (leaflet.checkTransects.simple) {
                  popup = ~popup,
                  group = "Planned Transects") %>%
     addCircleMarkers(data = wpts,
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-                   label = ~htmlEscape(paste(Type, Waypoint)),
-                   popup = ~popup,
-                   group = "Planned Transects") %>%
+                     radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     label = ~htmlEscape(paste(Type, Waypoint)),
+                     popup = ~popup,
+                     group = "Planned Transects") %>%
     # Add scale bar
     addScaleBar(position = "bottomright") %>%
     # Add map coordinates
@@ -241,7 +245,7 @@ if (leaflet.checkTransects.simple) {
                         "Bathymetry Contours", "Planned Transects", 
                         "UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
-    hideGroup(c("UCTD Stations")) %>% 
+    hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2])
   
@@ -355,31 +359,31 @@ if (leaflet.checkTransects.simple) {
                         "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
                         "Planned Transects (Transits)", "UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
-    hideGroup(c("UCTD Stations")) %>% 
+    hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2]) 
 }
 
 if (nrow(uctds.sf) > 0) {
   i.map <- i.map %>% 
-  # Add UCTD stations
-  addCircleMarkers(data = uctds.sf,
-                   radius = 3, color = "#000000", stroke = TRUE, weight = 2,
-                   fillOpacity = 1, fillColor =  "white",
-                   label = ~htmlEscape(name),
-                   popup = ~name,
-                   group = "UCTD Stations")   
+    # Add UCTD stations
+    addCircleMarkers(data = uctds.sf,
+                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     fillOpacity = 1, fillColor =  "white",
+                     label = ~htmlEscape(name),
+                     popup = ~name,
+                     group = "UCTD Stations")   
 }
 
 if (nrow(pairovets.sf) > 0) {
   i.map <- i.map %>% 
-  # Add Pairovet stations
-  addCircleMarkers(data = pairovets.sf,
-                   radius = 3, color = "#000000", stroke = TRUE, weight = 2,
-                   fillOpacity = 0.5, fillColor =  ~pairovetPal(type),
-                   label = ~htmlEscape(name),
-                   popup = ~name,
-                   group = "Pairovet Stations")
+    # Add Pairovet stations
+    addCircleMarkers(data = pairovets.sf,
+                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     fillOpacity = 0.5, fillColor =  ~pairovetPal(type),
+                     label = ~htmlEscape(name),
+                     popup = ~name,
+                     group = "Pairovet Stations")
 }
 
 # Print i.map
@@ -662,6 +666,12 @@ for (ii in unique(transects$loc)) {
     geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
     geom_sf(data = filter(transects, loc == ii), aes(colour = Type, linetype = Type), 
             show.legend = "line") +
+    # Plot acoustic transect labels N of Cape Flattery
+    geom_shadowtext(data = tx.labels, 
+                    aes(X, Y, label = transect.name,
+                        angle = brg, colour = Type),
+                    size = 2, fontface = 'bold.italic', 
+                    bg.colour = "white") +
     scale_colour_manual("Type", 
                         values = c(Adaptive = "red", Compulsory = "black",
                                    Offshore = "green", Nearshore = "magenta",

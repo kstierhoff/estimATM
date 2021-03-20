@@ -350,6 +350,30 @@ transects.sf <- transects %>%
 
 # mapview(transects.sf, zcol = "Type")
 
+# Create acoustic transect labels for maps
+tx.labels.tmp <- transects %>% 
+  mutate(transect.name = paste(str_sub(name, 1, 3), str_sub(name, -1))) %>% 
+  group_by(group, Type) %>% 
+  summarise(
+    transect.name = transect.name[1],
+    start.lat = Latitude[which.max(Longitude)],
+    start.long = max(Longitude),
+    end.lat = Latitude[which.min(Longitude)],
+    end.long = min(Longitude),
+    brg = 90 - swfscMisc::bearing(end.lat,end.long,start.lat,start.long)[1]) %>% 
+  ungroup()
+
+tx.end.labels <- tx.labels.tmp %>% 
+  filter(start.lat < 48.54116) %>% 
+  select(group, Type, transect.name, lat = end.lat, long = end.long, brg) 
+
+tx.start.labels <- tx.labels.tmp %>% 
+  filter(start.lat >= 48.54116) %>% 
+  select(group, Type, transect.name, lat = start.lat, long = start.long, brg) %>% 
+  rbind(tx.end.labels)
+
+tx.labels <- project_df(tx.start.labels, to = crs.proj)
+
 # # Convert uctds to sf
 # uctds.sf <- uctds %>% 
 #   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
@@ -452,7 +476,6 @@ survey.map <- base.map +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
                                                   "Mammal" = "dashed", "Nearshore" = "solid",
                                                   "Offshore" = "solid","Transit" = "dashed")) +
-  # geom_sf(data = filter(transects.sf, Type == "Saildrone"), colour = c("#F08C09")) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
@@ -462,7 +485,7 @@ ggsave(survey.map, filename = here("Figs/fig_survey_map.png"),
        height = map.height, width = map.width)
 
 # Save results for use with checkTransects.Rmd
-save(transects, wpts, uctds, wpt.export, pairovets,
+save(transects, tx.labels, wpts, uctds, wpt.export, pairovets,
      file = (here("Output/process_transects_output.Rdata")))
 
 # Create the map with all transects --------------------------------------------
