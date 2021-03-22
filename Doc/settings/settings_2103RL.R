@@ -100,11 +100,11 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 leg.breaks <- as.numeric(lubridate::ymd(c("2021-03-20", "2021-04-13")))
 
 # Define ERDDAP data variables
-erddap.vessel        <- "WTED"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2015-06-19" # Start of survey for ERDDAP vessel data query
-erddap.survey.end    <- "2015-09-11" # End of survey for ERDDAP vessel data query
+erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.survey.start  <- "2021-03-20" # Start of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2021-04-14" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
-erddap.classes       <- c("factor", "numeric", "numeric", "numeric","numeric")
+erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric")
 erddap.headers       <- c("time", "lat", "long", "SST", "SOG")
 survey.lat           <- c(32,51)
 survey.long          <- c(-130,-117)
@@ -388,8 +388,8 @@ trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl 
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
-ctd.hdr.pattern        <- "dCTD*.*hdr"
-ctd.cast.pattern       <- "dCTD*.*asc"
+ctd.hdr.pattern        <- "RL2102*.*hdr"
+ctd.cast.pattern       <- "RL2102*.*asc"
 ctd.depth              <- 350
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
