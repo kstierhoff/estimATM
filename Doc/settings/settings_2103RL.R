@@ -146,7 +146,7 @@ sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
 sd.time.offset   <- 7 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
-cruise.name <- 202103 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.name <- 202104 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
 cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL",",...))
 
 # Growth model parameters ------------------------------------------------------
@@ -295,7 +295,7 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
 nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "-Final_38kHz_CPS-ACIN.csv")
+nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*-Final_38_kHz_Krill-ACIN.csv")
 # Regex pattern for identifying nearshore transects
@@ -377,8 +377,8 @@ scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes2103RL.sqlite" # CUFES SQLite database
-cufes.date.format      <- "ymd" # mdy (1907RL only) or ymd (most other surveys)
+cufes.db.sqlite        <- "cufes202103RL.sqlite" # CUFES SQLite database
+cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl data
 trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
