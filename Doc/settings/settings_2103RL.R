@@ -146,7 +146,7 @@ sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
 sd.time.offset   <- 7 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
-cruise.name <- 202104 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.name <- 202103 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
 cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL",",...))
 
 # Growth model parameters ------------------------------------------------------
@@ -383,7 +383,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
-trawl.db.access        <- "TrawlDataEntry2103RL_Test.accdb"
+trawl.db.access        <- "TrawlDataEntry2103RL.accdb"
 trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data

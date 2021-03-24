@@ -27,11 +27,11 @@ pacman::p_load_gh("kstierhoff/atm")
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 
-# determines method of table generation (whether kable or xtable) for best formatting
-doc.type <- knitr::opts_knit$get("rmarkdown.pandoc.to")
-if (is.null(doc.type)) {
-  doc.type <- "html"
-}
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+doc.name <- knitr::current_input()
+if (is.null(doc.type)) {doc.type <- "html"}
+if (is.null(doc.name)) {doc.name <- "plotBio_Web.Rmd"}
 
 # global knitr chunk options
 knitr::opts_chunk$set(
@@ -55,19 +55,19 @@ source(here("Doc/settings", prj.settings))
 
 ```{r processing-controls}
 # Control script behavior (usually T)
-save.figs       <- T # Resave figures
-get.nav         <- F # Download nav data from ERDDAP
+save.figs       <- T # Save figures
+get.nav         <- T # Download nav data from ERDDAP
 get.nav.sd      <- F # Download nav data from ERDDAP
-copy.files      <- F # Copy data files from data to plotBio directory
-overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
+copy.files      <- T # Copy data files from data to plotBio directory
+overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)copy.files
 process.csv     <- T # Process acoustic backscatter files
-get.db          <- F # Import trawl database
+get.db          <- T # Import trawl database
 
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
 process.csv.all <- F # Process all CSV files (F = new files only)
-save.imap       <- T # Save interactive map using mapshot
+save.imap       <- T # Save interactive map using "mapshot"
 ```
 
 ```{r config-project}
@@ -556,7 +556,8 @@ cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
     Duration = as.numeric(difftime(Stop, Start, units = "mins")),
     Year = year(Start),
     AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
-  rename(lat = StartLatitude, long = StartLongitude) %>% 
+  rename(lat = StartLatitude, long = StartLongitude) %>%
+  filter(!is.na(lat), !is.na(long), !is.na(Stop)) %>% 
   project_df(to = crs.proj)
 
 # Close connection
@@ -641,10 +642,18 @@ if (process.csv) {
     # Create final data frame
     nasc.cps <- data.frame()
   } else {
-    # Load already processed files
-    load(here("Output/nasc_cps.Rdata")) 
-    # List only new CSV files
-    csv.files.cps <- csv.files.cps[!fs::path_file(csv.files.cps) %in% processed.cps]
+    if (file.exists(here("Output/nasc_cps.Rdata"))) {
+      # Load already processed files
+      load(here("Output/nasc_cps.Rdata")) 
+    } else {
+      # Create final data frame
+    nasc.cps <- data.frame()
+    }
+    
+    if (exists("processed.cps")) {
+      # List only new CSV files
+      csv.files.cps <- csv.files.cps[!fs::path_file(csv.files.cps) %in% processed.cps]  
+    }
   }
   
   if (length(csv.files.cps) > 0) {
@@ -736,7 +745,6 @@ if (process.csv) {
     load(here("Output/processed_krill.Rdata"))
   }
   
-  processed.krill
   # List local CSV files
   csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
                             regex = nasc.pattern.krill[survey.vessel.primary])
@@ -745,11 +753,29 @@ if (process.csv) {
     # Create final data frame
     nasc.krill <- data.frame()
   } else {
-    # Load already processed files
-    load(here("Output/nasc_krill.Rdata")) 
-    # List only new CSV files
-    csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]
+    if (file.exists(here("Output/nasc_krill.Rdata"))) {
+      # Load already processed files
+      load(here("Output/nasc_krill.Rdata")) 
+    } else {
+      # Create final data frame
+    nasc.krill <- data.frame()
+    }
+    
+    if (exists("processed.krill")) {
+      # List only new CSV files
+      csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]  
+    }
   }
+  
+  # if (process.csv.all) {
+  #   # Create final data frame
+  #   nasc.krill <- data.frame()
+  # } else {
+  #   # Load already processed files
+  #   load(here("Output/nasc_krill.Rdata")) 
+  #   # List only new CSV files
+  #   csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]
+  # }
   
   if (length(csv.files.krill) > 0) {
     # Configure progress bar

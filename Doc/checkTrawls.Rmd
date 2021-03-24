@@ -44,8 +44,8 @@ if (doc.type == "latex") {
 
 ```{r user-settings}
 # User-specified settings
-get.nav <- F # Download vessel nav from ERDDAP
-get.db  <- F # Extract data from trawl database (F for testing)
+get.nav <- T # Download vessel nav from ERDDAP
+get.db  <- T # Extract data from trawl database (F for testing)
 ```
 
 ```{r project-settings}
@@ -58,12 +58,6 @@ settings.files <- dir(here("Doc/settings"))
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
-```
-
-```{r info}
-# Character vector of scientific names (e.g., c("Sardinops sagax","Engraulis mordax",...))
-cps.spp           <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
-                       "Scomber japonicus","Trachurus symmetricus")
 ```
 
 ```{r get-nav}
@@ -79,7 +73,7 @@ if (get.nav) {
     erddap.survey.start <- max(date(nav$time)) - days(1)
   }
   
-  if (nav.lag > 24) {
+  if (nav.lag >= 24) {
     # Generate ERDDAP URL
     dataURL <- URLencode(paste(
       "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
@@ -182,15 +176,17 @@ if (trawl.source == "Access") {
       startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
       stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
       stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$EquilibriumTime,
-                                                format = "%H:%M:%S"))),
-      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$haulbackTime,
-                                                format = "%H:%M:%S")))) %>% 
+      # equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+      #                                    format(haul.all$EquilibriumTime,
+      #                                           format = "%H:%M:%S"))),
+      # haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+      #                                    format(haul.all$haulbackTime,
+      #                                           format = "%H:%M:%S")))
+      haulBackTime     = haulbackTime,
+      equilibriumTime  = EquilibriumTime) %>% 
     mutate(haulbackTime = case_when(
-      haulbackTime < EquilibriumTime ~ haulbackTime + days(1),
-      TRUE ~ haulbackTime)) %>%
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) %>%
     rename(cruise = Cruise, ship = Ship, haul = Haul, 
            collection = Collection, notes = Notes)
   
@@ -425,31 +421,33 @@ if (nrow(lengthFreq.all) > 0) {
     # Expand data frame by counts
     uncount(weights = count)
   
-  # Extract data by length type (SL, FL, and TL) and combine
-  lengths.expanded.final <- data.frame()
-  
-  for (i in unique(lengths.expanded.all$lengthType)) {
-    l.temp <- filter(lengths.expanded.all, lengthType == i)
-    names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
-    lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
+  if (nrow(lengths.expanded.all) > 0) {
+    # Extract data by length type (SL, FL, and TL) and combine
+    lengths.expanded.final <- data.frame()
+    
+    for (i in unique(lengths.expanded.all$lengthType)) {
+      l.temp <- filter(lengths.expanded.all, lengthType == i)
+      names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
+      lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
+    }
+    
+    # Add missing length columns
+    if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
+    if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
+    if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
+    if (is.null(lengths.expanded.final$ML)) {lengths.expanded.final$ML <- NA}
+    
+    # Remove unwanted columns and rename length columns  
+    lengths.expanded.final <- lengths.expanded.final %>% 
+      rename(forkLength_mm     = FL,
+             standardLength_mm = SL,
+             totalLength_mm    = TL,
+             mantleLength_mm   = ML) %>% 
+      mutate(
+        flaggedData = "N",
+        isRandomSample = "Y",
+        binned = TRUE)
   }
-  
-  # Add missing length columns
-  if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
-  if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
-  if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
-  if (is.null(lengths.expanded.final$ML)) {lengths.expanded.final$ML <- NA}
-  
-  # Remove unwanted columns and rename length columns  
-  lengths.expanded.final <- lengths.expanded.final %>% 
-    rename(forkLength_mm     = FL,
-           standardLength_mm = SL,
-           totalLength_mm    = TL,
-           mantleLength_mm   = ML) %>% 
-    mutate(
-      flaggedData = "N",
-      isRandomSample = "Y",
-      binned = TRUE)
 }
 
 lengths.all <- lengths.all  %>% 
@@ -466,8 +464,14 @@ lengths.all <- lengths.all  %>%
   mutate(individual_ID = as.numeric(individual_ID)) %>% 
   # Standardize sex values
   mutate(sex = tolower(trimws(sex)),
-         binned = FALSE) %>% 
-  bind_rows(lengths.expanded.final) %>% 
+         binned = FALSE) 
+
+if (exists("lengths.expanded.final")) {
+  lengths.all <- lengths.all %>% 
+    bind_rows(lengths.expanded.final)
+}
+
+lengths.all <- lengths.all %>% 
   # Create unique key and replace unused sex categories
   mutate(key = paste(cruise, ship, haul, collection, species, specimenNumber),
          sex = str_replace(sex,"totalFemale","female"),
@@ -604,7 +608,8 @@ lengths <- lengths %>%
   mutate(key = paste(collection, species, specimenNumber)) %>% 
   left_join(outliers) %>% 
   left_join(select(haul, haul, datetime = equilibriumTime)) %>% 
-  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = F))
+  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, 
+                   include.lowest = TRUE, labels = FALSE))
 ```
 
 # Overview
@@ -1112,7 +1117,7 @@ Hauls removed due to trawl performance issues (e.g., aborted, bad, poor, etc.).
 ```{r bad-hauls}
 haul.bad %>% 
   filter(cruise %in% cruise.name) %>%
-  select(haul, trawlDate = netInWaterTime, orderOcc, trawlPerformance) %>% 
+  select(haul, trawlDate, orderOcc, trawlPerformance) %>% 
   mutate(trawlDate = date(trawlDate)) %>% 
   datatable(rownames = FALSE)
 ```
@@ -1128,7 +1133,6 @@ haul.paths %>%
   mutate(distance = cell_spec(
     distance, knitr.format, color = "black",
     background = ifelse(distance <= 5, "white", "orange"))) %>%
-  # select(haul, distance, startLatMin:stopLongMin) %>%
   select(haul, distance) %>%
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("c")) %>% 
