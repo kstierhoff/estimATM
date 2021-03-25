@@ -161,9 +161,9 @@ crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
-map.height <- 7
+map.height <- 6
 # Map height for specific regions; used in makeTransects
-map.height.region <- 7
+map.height.region <- 6
 
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
@@ -172,7 +172,7 @@ leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
-pie.scale  <- 0.03 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
+pie.scale  <- 0.02 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
 label.list <- c("Monterey Bay","San Francisco","Crescent City",
@@ -285,7 +285,7 @@ sounder.type           <- c(RL  = "EK80")
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
+if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMANUGIAN-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2103RL")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS")
@@ -297,7 +297,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER")
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*-Final_38_kHz_Krill-ACIN.csv")
+nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N")
 # Regex pattern for identifying offshore transects

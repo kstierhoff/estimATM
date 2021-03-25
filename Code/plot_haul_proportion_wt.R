@@ -49,7 +49,7 @@ if (doc.name == "simulateBiomass.Rmd") {
          width = map.width, height = map.height) 
 } else {
   # Save nasc plot
-  ggsave(nasc.map.cps,
+  ggsave(trawl.pie.haul.wt,
          filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
          width = map.width, height = map.height) 
   }
