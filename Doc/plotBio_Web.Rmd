@@ -16,7 +16,7 @@ pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,vr
                reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
                shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
                leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra,
-               lwgeom)
+               lwgeom,htmlwidgets)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -1102,15 +1102,14 @@ nascPal <- colorFactor(nasc.colors.all, nasc.levels.all)
 
 # Plotting preferences -------------------------------------------------------
 # Leaflet tile options; set both to T if caching
-useCachedTile  <- T # Use cached tiles
-useCrossOrigin <- T # USe cross origin
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
 
 # Create leaflet map
 i.map <- leaflet() %>% 
   # Enable tile caching
-  # enableTileCaching() %>%
+  enableTileCaching() %>%
   # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-  # addProviderTiles(providers$Esri.OceanBasemap) %>%
   addProviderTiles(providers$Esri.OceanBasemap,
                    options = tileOptions(useCache = useCachedTile,
                                          crossOrigin = useCrossOrigin)) %>%
@@ -1304,11 +1303,14 @@ if (exists("nav.now.sd"))
 
 # Save imap
 dir_create(here("Output/imap"))
-save(i.map, file = here("Output/imap/plotBio_explorer.Rdata"))
+# save(i.map, file = here("Output/imap/plotBio_explorer.Rdata"))
 
-# if (save.imap) {
-#   mapshot(i.map, url = here("Output/imap/plotBio_explorer.HTML"))
-# }
+htmlwidgets::saveWidget(i.map, here("Output/imap/imap_widget.html"),
+                        selfcontained = TRUE)
+
+if (save.imap) {
+  mapshot(i.map, url = here("Output/imap/plotBio_explorer.HTML"))
+}
 ```
 
 ```{r plot-big-nasc, out.width="90%", out.height="90%"}
