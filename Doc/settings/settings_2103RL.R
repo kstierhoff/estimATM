@@ -292,7 +292,7 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMA
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")
