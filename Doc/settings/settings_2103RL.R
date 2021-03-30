@@ -286,13 +286,17 @@ sounder.type           <- c(RL  = "EK80")
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMANUGIAN-D")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2103RL")   
+  survey.dir <- c(RL  = "C:/SURVEY/2103RL")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS")
+  survey.dir <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS")
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV") 
+if (Sys.info()['nodename'] %in% c("SWC-SMANUGIAN-D")) {
+  nasc.dir  <- c(RL  = "PROCESSED/EV/CSV")   
+} else {
+  nasc.dir  <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
+}
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")

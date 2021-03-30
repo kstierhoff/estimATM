@@ -636,9 +636,11 @@ cufes.plot.ofe <- cufes %>%
 
 ```{r process-csv-cps}
 if (process.csv) {
-  if (file.exists(here("Output/processed_cps.Rdata"))) {
-    # Load already processed CSV files
-    load(here("Output/processed_cps.Rdata"))
+  if (!process.csv.all) {
+    if (file.exists(here("Output/processed_cps.Rdata"))) {
+      # Load already processed CSV files
+      load(here("Output/processed_cps.Rdata"))
+    }    
   }
   
   # List local CSV files
@@ -678,7 +680,7 @@ if (process.csv) {
       setWinProgressBar(pb, round((i / length(csv.files.cps)) * 100), label = info)
     }
     close(pb)
-  
+    
     # Calculate summary interval
     nasc.cps <- nasc.cps %>%
       mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
@@ -747,9 +749,11 @@ save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 
 ```{r process-csv-krill}
 if (process.csv) {
-  if (file.exists(here("Output/processed_krill.Rdata"))) {
-    # Load already processed CSV files
-    load(here("Output/processed_krill.Rdata"))
+  if (!process.csv.all) {
+    if (file.exists(here("Output/processed_krill.Rdata"))) {
+      # Load already processed CSV files
+      load(here("Output/processed_krill.Rdata"))
+    }
   }
   
   # List local CSV files
@@ -1201,13 +1205,15 @@ i.map <- leaflet() %>%
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
                       "Vessel Track", "Vessel Positions", "Trawls",
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
-                      "Backscatter-Krill", "Backscatter (Large)",
+                      "Backscatter-Krill", "Backscatter-Krill (Small)",
+                      "Backscatter (Large)",
                       "CUFES Egg Density", "CUFES Egg Density-Other",
                       "CUFES Egg Density-Squid", "CUFES (Negative)",
                       "Saildrone Tracks", "Saildrone Positions"),
     options = layersControlOptions(collapsed = F)) %>%  
-  hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "CUFES (Negative)", 
-              "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
+  hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "Backscatter-Krill (Small)", 
+              "CUFES (Negative)", "CUFES Egg Density-Squid", 
+              "Vessel Positions", "Saildrone Tracks", 
               "Planned Transects (Ancillary)", "Saildrone Tracks", "Saildrone Positions")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
@@ -1232,18 +1238,21 @@ if (nrow(filter(cufes.sf, Species == "JackMackerelEggs")) > 0)
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
                    popup = ~popup, group = "CUFES Egg Density")
+
 if (nrow(filter(cufes.sf, Species == "SardineEggs")) > 0)
   i.map <- i.map %>% 
   addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
                    popup = ~popup, group = "CUFES Egg Density")
+
 if (nrow(cufes.squid.sf) > 0)
   i.map <- i.map %>% 
   addCircleMarkers(data = cufes.squid.sf,
                    radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                    fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
                    popup = ~popup, group = "CUFES Egg Density-Squid")
+
 if (nrow(cufes.ofe.sf) > 0)
   i.map <- i.map %>% 
   addCircleMarkers(data = cufes.ofe.sf,
@@ -1252,22 +1261,6 @@ if (nrow(cufes.ofe.sf) > 0)
                    popup = ~popup, group = "CUFES Egg Density-Other") 
 
 # Add backscatter data
-if (nrow(filter(nasc.cps.sf, NASC < 200)) > 0)
-  i.map <- i.map %>%  
-  addCircleMarkers(data = filter(nasc.cps.sf, NASC < 200), 
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  "#000414", 
-                   label = ~label, popup = ~popup, 
-                   group = "Backscatter-CPS (Small)") 
-
-if (nrow(filter(nasc.krill.sf, NASC < 200)) > 0)
-  i.map <- i.map %>%  
-  addCircleMarkers(data = filter(nasc.krill.sf, NASC < 200), 
-                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
-                   label = ~label, popup = ~popup,
-                   group = "Backscatter-Krill") 
-
 if (nrow(filter(nasc.cps.sf, NASC >= 200)) > 0)
   i.map <- i.map %>%  
   addCircleMarkers(data = filter(nasc.cps.sf, NASC >= 200), 
@@ -1275,6 +1268,30 @@ if (nrow(filter(nasc.cps.sf, NASC >= 200)) > 0)
                    fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
                    label = ~label, popup = ~popup,
                    group = "Backscatter-CPS") 
+
+if (nrow(filter(nasc.krill.sf, NASC >= 200)) > 0)
+  i.map <- i.map %>%  
+  addCircleMarkers(data = filter(nasc.krill.sf, NASC >= 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup,
+                   group = "Backscatter-Krill") 
+
+if (nrow(filter(nasc.cps.sf, NASC < 200)) > 0)
+  i.map <- i.map %>%  
+  addCircleMarkers(data = filter(nasc.cps.sf, NASC < 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75,  fillColor = ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup, 
+                   group = "Backscatter-CPS (Small)") 
+
+if (nrow(filter(nasc.krill.sf, NASC < 200)) > 0)
+  i.map <- i.map %>%  
+  addCircleMarkers(data = filter(nasc.krill.sf, NASC < 200), 
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor = ~nascPal(bin.level), 
+                   label = ~label, popup = ~popup,
+                   group = "Backscatter-Krill (Small)") 
 
 if (exists("haul.paths"))
   i.map <- i.map %>% 
@@ -1304,9 +1321,9 @@ if (exists("nav.now.sd"))
 # Save imap
 dir_create(here("Output/imap"))
 # save(i.map, file = here("Output/imap/plotBio_explorer.Rdata"))
-
-htmlwidgets::saveWidget(i.map, here("Output/imap/imap_widget.html"),
-                        selfcontained = TRUE)
+# 
+# htmlwidgets::saveWidget(i.map, here("Output/imap/imap_widget.html"),
+#                         selfcontained = TRUE)
 
 if (save.imap) {
   mapshot(i.map, url = here("Output/imap/plotBio_explorer.HTML"))
