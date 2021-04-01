@@ -499,13 +499,36 @@ if (nrow(catch) > 0) {
 # Select and rename trawl data for pie charts
 haul.pie <- haul.summ.wt %>% 
   select(haul, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>%
+  # Create bins for defining point size in NASC plots
+  mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
+         bin.level = as.numeric(bin)) %>% 
   project_df(to = crs.proj)
 
 cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  # Create bins for defining point size in NASC plots
+  mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
+         bin.level =  as.numeric(bin)) %>% 
   project_df(to = crs.proj)
+
+# Filter for empty trawls
+haul.zero    <- filter(haul.pie, AllCPS == 0)
+
+cluster.zero <- filter(cluster.pie, AllCPS == 0)
+
+# Calculate pie radius based on latitude range
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
+
+# Calculate pie radius of each pie, based on All CPS landings
+if (scale.pies) {
+  haul.pie$radius    <- pie.radius*log(haul.pie$bin.level+1)
+  cluster.pie$radius <- pie.radius*log(cluster.pie$bin.level+1)
+} else {
+  haul.pie$radius    <- pie.radius
+  cluster.pie$radius <- pie.radius
+}
 
 # Filter for positive hauls and clusters
 haul.pos <- filter(haul.pie, AllCPS > 0) %>% 
@@ -521,23 +544,6 @@ if (nrow(haul.pos) > 0) {
   
   cluster.pos <- cluster.pos %>% 
     replace(. == 0, 0.0000001) 
-}
-
-# Filter for empty trawls
-haul.zero    <- filter(haul.pie, AllCPS == 0)
-
-cluster.zero <- filter(cluster.pie, AllCPS == 0)
-
-# Calculate pie radius based on latitude range
-pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
-
-# Calculate pie radius of each pie, based on All CPS landings
-if (scale.pies) {
-  haul.pie$radius    <- pie.radius*haul.pie$bin
-  cluster.pie$radius <- pie.radius*cluster.pie$bin
-} else {
-  haul.pie$radius    <- pie.radius
-  cluster.pie$radius <- pie.radius
 }
 
 # Convert haul data for plotting

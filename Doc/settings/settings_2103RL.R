@@ -171,7 +171,7 @@ useCrossOrigin <- F # USe cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
-scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
+scale.pies <- TRUE # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.02 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
