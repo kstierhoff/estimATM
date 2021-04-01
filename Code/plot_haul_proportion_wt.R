@@ -8,7 +8,7 @@ if (nrow(haul.pos) > 0) {
     # plot ship track data
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = pie.radius),
+    geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = radius),
                     cols = c("Anchovy", "JackMack", "Jacksmelt",
                              "PacHerring", "PacMack", "Sardine"),
                     color = 'black', alpha = 0.8) +
@@ -21,11 +21,11 @@ if (nrow(haul.pos) > 0) {
     # Plot empty cluster locations
     geom_point(data = haul.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    # ggtitle("CPS Proportions in Trawl Hauls") +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+    # geom_scatterpie_legend(radius = trawl.breaks, x = -50000, y = -600000) + 
+    coord_sf(crs = crs.proj, 
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+  
 } else {
   # Create trawl figure
   trawl.pie.haul.wt <- base.map +
@@ -34,10 +34,8 @@ if (nrow(haul.pos) > 0) {
             alpha = 0.75, linetype = "dashed") +
     # Plot empty trawl locations
     geom_point(data = haul.zero, aes(X, Y), 
-               size = 3, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    # ggtitle("CPS Proportions in Trawl Hauls") +
-    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+               size = 3, shape = 21, fill = 'black', colour = 'white') ++
+    coord_sf(crs = crs.proj, 
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 }
