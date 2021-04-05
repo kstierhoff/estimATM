@@ -97,7 +97,7 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2021-03-20", "2021-04-13")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2021-03-20", "2021-04-01", "2021-04-13")))
 
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey

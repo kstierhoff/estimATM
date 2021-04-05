@@ -15,9 +15,9 @@ css: css/ast.css
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,cowplot,knitr,shadowtext,plotly,sf,fs,vroom,
+pacman::p_load(tidyverse,cowplot,knitr,shadowtext,plotly,sf,fs,vroom,leaflet,
                DBI,stringr,gdata,forecast,lubridate,here,rnaturalearth,viridis,
-               DT,mapview,bookdown,ggspatial)
+               DT,mapview,bookdown,ggspatial,leafem,leaflet.extras)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -28,7 +28,7 @@ pacman::p_load_gh("kstierhoff/atm")
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 
-mapviewOptions(fgb = FALSE)
+# mapviewOptions(fgb = FALSE)
 
 # Control script behavior
 process.files   <- T # process CTD/UCTD files
@@ -536,10 +536,39 @@ base.map <- get_basemap(nav_sf, states, countries, locations, bathy, map.bounds,
 # Save plot
 ggsave(base.map, filename = here("Figs/fig_basemap.png"), 
        width = map.width, height = map.height)
+
+# Leaflet preferences -------------------------------------------------------
+# Set padding around data  
+imap.bounds <- map_bounds(all.ctd.hdr$lat, all.ctd.hdr$long, 0.1) 
+
+# Leaflet tile options; set both to T if caching
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
+
+# Create leaflet map
+i.map <- leaflet() %>% 
+  # Enable tile caching
+  enableTileCaching() %>%
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.OceanBasemap,
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>% 
+  # Add scale bar
+  addScaleBar(position = "bottomright") %>%
+  # Add map coordinates
+  addMouseCoordinates() %>% 
+  # Add measurement tool
+  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+             position = "topleft") %>% 
+  fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
+            imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 ```
 
 # Underway CTD (UCTD) Results
+
 ## Cast summary  
+
 Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r uctd-summary, include=TRUE}
@@ -591,36 +620,24 @@ Location of underway UCTD (red numbers) casts. Gray numbers indicate acoustic tr
 ```{r create-map-data}
 if (exists("uctd.summ")) {
   # Convert casts to spatial
-  uctd.sf <- st_as_sf(uctd.summ, coords = c("long","lat"), crs = crs.geog) %>%
-    st_transform(crs = crs.proj) %>% 
-    mutate(
-      X = as.data.frame(st_coordinates(.))$X,
-      Y = as.data.frame(st_coordinates(.))$Y)   
+  uctd.sf <- project_df(uctd.summ, 4326, 3310) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 }
 
-if (exists("uctd.missing")) {
-  uctd.missing.sf <- st_as_sf(uctd.missing, coords = c("long","lat"), crs = crs.geog) %>%
-    st_transform(crs = crs.proj) %>% 
-    mutate(
-      X = as.data.frame(st_coordinates(.))$X,
-      Y = as.data.frame(st_coordinates(.))$Y) 
+if (nrow(uctd.missing) > 0) {
+  uctd.missing.sf <- project_df(uctd.missing, 4326, 3310) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 }
 
 if (exists("all.ctd.hdr")) {
-  ctd.sf  <- st_as_sf(all.ctd.hdr, coords = c("long","lat"), crs = crs.geog) %>%
-    st_transform(crs = crs.proj) %>% 
-    mutate(
-      X = as.data.frame(st_coordinates(.))$X,
-      Y = as.data.frame(st_coordinates(.))$Y) 
+  ctd.sf  <- project_df(all.ctd.hdr, 4326, 3310) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 }
 
-if (exists("ctd.missing")) {
+if (nrow(ctd.missing) > 0) {
   if (nrow(ctd.missing) > 0) {
-    ctd.missing.sf <- st_as_sf(ctd.missing, coords = c("long","lat"), crs = crs.geog) %>%
-      st_transform(crs = crs.proj) %>% 
-      mutate(
-        X = as.data.frame(st_coordinates(.))$X,
-        Y = as.data.frame(st_coordinates(.))$Y)  
+    ctd.missing.sf <- project_df(ctd.missing, 4326, 3310) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
   }
 }
 ```
@@ -656,27 +673,43 @@ if (save.figs) {
   ggsave(here("Figs/fig_uctd_map.png"), map.uctd, 
          width = map.width, height = map.height)
 }
-
-# Map casts
-if (exists("uctd.sf")) {
-  if (exists("uctd.missing.sf")) {
-    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-      mapview(transects.sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
-      mapview(uctd.sf, zcol = "leg", cex = 4, layer.name = "UCTD Casts", legend = TRUE) +
-      mapview(uctd.missing.sf, color = "red", cex = 6, layer.name = "UCTD Casts-Unprocessed", legend = FALSE) 
-  } else {
-    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-      mapview(transects.sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
-      mapview(uctd.sf, zcol = "leg", cex = 4, layer.name = "UCTD Casts", legend = TRUE)  
-  }
-} else {
-  # Map only vessel location
-  mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-    mapview(transects.sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) 
-}
 ```  
 
+```{r i-map-uctd}
+# Map casts
+# Add nav data
+i.map.uctd <- i.map %>% 
+  # Add nav data
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") 
+
+# Add UCTD cast data
+ if (exists("uctd.missing.sf")) {
+  i.map.uctd <- i.map.uctd %>% 
+    addCircleMarkers(data = uctd.missing.sf,
+                   radius = 5, color = "red", stroke = TRUE, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  "red", 
+                   label = ~cast,
+                   popup = ~cast,
+                   group = "UCTD Casts-Unprocessed")
+ }
+
+ if (exists("uctd.sf")) {
+  i.map.uctd <- i.map.uctd %>% 
+    addCircleMarkers(data = uctd.sf,
+                   radius = 5, color = "#000414", stroke = FALSE, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  "blue", 
+                   label = ~cast,
+                   popup = ~cast,
+                   group = "UCTD Casts")
+ }
+
+# Plot map
+i.map.uctd
+```
+
 ## Descent rate v. Depth plot
+
 Descent rate of the UCTD by depth and vessel speed.  
 
 ```{r uctd-dZt-plot,out.width="90%",out.height="90%"}
@@ -931,7 +964,9 @@ if (exists("all.uctd.casts")) {
 ```
 
 # Traditional CTD Results
+
 ## Cast summary 
+
 Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r ctd-summary,include=TRUE}
@@ -956,6 +991,7 @@ if (length(all.ctd.casts) > 0) {
 ```  
 
 ## Cast locations
+
 Location of underway CTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. CTD cast numbers correspond to those in the previous table. Casts with a Casts with a **<span style="color:red">red</span>** border have not yet been processed.  border have not yet been processed.  
 
 ```{r ctd-map-all}
@@ -986,25 +1022,40 @@ if (save.figs) {
   ggsave(here("Figs/fig_ctd_map.png"), map.ctd, 
          width = map.width, height = map.height)
 }
-
-# Map casts
-if (exists("ctd.sf")) {
-  if (exists("ctd.missing.sf")) {
-    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-      mapview(transects.sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
-      mapview(ctd.sf, zcol = "leg", cex = 4, layer.name = "CTD Casts", legend = TRUE) +
-      mapview(ctd.missing.sf, color = "red", cex = 6, layer.name = "CTD Casts-Unprocessed", legend = FALSE) 
-  } else {
-    mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-      mapview(transects.sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) +
-      mapview(ctd.sf, zcol = "leg", cex = 4, layer.name = "CTD Casts", legend = TRUE)  
-  }
-} else {
-  # Map only vessel location
-  mapview(nav_sf, zcol = "leg", legend = FALSE, layer.name = "Vessel Track") +
-    mapview(transects.sf, zcol = "Type", alpha = 0.5, layer.name = "Planned Transects", legend = FALSE) 
-}
 ```  
+
+```{r i-map-ctd}
+# Map casts
+# Add nav data
+i.map.ctd <- i.map %>% 
+  # Add nav data
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") 
+
+# Add UCTD cast data
+ if (exists("ctd.missing.sf")) {
+  i.map.ctd <- i.map.ctd %>% 
+    addCircleMarkers(data = ctd.missing.sf,
+                   radius = 5, color = "red", stroke = TRUE, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  "red", 
+                   label = ~cast,
+                   popup = ~cast,
+                   group = "CTD Casts-Unprocessed")
+ }
+
+ if (exists("ctd.sf")) {
+  i.map.ctd <- i.map.ctd %>% 
+    addCircleMarkers(data = ctd.sf,
+                   radius = 5, color = "#000414", stroke = FALSE, opacity = 0.5,
+                   fillOpacity = 0.5, fillColor =  "blue", 
+                   label = ~cast,
+                   popup = ~cast,
+                   group = "CTD Casts")
+ }
+
+# Plot map
+i.map.ctd
+```
 
 ## Unprocessed CTD casts  
 List of CTD casts not yet processed. 
