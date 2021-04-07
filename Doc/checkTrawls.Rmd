@@ -523,14 +523,21 @@ lw.df <- data.frame()
 # Generate length/weight curves
 for (i in unique(L.max$scientificName)) {
   # Create a length vector for each species
-  L <- seq(0, L.max$max.TL[L.max$scientificName == i])
+  TL <- seq(0, L.max$max.TL[L.max$scientificName == i])
   
   # Calculate weights from lengths
-  W <- estimate_weight(i, L, season = tolower(survey.season))
+  W <- estimate_weight(i, TL, season = tolower(survey.season))
   
   # Combine results
-  lw.df <- bind_rows(lw.df, data.frame(scientificName = i, L, W))
+  lw.df <- bind_rows(lw.df, data.frame(scientificName = i, W, TL))
 }
+
+# Convert lengths for plotting
+lw.df <- lw.df %>% 
+  mutate(
+    FL = convert_length(scientificName, TL, "TL", "FL"),
+    SL = convert_length(scientificName, TL, "TL", "SL")
+  )
 
 # Estimate missing weights from lengths -------------------------------------------------------
 # Use Palance et al. 2019 models to estimate missing L and W
@@ -791,11 +798,16 @@ lengths %>%
 ```
 
 # Interactive plots
-The plots below provide information about trawl specimens (e.g., length, weigth, haul, collection, and specimen number) when you hover over points with the mouse. You may zoom, pan, toggle spike-lines, etc using the menu above each graph (available when the mouse is in the plot area). **<span style="color:red">Red</span>** and **<span style="color:blue">blue</span>** points are specimens that had missing length and weight measurements, respectively. Points with **bold black** outlines have already been "flagged" in the database but may or may not have been corrected.  
+
+The plots below provide information about trawl specimens (e.g., length, weight, haul, collection, and specimen number) when you hover over points with the mouse. You may zoom, pan, toggle spike-lines, etc using the menu above each graph (available when the mouse is in the plot area). **<span style="color:red">Red</span>** and **<span style="color:blue">blue</span>** points are specimens that had missing length and weight measurements, respectively. Points with **bold black** outlines have already been "flagged" in the database but may or may not have been corrected.  
 
 The dashed lines represent the season-specific (in this case, `r survey.season`) relationship between length and weight as described in Palance et al. [-@Palance2019]. Missing length or weight entries are estimated using the same relationships.  
 
+For each species, the native lengths (standard length for Sardine and Anchovy, and fork length for mackerels and Herring) and weights are plotted atop modeled L/W curves. Curves depicting native lengths are dark gray, and the others are light gray. Ideally, the measured values will fall along the darker gray dashed line.  
+
 ## Sardine
+
+Standard length (mm) vs. weight (g).
 
 ```{r sardine-data}
 # Select species
@@ -806,25 +818,36 @@ lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
 lengths.all.sub <- filter(lengths.all, 
                           scientificName == scientificName.sub,
                           season ==  tolower(survey.season))
-lw.df.sub <- filter(lw.df, scientificName == scientificName.sub)
+
+lw.df.sub <- filter(lw.df, scientificName == scientificName.sub) 
+
+# lw.df.sub <- filter(lw.df, scientificName == scientificName.sub) %>% 
+#   pivot_longer(cols = TL:SL,
+#                names_to = "length.type",
+#                values_to = "length") %>% 
+#   arrange(length.type, W, length)
 
 if (nrow(lengths.sub) > 0) {
   # Plot L/W data from past and current survey -----------------------------------
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
-               aes(totalLength_mm, weightg),
+               aes(standardLength_mm, weightg),
                colour = "gray70", alpha = 0.3) +
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
-               aes(totalLength_mm, weightg, fill = sex, 
+               aes(standardLength_mm, weightg, fill = sex, 
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot seasonal length models for each species
-    geom_line(data = lw.df.sub, aes(L, W), alpha = 0.75, colour = "gray50", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(SL, W), alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(TL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(FL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    # geom_line(data = lw.df.sub, aes(length, W, group = length.type),
+    #           linetype = "dashed", colour = "gray50") +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -833,7 +856,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA, alpha = 0.5) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") 
+    xlab("Length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -842,6 +865,8 @@ if (nrow(lengths.sub) > 0) {
 ```
 
 ## Anchovy
+
+Standard length (mm) vs. weight (g).  
 
 ```{r anchovy-data}
 # Select species
@@ -859,18 +884,22 @@ if (nrow(lengths.sub) > 0) {
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
-               aes(totalLength_mm, weightg),
+               aes(standardLength_mm, weightg),
                colour = "gray70", alpha = 0.3) +
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
-               aes(totalLength_mm, weightg, fill = sex, 
+               aes(standardLength_mm, weightg, fill = sex, 
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot seasonal length models for each species
-    geom_line(data = lw.df.sub, aes(L, W), alpha = 0.75, colour = "gray50", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(SL, W), alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(TL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(FL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    # geom_line(data = lw.df.sub, aes(length, W, group = length.type),
+    #           linetype = "dashed", colour = "gray50") +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -879,7 +908,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA, alpha = 0.5) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") 
+    xlab("Length (mm)") + ylab("Mass (g)")  
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -888,6 +917,8 @@ if (nrow(lengths.sub) > 0) {
 ```
 
 ## Pacific mackerel
+
+Fork length (mm) vs. weight (g).  
 
 ```{r mack-data}
 # Select species
@@ -905,18 +936,22 @@ if (nrow(lengths.sub) > 0) {
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
-               aes(totalLength_mm, weightg),
+               aes(forkLength_mm, weightg),
                colour = "gray70", alpha = 0.3) +
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
-               aes(totalLength_mm, weightg, fill = sex, 
+               aes(forkLength_mm, weightg, fill = sex, 
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot seasonal length models for each species
-    geom_line(data = lw.df.sub, aes(L, W), alpha = 0.75, colour = "gray50", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(SL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(TL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(FL, W), alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+    # geom_line(data = lw.df.sub, aes(length, W, group = length.type),
+    #           linetype = "dashed", colour = "gray50") +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -925,7 +960,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA, alpha = 0.5) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)")  
+    xlab("Length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -934,6 +969,8 @@ if (nrow(lengths.sub) > 0) {
 ```
 
 ## Jack mackerel
+
+Fork length (mm) vs. weight (g).  
 
 ```{r jack-data}
 # Select species
@@ -951,18 +988,22 @@ if (nrow(lengths.sub) > 0) {
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
-               aes(totalLength_mm, weightg),
+               aes(forkLength_mm, weightg),
                colour = "gray70", alpha = 0.3) +
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
-               aes(totalLength_mm, weightg, fill = sex, 
+               aes(forkLength_mm, weightg, fill = sex, 
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot seasonal length models for each species
-    geom_line(data = lw.df.sub, aes(L, W), alpha = 0.75, colour = "gray50", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(SL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(TL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(FL, W), alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+    # geom_line(data = lw.df.sub, aes(length, W, group = length.type),
+    #           linetype = "dashed", colour = "gray50") +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -971,7 +1012,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA, alpha = 0.5) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") 
+    xlab("Length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -979,7 +1020,9 @@ if (nrow(lengths.sub) > 0) {
 }
 ```
 
-## Pacific herring
+## Pacific herring  
+
+Fork length (mm) vs. weight (g).  
 
 ```{r herring-data}
 # Select species
@@ -997,18 +1040,22 @@ if (nrow(lengths.sub) > 0) {
   lw.plot <- ggplot() + 
     # Plot L/W data from all years/surveys
     geom_point(data = lengths.all.sub, 
-               aes(totalLength_mm, weightg),
+               aes(forkLength_mm, weightg),
                colour = "gray70", alpha = 0.3) +
     # Plot L/W data for current survey
     geom_point(data = lengths.sub,
-               aes(totalLength_mm, weightg, fill = sex, 
+               aes(forkLength_mm, weightg, fill = sex, 
                    colour = outlier, label = label), 
                shape = 21, alpha = 0.9) + 
     scale_fill_manual(name = "Sex", values = c("female" = "pink", "male" = "lightblue",
                                                "unknown" = "#FFC926", "missing" = "purple")) +
     scale_colour_manual(name = "Flagged", values = c("NA" = NA, "TRUE" = "black")) +
     # Plot seasonal length models for each species
-    geom_line(data = lw.df.sub, aes(L, W), alpha = 0.75, colour = "gray50", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(SL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(TL, W), alpha = 0.75, colour = "gray90", linetype = 'dashed') +
+    geom_line(data = lw.df.sub, aes(FL, W), alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+    # geom_line(data = lw.df.sub, aes(length, W, group = length.type),
+    #           linetype = "dashed", colour = "gray50") +
     # Plot individuals with missing lengths and weights
     geom_point(data = filter(lengths.sub, missing.length == TRUE), 
                aes(totalLength_mm, weightg, label = label),
@@ -1017,7 +1064,7 @@ if (nrow(lengths.sub) > 0) {
                aes(totalLength_mm, weightg, label = label),
                shape = 21, fill = 'blue', size = 2.5, colour = NA, alpha = 0.5) +
     # Format plot
-    xlab("Total length (mm)") + ylab("Mass (g)") 
+    xlab("Length (mm)") + ylab("Mass (g)") 
   
   ggplotly(lw.plot, dynamicTicks = TRUE) 
 } else {
@@ -1027,7 +1074,7 @@ if (nrow(lengths.sub) > 0) {
 
 ## Market squid
 
-Unlike other species, the dashed line represents the results of a Loess smoother on the length and weight data from this survey, not the length-weight model from all specimens. 
+Mantle length (mm) vs. weight (g). Unlike other species, the dashed line represents the results of a Loess smoother on the length and weight data from this survey, not the length-weight model from all specimens. 
 
 ```{r squid-data}
 # Select species
@@ -1074,6 +1121,8 @@ if (nrow(lengths.sub) > 0) {
 
 ## Lengths by leg
 
+Total lengths (or mantle length, for Market Squid) vs. weight for all speciments, symbolized by cruise leg.  
+
 ```{r length-weight-leg}
 # Examine length differences by leg
 lw.plot.leg <- ggplot() +
@@ -1090,7 +1139,7 @@ lw.plot.leg <- ggplot() +
              aes(totalLength_mm, weightg),
              shape = 21, fill = 'blue', size = 2.5) +
   # Plot seasonal length models for each species
-  geom_line(data = lw.df, aes(L, W), linetype = 'dashed', colour = "gray50", alpha = 0.75) +
+  geom_line(data = lw.df, aes(TL, W), linetype = 'dashed', colour = "gray50", alpha = 0.75) +
   # Facet by species
   facet_wrap(~scientificName, scales = "free") +
   # Format plot
