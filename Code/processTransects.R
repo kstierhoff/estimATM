@@ -21,7 +21,7 @@ if (!exists("renumber.transects")) {
       type = case_when(
         str_detect(name, "A+$") ~ "Adaptive",
         str_detect(name, "C+$") ~ "Compulsory",
-        str_detect(name, "S+$") ~ "Nearshore",
+        str_detect(name, "S+$") ~ "Saildrone",
         str_detect(name, "M+$") ~ "Mammal",
         str_detect(name, "E+$") ~ "Extra",
         str_detect(name, "T+$") ~ "Transit",
@@ -43,7 +43,7 @@ if (!exists("renumber.transects")) {
       type = case_when(
         str_detect(name, "A+$") ~ "Adaptive",
         str_detect(name, "C+$") ~ "Compulsory",
-        str_detect(name, "S+$") ~ "Nearshore",
+        str_detect(name, "S+$") ~ "Saildrone",
         str_detect(name, "M+$") ~ "Mammal",
         str_detect(name, "E+$") ~ "Extra",
         str_detect(name, "T+$") ~ "Transit",
@@ -81,7 +81,7 @@ if (!exists("renumber.transects")) {
         name = case_when(
           str_detect(name, "A+$") ~ paste0(wpt.tmp, "A"),
           str_detect(name, "C+$") ~ paste0(wpt.tmp, "C"),
-          str_detect(name, "S+$") ~ paste0(wpt.tmp, "N"),
+          str_detect(name, "S+$") ~ paste0(wpt.tmp, "S"),
           str_detect(name, "M+$") ~ paste0(wpt.tmp, "M"),
           str_detect(name, "E+$") ~ paste0(wpt.tmp, "E"),
           str_detect(name, "T+$") ~ paste0(wpt.tmp, "T"),
@@ -137,7 +137,7 @@ transect.regions <- transects %>%
   summarise(
     long = max(Longitude),
     lat = Latitude[which.max(Longitude)]) %>% 
-  filter(Type %in% c("Adaptive","Compulsory", "Nearshore", "Offshore")) %>% 
+  filter(Type %in% c("Adaptive","Compulsory", "Nearshore", "Offshore", "Saildrone")) %>% 
   mutate(loc = cut(lat, region.vec, labels = FALSE),
          Region = as.factor(case_when(
            loc == 1 ~ "Mexico",
@@ -463,19 +463,20 @@ pairovets.sf <- st_as_sf(pairovets, coords = c("Longitude","Latitude"), crs = cr
 survey.map <- base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", 
-                                                  "Nearshore","Offshore", "Transit")),
+                                                  "Nearshore","Offshore", "Transit", "Saildrone")),
           aes(linetype = Type, colour = Type), show.legend = "line") +
   scale_colour_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
                                                 "Offshore" = "green", "Nearshore" = "#FF00FF",
-                                                "Transit" = "cyan")) +
+                                                "Transit" = "cyan", "Saildrone" = "cyan")) +
   scale_fill_manual(name = "Type", values = c("Adaptive" = "red", "Compulsory" = "blue",
                                               "Offshore" = "green", "Nearshore" = "#FF00FF",
-                                              "Transit" = "cyan")) +
+                                              "Transit" = "cyan", "Saildrone" = "cyan")) +
   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
   geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "solid", "Compulsory" = "solid", 
                                                   "Mammal" = "dashed", "Nearshore" = "solid",
-                                                  "Offshore" = "solid","Transit" = "dashed")) +
+                                                  "Offshore" = "solid","Transit" = "dashed",
+                                                  "Saildrone" = "solid")) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
@@ -491,14 +492,14 @@ save(transects, tx.labels, wpts, uctds, wpt.export, pairovets,
 # Create the map with all transects --------------------------------------------
 survey.map.leg = base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit", "Saildrone")),
           aes(linetype = Type), colour = "grey50", show.legend = "line") +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory"), !is.na(Leg)),
           aes(linetype = Type, colour = factor(Leg)), show.legend = "line") +
   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "dashed", "Compulsory" = "solid", 
                                                   "Offshore" = "dashed", "Nearshore" = "dashed",
-                                                  "Transit" = "dashed")) +
+                                                  "Transit" = "dashed", "Saildrone" = "solid")) +
   scale_colour_discrete("Leg") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
@@ -511,14 +512,14 @@ ggsave(survey.map.leg, filename = here("Figs/fig_survey_map_leg.png"),
 # Create the map with all transects
 survey.map.region = base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit", "Saildrone")),
           aes(linetype = Type), colour = "grey50", show.legend = FALSE) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Nearshore", "Offshore")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Nearshore", "Offshore", "Saildrone")),
           aes(linetype = Type, colour = factor(Region)), show.legend = "line") +
   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
   scale_linetype_manual(name = "Type", values = c("Adaptive" = "dashed", "Compulsory" = "solid", 
                                                   "Offshore" = "dashed", "Nearshore" = "dashed",
-                                                  "Transit" = "dashed")) +
+                                                  "Transit" = "dashed", "Saildrone" = "solid")) +
   scale_colour_discrete("Leg") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 

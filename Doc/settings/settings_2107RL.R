@@ -68,7 +68,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210702_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints_saildrone.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -143,8 +143,8 @@ survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
-wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
-wpt.colors           <- c("#FF0000", "#0000FF", "#FF33F5", "#FFA500") 
+wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore","Saildrone")
+wpt.colors           <- c("#FF0000", "#0000FF", "#FF33F5", "#FFA500","#FFFF00") 
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
