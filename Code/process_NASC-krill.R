@@ -37,7 +37,7 @@ if (process.csv.krill) {
         nasc.vessel.krill.temp <- extract_csv(nasc.files.krill[ii]) %>% 
           mutate(vessel.name = i,
                  sounder = sounder.type[i],
-                 transect = str_replace(transect, nasc.pattern.krill[i],""),
+                 # transect = str_replace(transect, nasc.pattern.krill[i],""),
                  time.align  = align.time(datetime, 1))
         
         # Combine results

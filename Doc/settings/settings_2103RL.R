@@ -1,4 +1,19 @@
 # Processing controls ----------------------------------------------------
+# Control script behavior (usually T)
+save.figs       <- T # Save figures
+get.nav         <- T # Download nav data from ERDDAP
+get.nav.sd      <- F # Download nav data from ERDDAP
+copy.bib        <- T # Copy bibliography from the AST server; requires VPN if off site
+copy.files      <- T # Copy data files from data to plotBio directory
+overwrite.csv   <- F # Overwrite existing CSV files when copying
+overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
+process.csv     <- T # Process acoustic backscatter files
+process.csv.all <- T # Process acoustic backscatter files
+process.csv.krill <- F # Process krill backscatter data
+get.db          <- T # Import trawl database
+download.hab    <- F # Download habitat map from AST site
+resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
@@ -313,10 +328,10 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T")
 # Recursively search NASC directories
 nasc.recurse           <- c(RL = TRUE)
 # Max NASC value for removing outliers
-nasc.max               <- 10000*19
+nasc.max               <- NA # 10000*19
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = TRUE) # in the nearshore strata
+source.cps.nasc        <- c(RL  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2103RL.csv")) # in the nearshore strata 
