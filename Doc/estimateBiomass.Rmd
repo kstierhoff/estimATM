@@ -152,22 +152,43 @@ if (copy.files) {
     # Get vessel name
     dd <- nasc.vessels[d]
     
+    # List CSV files for CPS and krill
     csv.files.cps <- dir_ls(file.path(survey.dir[dd], 
                                       nasc.dir[dd]), 
                             regex = nasc.pattern.cps[dd],
                             recurse = nasc.recurse[dd])
     
-    file_copy(csv.files.cps, here("Data/Backscatter", dd), 
-              overwrite = overwrite.csv)  
-    
-    # Copy CSV files for Krill
     csv.files.krill <- dir_ls(file.path(survey.dir[dd], 
                                         nasc.dir[dd]), 
-                              regex = nasc.pattern.krill[dd])
+                              regex = nasc.pattern.krill[dd],
+                              recurse = nasc.recurse[dd])
     
-    file_copy(csv.files.krill, here("Data/Backscatter", dd), 
-              overwrite = overwrite.csv)
-    
+    # Copy CSV files
+    if (overwrite.csv) {
+      # Copy all files
+      file_copy(csv.files.cps, here("Data/Backscatter", dd), 
+                overwrite = overwrite.csv)
+      
+      file_copy(csv.files.krill, here("Data/Backscatter", dd), 
+                overwrite = overwrite.csv)
+    } else {
+      # List existing files
+      files.cps <- path_file(dir_ls(here("Data/Backscatter", dd),
+                    regex = nasc.pattern.cps[dd],
+                    recurse = nasc.recurse[dd]))
+      
+      files.krill <- path_file(dir_ls(here("Data/Backscatter", dd),
+                    regex = nasc.pattern.krill[dd],
+                    recurse = nasc.recurse[dd]))
+      
+      # Copy new files only
+      file_copy(str_subset(csv.files.cps, files.cps, negate = TRUE), 
+                here("Data/Backscatter", dd))
+      
+      file_copy(str_subset(csv.files.krill, files.krill, negate = TRUE), 
+                here("Data/Backscatter", dd))
+    }
+  
     # Update the progress bar
     pb.prog <- round(d/length(nasc.vessels)*100)
     info <- sprintf("%d%% done", pb.prog)
@@ -832,7 +853,7 @@ if (process.csv) {
           if (survey.name %in% c("1507SH","1606RL")) {
             cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
               mutate(key = paste(transect, interval))
-              # mutate(key = paste(interval, round(dist_m, 6))) 
+            # mutate(key = paste(interval, round(dist_m, 6))) 
             
             if (survey.name == c("1507SH")) {
               # Join nasc.vessel and cps.nasc on transect number and interval
@@ -1786,7 +1807,7 @@ if (nrow(herring.hauls) > 0) {
       lat1 = floor(bathy.bounds$ymax) + 1, 
       lat2 = floor(bathy.bounds$ymin) - 1, 
       resolution = 4)
-
+    
     # Save bathy results
     save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
                                   survey.name,".Rdata", sep = ""))  
@@ -2578,7 +2599,7 @@ if (get.db) {
     filter(between(Start, date(erddap.survey.start), date(erddap.survey.end)),
            Ship == cruise.ship) %>% 
     project_df(to = crs.proj)
-
+  
   # Close connection
   dbDisconnect(cufes.con)  
   
@@ -5255,8 +5276,8 @@ if (exists("all.ctd.hdr") & exists("uctd.summ")) {
 UCTD and CTD casts are assigned to acoustic transects so that they may be later used to determine the integration depth for estimating CPS abundance and biomass.  
 
 ```{r assign-ctd-transects}
-  if (exists("ctd.info.all")) {
-    if (process.ctd) {
+if (exists("ctd.info.all")) {
+  if (process.ctd) {
     # Assign nearest acoustic transect to CTD/UCTD cast
     # Create varialble for nearest cluster
     ctd.info.all$transect.name <- NA_character_
@@ -5620,23 +5641,23 @@ if (do.imap) {
     #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
     #                  label = ~htmlEscape(paste(Type, Waypoint)),
     #                  popup = ~popup,
-    #                  group = "Planned Transects (Core)") %>%
-    # # Add ancillary planned transects 
-    # addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
-    #              color = ~txPal(Type), weight = 3, opacity = 0.5,
-    #              label = ~htmlEscape(paste(Type, Transect)), 
-    #              popup = ~popup,
-    #              group = "Planned Transects (Ancillary)") %>%
-    # addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
-    #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
-    #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-    #                  label = ~htmlEscape(paste(Type, Waypoint)),
-    #                  popup = ~popup,
-    #                  group = "Planned Transects (Ancillary)") %>%
-    # Add nearshore stratum polygons
-    addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
-                weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-                fillOpacity = 0.50, group = "Biomass (Herring)") %>%
+  #                  group = "Planned Transects (Core)") %>%
+  # # Add ancillary planned transects 
+  # addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
+  #              color = ~txPal(Type), weight = 3, opacity = 0.5,
+  #              label = ~htmlEscape(paste(Type, Transect)), 
+  #              popup = ~popup,
+  #              group = "Planned Transects (Ancillary)") %>%
+  # addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
+  #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
+  #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+  #                  label = ~htmlEscape(paste(Type, Waypoint)),
+  #                  popup = ~popup,
+  #                  group = "Planned Transects (Ancillary)") %>%
+  # Add nearshore stratum polygons
+  addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
+              weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+              fillOpacity = 0.50, group = "Biomass (Herring)") %>%
     addPolygons(data = filter(strata.nse.sub, scientificName == "Engraulis mordax"), 
                 weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
                 fillOpacity = 0.50, group = "Biomass (Anchovy)") %>%
@@ -5828,8 +5849,8 @@ if (do.imap) {
   # Display map
   i.map
 } else {
-   print("No interactive map created. Check \"do.imap\" if unexpected.")
- }
+  print("No interactive map created. Check \"do.imap\" if unexpected.")
+}
 ```  
 
 # Match intervals for comparing EK60 and EK80 data (optional)
