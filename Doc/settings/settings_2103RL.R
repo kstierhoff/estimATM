@@ -118,9 +118,9 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2021-03-20", "2021-04-01", "2021-04-1
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2021-03-20" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2021-04-14" # End of survey for ERDDAP vessel data query
-erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
-erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric")
-erddap.headers       <- c("time", "lat", "long", "SST", "SOG")
+erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,wind_dir,wind_speed")
+erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
+erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
 survey.lat           <- c(32,51)
 survey.long          <- c(-130,-117)
 

@@ -621,7 +621,7 @@ base.map <- get_basemap(transects, states, countries,
 # Map planned transects
 survey.plan <- base.map +   
   geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
-  geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
+  # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
   geom_sf(data = transects, aes(colour = Type, linetype = Type), 
           show.legend = "line") +
   scale_colour_manual("Type", 
@@ -632,6 +632,8 @@ survey.plan <- base.map +
                         values = c(Adaptive = "dashed", Compulsory = "solid",
                                    Offshore = "dashed", Nearshore = "solid",
                                    Transit = "dashed", Saildrone = "solid")) +
+  geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
+  geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
@@ -667,10 +669,10 @@ for (ii in unique(transects$loc)) {
     geom_sf(data = filter(transects, loc == ii), aes(colour = Type, linetype = Type), 
             show.legend = "line") +
     # Plot acoustic transect labels N of Cape Flattery
-    geom_shadowtext(data = tx.labels, 
+    geom_shadowtext(data = tx.labels,
                     aes(X, Y, label = transect.name,
                         angle = brg, colour = Type),
-                    size = 2, fontface = 'bold.italic', 
+                    size = 2, fontface = 'bold.italic',
                     bg.colour = "white") +
     scale_colour_manual("Type", 
                         values = c(Adaptive = "red", Compulsory = "black",
@@ -728,6 +730,108 @@ if (file.exists(here("Figs/fig_survey_plan_mexico.png"))) {
 } else {
   print("No map for this region.")
 }
+```
+
+## Long Beach Carnage - Southern/Central CA
+
+```{r map-survey-plan-LBC}
+
+lbc.transects <- c(0:90, 220:300)
+
+# Set padding around data  
+map.bounds <- transects %>%
+  filter(Type == "Nearshore", Transect %in% lbc.transects) %>% 
+  st_transform(crs = crs.proj) %>%
+  st_bbox()  
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height.region*map.aspect
+
+# Create base map
+base.map <- get_basemap(filter(transects, loc == ii), states, countries, 
+                        landmarks, bathy, map.bounds, crs = crs.proj)
+
+lbc.map <- base.map +
+  geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
+  # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
+  geom_sf(data = filter(transects, Type != "Nearshore"), aes(colour = Type, linetype = Type), 
+          show.legend = "line") +
+  geom_sf(data = filter(transects, Type == "Nearshore", Transect %in% lbc.transects), 
+          aes(colour = Type, linetype = Type), 
+          show.legend = "line") +
+  # # Plot acoustic transect labels N of Cape Flattery
+  # geom_shadowtext(data = tx.labels,
+  #                 aes(X, Y, label = transect.name,
+  #                     angle = brg, colour = Type),
+  #                 size = 2, fontface = 'bold.italic',
+  #                 bg.colour = "white") +
+  scale_colour_manual("Type", 
+                      values = c(Adaptive = "red", Compulsory = "black",
+                                 Offshore = "green", Nearshore = "magenta",
+                                 Transit = "orange", Saildrone = "cyan")) +
+  scale_linetype_manual("Type", 
+                        values = c(Adaptive = "dashed", Compulsory = "solid",
+                                   Offshore = "dashed", Nearshore = "solid",
+                                   Transit = "dashed", Saildrone = "solid")) +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+# Save the base map
+ggsave(lbc.map, file = here("Figs", paste0("fig_survey_plan_LBC.png")), 
+       height = map.height.region, width = map.width)  
+
+```
+
+## Lisa Marie - WA, OR, and Norhern CA
+
+```{r map-survey-plan-LM}
+# Set padding around data  
+map.bounds <- transects %>%
+  filter(Type == "Nearshore", !Transect %in% lbc.transects) %>% 
+  st_transform(crs = crs.proj) %>%
+  st_bbox()  
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- 4
+# map.width  <- map.height.region*map.aspect
+
+# Create base map
+base.map <- get_basemap(filter(transects, loc == ii), states, countries, 
+                        landmarks, bathy, map.bounds, crs = crs.proj)
+
+lm.map <- base.map +
+  geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
+  # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
+  geom_sf(data = filter(transects, Type != "Nearshore"), aes(colour = Type, linetype = Type), 
+          show.legend = "line") +
+  geom_sf(data = filter(transects, Type == "Nearshore", !Transect %in% lbc.transects), 
+          aes(colour = Type, linetype = Type), 
+          show.legend = "line") +
+  # # Plot acoustic transect labels N of Cape Flattery
+  # geom_shadowtext(data = tx.labels,
+  #                 aes(X, Y, label = transect.name,
+  #                     angle = brg, colour = Type),
+  #                 size = 2, fontface = 'bold.italic',
+  #                 bg.colour = "white") +
+  scale_colour_manual("Type", 
+                      values = c(Adaptive = "red", Compulsory = "black",
+                                 Offshore = "green", Nearshore = "magenta",
+                                 Transit = "orange", Saildrone = "cyan")) +
+  scale_linetype_manual("Type", 
+                        values = c(Adaptive = "dashed", Compulsory = "solid",
+                                   Offshore = "dashed", Nearshore = "solid",
+                                   Transit = "dashed", Saildrone = "solid")) +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+# Save the base map
+ggsave(lm.map, file = here("Figs", paste0("fig_survey_plan_LM.png")), 
+       height = map.height.region, width = map.width)  
+
 ```
 
 # Depth ECDF plots

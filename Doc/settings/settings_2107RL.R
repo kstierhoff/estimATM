@@ -68,7 +68,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210702_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints_saildrone.gpx"
+gpx.file         <- "rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -135,9 +135,9 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2021-07-02", "2021-07-22",
 erddap.vessel        <- "WTED"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2015-06-19" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2015-09-11" # End of survey for ERDDAP vessel data query
-erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed")
-erddap.classes       <- c("factor", "numeric", "numeric", "numeric","numeric")
-erddap.headers       <- c("time", "lat", "long", "SST", "SOG")
+erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,wind_dir,wind_speed")
+erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
+erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
 survey.lat           <- c(32,51)
 survey.long          <- c(-130,-117)
 
