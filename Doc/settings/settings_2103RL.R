@@ -1,18 +1,18 @@
 # Processing controls ----------------------------------------------------
 # Control script behavior (usually T)
-save.figs       <- T # Save figures
-get.nav         <- T # Download nav data from ERDDAP
-get.nav.sd      <- F # Download nav data from ERDDAP
-copy.bib        <- T # Copy bibliography from the AST server; requires VPN if off site
-copy.files      <- T # Copy data files from data to plotBio directory
-overwrite.csv   <- F # Overwrite existing CSV files when copying
-overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)
-process.csv     <- T # Process acoustic backscatter files
-process.csv.all <- T # Process acoustic backscatter files
-process.csv.krill <- F # Process krill backscatter data
-get.db          <- T # Import trawl database
-download.hab    <- F # Download habitat map from AST site
-resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+save.figs         <- T # Save figures
+get.nav           <- T # Download nav data from ERDDAP
+get.nav.sd        <- F # Download nav data from ERDDAP
+copy.bib          <- F # Copy bibliography from the AST server; requires VPN if off site
+copy.files        <- T # Copy data files from data to plotBio directory
+overwrite.files   <- T # Overwrite existing files when copying (not CSV, see below)
+overwrite.csv     <- T # Overwrite existing CSV files when copying
+process.csv       <- T # Process acoustic backscatter files
+process.csv.all   <- T # Process acoustic backscatter files
+process.csv.krill <- T # Process krill backscatter data
+get.db            <- T # Import trawl database
+download.hab      <- F # Download habitat map from AST site
+resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
@@ -98,7 +98,7 @@ survey.name.long       <- "Spring 2021 Coastal Pelagic Species (CPS) Survey"
 survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
-survey.name            <- "2407RL"        # SWFSC/AST survey name
+survey.name            <- "2103RL"        # SWFSC/AST survey name
 survey.start           <- "20 March"       # Survey start date
 survey.end             <- "13 April"   # Survey end date
 survey.year            <- "2021"          # Survey year, for report
@@ -115,10 +115,10 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 leg.breaks <- as.numeric(lubridate::ymd(c("2021-03-20", "2021-04-01", "2021-04-13")))
 
 # Define ERDDAP data variables
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2021-03-20" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2021-04-14" # End of survey for ERDDAP vessel data query
-erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,wind_dir,wind_speed")
+erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
 survey.lat           <- c(32,51)
@@ -214,6 +214,8 @@ pac.herring.color  <- '#F5DEB3'
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus")
 # CUFES
+cufes.start        <- "2021-03-20" # Start of survey for CUFES filtering
+cufes.end          <- "2021-04-14" # End of survey for CUFES filtering
 # For legend objects
 cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
 cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
@@ -265,7 +267,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL") 
+nasc.vessels           <- c("RL","LBC") 
 nasc.vessels.offshore  <- NA_character_
 nasc.vessels.nearshore <- NA_character_
 nasc.vessels.krill     <- "RL"
@@ -301,76 +303,99 @@ sounder.type           <- c(RL  = "EK80")
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMANUGIAN-D")) {
-  survey.dir <- c(RL  = "C:/SURVEY/2103RL")   
+  survey.dir <- c(RL  = "C:/SURVEY/2103RL",
+                  LBC = "C:/SURVEY/2103RL")   
 } else {
-  survey.dir <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS")
+  survey.dir <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS",
+                  LBC = "//swc-storage3-s/AST3/SURVEYS/20210320_LASKER_SpringCPS")
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
 if (Sys.info()['nodename'] %in% c("SWC-SMANUGIAN-D")) {
   nasc.dir  <- c(RL  = "PROCESSED/EV/CSV")   
 } else {
-  nasc.dir  <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
+  nasc.dir  <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+                 LBC = "PROCESSED/EV/CSV/CARNAGE") 
 }
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")
+nasc.pattern.cps       <- c(RL  = "juan_cps*.*-Final 38kHz CPS.csv",
+                            LBC = "-Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
+                            LBC = "*Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
-nasc.pattern.nearshore <- c(RL  = "\\d{3}N")
+nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
+                            LBC = "\\d{3}N")
 # Regex pattern for identifying offshore transects
-nasc.pattern.offshore  <- c(RL  = "\\d{3}O")
+nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
+                            LBC = "\\d{3}O")
 # Regex pattern for identifying offshore transects
-nasc.pattern.inshore   <- c(RL  = "\\d{3}I")
+nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
+                            LBC = "\\d{3}I")
 # Regex pattern for identifying transits
-nasc.pattern.transit   <- c(RL  = "\\d{3}T")
+nasc.pattern.transit   <- c(RL  = "\\d{3}T",
+                            LBC = "\\d{3}T")
 # Recursively search NASC directories
-nasc.recurse           <- c(RL = TRUE)
+nasc.recurse           <- c(RL  = TRUE,
+                            LBC = TRUE)
 # Max NASC value for removing outliers
 nasc.max               <- NA # 10000*19
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = FALSE) # in the nearshore strata
+source.cps.nasc        <- c(RL  = FALSE,
+                            LBC = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2103RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL  = "[^0-9]") 
+tx.char.pattern        <- c(RL  = "[^0-9]",
+                            LBC = "[^0-9]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL  = TRUE) 
+strip.tx.nums          <- c(RL  = TRUE,
+                            LBC = FALSE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = FALSE) 
+strip.tx.chars         <- c(RL  = FALSE,
+                            LBC = FALSE) 
 
 # If T, removes transects with names including "transit"
-rm.transit             <- c(RL  = TRUE) 
+rm.transit             <- c(RL  = TRUE,
+                            LBC = FALSE) 
 
 # If T, removes transects with names including "offshore"
-rm.offshore            <- c(RL  = TRUE)
+rm.offshore            <- c(RL  = TRUE,
+                            LBC = FALSE)
 
 # If T, removes transects with names including "inshore"
-rm.inshore             <- c(RL  = TRUE)
+rm.inshore             <- c(RL  = TRUE,
+                            LBC = FALSE)
 
 # If T, removes transects with names including "nearshore"
-rm.nearshore           <- c(RL  = TRUE) 
+rm.nearshore           <- c(RL  = TRUE,
+                            LBC = FALSE) 
 
 # If T, subtracts NASC.5 from cps.nasc
-rm.surface             <- c(RL  = FALSE) 
+rm.surface             <- c(RL  = FALSE,
+                            LBC = FALSE) 
 
 # regex for matching number pattern
-tx.num.pattern         <- c(RL  = "-\\d{1}") 
+tx.num.pattern         <- c(RL  = "-\\d{1}",
+                            LBC = "-\\d{1}") 
 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL  = TRUE) 
+use.tx.number          <- c(RL  = TRUE,
+                            LBC = TRUE) 
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- list(RL = NA)
+tx.rm                  <- list(RL  = NA,
+                               LBC = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 3)
+min.tx.length          <- c(RL  = 3,
+                            LBC = 0.5)
 
 # Enforce nearest trawl cluster distance limits?
 limit.cluster.dist     <- c(OS  = FALSE,
@@ -386,8 +411,8 @@ max.cluster.dist       <- 30
 tx.spacing.bins <- c(0, 6, 15, 35, 70, 100)
 tx.spacing.dist <- c(5, 10, 20, 40, 80)
 
-tx.spacing.ns   <- 5 # Nearshore transect spacing, in nmi; set NA if calculating programatically
-tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
+tx.spacing.ns   <- 5  # Nearshore transect spacing, in nmi; set NA if calculating programmatically
+tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programmatically
 
 # SCS data
 scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
