@@ -188,7 +188,16 @@ if (leaflet.checkTransects.simple) {
     enableTileCaching() %>% 
     # Add provider tiles; 
     # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-    addProviderTiles(providers$Esri.OceanBasemap, 
+    addProviderTiles("Esri.OceanBasemap", 
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    addProviderTiles("Esri.WorldStreetMap", group = "Esri.WorldStreetMap",
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    addProviderTiles("Esri.WorldImagery", group = "Esri.WorldImagery",
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    addProviderTiles("OpenStreetMap.Mapnik", group = "OpenStreetMap.Mapnik",
                      options = tileOptions(useCache = useCachedTile,
                                            crossOrigin = useCrossOrigin)) %>%
     # Add EEZs
@@ -241,6 +250,7 @@ if (leaflet.checkTransects.simple) {
                position = "topleft") %>% 
     # Add layer controls
     addLayersControl(
+      baseGroups = c("Esri.OceanBasemap", "Esri.WorldImagery","Esri.WorldStreetMap","OpenStreetMap.Mapnik"),
       overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours", "Planned Transects", 
                         "UCTD Stations"),
@@ -255,7 +265,16 @@ if (leaflet.checkTransects.simple) {
     # Enable tile caching
     enableTileCaching() %>% 
     # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-    addProviderTiles(providers$Esri.OceanBasemap, 
+    addProviderTiles("Esri.OceanBasemap", 
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    addProviderTiles("Esri.WorldStreetMap", group = "Esri.WorldStreetMap",
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    addProviderTiles("Esri.WorldImagery", group = "Esri.WorldImagery",
+                     options = tileOptions(useCache = useCachedTile,
+                                           crossOrigin = useCrossOrigin)) %>%
+    addProviderTiles("OpenStreetMap.Mapnik", group = "OpenStreetMap.Mapnik",
                      options = tileOptions(useCache = useCachedTile,
                                            crossOrigin = useCrossOrigin)) %>%
     # Add EEZs
@@ -353,6 +372,7 @@ if (leaflet.checkTransects.simple) {
                position = "topleft") %>% 
     # Add layer controls
     addLayersControl(
+      baseGroups = c("Esri.OceanBasemap", "Esri.WorldImagery","Esri.WorldStreetMap","OpenStreetMap.Mapnik"),
       overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours",
                         "Planned Transects (Compulsory)", "Planned Transects (Adaptive)",
@@ -433,6 +453,20 @@ wpts %>%
 wpts %>% 
   select(-label, -popup) %>% 
   filter(Type %in% c("Nearshore")) %>% 
+  arrange(Transect) %>%
+  mutate(
+    Long = as.data.frame(st_coordinates(.))$X,
+    Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Saildrone Transects
+
+```{r saildrone-wpts-table}
+wpts %>% 
+  select(-label, -popup) %>% 
+  filter(Type %in% c("Saildrone")) %>% 
   arrange(Transect) %>%
   mutate(
     Long = as.data.frame(st_coordinates(.))$X,
@@ -732,106 +766,43 @@ if (file.exists(here("Figs/fig_survey_plan_mexico.png"))) {
 }
 ```
 
-## Long Beach Carnage - Southern/Central CA
-
-```{r map-survey-plan-LBC}
-
-lbc.transects <- c(0:90, 220:300)
-
-# Set padding around data  
-map.bounds <- transects %>%
-  filter(Type == "Nearshore", Transect %in% lbc.transects) %>% 
-  st_transform(crs = crs.proj) %>%
-  st_bbox()  
-
-# Determine map aspect ratio and set height and width
-map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.width  <- map.height.region*map.aspect
-
-# Create base map
-base.map <- get_basemap(filter(transects, loc == ii), states, countries, 
-                        landmarks, bathy, map.bounds, crs = crs.proj)
-
-lbc.map <- base.map +
-  geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
-  # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
-  geom_sf(data = filter(transects, Type != "Nearshore"), aes(colour = Type, linetype = Type), 
-          show.legend = "line") +
-  geom_sf(data = filter(transects, Type == "Nearshore", Transect %in% lbc.transects), 
-          aes(colour = Type, linetype = Type), 
-          show.legend = "line") +
-  # # Plot acoustic transect labels N of Cape Flattery
-  # geom_shadowtext(data = tx.labels,
-  #                 aes(X, Y, label = transect.name,
-  #                     angle = brg, colour = Type),
-  #                 size = 2, fontface = 'bold.italic',
-  #                 bg.colour = "white") +
-  scale_colour_manual("Type", 
-                      values = c(Adaptive = "red", Compulsory = "black",
-                                 Offshore = "green", Nearshore = "magenta",
-                                 Transit = "orange", Saildrone = "cyan")) +
-  scale_linetype_manual("Type", 
-                        values = c(Adaptive = "dashed", Compulsory = "solid",
-                                   Offshore = "dashed", Nearshore = "solid",
-                                   Transit = "dashed", Saildrone = "solid")) +
-  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-
-# Save the base map
-ggsave(lbc.map, file = here("Figs", paste0("fig_survey_plan_LBC.png")), 
-       height = map.height.region, width = map.width)  
-
+## By vessel
+```{r map-survey-vessels}
+if (file.exists(here("Code", paste0("map_survey_plan_", prj.name, ".R")))) {
+  source(here("Code", paste0("map_survey_plan_", prj.name, ".R")))
+} else {
+  print("No code for mapping alternate survey vessels for this survey.")
+}
 ```
 
-## Lisa Marie - WA, OR, and Norhern CA
+### Long Beach Carnage (Southern/Central CA)  
+
+```{r map-survey-plan-LBC}
+if (file.exists(here("Figs/fig_survey_plan_LBC.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_LBC.png"))
+} else {
+  print("No map for this vessel.")
+}
+```
+
+### Lisa Maria (WA, OR, and Norhern CA)  
 
 ```{r map-survey-plan-LM}
-# Set padding around data  
-map.bounds <- transects %>%
-  filter(Type == "Nearshore", !Transect %in% lbc.transects) %>% 
-  st_transform(crs = crs.proj) %>%
-  st_bbox()  
+if (file.exists(here("Figs/fig_survey_plan_LM.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_LM.png"))
+} else {
+  print("No map for this vessel.")
+}
+```
 
-# Determine map aspect ratio and set height and width
-map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.width  <- 4
-# map.width  <- map.height.region*map.aspect
+### Saildrone USVs
 
-# Create base map
-base.map <- get_basemap(filter(transects, loc == ii), states, countries, 
-                        landmarks, bathy, map.bounds, crs = crs.proj)
-
-lm.map <- base.map +
-  geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
-  # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
-  geom_sf(data = filter(transects, Type != "Nearshore"), aes(colour = Type, linetype = Type), 
-          show.legend = "line") +
-  geom_sf(data = filter(transects, Type == "Nearshore", !Transect %in% lbc.transects), 
-          aes(colour = Type, linetype = Type), 
-          show.legend = "line") +
-  # # Plot acoustic transect labels N of Cape Flattery
-  # geom_shadowtext(data = tx.labels,
-  #                 aes(X, Y, label = transect.name,
-  #                     angle = brg, colour = Type),
-  #                 size = 2, fontface = 'bold.italic',
-  #                 bg.colour = "white") +
-  scale_colour_manual("Type", 
-                      values = c(Adaptive = "red", Compulsory = "black",
-                                 Offshore = "green", Nearshore = "magenta",
-                                 Transit = "orange", Saildrone = "cyan")) +
-  scale_linetype_manual("Type", 
-                        values = c(Adaptive = "dashed", Compulsory = "solid",
-                                   Offshore = "dashed", Nearshore = "solid",
-                                   Transit = "dashed", Saildrone = "solid")) +
-  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-
-# Save the base map
-ggsave(lm.map, file = here("Figs", paste0("fig_survey_plan_LM.png")), 
-       height = map.height.region, width = map.width)  
-
+```{r map-survey-plan-saildrone}
+if (file.exists(here("Figs/fig_survey_plan_saildrone.png"))) {
+  include_graphics(here("Figs/fig_survey_plan_saildrone.png"))
+} else {
+  print("No map for this vessel.")
+}
 ```
 
 # Depth ECDF plots

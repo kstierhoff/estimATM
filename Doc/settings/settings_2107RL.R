@@ -50,7 +50,7 @@ min.tx.length <- 0 # nmi
 uctd.spacing   <- 15
 
 # Number of transects to remove from the start (if near Mexico)
-renumber.transects <- TRUE # Renumber transects to start at zero if transect are removed
+renumber.transects <- FALSE # Renumber transects to start at zero if transect are removed
 rm.n.transects <- 0
 # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 rm.i.transects <- NA
