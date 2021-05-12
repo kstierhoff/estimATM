@@ -319,7 +319,7 @@ if (Sys.info()['nodename'] %in% c("SWC-SMANUGIAN-D")) {
 }
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "juan_cps*.*-Final 38kHz CPS.csv",
+nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv",
                             LBC = "-Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
@@ -390,7 +390,7 @@ use.tx.number          <- c(RL  = TRUE,
                             LBC = TRUE) 
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- list(RL  = NA,
+tx.rm                  <- list(RL  = c("025-2","028-1"),
                                LBC = NA)
 
 # Minimum acoustic transect length (nmi)
@@ -480,9 +480,9 @@ nIndiv.min    <- 0
 nClusters.min <- 0
 
 # Use manually defined strata?
-stratify.manually    <- FALSE
+stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
-stratify.manually.ns <- FALSE
+stratify.manually.ns <- TRUE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects
