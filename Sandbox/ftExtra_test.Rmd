@@ -1,0 +1,217 @@
+---
+title: "DISTRIBUTION, BIOMASS, AND DEMOGRAPHY OF COASTAL PELAGIC FISHES IN THE CALIFORNIA CURRENT ECOSYSTEM DURING SUMMER 2015 BASED ON ACOUSTIC-TRAWL SAMPLING"
+author: "Kevin L. Stierhoff, Juan P. Zwolinski, and David A. Demer"
+date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
+output:
+  bookdown::word_document2:
+    toc: yes
+    toc_depth: 3
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+  bookdown::pdf_document2:
+    includes:
+      in_header: yaml/header.tex
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+csl: csl/ices-journal-of-marine-science.csl
+bibliography: bib/ast_bib.bib
+css: css/ast.css
+always_allow_html: yes
+linkcolor: blue
+---
+
+\pagenumbering{gobble}
+
+\listoftables
+
+\listoffigures
+
+\newpage
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate,knitr,here,
+               png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
+               odbc,cowplot,mapview,fs,beepr,ftExtra)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# set system time zone to UTC
+Sys.setenv(tz = "UTC")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# global pander options
+panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
+panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+
+# output options
+png.res       <- 150 # dpi for saved PNG images (to reduce file size while at sea)
+```
+
+```{r loop-controls}
+# User-defined loop controls
+combine.regions  <- F # Combine core and nearshore biomass plots
+plot.time.series <- T # Plot biomass time series 
+get.db           <- F # Query biomass estimates from AST database
+copy.files       <- F # Copy bib and CSL from AST server; requires internet
+```
+
+```{r copy-bib,include=F,eval=F}
+# Copy bibliography
+file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
+          here("Doc/csl"), overwrite = T)
+file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
+          here("Doc/bib"), overwrite = T)
+```
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Survey information file -------------------------------------------------------
+settings.files <- dir(here("Doc/settings"))
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# Output files ------------------------------------------------------------------
+prj.output <- settings.files[str_detect(settings.files, paste0("output_", prj.name, ".R"))]
+source(here("Doc/settings", prj.output))
+```
+
+(ref:cal-results) EK60 general purpose transceiver (GPT, Simrad) information, pre-calibration settings, and beam model results following calibration (below the horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into ER60.
+
+```{r cal-results, results='asis'}
+# Copy calibration results
+cal.results <- all.output
+
+# Get number of columns for table formatting
+cal.cols <- ncol(cal.results)
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  cal.results %>% 
+    as_flextable() %>% 
+    colformat_md()
+  
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(cal.results, 
+        format = knitr.format, 
+        align = c("l","l",rep("c", cal.cols - 2)),
+        booktabs = T, linesep = "", escape = F,
+        caption = '(ref:cal-results)') %>% 
+    kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>%
+    add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
+    row_spec(18, hline_after = T)
+}
+```
+
+```{r biomass-table-all,results='asis'}
+# Configure bootstrap estimate table
+be.table <- be  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         "$\\hat{B}$"     = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)
+
+be.table.nse <- be.nse  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         "$\\hat{B}$"     = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)
+```
+
+## Biomass distribution and demography {#results-biomass-distribution}
+
+### Northern Anchovy {#results-anchovy}
+
+#### Central stock {#results-anchovy-central}
+
+The total estimated biomass of the central stock of Northern Anchovy was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=1)`%; **Table** \@ref(tab:biomass-anch-c)). The stock was distributed from approximately Fort Bragg to San Diego, CA, but biomass was greatest between San Francisco, CA, and Pt. Conception (**Fig.** \@ref(fig:biom-dens-anch-c)**a**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']`, with modes at \~4, 6, and 9 cm (**Table** \@ref(tab:l-freq-summ-anch-c), **Fig.** \@ref(fig:l-disagg-anch-c)). Extrapolation of the central stock of Northern Anchovy biomass into the unsampled, nearshore waters is presented in **Appendix \@ref(appendix-nearshore-biomass-anchovy-c)**.
+
+(ref:biomass-anch-c) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; and coefficient of variation, CV) for the central stock of Northern Anchovy (*Engraulis mordax*) in the survey region. Stratum areas are nmi^2^.
+
+```{r biomass-anch-c}
+be.table.sub <- be.table %>%
+  filter(Name == "Engraulis mordax", Stock == "Central") %>%
+  mutate(Region = "Core") %>%
+  select(Name, Stock, Region, everything())
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>%
+      merge_v(j = c("Name")) %>%
+      italic(j = 1) %>%
+      # add_header(Name  = "",
+      #            Stock    = "",
+      #            Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum", 
+      #            Region = "Stratum",
+      #            Clusters = "Trawl", Individuals = "Trawl",
+      #            "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+      #            CV = "Biomass") %>%
+      merge_h(part = "header") %>%
+      align(align = "center",part = "header") %>%
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
+          align           = c(rep("l", 3), rep("r",ncol(be.table.sub) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-anch-c)') %>%
+      kable_styling(latex_options = c("hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>%
+      column_spec(1, italic = T) %>%
+      collapse_rows(columns = 1:3, valign = "top") %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```
