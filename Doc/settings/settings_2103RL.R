@@ -1,49 +1,60 @@
 # Processing controls ----------------------------------------------------
-# Control script behavior (usually T)
+## Settings in this section control various behaviors and tasks used in the main data processing scripts
+### Figure and mapping controls
 save.figs         <- T # Save figures
-get.nav           <- T # Download nav data from ERDDAP
-get.nav.sd        <- F # Download nav data from ERDDAP
+download.hab      <- F # Download habitat map from AST site
+resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+do.imap           <- F # Make interactive maps in plotBio, estimateBiomass, etc. (F if not working)
+
+### File handling
 copy.bib          <- F # Copy bibliography from the AST server; requires VPN if off site
-copy.files        <- T # Copy data files from data to plotBio directory
+copy.files        <- F # Copy data files from data to plotBio directory
 overwrite.files   <- T # Overwrite existing files when copying (not CSV, see below)
 overwrite.csv     <- T # Overwrite existing CSV files when copying
+
+### Data imports
+get.db            <- T # Import trawl database
+get.nav           <- F # Download nav data from ERDDAP
+get.nav.sd        <- F # Download nav data from ERDDAP
+
+### File processing
 process.csv       <- T # Process acoustic backscatter files
 process.csv.all   <- T # Process acoustic backscatter files
 process.csv.krill <- T # Process krill backscatter data
-get.db            <- T # Import trawl database
-download.hab      <- F # Download habitat map from AST site
-resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+process.ctd       <- T # Process CTD/UCTD cast files
+process.cal       <- T # Process calibration data
 
-estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+### Biomass estimation
+do.bootstrap      <- F # Do bootstrap resampling on biomass estimates
+match.intervals   <- F # Match intervals for comparing EK60 and EK80
+process.nearshore <- F # Process near backscatter data
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
-process.nearshore <- F # Process near backscatter data
+estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+process.seine     <- F # Process purse seine data, if present
 combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
-process.seine     <- F # Process purse seine data
 
 # Survey planning ---------------------------------------------------------
-# Transect spacing (nautical miles)
+## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
+### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 15 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
 tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
 
-# Mainland buffer distance for FSV and Saildrone transects
+### Mainland buffer distance for FSV and Saildrone transects
 sd.buffer  <- 6 # nmi
 fsv.buffer <- 80
 
-# Minimum transect length
+### Minimum transect length
 min.tx.length <- 0 # nmi
 
-# UCTD spacing (nautical miles)
+### UCTD spacing (nautical miles)
 uctd.spacing   <- 15
 
-# Number of transects to remove from the start (if near Mexico)
+### Transect removal and renumbering
+rm.n.transects     <- 0 # Number of transects to remove from the start (if near Mexico)
+rm.i.transects <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 renumber.transects <- FALSE # Renumber transects to start at zero if transect are removed
-rm.n.transects     <- 0
-# Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
-rm.i.transects <- NA
-# rm.i.transects <- c(paste(60:127, "Compulsory"), paste(60:127, "Adaptive"), 
-#                     paste(119:300, "Nearshore"), "1 Transit") 
 
 # Locations to remove from planning (e.g., north, central, south, and mexico)
 rm.location <- NA # c("mexico")
@@ -457,7 +468,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 500 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -488,66 +499,30 @@ stratify.manually.ns <- TRUE
 # Create a new data frame with each species, stratum, and vector containing transects
 strata.manual <- bind_rows(
   data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 1,
-    transect = 37:60),
-  data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:28),
+    transect = 1:14),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 30:35),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 3,
-    transect = 36:39),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 4,
-    transect = 40:58),
+    transect = 15:26),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 10:24),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 2,
-    transect = 33:42),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 3,
-    transect = 46:49),
+    transect = 5:14),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 24:28),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 2,
-    transect = 33:36),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 3,
-    transect = 38:47),
+    transect = 3:5),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:8),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 2,
-    transect = 12:22),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 3,
-    transect = 24:62)
-)
+    transect = 1:11)
+  )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.3 # Latitude of Pt. Conception (or change based on SST)
+stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
 # Transects used to define stock boundaries (primary or other)
 
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
@@ -585,9 +560,9 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
 cal.vessels        <- "RL"
-cal.dir            <- "//swc-storage1.nmfs.local/AST1/SURVEYS/20150615_SHIMADA_SummerCCE/DATA/EK60/CALIBRATION/RESULTS/San Diego"
-cal.datetime       <- "1 July"     # Date/time of calibration
-cal.plot.date      <- "2021-07-01" # Date of the calibration, used to plot cal time series
+cal.dir            <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210320_LASKER_SpringCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW"
+cal.datetime       <- "1 March"     # Date/time of calibration
+cal.plot.date      <- "2021-03-01" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "TBD"        # Calibration participants
@@ -604,9 +579,9 @@ cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about 
 cal.notes          <- "UPDATE CAL LOCATION. Lasker calibration sphere #1"
 
 # Physical conditions during calibration
-cal.temp           <-   18.7   # enter water temperature
-cal.sal            <-   33.8   # enter salinity
-cal.c              <- 1516.8   # enter sound speed (m/s)
+cal.temp           <-   16.1   # enter water temperature
+cal.sal            <-   33.0   # enter salinity
+cal.c              <- 1507.9   # enter sound speed (m/s)
 cal.min.z          <-    5     # enter minimum water depth below transducers
 cal.max.z          <-    8     # enter maximum water depth below transducers
  
