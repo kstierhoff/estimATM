@@ -215,7 +215,7 @@ set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius*1.5),
+  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = r*1.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
@@ -306,11 +306,11 @@ set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius*2.5),
+  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = r*2.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
-  # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = radius*0.5),
+  # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = r*0.5),
   #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
   #                                      "PacHerring", "PacMack", "Sardine"),
   #                             color = 'black', alpha = 0.8) +
@@ -434,7 +434,7 @@ haul.pies <- base.map +
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
   scatterpie::geom_scatterpie(data = haul.pos, 
-                              aes(X, Y, group = haul, r = radius*1.5),
+                              aes(X, Y, group = haul, r = r*1.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +

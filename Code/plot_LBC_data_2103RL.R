@@ -158,7 +158,7 @@ library(ggnewscale)
 
 # base.map + 
 #   # Plot purse seine pies
-#   scatterpie::geom_scatterpie(data = lbc.catch, aes(X, Y, group = set, r = radius),
+#   scatterpie::geom_scatterpie(data = lbc.catch, aes(X, Y, group = set, r = r),
 #                               cols = c("anchovy", "mackerel", "sardine"),
 #                               color = 'black', alpha = 0.8) +
 #   # Configure trawl scale
@@ -173,14 +173,14 @@ c = base.map +
   geom_sf(data = transects, colour = "gray50", alpha = 0.5, size = 1, linetype = "dashed") +
   geom_sf(data = lbc.nav, colour = "gray50") +
   # Plot purse seine pies
-  geom_scatterpie(data = lbc.catch, aes(X, Y, group = set, r = radius*1.25),
+  geom_scatterpie(data = lbc.catch, aes(X, Y, group = set, r = r*1.25),
                               cols = c("Anchovy", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.75) +
   # Plot trawl pies
   geom_scatterpie(data = haul.pie, aes(X, Y, group = haul, r = pie.radius.ns),
                   cols = c("Anchovy", "PacMack", "Sardine"),
                   color = 'black', alpha = 0.75) +
-  # geom_scatterpie(data = haul.pie, aes(X, Y, group = haul, r = radius*0.4),
+  # geom_scatterpie(data = haul.pie, aes(X, Y, group = haul, r = r*0.4),
   #                 cols = c("Anchovy", "PacMack", "Sardine"),
   #                 color = 'blue', alpha = 0.8) +
   # Configure trawl scale

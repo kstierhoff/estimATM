@@ -8,10 +8,10 @@ if (nrow(cluster.pos) > 0) {
     # plot ship track data
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = pie.radius),
+    geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = r),
                     cols = c("Anchovy", "JackMack", "Jacksmelt",
                              "PacHerring", "PacMack", "Sardine"),
-                    color = 'black', alpha = 0.8) +
+                    color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
@@ -22,7 +22,6 @@ if (nrow(cluster.pos) > 0) {
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    # ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
@@ -36,7 +35,6 @@ if (nrow(cluster.pos) > 0) {
     geom_point(data = cluster.zero, aes(X, Y), 
                size = 3, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    # ggtitle("CPS Proportions in Trawl Clusters") +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))

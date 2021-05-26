@@ -18,9 +18,9 @@ get.nav           <- F # Download nav data from ERDDAP
 get.nav.sd        <- F # Download nav data from ERDDAP
 
 ### File processing
-process.csv       <- T # Process acoustic backscatter files
-process.csv.all   <- T # Process acoustic backscatter files
-process.csv.krill <- T # Process krill backscatter data
+process.csv       <- F # Process acoustic backscatter files
+process.csv.all   <- F # Process acoustic backscatter files
+process.csv.krill <- F # Process krill backscatter data
 process.ctd       <- T # Process CTD/UCTD cast files
 process.cal       <- T # Process calibration data
 

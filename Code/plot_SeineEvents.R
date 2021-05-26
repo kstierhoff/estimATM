@@ -143,7 +143,7 @@ log.set.comp.map <- base.map +
   geom_sf(data = nav.path.sf) +
   geom_sf(data = transects.sf, size = 1) + 
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius*3),
+  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = r*3),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
@@ -166,7 +166,7 @@ log.trawl.comp.map <- base.map +
   geom_sf(data = nav.path.sf) +
   geom_sf(data = transects.sf, size = 1) + 
   # Plot trawl clusters
-  scatterpie::geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = radius*3),
+  scatterpie::geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = r*3),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
@@ -205,12 +205,12 @@ log.set.comp.map.jitter <- base.map +
   geom_sf(data = nav.path.sf) +
   geom_sf(data = transects.sf, size = 1) + 
   # Plot trawl clusters
-  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = radius*3),
+  scatterpie::geom_scatterpie(data = set.pos, aes(X, Y, group = key.set, r = r*3),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.6) +
   # # Plot trawl clusters
-  # scatterpie::geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = radius*2.5),
+  # scatterpie::geom_scatterpie(data = cluster.pos, aes(X, Y, group = cluster, r = r*2.5),
   #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
   #                                      "PacHerring", "PacMack", "Sardine"),
   #                             color = 'black', alpha = 0.6) +

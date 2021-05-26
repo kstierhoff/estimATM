@@ -8,10 +8,10 @@ if (nrow(haul.pos) > 0) {
     # plot ship track data
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = radius),
+    geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = r),
                     cols = c("Anchovy", "JackMack", "Jacksmelt",
                              "PacHerring", "PacMack", "Sardine"),
-                    color = 'black', alpha = 0.8) +
+                    color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
