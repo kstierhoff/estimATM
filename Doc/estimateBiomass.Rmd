@@ -576,7 +576,6 @@ save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
 
 # Map survey plan  
 
-
 (ref:map-survey-plan) Planned compulsory (solid black lines) and adaptive (dashed red lines) transect lines sampled by _`r survey.vessel`_; offshore extensions to compulsory acoustic transects sampled by USVs (dashed green lines); and nearshore transect lines sampled by USVs and industry vessels (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms).
 
 ```{r map-survey-plan,fig.cap='(ref:map-survey-plan)'}
@@ -880,18 +879,6 @@ if (process.csv) {
                   is.na(cps.nasc) ~ NASC.50,
                   TRUE ~ cps.nasc))
             }
-            
-            # cps.nasc.temp$NASC.50.Juan <- cps.nasc.temp$NASC.50
-            # 
-            # nasc.vessel <- nasc.vessel %>%
-            #    left_join(select(cps.nasc.temp, key, NASC.50.Juan))
-            # 
-            # ggplot(nasc.vessel, aes(NASC.50, NASC.50.Juan)) + geom_point()
-            # 
-            # 
-            # nasc.vessel <- nasc.vessel %>%
-            #   mutate(nasc.diff2 = NASC.50 - NASC.50.Juan)
-            
           } else {
             cps.nasc.temp <- read.csv(data.cps.nasc[i]) %>% 
               mutate(key = paste(lat, long, dist_m),
@@ -908,12 +895,21 @@ if (process.csv) {
               left_join(select(cps.nasc.temp, time.align, cps.nasc))  
           }
         } else {
-          # Use fixed integration depth (NASC.50), with or without surface noise removal
+          # Use fixed integration depth (NASC.70), with or without surface noise removal
           if (rm.surface[i]) {
             # Remove surface noise, often from Saildrone backscatter
-            nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70 - NASC.5)
+            if ("cps.NASC" %in% colnames(nasc.vessel)) {
+              nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.NASC - NASC.5)
+            } else {
+              nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70 - NASC.5)
+            }
           } else {
-            nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
+            # Keep surface backscatter
+            if ("cps.NASC" %in% colnames(nasc.vessel)) {
+              nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.NASC)
+            } else {
+              nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
+            }
           }
         }
         
@@ -1035,6 +1031,20 @@ nasc.summ <- nasc %>%
 
 # Save NASC summary
 save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
+```
+
+## Compare CPS backscatter (cps.nasc) to NASC.70
+
+For each vessel, plot the backscatter from the CTD.app (`cps.NASC`, or equivalent) to backscatter from the default fixed integration depth (`NASC.70`).
+
+```{r compare-cps-nasc}
+# Compare cps.nasc to NASC.70
+ggplot(nasc, aes(NASC.70, cps.nasc)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  facet_wrap(~vessel.name) +
+  coord_equal() +
+  theme_bw()
 ```
 
 ```{r process-backscatter-krill}
@@ -1746,19 +1756,19 @@ pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
 # Calculate pie radius of each pie, based on All CPS landings
 # Calculate pie radius of each pie, based on All CPS landings
 if (scale.pies) {
-  haul.pie$radius    <- pie.radius*log(haul.pie$bin.level+1)
-  cluster.pie$radius <- pie.radius*log(cluster.pie$bin.level+1)
+  haul.pie$r    <- pie.radius*log(haul.pie$bin.level+1)
+  cluster.pie$r <- pie.radius*log(cluster.pie$bin.level+1)
 } else {
-  haul.pie$radius    <- pie.radius
-  cluster.pie$radius <- pie.radius
+  haul.pie$r    <- pie.radius
+  cluster.pie$r <- pie.radius
 }
 
 # Filter for positive hauls and clusters
 haul.pos <- filter(haul.pie, AllCPS > 0) %>% 
-  arrange(desc(X))
+  arrange(X)
 
 cluster.pos <- filter(cluster.pie, AllCPS > 0) %>% 
-  arrange(desc(X))
+  arrange(X)
 
 # Substitute very small value for species with zero catch, just for pie charts
 if (nrow(haul.pos) > 0) {
@@ -1997,7 +2007,7 @@ if (process.csv) {
 nasc <- left_join(nasc, cluster.distance)
 ```
 
-## Map trawl cluster polygons around acoustic backscatter  
+## Map trawl cluster polygons around acoustic intervals  
 
 Backscatter from each 100 m-long acoustic interval is apportioned by species according to the nearest (in space) trawl cluster.  
 
@@ -2019,11 +2029,6 @@ if (save.figs) {
     geom_point(data = nasc, aes(X, Y), size = 0.5, show.legend = FALSE) +
     # Plot convex hull around NASC clusters
     geom_sf(data = nasc.super.clusters, colour = 'black', alpha = 0.5, show.legend = FALSE) +
-    # geom_point(data = nasc, aes(X, Y, colour = factor(cluster)),
-    #            show.legend = FALSE) +
-    # # Plot convex hull around NASC clusters
-    # geom_sf(data = nasc.super.clusters, aes(fill = factor(cluster)),
-    #         colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
     scale_colour_discrete(name = "Cluster") +
     # Plot cluster midpoints
@@ -2034,7 +2039,6 @@ if (save.figs) {
                     aes(X, Y, label = cluster), 
                     size = 2, colour = "blue", bg.colour = "white", fontface = "bold") +
     # Plot panel label
-    # ggtitle("Integrated NASC Clusters") +
     coord_sf(crs = crs.proj, 
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
@@ -2466,7 +2470,7 @@ if (nrow(length.outliers) == 0) {
 }
 ```
 
-### Examine speciment L-W data  
+### Examine specimen L-W data  
 
 The relationship between length and weight of all specimens is visually compared to those from historic surveys and also to L/W models derived from those specimens (**Insert references to Palance et al.; present equations.**). If missing length or weight measurements are present, they are estimated from these models using the following equations and the coefficients in the table below:  
 
@@ -2932,6 +2936,7 @@ The mean weight of each species in each cluster is estimated by 1) estimatiing t
 ts.summ <- select(l.summ.cluster, cluster, scientificName, 
                   meanwg, num, sigmawg, sigmaindiv) %>% 
   ungroup()
+
 # Save to file
 write.csv(ts.summ, file = here("Output/ts_summ_cluster.csv"), 
           quote = FALSE, row.names = FALSE)
@@ -3433,7 +3438,7 @@ include_graphics(here("Figs/fig_nasc_acoustic_proportions.png"))
 For each species, biomass density is summarized by transect, and is one criteria for defining sampling strata. Only two consecutive transects where log10(biomass + 1) = 0 are allowed withing a sampling strata, and each strata must have a transect with zero biomass on each end.
 
 ```{r estimate-acoustic-biomass-density}
-# Calculate biomass density for each species
+# Calculate biomass density for each species (units = tons/nmi^2)
 nasc <- nasc %>% 
   mutate( 
     anch.dens = cps.nasc*prop.anch / (4*pi*sigmawg.anch) / 1000,
@@ -3559,7 +3564,7 @@ nasc.clust.biom <- nasc.clust.hist %>%
                        ceiling(max(cluster.distance)/30)),
                    labels = FALSE) - 1) %>% 
   group_by(species, dist.bin) %>% 
-  summarise(total.density = sum(density, na.rm = TRUE)) %>% 
+  summarise(total.density = sum(density)) %>% 
   mutate(distance = dist.bin * ceiling(max(cluster.distance$cluster.distance)/30))
 
 # Calculate cumulative acoustic biomass versus distance to positive clusters
@@ -6072,7 +6077,7 @@ if (do.bootstrap) {
   catch.summary <- data.frame()
   # Create data frame for stratum summaries
   stratum.summary <- data.frame()
-  # Create data frame for comparing bootstrap esimates
+  # Create data frame for comparing bootstrap estimates
   bootstrap.comp <- data.frame()
   
   # Configure progress bar
@@ -7435,7 +7440,7 @@ for (i in cps.spp) {
 }  
 ```  
 
-```{r AbundanceByLength}
+```{r abundance-by-length}
 # Create and format abundance vs. length table for all species
 L.abund.table <- abund.summ %>%
   ungroup() %>% 
@@ -8059,9 +8064,9 @@ nasc.density.nse <- nasc.nse.final %>%
   project_df(to = crs.proj)
 
 # Create maps of nearshore biomass
-if (save.figs) {
-  source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))
-}
+# if (save.figs) {
+#   source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))
+# }
 ```
 
 ## Results for anchovy (_Engraulis mordax_)
@@ -8153,7 +8158,7 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Clupea pallasii-All.png"))) {
 # Appendices
 ## **Appendix A.** Acoustic calibration results.
 
-```{r process-cal-all}
+```{r process-cal-all, eval=FALSE}
 if (process.cal) {
   source(here("Code/extractCalAll.R"))
 } else {
@@ -8165,7 +8170,7 @@ if (save.figs) {
 }
 ```  
 
-```{r process-cal}
+```{r process-cal, eval=FALSE}
 # Get results from current survey ---------------------------------------------
 cal.res <- cal.res.all %>% 
   mutate(cal_date = mdy(cal_date)) %>% 
@@ -8266,7 +8271,7 @@ write.csv(all.output,
 
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80).
 
-```{r cal-results,results='asis', eval=FALSE}
+```{r cal-results, results='asis', eval=FALSE}
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(all.output)
