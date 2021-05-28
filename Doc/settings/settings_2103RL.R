@@ -280,14 +280,14 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LBC") 
 nasc.vessels.offshore  <- NA_character_
-nasc.vessels.nearshore <- NA_character_
+nasc.vessels.nearshore <- c("LBC")
 nasc.vessels.krill     <- "RL"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
-seine.vessels          <- NA_character_
+seine.vessels          <- c("LBC")
 # Use seine data to apportion backscatter
-use.seine.data         <- FALSE
+use.seine.data         <- TRUE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
@@ -313,7 +313,7 @@ sounder.type           <- c(RL  = "EK80")
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMANUGIAN-D")) {
+if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMANUGIAN-D", "SWC-JRENFREE1-D")) {
   survey.dir <- c(RL  = "C:/SURVEY/2103RL",
                   LBC = "C:/SURVEY/2103RL")   
 } else {
