@@ -1,5 +1,5 @@
 # Map Long Beach Carnage transects for Summer 2021 CCE Survey (2107RL)
-lbc.transects <- c(138:228, 357:378)
+lbc.transects <- c(138:228, 357:450)
 
 # Set padding around data  
 map.bounds <- transects %>%

@@ -128,6 +128,59 @@ wpts <- wpt.export %>%
                      '<b>Longitude:</b>', long, '<br/>')
   ) 
 
+# Get bearing for each transect; used to create new pseudo-transects
+transect.brg <- transects %>% 
+  filter(Type %in% c("Adaptive","Compulsory")) %>% 
+  select(Transect, Type, brg) %>% 
+  mutate(key = paste(Transect, Type, sep = "-")) %>% 
+  st_set_geometry(NULL)
+
+# Create sampling regions
+reg.30 <- wpts %>% 
+  filter(Type %in% c("Compulsory", "Adaptive")) %>% 
+  mutate(key = paste(Transect, Type, sep = "-")) %>% 
+  left_join(select(transect.brg, key, brg)) %>% 
+  group_by(Transect, Type) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  mutate(long = as.data.frame(st_coordinates(.))$X,
+         lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  group_by(Transect, Type) %>% 
+  mutate(
+    lat1  = destination(lat, long, brg, 30, units = "nm")["lat"],
+    long1 = destination(lat, long, brg, 30, units = "nm")["lon"]
+  ) %>% 
+  select(Transect, Type, key, brg, lat = lat1, long = long1) %>% 
+  st_set_geometry(NULL)
+
+write_csv((select(ungroup(reg.30), Transect, lat, long)), 
+            file = here("Output", paste0("region_lines_30.csv")),
+            col_names = FALSE)
+
+reg.60 <- reg.30 %>% 
+  group_by(Transect, Type, key) %>% 
+  mutate(
+    lat1  = destination(lat, long, brg, 30, units = "nm")["lat"],
+    long1 = destination(lat, long, brg, 30, units = "nm")["lon"]
+  ) %>% 
+  select(Transect, Type, brg, lat = lat1, long = long1)
+
+write_csv(select(ungroup(reg.60), Transect, lat, long), 
+            file = here("Output", paste0("region_lines_60.csv")),
+            col_names = FALSE)
+
+reg.90 <- reg.60 %>% 
+  group_by(Transect, Type, key) %>% 
+  mutate(
+    lat1  = destination(lat, long, brg, 30, units = "nm")["lat"],
+    long1 = destination(lat, long, brg, 30, units = "nm")["lon"]
+  ) %>% 
+  select(Transect, Type, brg, lat = lat1, long = long1)
+
+write_csv(select(ungroup(reg.90), Transect, lat, long), 
+            file = here("Output", paste0("region_lines_90.csv")),
+            col_names = FALSE)
+
 uctds.sf <- uctds %>% 
   as.tibble() %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
@@ -140,6 +193,32 @@ dir_create(here("Output/shapefiles"))
 
 st_write(transects.sf, here("Output/shapefiles/transects.shp"), delete_layer = TRUE)
 st_write(wpts, here("Output/shapefiles/waypoints.shp"), delete_layer = TRUE)
+
+# 
+# poly.tmp <- st_read(here("Data/GIS/bathy_5m_wc_poly.shp")) %>% 
+#   st_cast("POLYGON")
+# 
+# poly.buff.25 <- st_buffer(poly.tmp, 25/60)
+# poly.buff.55 <- st_buffer(poly.buff.25, 30/60)
+# poly.buff.100 <- st_buffer(poly.buff.55, 30/60)
+# 
+# mapview(poly.buff.100, col.regions = "yellow") + 
+#   mapview(poly.buff.55, col.regions = "orange") + 
+#   mapview(poly.buff.25, col.regions = "green") + 
+#   mapview(poly.tmp, col.regions = "gray50") + 
+#   mapview(transects, color = "white")
+# 
+# temp.sp <- as_Spatial(poly.buff.25)
+# 
+# rgdal::writeOGR(as_Spatial(poly.buff.25), here("Data/GIS/test_buffer.gpx"), layer = "Contour", driver = "GPX")
+# 
+# poly.25.out <- poly.buff.25 %>% 
+#   mutate(
+#     long = as.data.frame(st_coordinates(.))$X,
+#     lat = as.data.frame(st_coordinates(.))$Y)
+# 
+# rgdal::writeOGR(temp.sp, "test_buffer", layer = "test", driver = "GPX")
+# writeOGR(cities, here("Data/GIS"), "cities", driver="GPX")
 ```
 
 # Overview  
