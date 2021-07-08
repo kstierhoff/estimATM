@@ -23,6 +23,7 @@ process.csv.all   <- F # Process acoustic backscatter files
 process.csv.krill <- F # Process krill backscatter data
 process.ctd       <- T # Process CTD/UCTD cast files
 process.cal       <- T # Process calibration data
+process.scs       <- F # Process SCS data 
 
 ### Biomass estimation
 do.bootstrap      <- F # Do bootstrap resampling on biomass estimates
@@ -640,7 +641,7 @@ pairovet.button    <- "Pairovet IN"
 cb.flush.button    <- "CB Flush"
 cb.int.button      <- "CB Interm"
 cb.ext.button      <- "CB Extended"
-gps.lat.hdr        <- "MX512-Lat"
-gps.lon.hdr        <- "MX512-Lon"
+gps.lat.hdr        <- "GP170-Lat"
+gps.lon.hdr        <- "GP170-Lon"
 order.occ.hdr      <- "Order_Occ"
 notes.hdr          <- "Notes"

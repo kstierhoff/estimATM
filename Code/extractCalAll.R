@@ -2,7 +2,7 @@
 dir_create(here("Data/Calibration"))
 dir_create(here("Output/Calibration/All"))
 
-# Import calibartion directories -----------------------------------------------
+# Import calibration directories -----------------------------------------------
 # Configure ODBC connection
 cal.con  <- dbConnect(odbc(), 
                       Driver = "SQL Server", 

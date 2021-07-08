@@ -8,6 +8,7 @@ copy.files        <- F # Copy data files to local directory
 process.csv       <- F # Process Echoview files
 save.figs         <- F # Draw new figures and maps
 download.hab      <- F # Download habitat map
+process.scs       <- F # Process SCS data 
 
 do.bootstrap      <- F # Generate bootstrap estimates
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed

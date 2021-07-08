@@ -1,0 +1,2133 @@
+---
+output: 
+  bookdown::pdf_document2:
+    number_sections: yes
+    toc: no
+    includes: 
+      in_header: yaml/header_1907RL.tex
+  bookdown::word_document2:
+    reference_docx: template/report_template_DRAFT_Rmarkdown.docx
+csl: csl/ices-journal-of-marine-science.csl
+bibliography: bib/ast_bib.bib
+---
+```{r load-libraries, echo=F, error=F, message=F, warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,mapview,rgeos,
+          knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
+          maptools,png,grid,gridExtra,cowplot,flextable,fs,magick,
+          stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
+          scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+doc.name <- knitr::current_input()
+if (is.null(doc.type)) {doc.type <- "html"}
+if (is.null(doc.name)) {doc.name <- "reportSurvey.Rmd"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = F, warning = F, message = F,progress = T,
+                      fig.align = 'center',dev = "png",
+                      dev.args = list(type = "cairo"),dpi = 150)
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# set global knitr table format
+options(knitr.table.format = knitr.format,knitr.kable.NA = '')
+
+# global pander options
+panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
+panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+
+# Register Google Maps API
+register_google(key = google_map_api)
+```
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# Define ggplot theme
+theme_set(theme_bw())
+```
+
+```{r controls, echo=F, error=F, message=F, warning=F}
+# Processing instructions (T/F)
+copy.files      <- F # copy files from source
+copy.bib        <- F # copy files from source
+overwrite.csv   <- F # overwrite CSV files when copying
+overwrite.files <- F # overwrite files when copying
+download.maps   <- F # download habitat map
+save.figs       <- T # draw plots and maps, or use existing
+get.db          <- F # import database data
+process.scs     <- F # process SCS logs, or load processed data
+get.nav         <- F # download nave data from ERDDAP
+process.csv     <- F # process CSV files from Echoview
+process.csv.all <- F # Process all CSV files (F = only new files)
+process.cal     <- F # process calibration results from previous surveys for time series plots
+process.zmux    <- F # process impedance data
+resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+calc.raw.size   <- F # computer RAW file size, or use existing
+```
+
+```{r copy-bib,include=F}
+if (copy.bib) {
+  # Update bibliography and CSL
+  file_copy("//swc-storage1/ast1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
+            "csl", overwrite = T)
+  file_copy("//swc-storage1/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
+            "bib", overwrite = T)
+}
+```
+
+```{r copy-files, include=F}
+if (copy.files) {
+  # Create data directories
+  dir_create(here("Data", c("Backscatter","CUFES","Trawl")))
+  dir_create(here("Data/Backscatter", nasc.vessels))
+  
+  # Copy trawl Access database
+  haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                        regexp = trawl.db.access)
+  file_copy(haul.db, here("Data/Trawl"), overwrite = overwrite.files)
+  
+  # Copy CUFES files
+  cufes.file <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
+                           regex = cufes.db.sqlite)
+  file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
+  
+  # Copy CSV files for CPS
+  csv.files.cps <- dir_ls(file.path(survey.dir[survey.vessel.primary], 
+                                    nasc.dir[survey.vessel.primary]), 
+                          regex = nasc.pattern.cps[survey.vessel.primary])
+  file_copy(csv.files.cps, here("Data/Backscatter", survey.vessel.primary), 
+            overwrite = overwrite.csv)
+}
+```
+
+```{r download-habitat-maps}
+if (download.maps) {
+  # If survey is ongoing, use today's date to get habitat maps
+  if (date(erddap.survey.end) > date(now())) {
+    erddap.survey.end <- date(now()) - days(2)
+  } 
+  # Calculate the number of days in the survey
+  hab.days <- floor((ymd(erddap.survey.end) - ymd(erddap.survey.start))/3)
+  
+  # Format survey start date for downloading sardine potential habitat maps
+  hab.date.start <- format(ymd(erddap.survey.start), "%Y%m%d")
+  hab.date.mid1  <- format(ymd(erddap.survey.start) + hab.days, "%Y%m%d")
+  hab.date.mid2  <- format(ymd(erddap.survey.start) + hab.days*2, "%Y%m%d")
+  hab.date.end   <- format(ymd(erddap.survey.end), "%Y%m%d")
+  
+  # Create URLs for downloading downloading sardine potential habitat maps
+  hab.url.start <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
+                         hab.date.start,"_Habitat.png", sep = "")
+  hab.url.mid1  <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
+                         hab.date.mid1,"_Habitat.png", sep = "")
+  hab.url.mid2  <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
+                         hab.date.mid2,"_Habitat.png", sep = "")
+  hab.url.end   <- paste("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
+                         hab.date.end,"_Habitat.png", sep = "")
+  
+  # Download sardine potential habitat map files
+  download.file(hab.url.start, here("Figs/fig_habitat_start.png"), mode = "wb") 
+  download.file(hab.url.mid1,  here("Figs/fig_habitat_mid1.png"), mode = "wb") 
+  download.file(hab.url.mid2,  here("Figs/fig_habitat_mid2.png"), mode = "wb") 
+  download.file(hab.url.end,   here("Figs/fig_habitat_end.png"), mode = "wb") 
+  
+  # Create cowplot objects for map grid
+  hab.start <- ggdraw() + draw_image(here("Figs/fig_habitat_start.png")) 
+  hab.mid1  <- ggdraw() + draw_image(here("Figs/fig_habitat_mid1.png"))
+  hab.mid2  <- ggdraw() + draw_image(here("Figs/fig_habitat_mid2.png"))
+  hab.end   <- ggdraw() + draw_image(here("Figs/fig_habitat_end.png")) 
+  
+  # Create final figure
+  hab.map <- plot_grid(hab.start, hab.mid1, hab.mid2, hab.end, 
+                       nrow = 2, labels = c("a)","b)","c)","d)"))  
+  
+  # Save final figure
+  ggsave(hab.map, filename = here("Figs/fig_habitat_map.png"),
+         width = 8, height = 8)
+}
+```
+
+```{r process-cal-all}
+if (process.cal) {
+  source(here("Code/extractCalAll.R"))
+} else {
+  load(here("Data/Calibration/cal_results_all.Rdata"))
+}
+
+if (save.figs) {
+  source(here("Code/plot_CalTimeSeries.R"))
+}
+```  
+
+```{r process-cal}
+# Get results from current survey ---------------------------------------------
+cal.res <- cal.res.all %>% 
+  mutate(cal_date = mdy(cal_date)) %>% 
+  filter(between(cal_date,
+                 ymd(cal.plot.date) - days(cal.window),
+                 ymd(cal.plot.date) + days(cal.window))) %>% 
+  arrange(txdr_freq)
+
+
+# create data frame for calibration parameters
+cal.params <- cal.res %>% 
+  select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
+         txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
+         txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
+         txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
+         txdr_alon_oa,txdr_athw_oa,target_ts) 
+
+# add noise estimates
+# if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
+if (is.na(cal.noise[cal.vessels])) { 
+  cal.params$noise <- rep("N/A", length(cal.files))
+}else{
+  cal.params$noise <- unlist(cal.noise[cal.vessels])
+}
+
+# create data frame for beam model results
+bm.res <- cal.res %>% 
+  select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
+         bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
+
+# create a data frame for echosounder settings
+echo.settings <- cal.res %>% 
+  select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
+
+# create names for cal parameters and beam model results
+names(cal.params) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
+                       "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                       "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                       "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                       "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                       "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                       "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                       "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                       "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                       "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                       "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                       "Theoretical TS ($TS_\\mathrm{theory}$)",
+                       "Ambient Noise")
+
+names(bm.res) <- c("Frequency","On-axis Gain ($G_0$)",
+                   "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                   "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                   "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                   "Angle Offset Along. ($\\alpha_{0}$)",
+                   "Angle Offset Athw. ($\\beta_{0}$)")
+
+names(echo.settings) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
+                          "Bandwidth (Hz)","Transmit Power (W)",
+                          "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+
+# cast output by frequency and transducer model number
+param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
+bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+
+# add a column with parameter units
+param.units <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+                               "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                               "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+
+# add a column with beam model units
+bm.units <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+
+# add units to output and arrange columns
+param.output <- bind_cols(param.output, param.units) %>% 
+  select(variable, Units, everything()) %>% 
+  rename("Frequency ($f$, kHz)" = variable)
+
+bm.output <- bind_cols(bm.output, bm.units) %>% 
+  select(variable, Units, everything()) %>% 
+  rename("Frequency ($f$, kHz)" = variable)
+
+# combine results data frames
+all.output <- rbind(param.output, bm.output) %>% 
+  rename(" " = "Frequency ($f$, kHz)")
+
+# save output to .Rdata and CSV
+save(all.output,
+     file = here("Output/cal_output_table.Rdata"))
+
+write.csv(all.output,
+          file = here("Output/cal_output_table.csv"), 
+          quote = F, row.names = F)
+```
+
+```{r process-cal-lisa-marie}
+if ("LM" %in% cal.vessels) {
+  # Create a column with beam model units
+  bm.units.lm <- data.frame(Units = c("dB re 1","dB re 1","","deg","deg","deg","deg"))
+  
+  # Combine and format calibration results
+  all.output.lm <- tibble::tribble(
+    ~" ", ~"Excursion 1", ~"Excursion 2", ~"Combined (EK80)", ~"Combined (Echoview)",
+    "On-axis Gain ($G_0$)", 22.1, 21.95, 21.94, 22,
+    "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)", -0.46, -0.02, -0.48, -0.27,
+    "RMS", 0.36, 0.27, 0.08, 0.18,
+    "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)", 7.33, 6.47, 6.96, 6.99,
+    "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)", 7.21, 6.48, 6.97, 6.97,
+    "Angle Offset Along. ($\\alpha_{0}$)", 0.02, -0.06, 0, 0.01,
+    "Angle Offset Athw. ($\\beta_{0}$)", 0.29, -0.28, 0.01, 0.01,
+  ) %>% 
+    bind_cols(bm.units.lm) %>% 
+    select(1, Units, "38" = "Combined (EK80)")
+  
+  # save output to .Rdata and CSV
+  save(all.output.lm,
+       file = here("Output/cal_output_table_LisaMarie.Rdata"))
+  
+  write.csv(all.output.lm,
+            file = here("Output/cal_output_table_LisaMarie.csv"), 
+            quote = F, row.names = F)
+}
+```
+
+```{r process-cal-carnage}
+if ("LBC" %in% cal.vessels) {
+  # Create a column with beam model units
+  bm.units.lbc <- data.frame(Units = c("", "dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  
+  all.output.lbc <- tibble::tribble(
+    ~" ", ~"38", ~"70", ~"120", ~"200",
+    "Model", "ES38-12", "ES70-7C", "ES120-7C", "ES200-7C",
+    "On-axis Gain ($G_0$)",    21.72,    26.33,     26.12,     26.33,
+    "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",    -0.73,     -0.3,     -0.51,     -0.21,
+    "RMS",     0.06,     0.03,      0.07,      0.09,
+    "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",    12.47,     6.78,      6.78,      6.99,
+    "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",    12.54,     6.78,      6.71,      6.93,
+    "Angle Offset Along. ($\\alpha_{0}$)",    -0.06,     0.18,      0.06,     -0.01,
+    "Angle Offset Athw. ($\\beta_{0}$)",     0.06,    -0.08,       0.1,      0.01
+  ) %>% 
+    bind_cols(bm.units.lbc) %>% 
+    select(1, Units, everything())
+  
+  # save output to .Rdata and CSV
+  save(all.output.lbc,
+       file = here("Output/cal_output_table_LongBeachCarnage.Rdata"))
+  
+  write.csv(all.output.lbc,
+            file = here("Output/cal_output_table_LongBeachCarnage.csv"), 
+            quote = F, row.names = F)
+}
+```
+
+
+```{r process-cal-saildrone, eval=FALSE}
+# Create a column with beam model units
+bm.units.sd <- data.frame(Units = c("", "", "dB re 1 sr", "dB re 1 m$^{2}$", 
+                                    "dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+
+# bm.units.sd <- data.frame(Units = c("kHz", "", "", "dB re 1 sr", "dB re 1 m$^{2}$", 
+#                                     "dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+
+all.output.sd <- tibble::tribble(
+  ~" ", ~"1045 (38)", ~"1045 (200)", ~"1046 (38)", ~"1046 (200)", ~"1047 (38)", ~"1047 (200)",
+  # "Frequency", "38", "200", "38", "200", "38", "200",
+  "Echosounder SN", "266969-07", "266969-08", "266960-07", "266960-08", "266961-07", "266961-08",
+  "Transducer SN", "126", "126", "129", "129", "125", "125",
+  "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)", "-13.0", "-13.1", "-13.2", "-13.0", "-12.8",    "-12.60",
+  "Theoretical TS ($TS_\\mathrm{theory}$)",    "-42.40",    "-39.08",    "-42.40",    "-39.08",    "-42.40",    "-39.08",
+  "On-axis Gain ($G_0$)", "19.40", "19.40", "19.31", "19.25", "19.22", "19.37",
+  "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",  "0.01",  "0.01",  "0.00", "-0.02", "-0.01", "-0.03",
+  "RMS",  "0.34",  "0.26",  "0.55",  "0.24",  "0.17",  "0.23",
+  "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",  "17.4",  "17.4",  "17.2",  "17.4",  "17.5", "18.00",
+  "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",  "16.8",  "16.5",  "16.3",  "16.8",  "17.3", "17.70",
+  "Angle Offset Along. ($\\alpha_{0}$)",   "0.2",   "0.4",   "0.0",   "0.2",  "-0.1",  "0.30",
+  "Angle Offset Athw. ($\\beta_{0}$)",   "0.0",   "0.5",   "0.1",  "-0.1",   "0.1", "-0.20"
+) %>% 
+  bind_cols(bm.units.sd) %>% 
+  select(1, Units, everything())
+
+# save output to .Rdata and CSV
+save(all.output.sd,
+     file = here("Output/cal_output_table_Saildrone.Rdata"))
+
+write.csv(all.output.sd,
+          file = here("Output/cal_output_table_Saildrone.csv"), 
+          quote = F, row.names = F)
+```
+
+```{r plot-cal-pings}
+# Get ping data from current survey and format for plotting
+cal.pings <- cal.pings.all %>% 
+  mutate(cal_date = date(date_time)) %>% 
+   filter(between(cal_date,
+                 ymd(cal.plot.date) - days(cal.window),
+                 ymd(cal.plot.date) + days(cal.window))) %>% 
+  arrange(txdr_freq, ping_num)
+
+# Set axis limits based on range of ping angles
+cal.lim.tmp <- round(max(max(cal.pings$along), max(cal.pings$athw))) 
+
+if (cal.lim.tmp %% 2) {
+  # If range is odd, add 1 to make axis ticks look nice
+  cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
+} else {
+  cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+}
+
+# subset only outlier points
+outliers <- filter(cal.pings, outlier == 1)
+
+cal.pings <- cal.pings %>% 
+  left_join(select(cal.res,txdr_freq,txdr_type,target_ts,
+                   txdr_gain,bm_txdr_gain,
+                   bm_alon_ba,bm_athw_ba,
+                   bm_alon_oa,bm_athw_oa)) %>% 
+  mutate(
+    txdr_type      = fct_reorder(txdr_type, txdr_freq),
+    TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
+    alpha          = along - bm_alon_oa,
+    beta           = athw - bm_athw_oa,
+    x              = (2*alpha) / bm_alon_ba,
+    y              = (2*beta) / bm_athw_ba,
+    B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
+    TS_c_new       = TS_u_new + B,
+    relTS_c        = TS_c_new - target_ts,
+    relTS_c_scaled = case_when(
+      relTS_c >= 1 ~ 1,
+      relTS_c <= -1 ~-1,
+      between(relTS_c,-1,1) ~ relTS_c))
+
+if (cal.scales == "fixed") {
+  # Plot beam-uncompensated target strength data #####
+  tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+    geom_point(aes(colour = TS_u)) + 
+    geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
+               shape = "+", size = 1, alpha = 0.7) +
+    facet_wrap(~txdr_type, scales = cal.scales) +
+    scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                         option = "magma") +
+    scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
+                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+    scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+    guides(size =  FALSE) + theme_bw() + 
+    theme(panel.spacing    = unit(1, "lines"),
+          strip.background = element_rect(fill = "white"),
+          strip.text.x     = element_text(face = "bold")) + 
+    coord_equal()
+  
+  # Plot beam-compensated target strength data #####
+  tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+    geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
+    geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
+               shape = "+", size = 4) +
+    facet_wrap(~txdr_type, scales = cal.scales) + 
+    scale_fill_distiller(name = expression(italic(TS)[rel]),
+                         type = "div", palette = "RdBu", limits = c(-1,1)) +
+    scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
+                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+    scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+    theme_bw() + 
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background = element_rect(fill = "white"),
+          strip.text.x = element_text(face = "bold")) +
+    coord_equal()
+  
+} else {
+  # Plot beam-uncompensated target strength data #####
+  tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+    geom_point(aes(colour = TS_u)) + 
+    geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
+               shape = "+", size = 1, alpha = 0.7) +
+    facet_wrap(~txdr_type, scales = cal.scales) +
+    scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                         option = "magma") +
+    scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+    scale_y_continuous('Alongship Beam Angle (deg)\n') +
+    guides(size =  FALSE) + theme_bw() + 
+    theme(panel.spacing    = unit(1, "lines"),
+          strip.background = element_rect(fill = "white"),
+          strip.text.x     = element_text(face = "bold")) 
+  
+  # Plot beam-compensated target strength data #####
+  tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+    geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
+    geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
+               shape = "+", size = 4) +
+    facet_wrap(~txdr_type, scales = cal.scales) + 
+    scale_fill_distiller(name = expression(italic(TS)[rel]),
+                         type = "div", palette = "RdBu", limits = c(-1,1)) +
+    scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+    scale_y_continuous('Alongship Beam Angle (deg)\n') +
+    theme_bw() + 
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background = element_rect(fill = "white"),
+          strip.text.x = element_text(face = "bold")) 
+}
+
+# Save TS_c plot 
+ggsave(tsu.scatter, filename = here("Figs/fig_cal_TSu_scatter.png"),  
+       width = 9, height = 6)
+
+# Save TS_c plot 
+ggsave(here("Figs/fig_cal_TSrel_scatter.png"), tsc.scatter,
+       width = 9, height = 6)
+```
+
+```{r process-nav}
+if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time))
+  }
+  
+  if (nav.lag > 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      sep = ""))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                                    row.names = NULL, skip = 0))
+    names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = long - 360,
+             SOG      = SOG * 1.94384,
+             datetime = ymd_hms(time),
+             SST      = na_if(SST, NaN),
+             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(lat, min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
+  }
+  
+  # Convert nav to spatial
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  # Cast nav to transects
+  nav.paths.sf <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
+} else {
+  # Load nav data
+  load(here("Data/Nav/nav_data.Rdata"))
+}
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
+# Create gps.csv file from nav to replace missing data in Echoview
+nav.gps <- nav %>% 
+      mutate(GPS_date = format(datetime, format = "%F"),
+             GPS_time = format(datetime, format = "%T")) %>% 
+      select(GPS_date, GPS_time, latitude = lat, longitude = long)
+
+write_csv(nav.gps, here("Output/nav.gps.csv"))
+
+# Get most recent vessel position for plotting
+nav.now <- tail(nav.sf, 1) %>% 
+  mutate(label = paste("Last position:", datetime, "UTC"))
+```
+
+```{r create-basemap,include=F}
+# Configure base map options -----------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
+  project_df(to = crs.proj)
+
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav.paths.sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- transects.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.height <- 10
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+
+# Save the basemap
+ggsave(base.map,file = here("Figs/fig_basemap.png"), 
+       height = map.height, width = map.width)
+
+save(base.map, file = here("Data/Map/basemap.Rdata"))
+```
+
+```{r process-scs}
+if (process.scs) {
+  if (scs.source == "CSV") {
+    # Process bridge event data #####
+    bridge.events <- list.files(here("Data/SCS"), pattern = scs.pattern,
+                                full.names = T, recursive = T)  
+    # Import from CSV
+    bridge.snap <- fs::path(here("Data/SCS")) %>% 
+      dir_ls(regexp = scs.pattern) %>% 
+      map_df(read_csv) %>% 
+      select(Date, Time, Button, Notes = notes.hdr, 
+             Lat = gps.lat.hdr, Lon = gps.lon.hdr)
+      
+  } else if (scs.source == "ELG") {
+    # Process bridge event data 
+    bridge.events <- list.files(here("Data/SCS"), pattern = "MOA Snap.*elg",
+                                full.names = T, recursive = T)
+    # create temporary df
+    bridge.snap <- data.frame()
+    # read and rbind all files
+    for (i in bridge.events) {
+      bridge.snap.tmp <- read_csv(i) %>% 
+        select("Date", "Time", "Button", "Notes" = notes.hdr, 
+               "Lat" = gps.lat.hdr, "Lon" = gps.lon.hdr) 
+      
+      bridge.snap <- bind_rows(bridge.snap, bridge.snap.tmp)
+    }
+  } else if (scs.source == "XLSX") {
+    # Process bridge event data #####
+    bridge.events <- dir_ls(here("Data/SCS"), regexp = scs.pattern)
+    
+    bridge.snap <- tibble()
+    
+    for (b in bridge.events) {
+      moa.tmp <- read_xlsx(bridge.events[b]) %>% 
+        mutate(Time = as.character(gsub(".* ", "", Time)),
+               datetime = Date + hms(Time)) %>% 
+        select(Date, Time, Button, Notes = notes.hdr, 
+               Lat = gps.lat.hdr, Lon = gps.lon.hdr, datetime) 
+      
+      bridge.snap <- bind_rows(bridge.snap, moa.tmp)
+    }
+  }
+  
+  # Format data
+  bridge.snap <- bridge.snap %>% 
+    filter(Lon != "", Lat != "") %>% 
+    mutate(Lat      = as.numeric(substr(Lat, 1, 2)) + 
+                      as.numeric(substr(Lat, 3, 7))/60,
+           Lon      = -(as.numeric(substr(Lon, 1, 3)) +
+                        as.numeric(substr(Lon, 4, 8))/60),
+           Button = case_when(
+             Button == cb.flush.button ~ "Retracted (5 m)",
+             Button == cb.int.button ~  "Intermediate (7 m)",
+             Button == cb.ext.button ~  "Extended (9 m)",
+             TRUE ~ Button)) %>% 
+    arrange(datetime) %>% 
+    mutate(datetime =  format(datetime, format = "%m/%d/%Y %H:%M")) 
+  
+  # save processed SCS data
+  save(bridge.snap, file = here("Data/SCS/processed_logs.Rdata"))
+} else {
+  # load processed SCS data
+  load(here("Data/SCS/processed_logs.Rdata"))
+}
+```
+
+```{r import-trawl-data}
+if (get.db) {
+  if (trawl.source == "SQL") {
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "SQL Server", 
+                            Server = "161.55.235.187", 
+                            Database = "TRAWL", 
+                            Trusted_Connection = "True")
+  } else if (trawl.source == "Access") {
+    trawl.con  <- dbConnect(odbc::odbc(), 
+                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                            DBQ = file.path(here("Data/Trawl"), trawl.db.access))
+  }
+  
+  # Import trawl database tables
+  catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
+  haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+  lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
+  lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+  spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+  
+  # Close database channel
+  dbDisconnect(trawl.con)
+  
+  # Save imported database data to .Rdata file
+  save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+       file = here("Data/Trawl/trawl_data.Rdata"))
+} else {
+  load(here("Data/Trawl/trawl_data.Rdata"))
+}
+```
+
+```{r process-trawl-haul-data}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  # Reformat haul data to match SQL
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+      # equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+      #                                    format(haul.all$EquilibriumTime,
+      #                                           format = "%H:%M:%S"))),
+      # haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+      #                                    format(haul.all$haulbackTime,
+      #                                           format = "%H:%M:%S")))
+      haulBackTime     = haulbackTime,
+      equilibriumTime  = EquilibriumTime) %>% 
+    mutate(haulBackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) %>%
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, notes = Notes)
+  
+  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+  
+  # Correct equilibriumTime or haulBackTime
+  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  
+  # Reformat length frequency data to match SQL
+  lengths.all <- lengths.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, species = Species)
+  
+  # Reformat length frequency data to match SQL
+  lengthFreq.all <- lengthFreq.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
+           species = Species, length = Length, lengthType = LengthType, 
+           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
+           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
+           subSampleNumber = SubSampleNumber)
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    mutate(
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime))
+}
+
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  mutate(season = case_when(
+    month(equilibriumTime) < 6 ~ "spring",
+    TRUE ~ "summer"))
+
+# Filter haul data for current survey
+haul <- haul.all %>% 
+  select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 
+         stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
+         trawlPerformance, season, notes) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
+  # Calculate haul duration
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins")) %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>% 
+  # Assign cluster based on yearday
+  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% 
+  droplevels() # Remove unused factor levels
+
+# # Get haul starts
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal)))
+
+# Convert haul paths and midpoints to sf; CRS = crs.geog
+# Create haul paths from starts and ends
+haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") 
+
+haul.locs.sf <- haul.mid %>% 
+  mutate(label = paste("Haul", haul)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))  
+
+# Save haul data
+save(haul, file = here("Output/haul_info.Rdata"))
+``` 
+
+```{r process-catch-data}
+# Filter catch data
+catch <- catch.all %>% 
+  left_join(dplyr::select(spp.codes, species, scientificName, commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           scientificName %in% cps.spp & netSampleType == 'codend') %>% 
+  left_join(dplyr::select(haul, haul, cluster)) %>% 
+  mutate(key = paste(haul, scientificName),
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg)
+
+if (nrow(catch) > 0) {
+  # Summarize trawl catch by species
+  haul.summ.wt <- catch %>% 
+    select(haul, cluster, scientificName, totalWeight) %>% 
+    tidyr::spread(scientificName, totalWeight) 
+  
+  # Add species with zero total weight
+  if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (!has_name(haul.summ.wt, "Sardinops sagax"))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (!has_name(haul.summ.wt, "Scomber japonicus"))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  
+  # Calculate total weight of all CPS species
+  haul.summ.wt <- haul.summ.wt %>%  
+    replace(is.na(.), 0) %>% 
+    mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>%
+    # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
+    rename("Jacksmelt"  = "Atherinopsis californiensis",
+           "PacHerring" = "Clupea pallasii",
+           "Anchovy"    = "Engraulis mordax",
+           "Sardine"    = "Sardinops sagax",
+           "PacMack"    = "Scomber japonicus",
+           "JackMack"   = "Trachurus symmetricus") 
+  
+  # Summarise catch by cluster
+  cluster.summ.wt <- haul.summ.wt %>% 
+    select(-haul, -AllCPS) %>% 
+    group_by(cluster) %>% 
+    summarise_all(list(sum)) %>% 
+    mutate(AllCPS = rowSums(select(., -cluster))) %>% 
+    right_join(cluster.mid) %>% 
+    replace(is.na(.), 0)
+  
+  # Add lat/long to haul summary for plotting
+  haul.summ.wt <- haul.summ.wt %>% 
+    right_join(haul.mid) %>% 
+    replace(is.na(.), 0)
+  
+} else {
+  # Summarize trawl catch by species
+  haul.summ.wt <- bind_cols(select(haul, haul, cluster),
+                             data.frame(
+                               "Jacksmelt"  = rep(0, nrow(haul)),
+                               "PacHerring" = rep(0, nrow(haul)),
+                               "Anchovy"    = rep(0, nrow(haul)),
+                               "Sardine"    = rep(0, nrow(haul)),
+                               "PacMack"    = rep(0, nrow(haul)),
+                               "JackMack"   = rep(0, nrow(haul)),
+                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
+    right_join(haul.mid)
+                             
+  # Summarise catch by cluster
+  cluster.summ.wt <- haul.summ.wt %>% 
+    select(-haul, -AllCPS) %>% 
+    group_by(cluster) %>% 
+    summarise_all(list(sum)) %>% 
+    mutate(AllCPS = rowSums(select(., -cluster))) %>%
+    right_join(cluster.mid) %>% 
+    replace(is.na(.), 0)
+}
+
+# Prepare catch data for plotting ----------------------------------------------
+# Select and rename trawl data for pie charts
+haul.pie <- haul.summ.wt %>% 
+  select(haul, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
+         bin.level = as.numeric(bin)) %>% 
+  project_df(to = crs.proj) %>% 
+  mutate(
+    label = paste("Haul", haul),
+    popup = paste('<b>Cluster:', haul, '</b><br/>',
+                  'Anchovy:', Anchovy, 'kg<br/>',
+                  'Sardine:', Sardine, 'kg<br/>',
+                  'Jack Mackerel:', JackMack, 'kg<br/>',
+                  'P. herring:', PacHerring, 'kg<br/>',
+                  'P. mackerel:', PacMack, 'kg<br/>',
+                  'All CPS:', AllCPS, 'kg'))
+
+cluster.pie <- cluster.summ.wt %>% 
+  select(cluster, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
+         bin.level = as.numeric(bin)) %>% 
+  project_df(to = crs.proj) %>% 
+  mutate(
+    label = paste("Cluster", cluster),
+    popup = paste('<b>Cluster:', cluster, '</b><br/>',
+                  'Anchovy:', Anchovy, 'kg<br/>',
+                  'Sardine:', Sardine, 'kg<br/>',
+                  'Jack Mackerel:', JackMack, 'kg<br/>',
+                  'P. herring:', PacHerring, 'kg<br/>',
+                  'P. mackerel:', PacMack, 'kg<br/>',
+                  'All CPS:', AllCPS, 'kg'))
+
+# Filter for empty trawls
+haul.zero    <- filter(haul.pie, AllCPS == 0)
+
+cluster.zero <- filter(cluster.pie, AllCPS == 0)
+
+# Calculate pie radius based on latitude range
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
+
+# Calculate pie radius of each pie, based on All CPS landings
+# Calculate pie radius of each pie, based on All CPS landings
+if (scale.pies) {
+  haul.pie$r    <- pie.radius*log(haul.pie$bin.level+1)
+  cluster.pie$r <- pie.radius*log(cluster.pie$bin.level+1)
+} else {
+  haul.pie$r    <- pie.radius
+  cluster.pie$r <- pie.radius
+}
+
+# Filter for positive hauls and clusters
+haul.pos <- filter(haul.pie, AllCPS > 0) %>% 
+  arrange(X)
+
+cluster.pos <- filter(cluster.pie, AllCPS > 0) %>% 
+  arrange(X)
+
+# Substitute very small value for species with zero catch, just for pie charts
+if (nrow(haul.pos) > 0) {
+  haul.pos <- haul.pos %>% 
+    replace(. == 0, 0.0000001) 
+  
+  cluster.pos <- cluster.pos %>% 
+    replace(. == 0, 0.0000001) 
+}
+
+# Convert haul data for plotting
+haul.catch <- haul.summ.wt %>% 
+  project_df(to = crs.proj)
+
+# sum total weight of sardine, anchovy, and mackerel
+haul.Anchovy.kg    <- sum(haul.catch$Anchovy, na.rm = T)
+haul.Sardine.kg    <- sum(haul.catch$Sardine, na.rm = T)
+haul.PacMack.kg    <- sum(haul.catch$PacMack, na.rm = T)
+haul.JackMack.kg   <- sum(haul.catch$JackMack, na.rm = T)
+haul.PacHerring.kg <- sum(haul.catch$PacHerring, na.rm = T)
+haul.CPS.kg        <- sum(haul.Anchovy.kg, haul.Sardine.kg, haul.PacMack.kg,
+                          haul.JackMack.kg, haul.PacHerring.kg, na.rm = T)
+
+# summarize trawl haul data
+trawl.summ <- haul.catch %>% 
+  left_join(select(haul, haul, Date = equilibriumTime, Latitude = startLatDecimal,
+                   Longitude = startLongDecimal)) %>% 
+  select(Haul = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
+         "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
+         Jacksmelt, "All CPS" = AllCPS) %>% 
+  mutate(Date = format(Date, "%m/%d/%Y %H:%M"))
+```
+
+```{r process-cufes}
+# Read CUFES data
+cufes.filename <- list.files(here("Data/CUFES"), pattern = "*.sqlite")
+cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
+cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
+  collect() %>% 
+  mutate(
+    Start = case_when(
+      cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+      cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+    Stop = case_when(
+      cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+      cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
+    Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+    Year = year(Start),
+    AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+  rename(lat = StartLatitude, long = StartLongitude) %>% 
+  project_df(to = crs.proj)
+
+# Close connection
+dbDisconnect(cufes.con)
+
+# save raw cufes table to CSV
+write.csv(cufes.raw, file = here("Output/cufes_raw.csv"), 
+          quote = F, row.names = F)
+
+# Process CUFES data
+cufes <- cufes.raw %>% 
+  # Convert cufes to long format for plotting
+  select(
+    SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
+    SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+    Comments) %>%
+  gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
+         -lat, -long, -X, -Y, -Duration, -Comments) %>% 
+  mutate(Density = Counts/Duration/0.64,
+         # Create bins for defining point size in NASC plots
+         bin = cut(Density, cufes.breaks, include.lowest = T),
+         bin.level = as.numeric(bin)) %>% 
+  left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
+
+# Save processed cufes to CSV
+write.csv(cufes, file = here("Output/cufes_proc.csv"), 
+          quote = F, row.names = F)
+
+# Prepare CUFES data for plotting ----------------------------------------------
+# Select CUFES sample with zero density for plotting
+cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
+  mutate(bin.level = 1) %>% 
+  select(X, Y, SampleNumber)
+
+# Identify bad CUFES samples
+cufes.bad <- filter(cufes.raw, Duration <= 0)
+
+save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
+
+# Remove bad samples from CUFES
+cufes <- cufes %>% 
+  filter(!SampleNumber %in% cufes.bad$SampleNumber)
+
+# Write CUFES data from current survey to CSV
+write.csv(cufes, file = here("Output/cufes_data.csv"), quote = F)
+
+# Create bins for defining point size in NASC plots
+cufes <- cufes %>% 
+  mutate(bin = cut(Density, cufes.breaks, include.lowest = T),
+         bin.level = as.numeric(bin))
+
+# Project CUFES data from CPS
+cufes.plot <- cufes %>% 
+  filter(Density > 0, Species %in% cufes.plot.spp) %>%
+  arrange(desc(Density))
+
+# Project CUFES data from squid
+cufes.plot.squid <- cufes %>% 
+  filter(Density > 0, Species == "SquidEggs") %>% 
+  arrange(desc(Density))
+
+# Project CUFES data from other fish eggs (mostly P. mackerel)
+cufes.plot.ofe <- cufes %>% 
+  filter(Density > 0, Species == "OtherFishEggs") %>%
+  filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
+                                "S. japonicus"))) %>% 
+  arrange(desc(Density))
+```  
+
+```{r process-ctd-stations}
+# Extract CTD and UCTD cast locations
+events_sf <- st_as_sf(bridge.snap, coords = c("Lon","Lat"), crs = crs.geog)
+  
+ctd.sta         <- filter(events_sf, Button == ctd.button)
+uctd.sta        <- filter(events_sf, Button == uctd.button)
+
+# Extract bongo locations
+bongo.sta       <- filter(events_sf, Button == bongo.button)
+
+# Extract pairovet locations
+pairovet.sta    <- filter(events_sf, Button == pairovet.button)
+
+# Extract all CTD/UCTD stations
+all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
+                             filter(bridge.snap, Button == uctd.button)) %>% 
+  arrange(datetime) %>% 
+  select(Date = datetime, Button, Latitude = Lat, Longitude = Lon) %>% 
+  mutate(Button = case_when(
+    Button == ctd.button ~ "CTD Cast",
+    Button == uctd.button ~ "UCTD Cast", 
+    TRUE ~ Button))
+```  
+
+```{r process-csv-cps}
+if (process.csv) {
+  if (file.exists(here("Output/processed_cps.Rdata"))) {
+    # Load already processed CSV files
+    load(here("Output/processed_cps.Rdata"))
+  }
+  
+  # List local CSV files
+  csv.files.cps <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
+                          regex = nasc.pattern.cps[survey.vessel.primary])
+  
+  if (process.csv.all) {
+    # Create final data frame
+    nasc.cps <- data.frame()
+  } else {
+    # Load already processed files
+    load(here("Output/nasc_cps.Rdata")) 
+    # List only new CSV files
+    csv.files.cps <- csv.files.cps[!csv.files.cps %in% processed.cps]
+  }
+  
+  if (length(csv.files.cps) > 0) {
+    # Configure progress bar
+    pb <- winProgressBar(title = "CSV File Processing Progress - CPS", 
+                         label = "0% done", min = 0, max = 100, initial = 0)
+    
+    # Process all .CSV files
+    for (i in 1:length(csv.files.cps)) {
+      # Process i-th file
+      nasc.cps <- bind_rows(nasc.cps, extract_csv(csv.files.cps[i]))
+      
+      # Update the progress bar
+      info <- sprintf("%d%% done", round((i / length(csv.files.cps)) * 100))
+      setWinProgressBar(pb, round((i / length(csv.files.cps)) * 100), label = info)
+    }
+    close(pb)
+    
+    # Calculate summary interval
+    nasc.cps <- nasc.cps %>%
+      mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                       labels = F, include.lowest = T))
+    
+    # Save results
+    save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
+    write.csv(nasc.cps, file = here("Output/nasc_cps.csv"), row.names = F, quote = F)
+  }
+} else {
+  load(here("Output/nasc_cps.Rdata"))
+}
+
+# Get intervals with bad lat/long values
+bad.nasc.cps <- filter(nasc.cps, lat == 999, long == 999)
+write_csv(bad.nasc.cps, here("Output/nasc_bad_cps.csv"))
+
+# Summarize nasc for reporting effort
+nasc.summ <- nasc.cps %>% 
+  group_by(transect) %>% 
+  summarise(
+    distance = length(Interval)*100/1852,
+    lat = lat[which.min(long)],
+    lon = long[which.min(long)])
+
+# average NASC.70 data over new intervals or number of intervals in a 2 km radius
+nasc.summ.cps <- nasc.cps %>%
+  filter(lat != 999, long != 999) %>% 
+  group_by(transect, int) %>%
+  summarise(
+    bins    = length(int),
+    bin.mid = as.integer(round(bins / 2)),
+    lat     = lat[1],
+    long    = long[1],
+    NASC    = mean(NASC.70)
+  )
+
+# Average cps.nasc over defined interval
+# Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
+nasc.cps.sf <- nasc.cps %>%
+  filter(lat != 999, long != 999) %>%
+  select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
+  group_by(filename, transect, int) %>% 
+  summarise(
+    lat   = lat[1],
+    long  = long[1],
+    NASC  = mean(cps.nasc),
+    label = paste0('Transect: ', transect[1], "; ",
+                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
+                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
+  # Create bins for defining point size in NASC plots
+  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
+         bin.level =  as.numeric(bin)) %>% 
+  filter(!is.na(bin)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+nasc.plot.cps <- project_sf(nasc.cps.sf, crs.proj)
+
+# Convert acoustic transects to sf
+nasc.tx.sf <- st_as_sf(nasc.cps.sf, coords = c("long","lat"), crs = crs.geog) %>% 
+  select(transect) %>% 
+  group_by(transect) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  filter(!transect %in% tx.rm)
+
+# create acoustic transect labels
+nasc.tx.labels.cps <- nasc.cps %>%
+  group_by(transect) %>%
+  summarise(
+    lat = lat[which.max(long)],
+    long = max(long)
+  )
+
+# List already processed CSV files and save
+processed.cps <- unique(nasc.cps$filename)
+save(processed.cps, file =  here("Output/processed_cps.Rdata"))
+```
+
+```{r process-csv-krill}
+if (process.csv) {
+  if (file.exists(here("Output/processed_krill.Rdata"))) {
+    # Load already processed CSV files
+    load(here("Output/processed_krill.Rdata"))
+  }
+  
+  # List local CSV files
+  csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
+                          regex = nasc.pattern.krill[survey.vessel.primary])
+  
+  if (process.csv.all) {
+    # Create final data frame
+    nasc.krill <- data.frame()
+  } else {
+    # Load already processed files
+    load(here("Output/nasc_krill.Rdata")) 
+    # List only new CSV files
+    csv.files.krill <- csv.files.krill[!csv.files.krill %in% processed.krill]
+  }
+  
+  if (length(csv.files.krill) > 0) {
+    # Configure progress bar
+    pb <- winProgressBar(title = "CSV File Processing Progress - Krill", 
+                         label = "0% done", min = 0, max = 100, initial = 0)
+    
+    # Process all .CSV files
+    for (i in 1:length(csv.files.krill)) {
+      # Process i-th file
+      nasc.krill <- bind_rows(nasc.krill, extract_csv(csv.files.krill[i]))
+      
+      # Update the progress bar
+      info <- sprintf("%d%% done", round((i / length(csv.files.krill)) * 100))
+      setWinProgressBar(pb, round((i / length(csv.files.krill)) * 100), label = info)
+    }
+    close(pb)
+    
+    # Calculate summary interval
+    nasc.krill <- nasc.krill %>%
+      mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                       labels = F, include.lowest = T)) 
+    
+    # Save results
+    save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
+    write.csv(nasc.krill, file = here("Output/nasc_krill.csv"), row.names = F, quote = F)
+  }
+} else {
+  load(here("Output/nasc_krill.Rdata"))
+}
+
+# Get intervals with bad lat/long values
+bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
+write_csv(bad.nasc.krill, here("Output/nasc_bad_krill.csv"))
+
+# Average NASC.350 data over new intervals or number of intervals in a 2 km radius
+nasc.summ.krill <- nasc.krill %>%
+  filter(lat != 999, long != 999) %>%
+  group_by(transect, int) %>%
+  summarise(
+    bins    = length(int),
+    bin.mid = as.integer(round(bins / 2)),
+    lat     = lat[1],
+    long    = long[1],
+    NASC    = mean(NASC.350)
+  )
+
+# Average krill.nasc over defined interval
+# Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
+nasc.krill.sf <- nasc.krill %>%
+  filter(lat != 999, long != 999) %>%
+  select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
+  group_by(filename, transect, int) %>% 
+  summarise(
+    lat   = lat[1],
+    long  = long[1],
+    NASC  = mean(krill.nasc),
+    label = paste0('Transect: ', transect[1], "; ",
+                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
+                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
+  # Create bins for defining point size in NASC plots%>% 
+  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
+         bin.level =  as.numeric(bin))  %>% 
+  filter(!is.na(bin)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+nasc.plot.krill <- project_sf(nasc.krill.sf, crs.proj)
+
+# create acoustic transect labels
+nasc.tx.labels.krill <- nasc.krill %>%
+  group_by(transect) %>%
+  summarise(
+    lat = lat[which.max(long)],
+    long = max(long)
+  )
+
+# List already processed CSV files and save
+processed.krill <- unique(nasc.krill$filename)
+save(processed.krill, file =  here("Output/processed_krill.Rdata"))
+
+# Select plot levels for backscatter data
+nasc.plot.all   <- rbind(nasc.cps.sf, nasc.krill.sf) %>% 
+  filter(NASC >= 200)
+```
+
+```{r plot-maps,include=F}
+if (save.figs) {
+  # Map planned transects
+  survey.plan <- base.map +    
+    geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
+            show.legend = "line") +
+    scale_colour_manual("Type", 
+                        values = c(Adaptive = "red", Compulsory = "black",
+                                   Offshore = "green", Nearshore = "magenta",
+                                   transit = "orange")) +
+    scale_linetype_manual("Type", 
+                        values = c(Adaptive = "dashed", Compulsory = "solid",
+                                   Offshore = "dashed", Nearshore = "solid",
+                                   transit = "dashed")) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+ 
+  # save survey plan map
+  ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
+         height = map.height, width = map.width)
+  
+  # Plot Survey Track, Acoustic Transects, and Trawl Locations #####
+  survey.track.map <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, aes(linetype = Type), colour = "gray70",
+            show.legend = "line") +
+    # Plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
+    # Plot acoustic transects
+    geom_sf(data = nasc.tx.sf, size = 1) +
+    # Plot trawl transects
+    geom_point(data = haul.catch, aes(X, Y),
+               shape = 21, colour = "black", fill = "white", size = 1.5) +
+    scale_linetype_manual("Type", 
+                          values = c(Adaptive = "dashed", Compulsory = "solid",
+                                     Offshore = "dashed", Nearshore = "dotted",
+                                     transit = "dashed")) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  # save figure as PNG and PDF images
+  ggsave(here("Figs/fig_vessel_track.png"), survey.track.map,
+         height = map.height, width = map.width)
+  
+  # Plot Side Station Sampling Locations #####
+  survey.station.map <- base.map +
+    # Plot transects data
+    geom_sf(data = transects.sf, aes(linetype = Type), colour = "gray70",
+            show.legend = "line") +
+    # Plot ship track data
+    geom_sf(data = nav.paths.sf, colour = "gray70", size = 0.5, alpha = 0.5) +
+    # Plot acoustic transects
+    geom_sf(data = nasc.tx.sf, size = 1) +
+    scale_linetype_manual("Type", 
+                          values = c(Adaptive = "dashed", Compulsory = "solid",
+                                     Offshore = "dashed", Nearshore = "dotted",
+                                     transit = "dashed")) +
+    # Plot trawl transects
+    geom_point(data = haul.catch, aes(X, Y),
+               shape = 21, colour = "black", fill = "white", size = 2) +
+    geom_sf(data = bongo.sta, 
+               shape = 24, size = 1.5, fill = "orange", colour = "black") +
+    geom_sf(data = ctd.sta, 
+            shape = 21, size = 1, fill = "red", colour = "black") +
+    geom_sf(data = uctd.sta, 
+            shape = 21, size = 1, fill = "red", colour = "black") +
+    coord_sf(crs = crs.proj,
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  ggsave(here("Figs/fig_station_samples.png"), survey.station.map,
+         height = map.height, width = map.width)
+  
+  # Create final backscatter summary map
+  source(here("Code/plot_sA_CPS.R"))
+  # Create final CUFES egg density map
+  source(here("Code/plot_CUFES.R"))
+  # Create trawl haul and cluster proportion figures
+  source(here("Code/plot_haul_proportion_wt.R"))
+  
+  # Combine backscatter, CUFES, and trawl maps
+  nasc.cufes.trawl.plot      <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
+                                     nrow = 1, labels = c("a)", "b)", "c)"))
+
+  # Save maps
+  ggsave(nasc.cufes.trawl.plot, 
+         filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
+         width = map.width*3, height = map.height)
+  
+  # Create calibration site maps #####  
+  # Put calibration location lat/lon in a df, for point plot
+  cal.map.df <- data.frame(cal.lat.dd, cal.lon.dd)
+  
+  # get Google map from calibration location
+  cal.map <- ggmap(get_googlemap(c(cal.lon.dd, cal.lat.dd), 
+                           maptype = "terrain", zoom = 12))
+  
+  # get extent of calibration map for inset
+  cal.map.extent <- cal.map$data
+  
+  # create inset map
+  map.inset <- ggplot(ca) +
+    geom_sf() +
+    geom_path(data = cal.map.extent[c(1, 3, 4, 2, 1),], aes(lon, lat),
+              size = 0.5, colour = 'red') + # plot extent of inset map
+    theme(axis.text.x     = element_blank(), 
+          axis.text.y     = element_blank(), 
+          axis.ticks      = element_blank(),
+          axis.title.x    = element_blank(),
+          axis.title.y    = element_blank(),
+          plot.background = element_blank())
+  
+  # create main map using ggmap
+  map.main <- cal.map + 
+    geom_point(data = cal.map.df, aes(x = cal.lon.dd,y = cal.lat.dd),
+               shape = 23, size = 5, fill = "yellow", colour = "black") + 
+    xlab("\nLongitude (W)") + ylab("Latitude (N)\n") + 
+    theme_bw() + 
+    theme(plot.background = element_blank(),
+          axis.text.y = element_text(angle = 90, hjust = 0.5))
+  
+  # Create final color map
+  cal.map.color <- ggdraw() +
+    draw_plot(map.main,0,0,1,1) +
+    draw_plot(map.inset,0.65,0.65,0.325,0.325)
+  
+  # Save map image
+  ggsave(cal.map.color, filename = here("Figs/fig_cal_map.png"),
+         height = 10, width = 10, units = "in")
+} 
+```  
+
+\pagenumbering{gobble}
+
+**Report on the `r survey.name.long` (`r survey.name`), `r survey.start` to `r survey.end` `r survey.year`, conducted aboard NOAA Ship _`r survey.vessel.long`_, fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and three unmanned sailboats**  
+
+Kevin L. Stierhoff^1^, Juan P. Zwolinski^1,2^, Josiah S. Renfree^1^, Gabriel E. Johnson^1,3^, Scott A. Mau^1^, David W. Murfin^1^, Thomas S. Sessions^1^, and David A. Demer^1^
+
+^1^Fisheries Resources Division  
+Southwest Fisheries Science Center (SWFSC)  
+NOAA-National Marine Fisheries Service  
+8901 La Jolla Shores Dr.  
+La Jolla, CA 92037, USA  
+
+^2^University of California, Santa Cruz  
+The Cooperative Institute for Marine Ecosystems and Climate (CIMEC)  
+1156 High St, Santa Cruz, CA 95064  
+
+^3^NOAA Commissioned Officer Corps, Assigned to SWFSC
+
+\newpage
+\pagenumbering{arabic}
+
+# Introduction {#introduction}
+The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA Ship _`r survey.vessel.long`_ (hereafter, _`r survey.vessel`_), fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and three unmanned
+sailboats (**Fig. \@ref(fig:vessel-pic)**), `r survey.start` to `r survey.end` `r survey.year`. The Acoustic-Trawl Method (ATM) was used to assess coastal pelagic fish species (CPS) and krill within the CCE. Data were collected using multi-frequency echosounders, surface trawls, obliquely integrating net tows, a continuous underway fish-egg sampler (CUFES), and conductivity-temperature-depth probes (CTDs).  
+
+The objectives for the survey were to: 1) acoustically map the distributions and estimate the abundances of CPS, i.e., Pacific Sardine _Sardinops sagax_, Northern Anchovy _Engraulis mordax_, Pacific Herring _Clupea pallasii_, Pacific Mackerel _Scomber japonicus_, and Jack Mackerel _Trachurus symmetricus_; and krill (euphausiid spp.); 2) characterize and investigate linkages to their biotic and abiotic environments; 3) gather information regarding their life histories; and 4) use fishing vessels and unmanned surface vehicles (USVs) to sample in offshore and nearshore areas when and where sampling from NOAA ships is inefficient, unsafe, or both (**Fig. \@ref(fig:vessel-pic)**).  
+
+The survey domain was defined by the modeled distribution of potential habitat for the northern subpopulation (stock) of Pacific Sardine [@Zwolinski2011], and information recently gathered from other research projects [e.g., California Cooperative Oceanic Fisheries Investigations (CalCOFI) samples] or fishing industry reports (e.g., catch and bycatch data). This area encompassed the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S. and Canada from approximately `r survey.landmark.s`, to `r survey.landmark.n`, but also spanned portions of the southern stock of Pacific Sardine, and stocks of Pacific Mackerel, Jack Mackerel, and Pacific Herring.  
+
+This report provides an overview of the survey objectives and a summary of the survey equipment, acoustic-system calibration, sampling and analysis methods, and preliminary results. This report does not include estimates of the animal distributions and biomasses, which are documented separately. Advantages and disadvantages of sampling from NOAA ships, fishing vessels, and USVs are discussed.  
+
+(ref:vessel-pic) NOAA Ship _`r survey.vessel`_ (left) _Lisa Marie_ (top right) _Long Beach Carnage_ (middle right), and an unmanned surface vehicle (Saildrone USV, bottom right).
+
+```{r vessel-pic, fig.cap='(ref:vessel-pic)', out.height='3.5in', fig.pos='H'}
+include_graphics(here("Images/img_reuben_lasker.jpg"))
+```
+
+\newpage  
+
+## Scientific Personnel {#introduction-personnel}
+The collection and analysis of the survey data were conducted by members of the Fisheries Resources Division at the SWFSC. Superscripts denote additional roles of cruise participants: 1-Chief Scientist and 2-Volunteer.  
+
+**Project Lead:**
+
+* D. Demer
+
+**Acoustic Data Collection and Processing:**
+
+* Leg I:   D. Demer^1^ and J. Renfree
+* Leg II:  G. Johnson and K. Stierhoff^1^
+* Leg III: D. Murfin and T. Sessions
+* Leg IV:  S. Mau and J. Zwolinski^1^
+
+**Trawl Sampling:**
+
+* Leg I:   A. Freire, D. Griffith, M. Human, D. Jones^2^, B. Overcash, D. Pinkard-Meier^2^, R. Reed^2^
+* Leg II:  S. Bal Raj^2^, E. Gardner, H. Hicks^2^, B. Overcash, L. Vasquez Del Mercado, W. Watson, and A. Whalen^2^
+* Leg III: E. Gardner, N. Hunter^2^, D. Hwang^2^, H. Manjebrayakath^2^, A. Thompson, L. Vasquez Del Mercado, and E. Weber^1^
+* Leg IV:  M. Craig, A. Freire, D. Griffith, A. Hays, T. Howard^2^, and K. Runge^2^  
+
+**Purse-seine Sampling:**  
+
+* K. Hinton and P. Biondo
+
+**Echosounder Calibration:**
+
+* D. Murfin, J. Renfree, and T. Sessions
+
+# Methods {#methods}
+## Survey region and design {#methods-survey-design}
+
+The SWFSC’s ATM surveys of CPS in the CCE began in 2006 with a focus on the northern stock of Pacific Sardine. Since then, they have expanded in scope and objectives to include the larger forage-fish assemblage and krill. This evolution, and the migratory behavior of Pacific Sardine, serve to explain the present survey region and design.  
+
+During spring, the northern stock of Pacific Sardine typically aggregates offshore of central and southern California to spawn [@Demer2012, and reference therein]. During summer, if the stock is large enough, adults will migrate north, compress along the coast, and feed in the upwelled regions (**Fig. \@ref(fig:sardine-distribution)**).  
+
+During `r tolower(survey.season)` `r survey.year`, the west coasts of the United States and Vancouver Island, Canada, were surveyed using _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and three USVs. Compulsory transects were nearly perpendicular to the coast with separations of 10 to 20 nmi. The survey began off `r survey.landmark.n`, and progressed southwards toward `r survey.landmark.s`. Irrespective of the size of the stock and the extent of its migration, the northern stock of Pacific Sardine tends to reside within its potential habitat [@Zwolinski2011].  
+
+The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent of the potential habitat of the northern stock of Pacific Sardine^[http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/habitat.asp] at the time of the survey (**Fig. \@ref(fig:sardine-habitat)**). Transect positions, lengths, and spaces were adjusted during the survey according to the observed distribution of putative CPS backscatter in the echosounders, CPS eggs in CUFES samples, or CPS caught in trawls. To estimate CPS biomass in offshore waters not routinely sampled during CCE surveys, sampling was also conducted by _`r survey.vessel`_ and two USVs (SD-1045 and SD-1046) along ~100 nmi-long extensions of compulsory transects spaced ~40 nmi-apart between approximately Florence, OR and San Diego. To estimate CPS biomass near shore, where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was augmented with echosounder and purse-seine sampling from two fishing vessels, and echosounder sampling from a third USV. The coasts of WA and OR were surveyed by F/V _Lisa Marie_; the coasts of WA, OR, and CA (north of Pt. Conception) were surveyed by a USV; and the coasts of the Southern CA Bight (SCB), and Santa Cruz and Santa Catalina Islands were surveyed by F/V _Long Beach Carnage_.  
+
+(ref:sardine-distribution) Conceptual spring (shaded region) and summer (hashed region) distributions of potential habitat for the northern stock of Pacific Sardine along the west coasts of Mexico, the United States, and Canada. The dashed and dotted lines represent, respectively, the approximate summer and spring positions of the 0.2 mg m^–3^ chlorophyll-a concentration isoline. This isoline appears to oscillate in synchrony with the transition zone chlorophyll front [TZCF, @Polovina2001] and the offshore limit of the northern stock Pacific Sardine potential habitat [@Zwolinski2011]. Mackerels are found within and on the edge of the same oceanographic  habitat [e.g., @Demer2012; @Zwolinski2012]. The TZCF may delineate the offshore and southern limit of both Pacific Sardine and Pacific Mackerel distributions, and juveniles may have nursery areas in the Southern California Bight (SCB), downstream of upwelling regions.
+
+```{r sardine-distribution, fig.cap='(ref:sardine-distribution)',out.height='6in',fig.pos='H'}
+include_graphics(here("Images/img_survey_region.png"))  
+```  
+
+\newpage  
+
+(ref:survey-plan) Planned compulsory (solid black lines) and adaptive (dashed red lines) transect lines sampled by _`r survey.vessel`_; offshore extensions to compulsory acoustic transects sampled by USVs (dashed green lines); and nearshore transect lines sampled by USVs and fishing vessels (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms).
+
+```{r survey-plan, fig.cap='(ref:survey-plan)', out.height='8in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_survey_plan.png"))
+```  
+
+\newpage  
+
+(ref:sardine-habitat) Distribution of potential habitat for the northern stock of Pacific Sardine (a) before, (b, c) during, and (d) at the end of the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
+
+```{r sardine-habitat,fig.cap='(ref:sardine-habitat)',out.width = '7in',fig.align='center',fig.pos='H',eval=FALSE}
+include_graphics(here("Figs/fig_habitat_map.png"))
+```  
+
+\newpage
+
+## Acoustic sampling {#methods-acoustic-sampling}
+### Echosounders {#methods-echosounders}  
+
+On _`r survey.vessel`_, multi-frequency EK60 General Purpose Transceivers (18- and 38-kHz GPTs; Simrad) and EK80 Wideband Transceivers (70-, 120-, 200-, and 333-kHz WBTs; Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise (**Appendix \@ref(appendix-cb-pos)**). Transducer position and motion were measured at 5 Hz using an inertial motion unit (POS-MV, Trimble/Applanix).  
+
+(ref:cb-config) Transducer locations on the bottom of the centerboard aboard _`r survey.vessel`_.
+
+```{r cb-config,fig.cap='(ref:cb-config)',out.width = '6.5in',fig.align='center',fig.pos='H'}
+if (survey.vessel.primary == "RL") {
+  include_graphics(here("Images/img_centerboard_config_RL.png"))
+} else {
+  include_graphics(here("Images/img_centerboard_config_SH.png"))
+}
+```  
+
+On the three USVs (SD-1045, SD-1046, and SD-1047), a miniature Wide Band Transceiver (WBT Mini, Simrad) was configured with a gimbaled, keel-mounted, dual-frequency transducer (ES38-18|200-18C, Simrad), containing a split-beam 38 kHz and single-beam 200 kHz with nominally 18$^\circ$ beamwidths. On _Lisa Marie_, the SWFSC’s echosounder (Simrad EK60 GPT) was connected to the vessel's hull-mounted 38-kHz split-beam transducer (Simrad ES38-B). On _Long Beach Carnage_, the SWFSC's multi-frequency echosounders (38-, 70-, 120-, and 200-kHz EK60 GPTs; Simrad) were configured with the SWFSC's multi-frequency transducer array (MTA4) with split-beam transducers (ES38-12, ES70-7C, ES120-7C and ES200-7C; Simrad) mounted on the bottom of a pole.  
+
+### Calibrations {#methods-echosounder-calibration}  
+On _`r survey.vessel`_, the transducer integrities were first verified through transducer-impedance measurements in water and air using an LCR meter (Agilent E4980A) and custom software (MATLAB; MathWorks, Inc.). The impedance magnitude ($|Z|$, $\Omega$), phase ($\theta$, $^\circ$), conductance ($G$, $S$), susceptance ($B$, $S$), resistance ($R$, $\Omega$), and reactance ($X$, $\Omega$) were measured over broadband frequency ranges for each transducer quadrant (**Appendix \@ref(appendix-impedance-analyisis)**). No transducer impedance measurements were made on other vessels prior to this survey.  
+
+Next, the echosounder systems on each vessel were calibrated using the standard sphere technique [@Foote1987;@Demer2015]. On _`r survey.vessel`_, each WBT was calibrated in both CW (i.e., continuous wave or chirp mode) and FM modes (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere` (`r cal.sphere.name`); calibrations of WBTs in FM mode used both the WC38.1 and a smaller 25-mm WC sphere. On each vessel, GPTs or WBTs were configured using the calibration results via the control software (EK80 `r ek80.version`, Simrad; see **Section \@ref(results-echosounder-calibration)**).  
+
+### Data collection {#methods-acoustic-data-collection}  
+
+Computer clocks were synchronized with the GPS clock (UTC) using synchronization software (NetTime^[http://timesynctool.com]). The 18-kHz GPT, operated by a separate PC from the other echosounders, was programmed to track the seabed and output the detected depth to the ship’s Scientific Computing System (SCS). The 38-, 70-, 120-, 200-, and 333-kHz echosounders were controlled by the ER60 Adaptive Logger [EAL^[https://swfsc.noaa.gov/eal/], @Renfree2016]. The EAL optimizes the pulse interval based on the seabed depth, while avoiding aliased seabed echoes, and was programmed such that once an hour the echosounders would operate in passive mode and record three pings, for obtaining estimates of the background noise level. The echosounder data from the USVs were erroneously timestamped (UTC+7 h), causing the correctly timestamped (UTC) navigation data to be mismatched. The erroneous timestamps were corrected in post-processing using the Fileset Time Offset parameter in Echoview. Acoustic sampling for CPS-density estimation along the pre-determined transects was limited to daylight hours (approximately between sunrise and sunset).  
+
+Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$, dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were logged to 60 m beyond the detected seabed range or to a maximum of `r raw.log.range` m and stored in Simrad .raw format with a `r raw.size`-MB maximum file size. During daytime and nighttime, the echosounders were set to operate in CW and FM modes, respectively. For each acoustic instrument, the prefix for the file name is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software. For example, a file generated by the Simrad EK80 software (`r ek80.version`) for a WBT operated in CW mode is named `1907RL-CW-D20190723-T125901.raw`.   
+
+To minimize acoustic interference, transmit pulses from the EK60, EK80, ME70, MS70, SX90, and the acoustic Doppler current profiler (Ocean Surveyor Model OS75 ADCP, Teledyne RD Instruments) on _`r survey.vessel`_ were triggered using a synchronization system (K-Sync, Simrad). The K-Sync trigger rate, and thus echosounder ping interval, was modulated by the EAL using the 18-kHz seabed depth provided by the SCS. During daytime, the ME70, SX90, and ADCP were operated continuously, while the MS70 was only operated at times when CPS were present. At nighttime, only the EK60, EK80, and ADCP were operated. All other instruments that produce sound within the echosounder bandwidths were secured during daytime-survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Model SRD-500A, Sperry Marine), or both. Transmit pulses from the survey echosounders and fishing sonars aboard _Lisa Marie_ and _Long Beach Carnage_ were not synchronized.  
+
+### Data processing {#methods-acoustic-data-processing}  
+
+Echoes from schooling CPS and plankton (**Figs. \@ref(fig:ev-filtering-example)a, d**) were identified using a semi-automated data processing algorithm implemented using Echoview software (`r ev.version`; Echoview Software Pty Ltd). The filters and thresholds were based on a subsample of echoes from randomly selected CPS schools. The aim of the filter criteria is to retain at least 95% of the noise-free backscatter from CPS while rejecting at least 95% of the non-CPS backscatter (**Fig. \@ref(fig:ev-filtering-example)**). Data from _`r survey.vessel`_ and _Long Beach Carnage_ were processed using the following steps:  
+
+1. Match geometry of the 70-, 120-, 200-, and 333-kHz $S_v$ to the 38-kHz $S_v$;
+2. Remove passive-mode pings;
+3. Estimate and subtract background noise using the background noise removal function [@DeRobertis2007] in Echoview (**Figs. \@ref(fig:ev-filtering-example)b, e**);
+4. Average the noise-free $S_v$ echograms using non-overlapping 11-sample by 3-ping bins;
+5. Expand the averaged, noise-reduced _S~v~_ echograms with a 7 pixel x 7 pixel dilation;
+6. For each pixel, compute: $S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}}$, $S_{v,\mathrm{120kHz}}-S_{v,\mathrm{38kHz}}$, and $S_{v,\mathrm{70kHz}}-S_{v,\mathrm{38kHz}}$;
+7. Create a Boolean echogram for $S_v$ differences in the CPS range: $-13.85 < S_{v,\mathrm{70kHz}}-S_{v,\mathrm{38kHz}} < 9.89 \text{ and} -13.5 < S_{v,\mathrm{120kHz}}-S_{v,\mathrm{38kHz}} < 9.37 \text{ and} -13.51 < S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}} < 12.53$;
+8. Compute the 120- and 200-kHz Variance-to-Mean Ratios [$VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$, respectively, @Demer2009] using the difference between noise-filtered $S_v$ (Step 3) and averaged $S_v$ (Step 4);
+9. Expand the $VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$ echograms with a 7 pixel x 7 pixel dilation;
+10. Create a Boolean echogram based on the $VMR$s in the CPS range: $VMR_{\mathrm{120kHz}}$ > -65 dB and $VMR_{\mathrm{200kHz}}$ > -65 dB. Diffuse backscattering layers have low $VMR$ [@Zwolinski2010] whereas fish schools have high $VMR$ [@Demer2009];
+11. Intersect the two Boolean echograms to create an echogram with "TRUE" samples for candidate CPS schools and "FALSE" elsewhere;
+12. Mask the noise-reduced echograms using the CPS Boolean echogram (**Figs. \@ref(fig:ev-filtering-example)c, f**);
+13. Create an integration-start line `r int.start` m below the transducer (~10 m depth);
+14. Create an integration-stop line `r adz.range` m above the estimated seabed [@Demer2009], or to the maximum logging range (e.g., `r int.stop` m), whichever is shallowest;
+15. Set the minimum $S_v$ threshold to -60 dB (corresponding to a density of approximately three 20-cm-long Pacific Sardine per 100 m^3^);
+16. Integrate the volume backscattering coefficients ($s_V$, m^2^ m^-3^) attributed to CPS over 5-m depths and averaged over 100-m distances;
+17. Output the resulting nautical area scattering coefficients ($s_A$; m^2^ nmi^-2^) and associated information from each transect and frequency to comma-delimited text (.csv) files.
+
+Data from _Lisa Marie_ were processed using the following steps:  
+
+1. Remove shorter-duration, transient noise (e.g., ship’s asynchronous sonar) using the Impulse Noise Removal operator;
+2. Remove longer-duration, transient noise (e.g., wave-hull collisions) using the Transient Noise Removal operator;
+3. Compensate attenuated signals (e.g., from air-bubble attenuation) using the Attenuated Signal Removal operator;
+4. Average the noise-free $S_v$ echograms using non-overlapping 11-sample by 3-ping bins;
+5. Compute the $VMR$ using the difference between noise-filtered $S_v$ (Step 3) and averaged $S_v$ (Step 4);
+6. Create a Boolean echogram mask using $VMR$ > -48 dB;
+7. Expand the Boolean mask with a 7 pixel x 7 pixel dilation;
+8. Performs Steps 12-17 from `r survey.vessel` processing.
+9. Data from the USVs were processed using the following:
+10. Match geometry of the $S_{v,\mathrm{200kHz}}$ to the $S_{v,\mathrm{38kHz}}$;
+11. Remove passive-mode pings;
+12. Perform Steps 3-5 from `r survey.vessel` processing;
+13. For each pixel, compute: $S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}}$;
+14. Create a Boolean echogram for $S_v$ differences in the CPS range: $-3 < S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}} < 9.37$
+15. Perform Steps 8-9 from `r survey.vessel` processing;
+16. Create a Boolean echogram mask using $VMR$ > -57 dB;
+17. Performs Steps 11-17 from `r survey.vessel` processing.  
+
+Data from the USVs were processed using the following steps:  
+
+1. Match geometry of the $S_{v,\mathrm{200kHz}}$ to the $S_{v,\mathrm{38kHz}}$;
+2. Remove passive-mode pings;
+3. Perform Steps 3-5 from `r survey.vessel` processing;
+4. For each pixel, compute: $S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}}$;
+5. Create a Boolean echogram for $S_v$ differences in the CPS range: $-3 < S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}} < 9.37$;
+6. Perform Steps 8-9 from `r survey.vessel` processing;
+7. Create a Boolean echogram mask using $VMR$ > -57 dB;
+8. Performs Steps 11-17 from `r survey.vessel` processing.
+
+When necessary, the start and stop integration lines were manually edited to exclude reverberation due to bubbles, to include the entirety of shallow CPS aggregations, or to exclude seabed echoes.  
+
+(ref:ev-filtering-example) Echogram depicting CPS schools (red) and plankton aggregations (blue and green) at 38 kHz (top row) and 120 kHz (bottom row). Example data processing steps include the original echogram (left column), after noise subtraction and bin-averaging (middle column), and after filtering to retain only putative CPS echoes (right column).
+
+```{r ev-filtering-example,fig.cap='(ref:ev-filtering-example)',out.width = '7in',fig.pos='H'}
+include_graphics(here("Images/img_echoview_filtering_example-labeled.png"))
+```  
+
+(ref:sv-diff) $S_v$-differences (minimum, maximum; dB) for putative CPS.
+
+```{r sv-diff,fig.cap='(ref:sv-diff)', results='asis',eval=F}
+# create table for Sv difference values
+sv.diff <- read.delim(here("Data/sv_diff_table.txt"))
+names(sv.diff) <- c("$S_\\mathrm{v70kHz}-S_\\mathrm{v38kHz}$", 
+                    "$S_\\mathrm{v120kHz}-S_\\mathrm{v38kHz}$", 
+                    "$S_\\mathrm{v200kHz}-S_\\mathrm{v38kHz}$")
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(sv.diff)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(sv.diff, align = rep("c", ncol(sv.diff)), escape = F,
+        caption = '(ref:sv-diff)') %>% 
+    kable_styling(position = "center", latex_options = c("hold_position"))
+}
+```  
+
+## Trawl sampling {#methods-trawl-sampling}  
+
+During the day, CPS form schools, typically in the upper mixed layer [to 70-m depth in the spring; @Kim2005], and generally shallower in summer. After sunset, CPS schools tend to ascend and disperse; at that time, with reduced visibility and no schooling behavior, they are less able to avoid a net [@Mais1974]. Therefore, trawl sampling for identifying the species composition and length distributions of acoustic targets was performed at night.  
+
+The net, a Nordic 264 rope trawl (NET Systems; Bainbridge Island, WA; **Figs. \@ref(fig:trawl-diagrams)a, b**), has a rectangular opening in the fishing portion of the net with an area of approximately 300 m^2^ (~15-m tall x 20-m wide), variable-sized mesh in the throat, an 8-mm square-mesh cod-end liner (to retain a large range of animal sizes), and a "marine mammal excluder device" to prevent the capture of large animals, such as dolphins, turtles, or sharks [@Dotson2010]. The trawl doors are foam-filled and the trawl headrope is lined with floats so the trawl tows at the surface.  
+
+Up to three nighttime (i.e., 60 min after sunset to 30 min before sunrise) surface trawls, typically spaced 5-10 nmi-apart, were conducted in areas where echoes or eggs from putative CPS schools were observed earlier that day. Each evening, trawl locations were selected by an acoustician who monitored CPS echoes and a member of the trawl group who measured the densities of CPS eggs in CUFES samples. The locations were provided to the watch officers who charted the proposed trawl sites. Trawl locations were selected using the following criteria, in descending priority: CPS schools in echograms that day, CPS eggs in CUFES samples that day, and the trawl locations and catches during the previous night. If no CPS echoes or CPS eggs were observed along the transect(s) that day, the trawls were alternatively placed nearshore one night and offshore the next night, with consideration given to the seabed depth and the modeled distribution of Pacific Sardine habitat.  
+
+Trawls were towed at ~4 kn for 45 min. The total catch from each trawl was weighed and sorted by species or groups. From the catches with CPS, up to 50 fish were selected randomly for each of the target species. Those were weighed and measured to either their standard length ($L_S$; mm) for Pacific Sardine and Northern Anchovy, or fork length ($L_F$; mm) for Jack Mackerel, Pacific Mackerel, and Pacific Herring. In addition, sex and maturity were recorded for up to 50 specimens from all species. Ovaries were preserved for up to 10 specimens of each CPS species except Pacific Herring. Fin clips were removed from 50 Pacific Sardine and Northern Anchovy specimens each from five different geographic zones (designated by J. Hyde and M. Craig, SWFSC) and preserved in ethanol for genetic analysis. Otoliths were removed from all 50 Pacific Sardine in the subsample; for other CPS species, 25 otoliths were removed from other CPS species "as equally as possible" from the range of sizes present. The combined catches in up to three trawls per night (i.e., trawl cluster) were used to estimate the proportions of species contributing to the nearest samples of acoustic backscatter.  
+
+## Purse seine sampling {#methods-seine-sampling}  
+
+Purse seines were set to provide information about size, age, and species composition of fishes observed in the echosounders mounted on the fishing vessels that sampled the nearshore region. _Lisa Marie_ used an approximately 440 m-long and 40 m-deep net with 17 mm-wide mesh (A. Blair, pers. comm.). _Long Beach Carnage_ used an approximately 200 m-long and 27 m-deep net with 17 mm-wide mesh; a small section on the back end of the net had 25 mm-wide mesh (R. Ashley, pers. comm.). All specimens collected by _Lisa Marie_ and _Long Beach Carnage_ were frozen and later processed by the Washington Department of Fish and Wildlife (WDFW) or California Department of Fish and Wildlife (CDFW), respectively.  
+
+On _Lisa Marie_, as many as three purse seine sets were planned each day. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, Pacific Sardine, Northern Anchovy, Jack Mackerel, Pacific Mackerel, and Pacific Herring were sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set. The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 25 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually, and gonads were collected and preserved from female specimens.
+
+On _Long Beach Carnage_, a maximum of one set per day was planned during daylight hours. In the event of abundant CPS or an unsuccessful daytime set, a set was made at night. For each set, three dip net samples, spatially separated as much as possible, were collected, and specimens were frozen for later analysis by CDFW biologists. The total weight (tons) of the school was estimated by the captain. After the survey, each dip net sample was sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set. The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 50 randomly selected specimens of each species. Otoliths were extracted and macroscopic maturity stage was determined visually. Since samples were frozen, no gonad samples from female specimens were analyzed.  
+
+(ref:trawl-diagrams) Schematic drawings of the Nordic 264 rope trawl a) net and b) cod-end.
+
+```{r trawl-diagrams, fig.cap='(ref:trawl-diagrams)',out.height='7.5in',fig.pos='H'}
+include_graphics(here("Images/img_Nordic_264.png")) 
+```  
+
+\newpage  
+
+## Ichthyoplankton and oceanographic sampling {#methods-other-sampling}
+### Egg and larva sampling {#methods-egg-sampling}  
+
+During the day, fish eggs were collected using a CUFES [@Checkley1997], which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. The particles in the sampled water were sieved by a 505-$\mu$m mesh. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs". Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the durations of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish.  
+
+A CalCOFI bongo oblique net [a bridleless pair of 71-cm diameter nets with 505-$\mu$m mesh; @Smith1977] was used opportunistically to sample ichthyoplankton and krill after sunset, to contribute to the CalCOFI ichthyoplankton time series. Where there was adequate depth, 300 m of wire was deployed at a rate of 50 m min^-1^ and then retrieved at 20 m min^-1^, at a nominal wire angle of 45$^\circ$. Bongo samples were stored in 5% buffered formalin.  
+
+### Conductivity and temperature versus depth (CTD) sampling {#methods-ctd-sampling}  
+
+Conductivity and temperature were measured versus depth to `r ctd.depth` m using calibrated sensors on a CTD rosette or underway probe (UnderwayCTD, or UCTD; Teledyne Oceanscience) cast from the vessel. These data were used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005]. These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth during acoustic data processing.  
+
+\newpage  
+
+# Results {#results}
+## Echosounder calibrations {#results-echosounder-calibration}  
+
+For _`r survey.vessel`_, the EK80s were calibrated between `r cal.datetime` while the vessel was alongside the pier near `r cal.loc` (`r cal.lat.dd` $^\circ$N, `r cal.lon.dd` $^\circ$W). Measurements of sea-surface temperature ($t_w$ = `r cal.temp` $^\circ$C) and salinity ($s_w$ = `r cal.sal` psu) were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) and input to the WBT-control software (EK80 `r ek80.version`, Simrad), which derived estimates of sound speed ($c_w$ = `r cal.c` m s^-1^) and absorption coefficients (see **Table \@ref(tab:cal-results)**). Varying with tide, the seabed was approximately `r cal.min.z` to `r cal.max.z` m beneath the transducers. The calibration spheres were positioned in the far-field of each transducer, at 3.5- to 7-m range. WBT information, settings, and calibration results are presented in **Table \@ref(tab:cal-results)**. Measurements of beam-compensated sphere target strength relative to the theoretical target strength ($TS_{rel}$, dB re 1 m^2^) are presented in **Fig. \@ref(fig:tsc-plot)**. Measurements of gain, beamwidth, and offset angles from WBTs operated in FM mode are presented in **Fig. \@ref(fig:cal-plot-fm)**. During the impedance measurements with the centerboard in the retracted position, and later confirmed during calibration, one quadrant of the 18-kHz transducer appeared to be dysfunctional. An examination of impedance measurements made during the survey with the centerboard in the extended position indicated that the transducer may have been functional. Therefore, the results of the last known good calibration of the 18-kHz transducer, from the 2018 Summer CCE survey, are presented in **Table \@ref(tab:cal-results)**.  
+
+(ref:tsc-plot) Relative beam-compensated target strength ($TS_{rel}$, dB re 1 m^2^) measurements of a WC38.1 sphere at `r echo.freqs` kHz. $TS_{rel}$ is calculated as the difference between the beam-compensated target strength ($TS_c$) and the theoretical target strength ($TS_{theory}$, see **Table \@ref(tab:cal-results)**). Data for the 18-kHz transducer are from the last known good calibration prior to the 2018 Summer CCE survey. Crosses indicate measurements marked as outliers after viewing the beam model results.
+
+```{r tsc-plot,fig.cap='(ref:tsc-plot)',out.width='4.25in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_cal_TSrel_scatter.png"))
+``` 
+
+\newpage  
+
+(ref:cal-results) Simrad EK60 general purpose transceiver (GPT; 18 and 38 kHz) and EK80 wideband transceiver (WBT; 70, 120, 200, and 333 kHz) and transducer information; pre-calibration settings (above horizontal line); and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles ($\alpha_{-3dB}$ and $\beta_{-3dB}$) and angle offsets ($\alpha_0$ and $\beta_0$), and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the control software (EK80 `r ek80.version`, Simrad). Results for the 18-kHz transducer are from the last known good calibration prior to the 2018 Summer CCE survey.
+
+```{r cal-results,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output, format = knitr.format, align = c("l","l",rep("c",ncol(all.output) - 2)),
+        booktabs = T, escape = F, linesep = "",
+        caption = '(ref:cal-results)') %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("scale_down","hold_position")) %>% 
+    row_spec(18, hline_after = T) %>% 
+    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
+}
+```  
+
+<!-- (ref:cal-map) Map of the calibration location (yellow diamond) near `r cal.loc`. The red box in the inset indicates the location and extent of the main map. -->
+
+<!-- ```{r cal-map,fig.cap='(ref:cal-map)',out.width = '4.5in',fig.align='center',fig.pos='H',eval=FALSE} -->
+<!-- include_graphics(here("Figs/fig_cal_map.png")) -->
+<!-- ```  -->
+
+<!-- (ref:tsu-plot) Uncompensated target strength ($TS_u$, dB re 1 m^2^) measurements of a WC38.1 sphere at `r echo.freqs` kHz. Crosses indicate measurements marked as outliers after viewing the beam model results. -->
+
+<!-- ```{r tsu-plot,fig.cap='(ref:tsu-plot)',out.width='4.5in',fig.align='center',fig.pos='H',eval=FALSE}   -->
+<!-- # Uncompensated sphere target strength ($TS_u$, dB re 1 m^2^); presented in **Fig. \@ref(fig:tsu-plot)**  -->
+
+<!-- include_graphics(here("Figs/fig_cal_TSu_scatter.png")) -->
+<!-- ```   -->
+
+<!-- (ref:cal-ts-plot) Time series of beam model results of a) on-axis gain ($G_0$, dB); b) $S_a$ correction ($S_a corr$, dB re 1); c) alongship ($\alpha_\mathrm{-3dB}$, blue) and athwartship ($\beta_\mathrm{-3dB}$, red) beamwidths (deg); d) alongship ($\alpha_\mathrm{0}$, blue) and athwartship ($\beta_\mathrm{0}$, red) offset angles (deg); and e) RMS (dB) for `r echo.freqs` kHz. Unfilled circles indicate results from the current survey. -->
+
+<!-- ```{r cal-ts-plot,fig.cap='(ref:cal-ts-plot)',out.width='6.5in',fig.align='center',fig.pos='H',eval=FALSE} -->
+<!-- include_graphics(here("Figs/fig_cal_time_series_combo.png")) -->
+<!-- ``` -->
+
+\newpage
+\blandscape
+
+(ref:cal-plot-fm) Measurements of on-axis gain ($G_0$, dB); alongship ($\alpha_\mathrm{-3dB}$, cyan) and athwartship ($\beta_\mathrm{-3dB}$, magenta) beamwidths (deg); and alongship ($\alpha_\mathrm{0}$, cyan) and athwartship ($\beta_\mathrm{0}$, magenta) offset angles (deg) measured during calibrations of EK80 wideband transceivers (WBT; 70, 120, 200, and 333 kHz) in frequency modulation (FM, or broadband) mode. Calibration files in XML format are available upon request.
+
+```{r cal-plot-fm,fig.cap='(ref:cal-plot-fm)',out.width='8in',fig.align='center',fig.pos='H',eval=FALSE}  
+# Plots generated using Code/plot_CalFM.R
+
+include_graphics(here("Figs/fig_cal_FM_AllFreqs.png"))
+```
+
+\elandscape
+\newpage
+
+## Data collection {#results-data-collection}
+### Acoustic and net sampling {#results-acoustic-trawl-sampling}  
+
+```{r load-nearshore-nasc-summary}
+load(here("Output/purse_seine_sets.Rdata"))
+load(here("Output/nasc_summ_tx_ns.Rdata"))
+
+nasc.summ.lm.ns  <- filter(nasc.summ.ns, vessel.name == "LM")
+nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
+nasc.summ.sd.ns  <- filter(nasc.summ.ns, vessel.name == "SD")
+```  
+
+The core survey region spanned an area from approximately `r survey.landmark.n`, to `r survey.landmark.s` (**Fig. \@ref(fig:station-sampling)**). _`r survey.vessel`_ sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(trawl.summ)` Nordic trawls.  
+
+The nearshore region spanned an area from approximately Cape Flattery to San Diego. _Lisa Marie_ surveyed nearshore from approximately Cape Flattery the WA-OR border (**Fig. \@ref(fig:nasc-seine-lm)**), with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r nrow(lm.sets)` purse seine sets. The USV (SD-1047) surveyed nearshore between Cape Flattery and Pt. Conception, with `r nrow(nasc.summ.sd.ns)` east-west transects totaling `r sprintf("%.0f", sum(nasc.summ.sd.ns$distance))` nmi (**Fig. \@ref(fig:nasc-trawl-sd)**). _Long Beach Carnage_ surveyed nearshore from approximately Pt. Conception to San Diego, including around Santa Cruz and Santa Catalina Islands  (**Fig. \@ref(fig:nasc-seine-lbc)**), with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets.  
+
+The offshore region spanned an area between approximately Florence and San Diego. _`r survey.vessel`_ surveyed `r num2words(n_distinct(nasc.summ.rl.os$transect))` east-west offshore transects totaling `r prettyNum(sum(nasc.summ.rl.os$distance), digits = 1, big.mark = ",")` nmi, and two USVs (SD-1045 and SD-1046) surveyed `r n_distinct(nasc.summ.sd.os$transect)` east-west offshore transects totaling `r prettyNum(sum(nasc.summ.sd.os$distance), digits = 1, big.mark = ",")` nmi.  
+
+During the 77-day survey, _`r survey.vessel`_ traveled 13,360 nmi, burned 476,500 l of diesel and, at 2.6817 kg l^-1^, emitted ~16,595 kg d^-1^ for a total CO~2~ footprint of ~1,277,830 kg (pers. comm., CAPT Chad Cary).  
+
+**Leg I**  
+On 13 June, _`r survey.vessel`_ departed from the Exploratorium (Pier 15) in San Francisco, CA at ~1800 (all times UTC) and began the transit to northern Vancouver Island. Throughout the transit, sampling was conducted during the day with the CUFES, EK60s, EK80s, ME70, MS70 and SX90. On 17 June, _`r survey.vessel`_ arrived at the first offshore station off Cape Scott, British Columbia at ~1230 to begin acoustic sampling along transect 129. On 1 July, acoustic sampling ceased after the completion of transect 84 off Newport, OR. On 2 July, _`r survey.vessel`_ arrived at the Marine Operations-Pacific (MOC-P) Pier in Newport at ~2100 to complete Leg I.  
+
+During Leg I (from 20 June to 1 July), _`r survey.vessel`_ coordinated with _Lisa Marie_, which sampled the nearshore region between Cape Flattery, WA and the OR-CA border. On 21 June, Greg Shaughnessy (Ocean Gold Seafoods) embarked _`r survey.vessel`_ to observe survey operations. At the same time, Josiah Renfree boarded _Lisa Marie_ to remedy minor issues with the echosounder before rejoining _`r survey.vessel`_. At ~1900 on 25 June, Mr. Shaughnessy disembarked and was put ashore in Westport, WA via _`r survey.vessel`_'s skiff.  
+
+During Legs I through III (from 20 June to 24 August), one USV (SD-1047) conducted daytime acoustic sampling in the nearshore region between Cape Flattery and Pt. Conception. Between approximately Tillamook, OR and Pt. Arena, CA, transects were sampled at 10-nmi spacing to allow the USV to catch-up to _`r survey.vessel`_.  
+
+**Leg II**  
+On 8 July, _`r survey.vessel`_ departed from MOC-P Pier in Newport, OR, at ~0000. Acoustic sampling resumed at ~0145 on 8 July along transect 083 south of Newport, OR. On 24 July, acoustic sampling ceased after the completion of transect 050 off Albion, CA. On 25 July, _`r survey.vessel`_ arrived at Pier 30/32 in San Francisco, CA at ~1300 to complete Leg II. 
+
+During Legs II and III (from 9 July to 6 August), two USVs (SD-1045 and SD-1046) conducted daytime acoustic sampling at 80-nmi spacing in the offshore region between approximately Florence and Pt. Conception. From 6 to 12 August, one USV (SD-1046) conducted daytime acoustic sampling at 40-nmi spacing in the offshore region between approximately Pt. Conception and San Diego.  
+
+**Leg III**  
+
+On 30 July, _`r survey.vessel`_ departed from Pier 30/32 in San Francisco at ~1300 and transited to transect 049 north of the Point Arena lighthouse. Trawling was conducted during the evening of 30 July, prior to resuming acoustic sampling along transect 049 on 31 July. Intermittent malfunctions of the trawl winch encoders reduced trawl sampling from 1-2 August. Increased malfunctions of the trawl-winch encoders prohibited trawling from 3-6 August. On 6 August, the trawl winches were repaired and normal sampling resumed. On 16 August, acoustic sampling ceased after the completion of transect 023 off Morro Bay. On 17 August, _`r survey.vessel`_ arrived at the 10th Avenue Marine Terminal in San Diego, CA at ~1400 to complete Leg III.  
+
+\newpage  
+
+**Leg IV**
+
+On 22 August, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in San Diego at ~1500. Training on the ship’s dynamic-positioning system was performed in San Diego Harbor until ~2000, after which _`r survey.vessel`_ transited to transect 019 off Pismo Beach. On 23 August, at ~1700, _`r survey.vessel`_ deployed a benthic acoustic lander off Pt. Conception, then resumed acoustic sampling along transect 019 at ~1800. On 1 September, _`r survey.vessel`_'s fog horn was repaired using parts received from ashore via skiff. At ~1500 on 1 September, the UCTD probe was lost when a vessel running parallel to the ship turned across the stern and severed the line. At ~0200 on 7 September, acoustic sampling ceased after the completion of transect 001 off San Diego. _`r survey.vessel`_ arrived at the 10th Avenue Marine Terminal in San Diego at ~2100 on 8 September to complete the survey.  
+
+During Leg IV (from 26 August to 6 September), _`r survey.vessel`_ coordinated sampling with _Long Beach Carnage_ in the Southern CA Bight between Pt. Conception and San Diego and around Santa Cruz and Santa Catalina Islands.  
+
+### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
+
+A total of `r nrow(ctd.sta)` CTD casts and `r nrow(bongo.sta)` bongo tows were conducted throughout the survey. In addition, `r nrow(uctd.sta)` UCTD casts were conducted and `r prettyNum(nrow(cufes.raw), digits = 1, big.mark = ",")` CUFES samples were collected underway. The locations of CTD and UCTD stations are presented in **Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**.  
+
+## Distribution of CPS {#results-cps-distribution}
+### Core region  
+
+Acoustic backscatter ascribed to CPS (**Fig. \@ref(fig:nasc-cufes-trawl)a**)  was observed throughout the survey area, but was most prevalent off southwest Vancouver Island and Cape Flattery; nearshore between the Columbia River and Cape Mendocino; and throughout the entire survey area between Cape Blanco and San Diego.  
+
+Northern Anchovy eggs were abundant in CUFES samples nearshore off the Columbia River; offshore north of Newport; and offshore between approximately San Francisco and Morro Bay (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Pacific Sardine eggs were abundant nearshore between the Columbia River and Cape Blanco; and offshore between Cape Blanco and Cape Mendocino (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Jack Mackerel eggs were observed between approximately Newport and Cape Mendocino, offshore between approximately San Francisco and Morro Bay, and in the southern portion of the SCB (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Between Newport and Cape Mendocino, Jack Mackerel eggs were coincident with Pacific Sardine eggs (**Fig. \@ref(fig:nasc-cufes-trawl)b**).  
+
+Pacific Herring catches were predominant, by weight, in trawl samples collected off Vancouver Island and nearshore off WA, north of the Columbia River (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Jack Mackerel dominated the trawl catches between approximately Newport and Bodega Bay (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Northern Anchovy was the predominant species in trawl catches between Bodega Bay and San Diego. Pacific Sardine were caught in relatively small numbers between the Columbia River and Cape Mendocino, near Bodega Bay, and around the northern Channel Islands in the SCB (**Fig. \@ref(fig:nasc-cufes-trawl)c**). A few Pacific Mackerel were caught along the OR and northern CA coasts, and offshore near Bodega Bay and Pt. Conception (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Overall, the `r nrow(trawl.summ)` trawls captured a combined `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel, and `r prettyNum(haul.PacHerring.kg, digits = 1, big.mark = ",")` kg Pacific Herring; **Appendix \@ref(appendix-trawl-sampling)**).  
+
+### Nearshore region  
+
+Off the WA and OR coasts, acoustic backscatter sampled by _Lisa Marie_ and ascribed to CPS was most prevalent near the Columbia River and around Newport (**Fig. \@ref(fig:nasc-seine-lm)a**). Off the coasts of WA, OR, and CA, acoustic backscatter sampled by the nearshore USV and ascribed to CPS was most prevalent near the Columbia River; off San Francisco Bay; and between Carmel, CA and Morro Bay (**Fig. \@ref(fig:nasc-trawl-sd)a**). In the SCB, acoustic backscatter sampled by _Long Beach Carnage_ and ascribed to CPS was observed throughout the nearshore survey area, but was most prevalent between Santa Barbara and Malibu; and between Costa Mesa and La Jolla (**Fig. \@ref(fig:nasc-seine-lbc)a**).  
+
+Pacific Herring catches were predominant, by weight, in purse seine and trawl samples collected between Cape Flattery and Newport (**Fig. \@ref(fig:nasc-seine-lm)b**, **Fig. \@ref(fig:nasc-trawl-sd)b**). Jack Mackerel dominated the purse seine catches between approximately Newport and the OR-CA border (**Fig. \@ref(fig:nasc-seine-lm)b**), and trawl samples between approximately Newport and Bodega Bay (**Fig. \@ref(fig:nasc-trawl-sd)b**). Northern Anchovy were present in four purse seines set by _Lisa Marie_ and one set by _Long Beach Carnage_, but were most abundant north of the Columbia River (**Fig. \@ref(fig:nasc-seine-lm)b**). In trawl samples, Northern Anchovy were the predominant species caught between Bodega Bay and San Diego (**Fig. \@ref(fig:nasc-trawl-sd)b**). A few Pacific Sardine were caught in purse seine samples between the Columbia River and Newport (**Fig. \@ref(fig:nasc-seine-lm)b**) and in trawl samples collected between the Columbia River and Cape Mendocino (**Fig. \@ref(fig:nasc-trawl-sd)b**), but Pacific Sardine dominated the purse seine samples collected throughout the SCB (**Fig. \@ref(fig:nasc-seine-lbc)b**). A few Pacific Mackerel were caught in trawl samples collected along the OR and northern CA coasts (**Fig. \@ref(fig:nasc-trawl-sd)b**) and in purse seine samples collected in the SCB near Anacapa Island and Long Beach (**Fig. \@ref(fig:nasc-seine-lbc)b**).  
+
+### Offshore region  
+
+Acoustic backscatter ascribed to CPS in the offshore region was generally greatest along the innermost portions of transects conducted between approximately Cape Mendocino and San Francisco, and in the SCB off San Clemente Island and San Diego (**Fig. \@ref(fig:nasc-offshore)**). Jack Mackerel eggs were predominant in the offshore region and in most cases extended to the ends of the 100 nmi-long transect extensions (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Some Pacific Sardine eggs were also present in offshore transects off central CA. Six trawl samples were collected in the offshore region; four with CPS in the catch. Of those that contained CPS, Jack Mackerel were most abundant, with some Pacific Mackerel and Pacific Sardine also present (**Fig. \@ref(fig:nasc-cufes-trawl)c**).  
+
+\newpage  
+
+<!-- (ref:cruise-track) Cruise track of _`r survey.vessel`_ (gray line), east-west acoustic transects (black lines), and locations of surface trawls (white points). -->
+
+<!-- ```{r cruise-track,fig.cap='(ref:cruise-track)',out.height='8.5in',fig.align='center',fig.pos='H',eval=FALSE} -->
+<!-- include_graphics(here("Figs/fig_vessel_track.png")) -->
+<!-- ```  -->
+
+(ref:station-sampling) The locations of surface trawls (white points); CTD and UCTD casts (red circles); and bongo net samples (orange triangles) relative to the east-west acoustic transects (black lines) and cruise track of _`r survey.vessel`_ (heavy gray line). Also shown are planned offshore USV transects (dashed lines).
+
+```{r station-sampling,fig.cap='(ref:station-sampling)',out.height='8in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_station_samples.png"))
+```  
+
+\newpage  
+\blandscape  
+
+(ref:nasc-cufes-trawl) Survey transects overlaid with (a) the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS; (b) egg densities (eggs m^-3^) for Northern Anchovy, Jack Mackerel, and Pacific Sardine from the CUFES; and (c) proportions, by weight, of CPS species in each trawl sample (black points indicate trawls with no CPS). Species with low catch weights may not visible at this scale. 
+
+```{r nasc-cufes-trawl,fig.cap='(ref:nasc-cufes-trawl)',out.width='7.5in',fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
+``` 
+
+\elandscape
+\newpage  
+
+(ref:nasc-seine-lm) Nearshore survey transects conducted by _Lisa Marie_ overlaid with a) the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS and b) the proportions, by weight, of CPS in each purse seine set. Species with low catch weights may not visible at this scale.
+
+```{r nasc-seine-lm, fig.cap='(ref:nasc-seine-lm)', out.height='7in', fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LisaMarie.png"))
+```  
+
+\newpage
+\blandscape
+
+(ref:nasc-trawl-sd) Nearshore survey transects conducted by an unmanned surface vehicle (USV; SD-1047) overlaid with a) the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS and b) the proportions, by weight, of CPS in the nearest trawl samples collected by _`r survey.vessel`_ (black points indicate sets with no CPS). Species with low catch weights may not visible at this scale.
+
+```{r nasc-trawl-sd, fig.cap='(ref:nasc-trawl-sd)', out.width='6.5in', fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_trawl_proportion_haul_wt_Saildrone.png"))
+```
+
+\elandscape
+\newpage  
+
+(ref:nasc-seine-lbc) Nearshore survey transects conducted by _Long Beach Carnage_ overlaid with a) the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS and b) the proportions, by weight, of CPS in each purse seine set. Species with low catch weights may not visible at this scale.
+
+```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.height='8in', fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))
+```
+
+\newpage  
+
+(ref:nasc-offshore) Offshore survey transects conducted by _`r survey.vessel`_ and two USVs (SD-1045 and SD-1046) overlaid with the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS.
+
+```{r nasc-offshore, fig.cap='(ref:nasc-offshore)', out.height='8in', fig.pos='H'}
+include_graphics(here("Figs/fig_backscatter_cps_os.png"))
+```  
+
+\newpage  
+
+# Discussion {#discussion}  
+
+The principal objectives of the `r survey.das`-day, Summer 2019 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, survey Pacific Mackerel, Jack Mackerel, Pacific Herring, and the southern stock of Pacific Sardine. With the benefit of favorable weather and few technical problems, _`r survey.vessel`_ surveyed the entire planned area from the northern end of Vancouver Island to San Diego. South of the Strait of Juan de Fuca, all transects were spaced `r adaptive.spacing`-nmi apart. The coordinated sampling with fishing vessels and USVs expanded the survey area into previously unsampled regions.  
+
+The combined use of NOAA ships, fishing vessels, and USVs to conduct ATM surveys of CPS identified several advantages and disadvantages, which are elaborated below from the perspective of the SWFSC's Advanced Survey Technologies Group. 
+
+## Advantages {#discussion-advantages}  
+
++ Two USVs sampled acoustic transects offshore, where wind was ample, provided sampling that was coincident with that from _`r survey.vessel`_, and increased the collection of acoustic backscatter data throughout approximately two-thirds of the survey area;
++ Fishing vessels extended the echosounder and net-catch data to nearshore areas where _`r survey.vessel`_ could not safely navigate nor trawl. With coordination, the sampling from _`r survey.vessel`_ was concomitant with sampling from _Lisa Marie_ off WA and OR, and from _Long Beach Carnage_ off SCB.  
+
+## Disadvantages {#discussion-disadvantages}  
+
++ The USV sampled acoustic transects nearshore, where wind was often light and variable, but had difficulty navigating and progressed slowly along the coasts of WA and OR compared to the offshore USVs, and therefore was less coincident with sampling from _`r survey.vessel`_;
++ The fishing vessels and USVs sampled with fewer echosounder frequencies than _`r survey.vessel`_. Consequently, there were differences in the acoustic data processing that may affect the identification of CPS echoes.  
+
+# Disposition of Data {#data-disposition}
+```{r calc-raw-size, eval=FALSE}
+if (calc.raw.size) {
+  # calculate sizes of ER60, EK80, ME70, MS70, and SX90 .RAW files
+  ek60.file.size <- sum(dir_info(file.path(survey.dir,'DATA/EK60/RAW'), 
+                                 regexp = '.raw$', recursive = T)$size)
+  ek80.file.size <- sum(dir_info(file.path(survey.dir,'DATA/EK80/RAW'), 
+                                 regexp = '.raw$', recursive = T)$size)
+  me70.file.size <- sum(dir_info(file.path(survey.dir,'DATA/ME70/RAW'), 
+                                 regexp = '.raw$', recursive = T)$size)
+  ms70.file.size <- sum(dir_info(file.path(survey.dir,'DATA/MS70/RAW'), 
+                                 regexp = '.raw$', recursive = T)$size)
+  sx90.file.size <- sum(dir_info(file.path(survey.dir,'DATA/SX90/RAW'), 
+                                 regexp = '.raw$', recursive = T)$size)
+
+  save(ek60.file.size, ek80.file.size, me70.file.size, ms70.file.size, sx90.file.size,
+       file = here("Output/raw_file_info.Rdata"))
+} else {
+  load(here("Output/raw_file_info.Rdata"))
+}
+```  
+
+Approximately 17.6 TB of raw EK80 data, 625 GB of raw ME70 data, 822 GB of raw MS70 data, and 1.30 TB of raw SX90 data are archived on the SWFSC data server. For more information, contact: David Demer (Southwest Fisheries Science Center, 8901 La Jolla Shores Drive, La Jolla, California, 92037, U.S.A.; phone: 858-546-5603; email: <david.demer@noaa.gov>).
+
+# Acknowledgements {#acknowledgements}  
+
+We thank the crew members of NOAA Ship _`r survey.vessel`_, as well as the scientists and volunteer technicians that participated in the sampling operations at sea. We thank Richard Jenkins and the team at Saildrone, Inc. who were contracted to conduct the nearshore and offshore USV sampling. We thank Capts. Ricky Blair (_Lisa Marie_); Greg Shaughnessy (Ocean Gold Seafoods); and Rich Ashley and Tom Brinton (_Long Beach Carnage_) for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey of the SCB. We thank Kristen Hinton and Patrick Biondo (WA Department of Fish and Wildlife) for collecting and processing specimens from purse-seine set from _Lisa Marie_; and Dianna Porzio, Trung Nguyen, Kelly Kloos, and Trevor Stocking (CA Department of Fish and Wildlife) for their assistance processing specimens from purse-seine set from the _Long Beach Carnage_. Critical reviews by Lanora Vasquez Del Mercado and Annie Yau improved this report.  
+
+# References {-}  
+
+<div id = 'refs'></div>  
+
+\newpage  
+
+# (APPENDIX) Appendix {-}
+# Appendix {-} 
+# Centerboard positions {#appendix-cb-pos}
+
+Date, time, and location associated with changes to the position of the centerboard and transducer depth.
+
+```{r cb-pos,results='asis'}
+# get centerboard position records
+cb.pos <- filter(bridge.snap, 
+                 Button %in% c("Retracted (5 m)","Intermediate (7 m)","Extended (9 m)")) %>% 
+  select(datetime, Button, Lat, Lon) %>% 
+  rename(`Date Time` = datetime, `Position (depth)` = Button, 
+         `Latitude` = Lat, `Longitude` = Lon)
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  regulartable(cb.pos)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(cb.pos, align = c("l","l","c","c"), digits = c(0,0,4,4),
+        escape = F, booktabs = T, linesep = "") %>% 
+    kable_styling(position = "center",
+                  latex_options = c("striped", "hold_position"))
+}
+```   
+
+\newpage
+
+# Echosounder transducer impedance measurements {#appendix-impedance-analyisis}  
+## All transducers
+As part of the echosounder calibrations aboard the NOAA Ship _Lasker_, the impedance of each quadrant of each transducer was measured with the transducers in air (centerboard in maintenance position) and water (centerboard in retracted position). The complex impedance was measured using a Precision LCR Meter (E4980A, Agilent) at 201 frequencies spanning a user-specified bandwidth, and automated using a computer-controlled, custom-made multiplexer that switches the individual transducer quadrants between an echosounder and the LCR meter (**Fig. \@ref(fig:impedance-plots)**).  
+
+(ref:impedance-plots) The magnitude of impedance ($|Z|$, $\Omega$; panel a), phase ($\theta$, $^\circ$; panel b), and conductance ($G$, $S$; panel c) versus frequency, and susceptance ($B$, $S$) versus $G$ (admittance circle; panel d), for each transducer quadrant (various colors) measured in water at the time of calibration.
+
+```{r impedance-plots,fig.cap='(ref:impedance-plots)',out.height="6.5in",fig.pos='H'}
+if (process.zmux) {
+  source(here("Code/plotZmux.R"))
+}
+
+include_graphics(here("Figs/fig_impedance_plot_all.png"))
+```  
+
+\newpage
+
+The impedance measurements indicated that quadrant 1 of the 18-kHz transducer (ES18, Simrad) was faulty (**Fig. \@ref(fig:impedance-plots)**, top left). To rule out the possibility that the fault was caused by the multiplexer, repeated measurements were obtained with the transducer connected: (1) through the multiplexer, (2) directly through the transducer’s Amphenol connector, and (3) directly to the quadrant 1 wires on the transducer cable. In all cases, the quadrant 1 impedance was abnormal. The following describes the measurements conducted.  
+
+## Fault isolation
+### Air measurements  
+
+On 30 April, with the centerboard in the maintenance position (i.e., transducers in air), impedance measurements were obtained for all quadrants of the ES18 with the transducer connected through the custom-made multiplexer (**Fig. \@ref(fig:impedance-es18-air)**). At 18 kHz, the magnitudes of impedance for quadrants 1-4 were 8.4 $\mathrm{k}\Omega$, 10.9 $\Omega$, 10.9 $\Omega$, and 9.9 $\Omega$, respectively.  
+
+(ref:impedance-es18-air) Impedance measurements in air.
+
+```{r impedance-es18-air,fig.cap='(ref:impedance-es18-air)',out.height="6in",fig.pos='H'}
+include_graphics(here("Images/img_es18_impedance_air.jpg"))
+```  
+
+\newpage
+
+### Water measurements
+#### Through multiplexer 
+
+On 1 May, the centerboard was lowered to the retracted position — placing the transducers in water — and impedance was again measured for all quadrants of the ES18 with the transducer connected through the multiplexer (**Fig. \@ref(fig:impedance-es18-water-zmux)**). At 18 kHz, the magnitudes of impedance for quadrants 1-4 were 8.4 $\mathrm{k}\Omega$, 74.3 $\Omega$, 67.2 $\Omega$, and 68.7 $\Omega$, respectively.  
+
+(ref:impedance-es18-water-zmux) Impedance measurements in water via the multiplexer.
+
+```{r impedance-es18-water-zmux,fig.cap='(ref:impedance-es18-water-zmux)',out.height="6in",fig.pos='H'}
+include_graphics(here("Images/img_es18_impedance_water_zmux.jpg"))
+```
+
+\newpage
+
+#### Directly to Amphenol connector
+
+The LCR meter was then connected directly to quadrant 1 of the ES18 on the transducer’s Amphenol connector (Pins H and J) and impedance measurements obtained (**Fig. \@ref(fig:impedance-es18-water-amphenol)**). At 18 kHz, the magnitude of impedance for quadrant 1 was 8.2 $\mathrm{k}\Omega$.  
+
+(ref:impedance-es18-water-amphenol) Impedance measurements in water via the Amphenol connector.
+
+```{r impedance-es18-water-amphenol,fig.cap='(ref:impedance-es18-water-amphenol)',out.height="6in",fig.pos='H'}
+include_graphics(here("Images/img_es18_impedance_water_amphenol.jpg"))
+```
+
+
+\newpage  
+
+#### Directly to transducer wires  
+
+The transducer’s Amphenol connector was then disassembled and the LCR meter connected directly to the quadrant 1 wires, then impedance measurements were obtained (**Fig. \@ref(fig:impedance-es18-water-direct)**). At 18 kHz, the magnitude of impedance for quadrant 1 was 5.4 $\mathrm{k}\Omega$.  
+
+(ref:impedance-es18-water-direct) Impedance measurements in water via the transducer wires.
+
+```{r impedance-es18-water-direct,fig.cap='(ref:impedance-es18-water-direct)',out.height="6in",fig.pos='H'}
+include_graphics(here("Images/img_es18_impedance_water_direct.jpg"))
+```  
+
+\newpage
+
+# CTD and UCTD sampling locations {#appendix-ctd-sampling}
+
+Times and locations of conductivity and temperature versus depth casts while on station (CTD) and underway (UCTD).  
+
+```{r uctd-sample-table,results='asis'}
+# Rename
+all.ctds.table <- all.ctds %>% 
+  mutate(Button = str_replace(Button, " Cast","")) %>% 
+  rename(`Date Time` = Date, `Cast Type` = Button,
+         `Latitude` = Latitude, `Longitude` = Longitude)
+
+if (doc.type == "docx") {
+  # create flextable object (for Word)
+  regulartable(all.ctds.table)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.ctds.table,
+        align = c("l","l","c","c"), 
+        digits = c(0,0,4,4),
+        escape = F, longtable = T, 
+        booktabs = T) %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("repeat_header","hold_position"))
+}
+```  
+
+\newpage
+\blandscape
+
+# Trawl sample summary {#appendix-trawl-sampling}
+
+Date, time, location at the start of trawling (i.e., at net equilibrium, when the net is fully deployed and begins fishing), and biomasses (kg) of CPS collected for each trawl haul.
+
+```{r trawl-catch-summary,results='asis'}
+# Summarize catch by species, used to subset columns
+pos.cps <- trawl.summ %>% 
+  select(-Haul, -Date, -Latitude, -Longitude, -"All CPS") %>% 
+  gather(key = "scientificName", value = "weight") %>% 
+  group_by(scientificName) %>% 
+  summarise(weight = sum(weight, na.rm = T)) %>% 
+  filter(weight != 0) %>% 
+  pull(scientificName)
+
+# Select only species with positive catch weight
+trawl.summ <- trawl.summ %>% 
+  select(Haul, `Date Time` = Date, `Latitude` = Latitude, 
+         `Longitude` = Longitude,
+         all_of(pos.cps), "All CPS") 
+
+# Replace zeros with NA
+trawl.summ[trawl.summ == 0] <- NA
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  regulartable(trawl.summ)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(trawl.summ,escape = F,longtable = T,booktabs = T,
+        align = c("r","c",rep("r",ncol(trawl.summ) - 2)),
+        digits = c(0,0,4,4,rep(2, ncol(trawl.summ) - 4))) %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("repeat_header","hold_position"))
+}
+```  
+
+\elandscape
