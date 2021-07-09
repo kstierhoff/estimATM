@@ -320,7 +320,7 @@ sounder.type           <- c(RL  = "EK80")
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L")) {
+if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2107RL")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SummerCPS")
@@ -412,8 +412,8 @@ scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes2107RL.sqlite" # CUFES SQLite database
-cufes.date.format      <- "ymd" # mdy (1907RL only) or ymd (most other surveys)
+cufes.db.sqlite        <- "cufes202107RL.sqlite" # CUFES SQLite database
+cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 # Trawl data
 trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
