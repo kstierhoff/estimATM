@@ -1,7 +1,7 @@
 ---
-title: "Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the 2019 California Current Ecosystem Survey (1907RL)"
-author: "SWFSC Advanced Survey Technologies Group"
-date: 'Last updated: `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`'
+# title: "Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions"
+# author: "SWFSC Advanced Survey Technologies Group"
+# date: 'Last updated: `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`'
 output:
   bookdown::html_document2:
     toc: yes
@@ -14,11 +14,50 @@ css: css/ast.css
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse, here, knitr, DT, fs, htmltools)
+pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,vroom,
+               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
+               shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
+               leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra,
+               lwgeom,htmlwidgets)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+doc.name <- knitr::current_input()
+if (is.null(doc.type)) {doc.type <- "html"}
+if (is.null(doc.name)) {doc.name <- "plotBio_All.Rmd"}
 
 # global knitr chunk options
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```  
+
+```{r user-input}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+
+source(here("Doc/settings", prj.settings))
+```
+
+# Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the `r survey.name` 
+
+## SWFSC Advanced Survey Technologies Group  
+
+_**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`
+
 
 # Interactive survey map
 
@@ -44,7 +83,11 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 (ref:backscatter-map-cps) The distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS.
 
 ```{r plot-backscatter-cps,fig.cap='(ref:backscatter-map-cps)',out.width="100%"}
-include_graphics(here("Figs/fig_backscatter_cps.png"))
+if (file.exists(here("Figs/fig_backscatter_cps.png"))) {
+  include_graphics(here("Figs/fig_backscatter_cps.png"))
+} else {
+  print("No CPS backscatter plot yet.")
+}
 ```
 
 \newpage
@@ -54,7 +97,11 @@ include_graphics(here("Figs/fig_backscatter_cps.png"))
 (ref:backscatter-map-krill) The distribution of 200-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 350-m deep) ascribed to krill.
 
 ```{r plot-backscatter-krill,fig.cap='(ref:backscatter-map-krill)',out.width="100%"}
-include_graphics(here("Figs/fig_backscatter_krill.png"))
+if (file.exists(here("Figs/fig_backscatter_krill.png"))) {
+  include_graphics(here("Figs/fig_backscatter_krill.png"))
+} else {
+  print("No krill backscatter plot yet.")
+}
 ```
 
 \newpage  
@@ -64,7 +111,12 @@ include_graphics(here("Figs/fig_backscatter_krill.png"))
 (ref:cufes-egg-density) Map of CUFES egg density (eggs m^-3^) for anchovy, jack mackerel, and sardine.
 
 ```{r plot-cufes,fig.cap='(ref:cufes-egg-density)',out.width="100%"}
-include_graphics(here("Figs/fig_cufes_egg_density.png"))
+if (file.exists(here("Figs/fig_cufes_egg_density.png"))) {
+  include_graphics(here("Figs/fig_cufes_egg_density.png"))
+} else {
+  print("No CUFES plot yet.")
+}
+
 ```  
 
 \newpage
@@ -72,7 +124,11 @@ include_graphics(here("Figs/fig_cufes_egg_density.png"))
 (ref:cufes-egg-density-facet) Map of CUFES egg density (eggs m^-3^) for anchovy, jack mackerel, and sardine.
 
 ```{r plot-cufes-facet,fig.cap='(ref:cufes-egg-density-facet)',out.width='100%'}
-include_graphics(here("Figs/fig_cufes_egg_density_facet.png"))
+if (file.exists(here("Figs/fig_cufes_egg_density_facet.png"))) {
+  include_graphics(here("Figs/fig_cufes_egg_density_facet.png"))
+} else {
+  print("No CUFES backscatter plot yet.")
+}
 ```
 
 \newpage  
@@ -80,13 +136,17 @@ include_graphics(here("Figs/fig_cufes_egg_density_facet.png"))
 **Table 1.** Bad CUFES samples
 
 ```{r bad-cufes-table}
-# Load bad CUFES data
-load(here("Output/cufes_bad.Rdata"))
-
-if (nrow(cufes.bad) > 0) {
-  datatable(cufes.bad)
+if (file.exists(here("Output/cufes_bad.Rdata"))) {
+  # Load bad CUFES data
+  load(here("Output/cufes_bad.Rdata"))  
+  
+  if (nrow(cufes.bad) > 0) {
+    datatable(cufes.bad)
+  } else {
+    print("No bad CUFES samples.")
+  }
 } else {
-  print("No bad cufes samples.")
+  print("No CUFES data yet.")
 }
 ```
 
@@ -98,7 +158,11 @@ if (nrow(cufes.bad) > 0) {
 (ref:trawl-proportion-haul-wt) Proportions of CPS species in trawl hauls, by weight (black points indicate trawl hauls with no CPS). 
 
 ```{r plot-trawl-proportion-haul-wt,fig.cap='(ref:trawl-proportion-haul-wt)',out.width='100%'}
-include_graphics(here("Figs/fig_trawl_proportion_haul_wt.png"))
+if (file.exists(here("Figs/fig_trawl_proportion_haul_wt.png"))) {
+  include_graphics(here("Figs/fig_trawl_proportion_haul_wt.png"))
+} else {
+  print("No trawl haul proportion plot yet.")
+}
 ```
 
 \newpage  
@@ -108,7 +172,11 @@ include_graphics(here("Figs/fig_trawl_proportion_haul_wt.png"))
 (ref:nasc-cufes-trawl) A map of the a) distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS, b) CUFES egg density (eggs m^-3^) for anchovy and sardine, and c) proportions of CPS species (by weight) in trawl hauls (black points indicate trawl hauls with no CPS).
 
 ```{r plot-combo-maps,fig.cap='(ref:nasc-cufes-trawl)',out.width='100%'}
-include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
+if (file.exists(here("Figs/fig_nasc_cufes_haul_wt.png"))) {
+  include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
+} else {
+  print("No backscatter/CUFES/haul proportion plot yet.")
+}
 ```
 
 # Plot saildrone data
@@ -116,7 +184,11 @@ include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
 (ref:saildrone-transects) Transect sampled by Saildrone unmanned survace vehicles (USVs).
 
 ```{r plot-saildrone,fig.cap='(ref:saildrone-transects)',out.width='100%',eval=FALSE}
-include_graphics(here("Figs/fig_saildrone_map.png"))
+if (file.exists(here("Figs/fig_saildrone_map.png"))) {
+  include_graphics(here("Figs/fig_saildrone_map.png"))
+} else {
+  print("No Saildrone plot yet.")
+}
 ```
 
 # Examine backscatter outliers 
@@ -124,11 +196,15 @@ include_graphics(here("Figs/fig_saildrone_map.png"))
 (ref:nasc-outliers) An interactive plot of the top 100 backscatter ($s_A$) intervals, labeled with the transect name and interval to facilitate futher scrutiny of processing steps in Echoview.
 
 ```{r plot-big-nasc,fig.cap='(ref:nasc-outliers)'}
-# Load NASC outliers
-load(here("Output/nasc_backscatter_plotly.Rdata"))
-
-# Plot NASC outliers using plotly
-plotly::ggplotly(nasc.outlier.plotly)
+if (file.exists(here("Output/nasc_backscatter_plotly.Rdata"))) {
+  # Load NASC outliers
+  load(here("Output/nasc_backscatter_plotly.Rdata"))
+  
+  # Plot NASC outliers using plotly
+  plotly::ggplotly(nasc.outlier.plotly)
+} else {
+  print("No backscatter data yet.")
+}
 ```  
 
 For questions about these data, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
