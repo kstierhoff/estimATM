@@ -1,0 +1,115 @@
+---
+output: 
+  bookdown::pdf_document2:
+    number_sections: no
+    toc: no
+    includes: 
+      in_header: yaml/header_final.tex
+  bookdown::word_document2:
+    reference_docx: template/report_template_DRAFT_Rmarkdown.docx
+csl: csl/ices-journal-of-marine-science.csl
+bibliography: bib/ast_bib.bib
+---
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
+               png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
+               odbc,cowplot,mapview,fs,beepr)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+
+
+# set system time zone to UTC
+Sys.setenv(tz = "UTC")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# global pander options
+panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
+panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+```
+
+```{r project-info}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r load-catch-data}
+# Load catch data
+load(here("Data/Trawl/trawl_data.Rdata"))
+```
+
+```{r}
+# Filter and format
+catch <- catch.all %>% 
+  filter(cruise == cruise.name) %>% 
+  left_join(spp.codes)
+
+# Summarize species catch by weight and number
+catch.summary <- catch %>% 
+  mutate(totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum = totalWeight/(subSampleWtkg/subSampleCount)) %>%
+  group_by(scientificName, commonName) %>% 
+  summarise(totalWeight = sum(totalWeight),
+            totalNum    = sum(totalNum)) %>% 
+  arrange(desc(totalWeight)) 
+
+# Rename columns
+names(catch.summary) <- c("Scientific Name","Common Name",
+                          "Total weight (kg)","Total number (n)")
+```
+
+# Trawl catch summary for the `r survey.name.long` (`r survey.name` )
+
+## NOAA Fisheries-Southwest Fisheries Science Center
+
+_**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`
+
+Catch for all trawl samples are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
+
+```{r catch-table}
+kable(catch.summary, format = knitr.format, booktabs = TRUE, 
+      escape = FALSE, longtable = TRUE,
+      align           = c(rep("l", 2), rep("r", ncol(catch.summary) - 2)),
+      digits          = c(0),
+      format.args     = list(big.mark = ",")) %>% 
+  kable_styling(latex_options = c("repeat_header","HOLD_position",
+                                  "scale_down"),
+                position = "center",
+                font_size = 8) %>%
+  column_spec(1, italic = T) 
+```
+
+For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
