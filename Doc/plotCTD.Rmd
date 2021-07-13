@@ -28,18 +28,6 @@ pacman::p_load_gh("kstierhoff/atm")
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 
-# mapviewOptions(fgb = FALSE)
-
-# Control script behavior
-process.files   <- T # process CTD/UCTD files
-copy.files      <- T # copy data files from data to plotCTD directory
-overwrite.files <- T # overwrite existing files
-get.nav         <- T # download nav data from ERDDAP
-
-save.figs       <- T # create new figures
-get.map         <- F # download map from rnaturalearth
-resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
-
 # determines method of table generation for best formatting
 doc.type <- knitr::opts_knit$get("rmarkdown.pandoc.to")
 if (is.null(doc.type)) {
@@ -66,6 +54,18 @@ settings.files <- dir(here("Doc/settings"))
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
+```
+
+```{r processing-controls}
+# Control script behavior
+process.files   <- T # process CTD/UCTD files
+copy.files      <- T # copy data files from data to plotCTD directory
+overwrite.files <- T # overwrite existing files
+get.nav         <- T # download nav data from ERDDAP
+
+save.figs       <- T # create new figures
+get.map         <- F # download map from rnaturalearth
+resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
 ```{r copy-files, include=F}
@@ -539,7 +539,7 @@ ggsave(base.map, filename = here("Figs/fig_basemap.png"),
 
 # Leaflet preferences -------------------------------------------------------
 # Set padding around data  
-imap.bounds <- map_bounds(all.ctd.hdr$lat, all.ctd.hdr$long, 0.1) 
+imap.bounds <- map_bounds(nav$lat, nav$long, 0.1) 
 
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
@@ -637,7 +637,7 @@ if (exists("all.ctd.hdr")) {
 if (nrow(ctd.missing) > 0) {
   if (nrow(ctd.missing) > 0) {
     ctd.missing.sf <- project_df(ctd.missing, 4326, 3310) %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) 
   }
 }
 ```
@@ -684,25 +684,25 @@ i.map.uctd <- i.map %>%
                label = ~leg, group = "Vessel Track") 
 
 # Add UCTD cast data
- if (exists("uctd.missing.sf")) {
+if (exists("uctd.missing.sf")) {
   i.map.uctd <- i.map.uctd %>% 
     addCircleMarkers(data = uctd.missing.sf,
-                   radius = 5, color = "red", stroke = TRUE, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  "red", 
-                   label = ~cast,
-                   popup = ~cast,
-                   group = "UCTD Casts-Unprocessed")
- }
+                     radius = 5, color = "red", stroke = TRUE, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  "red", 
+                     label = ~cast,
+                     popup = ~cast,
+                     group = "UCTD Casts-Unprocessed")
+}
 
- if (exists("uctd.sf")) {
+if (exists("uctd.sf")) {
   i.map.uctd <- i.map.uctd %>% 
     addCircleMarkers(data = uctd.sf,
-                   radius = 5, color = "#000414", stroke = FALSE, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  "blue", 
-                   label = ~cast,
-                   popup = ~cast,
-                   group = "UCTD Casts")
- }
+                     radius = 5, color = "#000414", stroke = FALSE, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  "blue", 
+                     label = ~cast,
+                     popup = ~cast,
+                     group = "UCTD Casts")
+}
 
 # Plot map
 i.map.uctd
@@ -970,23 +970,27 @@ if (exists("all.uctd.casts")) {
 Summary of traditional CTD casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r ctd-summary,include=TRUE}
-if (length(all.ctd.casts) > 0) {
-  # make a copy of ctd.summ
-  ctd.table <- all.ctd.hdr %>% 
-    mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S"))
-  
-  # rename columns
-  names(ctd.table) <- c("Order Occupied", "Filename", "Date/time", 
-                        "Lat", "Lon", "Depth (m)", "Class", "Leg")
-  
-  # Write results to CSV file
-  write_csv(ctd.table, here("Output/ctd_summary_table.csv"))
-  
-  # print table
-  datatable(ctd.table)  
-  
+if (exists("all.ctd.casts")) {
+  if (length(all.ctd.casts) > 0) {
+    # make a copy of ctd.summ
+    ctd.table <- all.ctd.hdr %>% 
+      mutate(cast.date = format(cast.date,"%m/%d/%Y %H:%M:%S"))
+    
+    # rename columns
+    names(ctd.table) <- c("Order Occupied", "Filename", "Date/time", 
+                          "Lat", "Lon", "Depth (m)", "Class", "Leg")
+    
+    # Write results to CSV file
+    write_csv(ctd.table, here("Output/ctd_summary_table.csv"))
+    
+    # print table
+    datatable(ctd.table)  
+    
+  } else {
+    cat("No CTD casts processed.")
+  } 
 } else {
-  cat("No CTD casts processed.")
+  cat("No CTD casts present.")
 }
 ```  
 
@@ -1005,18 +1009,18 @@ if (save.figs) {
         coord_sf(crs = crs.proj,
                  xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    } else {
+      # Create main map using ggmap
+      map.ctd <- base.map + 
+        geom_sf(data = transects.sf) + 
+        geom_shadowtext(aes(mean(c(map.bounds["xmin"], map.bounds["xmax"])), 
+                            mean(mean(c(map.bounds["ymin"], map.bounds["ymax"]))), 
+                            label = "No CTD casts"), 
+                        colour = "black", bg.color = "red", size = 6, fontface = "bold") +
+        coord_sf(crs = crs.proj,
+                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
+                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
     }
-  } else {
-    # Create main map using ggmap
-    map.ctd <- base.map + 
-      geom_sf(data = transects.sf) + 
-      geom_shadowtext(aes(mean(c(map.bounds["xmin"], map.bounds["xmax"])), 
-                          mean(mean(c(map.bounds["ymin"], map.bounds["ymax"]))), 
-                          label = "No CTD casts"), 
-                      colour = "black", bg.color = "red", size = 6, fontface = "bold") +
-      coord_sf(crs = crs.proj,
-               xlim = c(map.bounds["xmin"], map.bounds["xmax"]),
-               ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   }
   # save map
   ggsave(here("Figs/fig_ctd_map.png"), map.ctd, 
@@ -1033,25 +1037,25 @@ i.map.ctd <- i.map %>%
                label = ~leg, group = "Vessel Track") 
 
 # Add UCTD cast data
- if (exists("ctd.missing.sf")) {
+if (exists("ctd.missing.sf")) {
   i.map.ctd <- i.map.ctd %>% 
     addCircleMarkers(data = ctd.missing.sf,
-                   radius = 5, color = "red", stroke = TRUE, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  "red", 
-                   label = ~cast,
-                   popup = ~cast,
-                   group = "CTD Casts-Unprocessed")
- }
+                     radius = 5, color = "red", stroke = TRUE, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  "red", 
+                     label = ~cast,
+                     popup = ~cast,
+                     group = "CTD Casts-Unprocessed")
+}
 
- if (exists("ctd.sf")) {
+if (exists("ctd.sf")) {
   i.map.ctd <- i.map.ctd %>% 
     addCircleMarkers(data = ctd.sf,
-                   radius = 5, color = "#000414", stroke = FALSE, opacity = 0.5,
-                   fillOpacity = 0.5, fillColor =  "blue", 
-                   label = ~cast,
-                   popup = ~cast,
-                   group = "CTD Casts")
- }
+                     radius = 5, color = "#000414", stroke = FALSE, opacity = 0.5,
+                     fillOpacity = 0.5, fillColor =  "blue", 
+                     label = ~cast,
+                     popup = ~cast,
+                     group = "CTD Casts")
+}
 
 # Plot map
 i.map.ctd
@@ -1290,18 +1294,26 @@ if (exists("all.ctd.hdr")) {
 }
 
 if (exists("uctd.summ")) {
-  ctd.info.all <- ctd.info.all %>% 
-    bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
-    mutate(type = case_when(
-      str_detect(cast, "UCTD") ~ "UCTD",
-      TRUE ~ "CTD"))
+  if(exists("ctd.info.all")) {
+    ctd.info.all <- ctd.info.all %>% 
+      bind_rows(select(uctd.summ, cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag)) %>% 
+      mutate(type = case_when(
+        str_detect(cast, "UCTD") ~ "UCTD",
+        TRUE ~ "CTD")) 
+  } else {
+    ctd.info.all <- uctd.summ %>% 
+      select(cast.num, cast, cast.date, lat, long, max.depth, class, leg, lag) %>% 
+      mutate(type = case_when(
+        str_detect(cast, "UCTD") ~ "UCTD",
+        TRUE ~ "CTD"))
+  }
 }
 
 # Save to CSV file
 write.csv(ctd.data.all, file = here("Output/cast_data_all.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 
 write.csv(ctd.info.all, file = here("Output/cast_info_all.csv"), 
-          quote = F, row.names = F)
+          quote = FALSE, row.names = FALSE)
 ```
 
