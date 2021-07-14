@@ -110,17 +110,17 @@ region.vec <- c(0, 32.5353, 34.7, 41.99, 48.490, 55)
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
-survey.name.long       <- "Summer 2021 Sardine-Hake (SaKe) Survey"
+survey.name.long       <- "Summer 2021 California Current Ecosystem Survey (CCES)"
 survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2107RL"        # SWFSC/AST survey name
 survey.start           <- "2 July"       # Survey start date
-survey.end             <- "22 October"   # Survey end date
+survey.end             <- "15 October"   # Survey end date
 survey.year            <- "2021"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
-survey.das             <- 80              # Days at sea allocated
-survey.landmark.n      <- "Cape Scott, British Columbia" # Landmark - N extent of survey
+survey.das             <- 86              # Days at sea allocated
+survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
 survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
@@ -130,7 +130,7 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 leg.breaks <- as.numeric(lubridate::ymd(c("2021-07-02", "2021-07-22", 
                                           "2021-08-22", "2021-09-21",
-                                          "2021-10-23")))
+                                          "2021-10-15")))
 
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
@@ -163,8 +163,8 @@ survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
 erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2019"
-erddap.survey.start.sd <- "2019-06-18T00%3A00%3A00Z"
-erddap.survey.end.sd   <- "2019-09-30T23%3A59%3A00Z"
+erddap.survey.start.sd <- "2021-07-10T00%3A00%3A00Z"
+erddap.survey.end.sd   <- "2021-09-30T23%3A59%3A00Z"
 # Configure columns and classes
 erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
 erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
@@ -176,7 +176,7 @@ sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
                                end.date   = ymd(c("2019-08-07", "2019-08-12", "2019-08-25")))
 
 # Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
-sd.time.offset   <- 7 # Hours to add/subtract from GPS data (typically 0)
+sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
 cruise.name <- 202107 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
@@ -204,7 +204,7 @@ useCrossOrigin <- F # USe cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
-scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
+scale.pies <- TRUE   # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
@@ -288,18 +288,18 @@ lf.ncols <- 5
 nasc.vessels           <- c("RL") 
 nasc.vessels.offshore  <- NA_character_
 nasc.vessels.nearshore <- NA_character_
-nasc.vessels.krill     <- "RL"
+nasc.vessels.krill     <- c("RL")
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
-seine.vessels          <- NA_character_
+seine.vessels          <- c("LBC","LM")
 # Use seine data to apportion backscatter
 use.seine.data         <- FALSE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata?
-merge.vessels <- c(OS  = FALSE,
+merge.vessels <- c(OS = FALSE,
                    NS = FALSE)
 
 # Combine data from all regions?
@@ -330,9 +330,9 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-FRD
 nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "-Final_38kHz_CPS-ACIN.csv")
+nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*-Final_38_kHz_Krill-ACIN.csv")
+nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N")
 # Regex pattern for identifying offshore transects
@@ -347,7 +347,7 @@ nasc.recurse           <- c(RL = TRUE)
 nasc.max               <- 10000*19
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = TRUE) # in the nearshore strata
+source.cps.nasc        <- c(RL  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv")) # in the nearshore strata 
@@ -386,7 +386,7 @@ use.tx.number          <- c(RL  = TRUE)
 tx.rm                  <- list(RL = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 3)
+min.tx.length          <- c(RL  = 25)
 
 # Enforce nearest trawl cluster distance limits?
 limit.cluster.dist     <- c(OS  = FALSE,
@@ -467,8 +467,8 @@ max.diff <- 3
 nTx.min <- 2
 
 # Stratum pruning settings
-nIndiv.min    <- 0
-nClusters.min <- 0
+nIndiv.min    <- 10
+nClusters.min <- 3
 
 # Use manually defined strata?
 stratify.manually    <- FALSE
