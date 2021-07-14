@@ -330,7 +330,7 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-FRD
 nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "-Final 38kHz CPS.csv")
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
@@ -344,7 +344,7 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T")
 # Recursively search NASC directories
 nasc.recurse           <- c(RL = TRUE)
 # Max NASC value for removing outliers
-nasc.max               <- 10000*19
+nasc.max               <- NA
 
 # If T, read cps.nasc from file; else use NASC.50 
 source.cps.nasc        <- c(RL  = FALSE) # in the nearshore strata
