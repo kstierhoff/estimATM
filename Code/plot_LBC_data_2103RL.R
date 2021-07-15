@@ -7,6 +7,7 @@ library(here)
 library(atm)
 library(surveyR)
 library(cowplot)
+library(ggnewscale)
 
 # Load settings
 source(here("Doc/settings/settings_2103RL.R"))
@@ -52,7 +53,7 @@ transects <- st_read(here("Output/planned_transects.shp")) %>%
   filter(Region == "S. CA Bight")
 
 # Read LBC data
-lbc.nav <- read_csv(here("Data/Nav/2103LBC.gps.csv")) %>% 
+lbc.nav <- read_csv(here("Data/Nav/GPS/2103LBC.gps.csv")) %>% 
   rename(lat = Latitude, long = Longitude) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
   summarise(do_union = F) %>% 
