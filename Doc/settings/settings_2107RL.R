@@ -162,7 +162,7 @@ survey.start.sd  <- NA_character_ # Start of Saildrone survey
 survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
-erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2019"
+erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2021"
 erddap.survey.start.sd <- "2021-07-10T00%3A00%3A00Z"
 erddap.survey.end.sd   <- "2021-09-30T23%3A59%3A00Z"
 # Configure columns and classes
