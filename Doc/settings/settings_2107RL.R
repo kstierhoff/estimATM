@@ -162,18 +162,18 @@ survey.start.sd  <- NA_character_ # Start of Saildrone survey
 survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
-erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2021"
-erddap.survey.start.sd <- "2021-07-10T00%3A00%3A00Z"
-erddap.survey.end.sd   <- "2021-09-30T23%3A59%3A00Z"
+erddap.url.sd <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2021"
+erddap.survey.start.sd <- "2021-07-07T00%3A00%3A00Z"
+erddap.survey.end.sd   <- "2021-10-15T23%3A59%3A00Z"
 # Configure columns and classes
 erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
 erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 
 # Define date range for each Saildrone to remove overlapping transits
-sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
-                               start.date = ymd(c("2019-07-09", "2019-07-09", "2019-06-20")),
-                               end.date   = ymd(c("2019-08-07", "2019-08-12", "2019-08-25")))
+sd.date.range    <- data.frame(saildrone  = c(1055, 1059),
+                               start.date = ymd(c("2021-07-06", "2021-10-15")),
+                               end.date   = ymd(c("2021-07-06", "2021-10-15")))
 
 # Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
 sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
