@@ -199,8 +199,8 @@ map.height <- 10
 map.height.region <- 7
 
 # Leaflet tile options; set both to T if caching
-useCachedTile  <- F # Use cached tiles
-useCrossOrigin <- F # USe cross origin
+useCachedTile  <- T # Use cached tiles
+useCrossOrigin <- T # USe cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
