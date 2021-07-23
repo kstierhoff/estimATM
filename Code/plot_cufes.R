@@ -78,7 +78,7 @@ if (doc.name == "simulateBiomass.Rmd") {
   
   ggsave(cufes.density.facet,
          filename = here("Figs/fig_cufes_egg_density_facet.png"),
-         width = map.width, height = map.height) 
+         width = map.width*3, height = map.height) 
 }
 
 # Project nav for plotting

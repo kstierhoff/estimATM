@@ -16,7 +16,7 @@ pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,vr
                reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
                shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
                leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra,
-               lwgeom,htmlwidgets)
+               lwgeom,htmlwidgets,beepr)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -58,7 +58,7 @@ source(here("Doc/settings", prj.settings))
 # Control script behavior (usually T)
 save.figs       <- T # Save figures
 get.nav         <- T # Download nav data from ERDDAP
-get.nav.sd      <- F # Download nav data from ERDDAP
+get.nav.sd      <- T # Download nav data from ERDDAP
 copy.files      <- T # Copy data files from data to plotBio directory
 overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)copy.files
 process.csv     <- T # Process acoustic backscatter files
@@ -67,7 +67,7 @@ get.db          <- T # Import trawl database
 # Are we sampling? If no, F. Skips data processing steps.
 sampling.acoustics <- T 
 sampling.cufes     <- T 
-sampling.trawl     <- F 
+sampling.trawl     <- T 
 
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -136,7 +136,7 @@ if (get.nav) {
       sep = ""))
     
     # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+    nav.temp <- data.frame(read.csv(dataURL, header = FALSE, colClasses = erddap.classes, 
                                     row.names = NULL, skip = 0))
     names(nav.temp) <- erddap.headers
     
@@ -153,8 +153,8 @@ if (get.nav) {
              leg      = paste("Leg", 
                               cut(as.numeric(date(datetime)), 
                                   leg.breaks, 
-                                  labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+                                  labels = FALSE))) %>%
+      filter(is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
              between(lat, min(survey.lat), max(survey.lat)), 
              between(long, min(survey.long), max(survey.long))) 
     
@@ -173,7 +173,7 @@ if (get.nav) {
   # Cast nav to transects
   nav.paths.sf <- nav.sf %>% 
     group_by(leg) %>% 
-    summarise(do_union = F) %>% 
+    summarise(do_union = FALSE) %>% 
     st_cast("LINESTRING")
   
   # Save results
@@ -191,13 +191,13 @@ wpts.sf <- wpts %>%
   filter(Type %in% wpt.types) %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   mutate(
-    label    = paste("Transect", Transect),
-    popup    = paste('<b>Transect:</b>', Transect, Type)
+    label = paste("Transect", Transect),
+    popup = paste('<b>Transect:</b>', Transect, Type)
   )
 
 transects.sf <- wpts.sf %>% 
   group_by(Type, Transect, Region) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING") %>% 
   ungroup() %>% 
   mutate(
@@ -259,7 +259,7 @@ if (get.nav.sd) {
         "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
       
       # Download and parse ERDDAP nav data
-      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = F, 
+      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = FALSE, 
                                          colClasses = erddap.classes.sd, 
                                          row.names = NULL, skip = 0))
       names(nav.temp.sd) <- erddap.headers.sd
@@ -293,7 +293,7 @@ if (get.nav.sd) {
     # Convert saildrone nav to spatial
     nav.sd.paths.sf <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
-      summarise(do_union = F) %>% 
+      summarise(do_union = FALSE) %>% 
       st_cast("LINESTRING") %>% 
       mutate(tracklength = st_length(.))
     
@@ -344,7 +344,8 @@ if (sampling.trawl) {
     dbDisconnect(trawl.channel)
     
     # Save imported database data to .Rdata file
-    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, file = here("Data/Trawl/trawl_data.Rdata"))
+    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+         file = here("Data/Trawl/trawl_data.Rdata"))
   } else {
     # Load data
     load(here("Data/Trawl/trawl_data.Rdata"))
@@ -539,11 +540,11 @@ if (sampling.trawl) {
   
   # Calculate pie radius of each pie, based on All CPS landings
   if (scale.pies) {
-    haul.pie$radius    <- pie.radius*log(haul.pie$bin.level+1)
-    cluster.pie$radius <- pie.radius*log(cluster.pie$bin.level+1)
+    haul.pie$r    <- pie.radius*log(haul.pie$bin.level+1)
+    cluster.pie$r <- pie.radius*log(cluster.pie$bin.level+1)
   } else {
-    haul.pie$radius    <- pie.radius
-    cluster.pie$radius <- pie.radius
+    haul.pie$r    <- pie.radius
+    cluster.pie$r <- pie.radius
   }
   
   # Filter for positive hauls and clusters
@@ -575,7 +576,7 @@ if (sampling.cufes) {
   # Read CUFES data
   cufes.filename <- list.files(here("Data/CUFES"), pattern = "*.sqlite")
   cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
-  cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
+  cufes.raw      <- tbl(cufes.con, "cufessqlite") %>%
     collect() %>% 
     mutate(
       Start = case_when(
@@ -595,8 +596,7 @@ if (sampling.cufes) {
   dbDisconnect(cufes.con)
   
   # save raw cufes table to CSV
-  write.csv(cufes.raw, file = here("Output/cufes_raw.csv"), 
-            quote = FALSE, row.names = FALSE)
+  write_csv(cufes.raw, file = here("Output/cufes_raw.csv"))
   
   # Process CUFES data
   cufes <- cufes.raw %>% 
@@ -609,13 +609,12 @@ if (sampling.cufes) {
            -lat, -long, -X, -Y, -Duration, -Comments) %>% 
     mutate(Density = Counts/Duration/0.64,
            # Create bins for defining point size in NASC plots
-           bin = cut(Density, cufes.breaks, include.lowest = T),
+           bin = cut(Density, cufes.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin)) %>% 
     left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
   
   # Save processed cufes to CSV
-  write.csv(cufes, file = here("Output/cufes_proc.csv"), 
-            quote = F, row.names = F)
+  write_csv(cufes, file = here("Output/cufes_proc.csv"))
   
   # Prepare CUFES data for plotting ----------------------------------------------
   # Select CUFES sample with zero density for plotting
@@ -633,11 +632,11 @@ if (sampling.cufes) {
     filter(!SampleNumber %in% cufes.bad$SampleNumber)
   
   # Write CUFES data from current survey to CSV
-  write.csv(cufes, file = here("Output/cufes_data.csv"), quote = F)
+  write_csv(cufes, file = here("Output/cufes_data.csv"))
   
   # Create bins for defining point size in NASC plots
   cufes <- cufes %>% 
-    mutate(bin = cut(Density, cufes.breaks, include.lowest = T),
+    mutate(bin = cut(Density, cufes.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin))
   
   # Project CUFES data from CPS
@@ -710,11 +709,11 @@ if (sampling.acoustics) {
       # Calculate summary interval
       nasc.cps <- nasc.cps %>%
         mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                         labels = F, include.lowest = T))
+                         labels = FALSE, include.lowest = TRUE))
       
       # Save results
       save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
-      write.csv(nasc.cps, file = here("Output/nasc_cps.csv"), row.names = F, quote = F)
+      write_csv(nasc.cps, file = here("Output/nasc_cps.csv"))
     }
   } else {
     load(here("Output/nasc_cps.Rdata"))
@@ -737,10 +736,10 @@ if (sampling.acoustics) {
     )
   
   # Average cps.nasc over defined interval
-  # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
+  # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
   nasc.cps.sf <- nasc.cps %>%
     filter(lat != 999, long != 999) %>%
-    select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.100) %>% 
+    select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.150) %>% 
     group_by(filename, transect, int) %>% 
     summarise(
       lat   = lat[1],
@@ -753,7 +752,7 @@ if (sampling.acoustics) {
                      '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
                      '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
     # Create bins for defining point size in NASC plots
-    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
+    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
            bin.level =  as.numeric(bin)) %>% 
     filter(!is.na(bin)) %>% 
     st_as_sf(coords = c("long","lat"), crs = crs.geog) 
@@ -835,11 +834,11 @@ if (sampling.acoustics) {
       # Calculate summary interval
       nasc.krill <- nasc.krill %>%
         mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                         labels = F, include.lowest = T)) 
+                         labels = FALSE, include.lowest = TRUE)) 
       
       # Save results
       save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
-      write.csv(nasc.krill, file = here("Output/nasc_krill.csv"), row.names = F, quote = F)
+      write_csv(nasc.krill, file = here("Output/nasc_krill.csv"))
     }
   } else {
     load(here("Output/nasc_krill.Rdata"))
@@ -862,7 +861,7 @@ if (sampling.acoustics) {
     )
   
   # Average krill.nasc over defined interval
-  # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
+  # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
   nasc.krill.sf <- nasc.krill %>%
     filter(lat != 999, long != 999) %>%
     select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
@@ -878,7 +877,7 @@ if (sampling.acoustics) {
                      '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
                      '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
     # Create bins for defining point size in NASC plots%>% 
-    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
+    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
            bin.level =  as.numeric(bin))  %>% 
     filter(!is.na(bin)) %>% 
     st_as_sf(coords = c("long","lat"), crs = crs.geog) 
@@ -1033,7 +1032,7 @@ if (sampling.trawl) {
     arrange(haul) %>% 
     st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
     group_by(haul) %>% 
-    summarise(do_union = F) %>% 
+    summarise(do_union = FALSE) %>% 
     st_cast("LINESTRING") %>% 
     left_join(select(haul.catch, -X, -Y, -cluster)) %>% 
     replace(is.na(.), 0) %>% 
@@ -1156,15 +1155,13 @@ if (sampling.acoustics) {
 
 # Plotting preferences -------------------------------------------------------
 # Leaflet tile options; set both to T if caching
-useCachedTile  <- F # Use cached tiles
-useCrossOrigin <- F # USe cross origin
 
 # Create leaflet map
 i.map <- leaflet() %>% 
   # Enable tile caching
   enableTileCaching() %>%
   # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-  addProviderTiles(providers$Esri.OceanBasemap,
+  addProviderTiles(providers$Stamen.TonerLite,
                    options = tileOptions(useCache = useCachedTile,
                                          crossOrigin = useCrossOrigin)) %>%
   # Add EEZs
@@ -1199,7 +1196,7 @@ i.map <- leaflet() %>%
                popup = ~popup,
                group = "Planned Transects (Core)") %>%
   addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
                    fillOpacity = 0.5, fillColor =  ~txPal(Type), 
                    label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
@@ -1211,7 +1208,7 @@ i.map <- leaflet() %>%
                popup = ~popup,
                group = "Planned Transects (Ancillary)") %>%
   addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
-                   radius = 3, color = "#000414", stroke = F, opacity = 0.5,
+                   radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
                    fillOpacity = 0.5, fillColor =  ~txPal(Type),
                    # label = ~htmlEscape(paste(Type, Waypoint)),
                    popup = ~popup,
@@ -1236,7 +1233,7 @@ i.map <- leaflet() %>%
                       "CUFES Egg Density", "CUFES Egg Density-Other",
                       "CUFES Egg Density-Squid", "CUFES (Negative)",
                       "Saildrone Tracks", "Saildrone Positions"),
-    options = layersControlOptions(collapsed = F)) %>%  
+    options = layersControlOptions(collapsed = FALSE)) %>%  
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "Backscatter-Krill (Small)", 
               "CUFES (Negative)", "CUFES Egg Density-Squid", 
               "Vessel Positions", "Saildrone Tracks", 
@@ -1371,7 +1368,7 @@ if (sampling.trawl) {
                        popup = ~popup, label = ~label,
                        group =  "Trawls")    
 }
-  
+
 # Add Saildrone data
 if (exists("nav.sd.paths.sf"))
   i.map <- i.map %>% 
@@ -1465,7 +1462,7 @@ if (get.nav.sd) {
 
 #### SWFSC Advanced Survey Technologies Group  
 
-_**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`
+_**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`
 
 An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to 100-m deep) and krill (5 to 350-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.
 
@@ -1473,5 +1470,10 @@ An interactive map of the distribution of 38-kHz integrated backscattering coeff
 # Display map
 i.map
 ```  
+
+```{r beep}
+beepr::beep(3)
+```
+
 
 For questions about this page, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).

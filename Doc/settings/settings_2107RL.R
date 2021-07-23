@@ -162,18 +162,18 @@ survey.start.sd  <- NA_character_ # Start of Saildrone survey
 survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
-erddap.url.sd <- "https://ferret.pmel.noaa.gov/pmel/erddap/tabledap/saildrone_west_coast_survey_2019"
-erddap.survey.start.sd <- "2021-07-10T00%3A00%3A00Z"
-erddap.survey.end.sd   <- "2021-09-30T23%3A59%3A00Z"
+erddap.url.sd <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2021"
+erddap.survey.start.sd <- "2021-07-07T00%3A00%3A00Z"
+erddap.survey.end.sd   <- "2021-10-15T23%3A59%3A00Z"
 # Configure columns and classes
 erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
 erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
 
 # Define date range for each Saildrone to remove overlapping transits
-sd.date.range    <- data.frame(saildrone  = c(1045, 1046, 1047),
-                               start.date = ymd(c("2019-07-09", "2019-07-09", "2019-06-20")),
-                               end.date   = ymd(c("2019-08-07", "2019-08-12", "2019-08-25")))
+sd.date.range    <- data.frame(saildrone  = c(1055, 1059),
+                               start.date = ymd(c("2021-07-06", "2021-10-15")),
+                               end.date   = ymd(c("2021-07-06", "2021-10-15")))
 
 # Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
 sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
@@ -199,12 +199,12 @@ map.height <- 10
 map.height.region <- 7
 
 # Leaflet tile options; set both to T if caching
-useCachedTile  <- F # Use cached tiles
-useCrossOrigin <- F # USe cross origin
+useCachedTile  <- T # Use cached tiles
+useCrossOrigin <- T # USe cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
-scale.pies <- TRUE   # Scale pie charts (TRUE/FALSE)
+scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
@@ -415,7 +415,7 @@ cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIO
 cufes.db.sqlite        <- "cufes202107RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 # Trawl data
-trawl.source           <- "SQL" # "SQL" or "Access"
+trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2107RL.accdb"
