@@ -235,6 +235,8 @@ cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus")
 # CUFES
 # For legend objects
+cufes.date.range   <- c(start = ymd_hms("2021-07-12 19:30:00 UTC"), 
+                        stop  = now())
 cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
 cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
                         "50-250", "250-500", ">500")

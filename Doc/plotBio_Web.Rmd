@@ -613,6 +613,13 @@ if (sampling.cufes) {
            bin.level = as.numeric(bin)) %>% 
     left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
   
+  if (exists("cufes.date.range")) {
+    if (!is.na(cufes.date.range)) {
+      cufes <- cufes %>% 
+        filter(between(Start, cufes.date.range["start"], cufes.date.range["stop"]))
+    }
+  }
+  
   # Save processed cufes to CSV
   write_csv(cufes, file = here("Output/cufes_proc.csv"))
   
@@ -620,7 +627,14 @@ if (sampling.cufes) {
   # Select CUFES sample with zero density for plotting
   cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
     mutate(bin.level = 1) %>% 
-    select(X, Y, SampleNumber)
+    select(X, Y, Start, SampleNumber)
+  
+  if (exists("cufes.date.range")) {
+    if (!is.na(cufes.date.range)) {
+      cufes.neg <- cufes.neg %>% 
+        filter(between(Start, cufes.date.range["start"], cufes.date.range["stop"]))
+    }
+  }
   
   # Identify bad CUFES samples
   cufes.bad <- filter(cufes.raw, Duration <= 0)
