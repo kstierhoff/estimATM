@@ -63,5 +63,5 @@ cal.info.all  <- arrange(cal.info.all, mdy_hms(date_time))
 cal.pings.all <- arrange(cal.pings.all, date_time)
 
 # write all results to file
-save(cal.res.all, cal.info.all, cal.pings.all, 
+save(cal.res.all, cal.info.all, cal.pings.all, cal.files,
      file = here("Data/Calibration/cal_results_all.Rdata"))
