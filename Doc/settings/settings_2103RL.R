@@ -436,7 +436,7 @@ cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIO
 cufes.db.sqlite        <- "cufes202103RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl data
-trawl.source           <- "Access" # "SQL" or "Access"
+trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2103RL.accdb"
@@ -523,9 +523,9 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
-# Transects used to define stock boundaries (primary or other)
+stock.break.sar  <- 32.516578 # Latitude of US-Mexico Border (or change based on SST)
 
+# Transects used to define stock boundaries (primary or other)
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 
 
@@ -560,7 +560,7 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- "RL"
+cal.vessels        <- c("RL","LBC")
 cal.dir            <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210320_LASKER_SpringCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW"
 cal.datetime       <- "1 March"     # Date/time of calibration
 cal.plot.date      <- "2021-03-01" # Date of the calibration, used to plot cal time series
@@ -588,7 +588,8 @@ cal.max.z          <-    8     # enter maximum water depth below transducers
  
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
-cal.noise          <- list(RL = NA)
+cal.noise          <- list(RL = NA,
+                           LBC = NA)
 
 # Axis options for calibration plots
 cal.scales    <- "free"  # fixed or free
