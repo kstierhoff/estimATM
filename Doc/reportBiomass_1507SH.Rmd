@@ -3,6 +3,15 @@
 # author: "Kevin L. Stierhoff, Juan P. Zwolinski, and David A. Demer"
 # date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
+  bookdown::pdf_document2:
+    includes:
+      in_header: yaml/header_1507SH.tex
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
   bookdown::word_document2:
     reference_docx: template/report_template_Rmarkdown.docx
     toc: yes
@@ -10,15 +19,6 @@ output:
     pandoc_args:
     - --filter
     - yaml/pandoc-newpage-filter.R
-  bookdown::html_document2:
-    toc: yes
-    toc_float: yes
-  bookdown::pdf_document2:
-    includes:
-      in_header: yaml/header_1507SH.tex
-    toc: yes
-    toc_depth: 3
-    number_sections: yes
   word_document:
     toc: yes
     toc_depth: '3'
@@ -89,15 +89,17 @@ png.res       <- 150 # dpi for saved PNG images (to reduce file size while at se
 combine.regions  <- F # Combine core and nearshore biomass plots
 plot.time.series <- T # Plot biomass time series 
 get.db           <- F # Query biomass estimates from AST database
-copy.files       <- F # Copy bib and CSL from AST server; requires internet
+copy.files       <- T # Copy bib and CSL from AST server; requires internet
 ```
 
-```{r copy-bib,include=F,eval=F}
-# Copy bibliography
-file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
-          here("Doc/csl"), overwrite = T)
-file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
-          here("Doc/bib"), overwrite = T)
+```{r copy-bib,include=F}
+if (copy.files) {
+  # Copy bibliography
+  file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
+            here("Doc/csl"), overwrite = T)
+  file.copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
+            here("Doc/bib"), overwrite = T)
+}
 ```
 
 ```{r user-input}
@@ -126,7 +128,7 @@ This analysis was conducted during 2020 using methods developed in 2017 for cons
 For the `r tolower(survey.season)` `r survey.year` survey area and period, the estimated biomass of the northern stock (sub-population) of Northern Anchovy was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%). The northern stock ranged from approximately central Vancouver Island, BC to Cape Mendocino, and standard length ($L_S$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Northern']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Northern']` cm with modes at \~3 and 13 cm.
 
 The estimated biomass of the central stock of Northern Anchovy was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=1)`%). The central stock ranged from approximately Cape Mendocino to San Diego, 
-CA, and $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` cm with modes at \~4, 6, and 9 cm. Although this is considered the best estimate of age-1+ biomass for the study area and period, the ATM may have underestimated young-of-the-year anchovy. To quantify the age-0 biomass in 2015, the 2016 estimate of abundance-at-length [@Stierhoff2020d] was projected back in time, in monthly steps, using a growth model, monthly records of commercial landings, and a published estimate of natural mortality (see **Section \@ref(discussion-anchovy-biomass-central)**).  
+CA, and $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == 'Central']` cm with modes at \~4, 6, and 9 cm. Although this is considered the best estimate of age-1+ biomass for the study area and period, the ATM may have underestimated young-of-the-year anchovy. To quantify the age-0 biomass in 2015, the 2016 estimate of abundance-at-length [@Stierhoff2021b] was projected back in time, in monthly steps, using a growth model, monthly records of commercial landings, and a published estimate of natural mortality (see **Section \@ref(discussion-anchovy-biomass-central)**).  
 
 The estimated biomass of the northern stock of Pacific Sardine was `r prettyNum(be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%). This estimate was not significantly different that the estimate of 15,870 t (CV = 80.2%) presented in Zwolinski et al. [-@Zwolinski2016]. The northern stock ranged from approximately Newport, OR, to Cape Blanco, and from Bodega Bay, CA, to Pt. Conception. $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == 'Northern']` to `r length.summ$L.max[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == 'Northern']` cm with a mode between 5 and 8 cm, and at 25 cm.
 
@@ -1527,13 +1529,13 @@ The northern stock of Northern Anchovy is north of Cape Mendocino and south of H
 
 #### Central stock {#discussion-anchovy-biomass-central}
 
-The estimated biomass of the central stock of Northern Anchovy, found off CA south of Cape Mendocino, was `r prettyNum(sum(be.anch.c$Biomass), big.mark=",", digits = 4)` t (CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=3)` - `r prettyNum(be$upper.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=4)` t) in `r tolower(survey.season)` `r survey.year`. Although this biomass was not significantly larger than for previous surveys, most of the catches included young-of-the-year (\<7 cm) fish. Because the catches of these recruits were more widespread than echoes from CPS schools, there is some uncertainty about the acoustic detections of age-0 anchovy. Also, within the geographic range of the stock, an unusual diffuse scattering layer was observed, yet removed by the algorithm used to detect CPS backscatter. Irrespective of these irregularities, the growth of this 2015 cohort was observed in the results of the summer 2016 survey, when the stock's biomass increased to 144,399 t [@Stierhoff2020d]. The stock biomass has continued to grow, reaching 769,154 t in summer 2019 [@Stierhoff2020b].  
+The estimated biomass of the central stock of Northern Anchovy, found off CA south of Cape Mendocino, was `r prettyNum(sum(be.anch.c$Biomass), big.mark=",", digits = 4)` t (CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=3)` - `r prettyNum(be$upper.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=4)` t) in `r tolower(survey.season)` `r survey.year`. Although this biomass was not significantly larger than for previous surveys, most of the catches included young-of-the-year (\<7 cm) fish. Because the catches of these recruits were more widespread than echoes from CPS schools, there is some uncertainty about the acoustic detections of age-0 anchovy. Also, within the geographic range of the stock, an unusual diffuse scattering layer was observed, yet removed by the algorithm used to detect CPS backscatter. Irrespective of these irregularities, the growth of this 2015 cohort was observed in the results of the summer 2016 survey, when the stock's biomass increased to 144,399 t [@Stierhoff2021b]. The stock biomass has continued to grow, reaching 769,154 t in summer 2019 [@Stierhoff2020b].  
 
 To quantify the potential bias in the estimated biomass of the central stock of Northern Anchovy, the 2016 estimate of abundance-at-length (Stierhoff et al. 2020) was projected back in time, in monthly steps, using records of monthly fishing mortality ^[https://wildlife.ca.gov/Fishing/Commercial/Landings] and a published estimate of natural mortality [$M$ = -1.1; @MacCall1973]. Because age data were not available, the reverse growth was calculated using the standard von Bertalanffy growth equation solved for length ($L$):  $L_{t-1}=L_{t}-{(K/12)}*(L_{\infty}-L_t)$, where $L_{t-1}$ and $L_t$ were two consecutive months, $L_\infty$ was 177 mm, and the growth parameter ($K$) was set to 0.95 to visually match the length distribution of the derived population to that estimated in 2015. The abundance ($N$) was calculated recursively as:  $N_{L_{t-1}}=(N_{L_t}+C_{N,L_t})/e^{M/12}$, where $N_{L_{t-1}}$ and $N_{L_t}$ are the abundances of a given length on a given month and its preceding one, respectively; $C_{N,L_t}$ is the catch (by number) of fish of a given length on a given month. $C_{N,L_t}$ was calculated as ${C_B}/{\overline{W}}*P_{N,L_t}$), where $C_B$ is the total catch in weight on a given month; $\hat{W}$ is the expected mean weight derived from the ATM synthetic abundance for the respective month; and $P_{N,L_t}$ is the proportion (by number) of the fish of a given length during that same month.  
 
-Starting from a biomass of 144,399 t in 2016 [@Stierhoff2020d], the backward-projected biomass in 2015 was 36,839 t (**Fig.** \@ref(fig:anchovy-hindcast)), approximately `r num2words(36839/sum(be.anch.c$Biomass))` times more than the biomass estimate reported here. This estimated bias may be due to a combination of errors in echo-classification, TS estimation, and trawl-catch selectivity specifically for age-0 fish. Notwithstanding this evaluation of uncertainty, the standard-analysis estimate of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=1)`%), represents the age-1+ biomass for the study area and period.  
+Starting from a biomass of 144,399 t in 2016 [@Stierhoff2021b], the backward-projected biomass in 2015 was 36,839 t (**Fig.** \@ref(fig:anchovy-hindcast)), approximately `r num2words(36839/sum(be.anch.c$Biomass))` times more than the biomass estimate reported here. This estimated bias may be due to a combination of errors in echo-classification, TS estimation, and trawl-catch selectivity specifically for age-0 fish. Notwithstanding this evaluation of uncertainty, the standard-analysis estimate of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=1)`%), represents the age-1+ biomass for the study area and period.  
 
-(ref:anchovy-hindcast) Abundance (top) and biomass (bottom) estimates for the central stock of Northern Anchovy, by total length ($L_T$), using the acoustic-trawl method (ATM) in 2015 (blue, this study), compared to monthly estimates projected back in time (red) using estimates from the summer ATM survey conducted in 2016 [green; @Stierhoff2020d], monthly commercial landings (https://wildlife.ca.gov/Fishing/Commercial/Landings), and a published estimate of natural mortality [@MacCall1973], and accounting for growth.
+(ref:anchovy-hindcast) Abundance (top) and biomass (bottom) estimates for the central stock of Northern Anchovy, by total length ($L_T$), using the acoustic-trawl method (ATM) in 2015 (blue, this study), compared to monthly estimates projected back in time (red) using estimates from the summer ATM survey conducted in 2016 [green; @Stierhoff2021b], monthly commercial landings (https://wildlife.ca.gov/Fishing/Commercial/Landings), and a published estimate of natural mortality [@MacCall1973], and accounting for growth.
 
 ```{r anchovy-hindcast,fig.cap='(ref:anchovy-hindcast)',out.height='7in',fig.pos='H'}
 include_graphics(here("Images/img_biomass_hindcast_anchovy_1507SH.jpg"))
@@ -1545,7 +1547,7 @@ include_graphics(here("Images/img_biomass_hindcast_anchovy_1507SH.jpg"))
 
 #### Northern stock {#discussion-sardine-biomass-northern}
 
-The `r tolower(survey.season)` `r survey.year` survey sampled most of the potential habitat for the northern stock of Pacific Sardine, and likely most of the stock. The stock biomass, `r prettyNum(sum(be.sar.n$Biomass), big.mark=",", digits = 4)` t (CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)`%; CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Sardinops sagax" & be$Stock == "Northern" & be$Stratum == "All"],big.mark=",",digits=3)` - `r prettyNum(be$upper.ci.B[be$Species == "Sardinops sagax" & be$Stock == "Northern" & be$Stratum == "All"],big.mark=",",digits=4)` t), was patchy and observed mostly off Oregon and central California. This revised biomass estimate of the northern stock of Pacific Sardine for the survey area and period does not differ significantly from the estimate of 15,870 t (CV = 80.2%) presented in Zwolinski et al. [-@Zwolinski2016]. The abundance of Pacific Sardine between 5 and 8 cm in 2015 suggests a successful recruitment during the spring. A gap in the length distribution of Pacific Sardine between 10 and 19 cm likely indicates poor recruitment success in 2014, similar to subsequent years. Accordingly, the stock abundance and biomass continued to decline from 2016 [@Stierhoff2020d] to 2017 [@Zwolinski2019a], and the modal length increased.  
+The `r tolower(survey.season)` `r survey.year` survey sampled most of the potential habitat for the northern stock of Pacific Sardine, and likely most of the stock. The stock biomass, `r prettyNum(sum(be.sar.n$Biomass), big.mark=",", digits = 4)` t (CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)`%; CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Sardinops sagax" & be$Stock == "Northern" & be$Stratum == "All"],big.mark=",",digits=3)` - `r prettyNum(be$upper.ci.B[be$Species == "Sardinops sagax" & be$Stock == "Northern" & be$Stratum == "All"],big.mark=",",digits=4)` t), was patchy and observed mostly off Oregon and central California. This revised biomass estimate of the northern stock of Pacific Sardine for the survey area and period does not differ significantly from the estimate of 15,870 t (CV = 80.2%) presented in Zwolinski et al. [-@Zwolinski2016]. The abundance of Pacific Sardine between 5 and 8 cm in 2015 suggests a successful recruitment during the spring. A gap in the length distribution of Pacific Sardine between 10 and 19 cm likely indicates poor recruitment success in 2014, similar to subsequent years. Accordingly, the stock abundance and biomass continued to decline from 2016 [@Stierhoff2021b] to 2017 [@Zwolinski2019a], and the modal length increased.  
 
 In recent years, the distribution of the northern stock of Pacific Sardine has been fragmented and its migration has been abbreviated. Despite the recurrent presence of good potential habitat north of Vancouver Island during the summer months (see **Fig.** \@ref(fig:sardine-potential-habitat)), the stock has not migrated there since 2013 [@Zwolinski2014].
 
@@ -1555,7 +1557,7 @@ The biomass of Pacific Mackerel was `r prettyNum(be.all$Biomass[be.all$Species =
 
 ### Jack Mackerel {#discussion-jack}
 
-The biomass of Jack Mackerel in summer 2015 was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t). Jack Mackerel were distributed throughout much of the survey area and comprised the majority of CPS biomass observed. Biomass was comparable to estimates from summer 2016 [129,581 t; @Stierhoff2020d] and 2017 [128,313 t; @Zwolinski2019a], but was considerably lower than biomass observed in the summers of 2018 [202,471 t; @Stierhoff2019b] and 2019 [385,801 t; @Stierhoff2020b]. Their length distribution had three distinct modes indicating the presence of several distinct year classes.  
+The biomass of Jack Mackerel in summer 2015 was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t). Jack Mackerel were distributed throughout much of the survey area and comprised the majority of CPS biomass observed. Biomass was comparable to estimates from summer 2016 [129,581 t; @Stierhoff2021b] and 2017 [128,313 t; @Zwolinski2019a], but was considerably lower than biomass observed in the summers of 2018 [202,471 t; @Stierhoff2019b] and 2019 [385,801 t; @Stierhoff2020b]. Their length distribution had three distinct modes indicating the presence of several distinct year classes.  
 
 ### Pacific Herring {#discussion-herring}
 
