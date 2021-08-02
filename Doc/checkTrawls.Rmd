@@ -170,33 +170,45 @@ if (get.db) {
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
+  if (year(haul.all$trawlDate[1]) >= 2021) {
+    haul.all <- haul.all %>% 
     mutate(
       startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
       startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
       stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
       stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      # equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-      #                                    format(haul.all$EquilibriumTime,
-      #                                           format = "%H:%M:%S"))),
-      # haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-      #                                    format(haul.all$haulbackTime,
-      #                                           format = "%H:%M:%S")))
       haulBackTime     = haulbackTime,
-      equilibriumTime  = EquilibriumTime) %>% 
-    mutate(haulbackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>%
+      equilibriumTime  = EquilibriumTime) %>%
     rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, notes = Notes)
+  
+  } else {
+    haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$EquilibriumTime,
+                                                format = "%H:%M:%S"))),
+      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$haulbackTime,
+                                                format = "%H:%M:%S")))) %>%
+      mutate(haulBackTime = case_when(
+        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+        TRUE ~ haulBackTime)) %>%
+    rename(cruise = Cruise, ship = Ship, haul = Haul,
            collection = Collection, notes = Notes)
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
   hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-  
+
   # Correct equilibriumTime or haulBackTime
   haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
   haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  }
   
   # Reformat length frequency data to match SQL
   lengths.all <- lengths.all %>% 
@@ -230,6 +242,7 @@ haul.all <- haul.all %>%
 
 # Get only hauls from current survey
 haul <- filter(haul.all, cruise %in% cruise.name) %>% 
+  arrange(trawlDate) %>% 
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
          cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
 

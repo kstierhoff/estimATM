@@ -72,7 +72,7 @@ sampling.trawl     <- T
 # Control script behavior (often F)
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- F # Process all CSV files (F = new files only)
+process.csv.all <- T # Process all CSV files (F = new files only)
 save.imap       <- F # Save interactive map using "mapshot"
 ```
 
@@ -357,31 +357,45 @@ if (sampling.trawl) {
 if (sampling.trawl) {
   # Create startLatitudeDecimal and startLongitudeDecimal for Access data
   if (trawl.source == "Access") {
-    haul.all <- haul.all %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-        # equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-        #                                    format(haul.all$EquilibriumTime,
-        #                                           format = "%H:%M:%S"))),
-        # haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-        #                                    format(haul.all$haulbackTime,
-        #                                           format = "%H:%M:%S")))
-        haulBackTime     = haulbackTime,
-        equilibriumTime  = EquilibriumTime) %>% 
-      mutate(haulbackTime = case_when(
-        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-        TRUE ~ haulBackTime)) %>%
-      rename(cruise = Cruise, ship = Ship, haul = Haul, 
-             collection = Collection, notes = Notes)
-    
-    # Filter haul data for current survey
-    haul <- haul.all %>% 
-      select(cruise , ship, haul, collection,
-             startLatDecimal, startLongDecimal, stopLatDecimal,
-             stopLongDecimal, equilibriumTime, haulBackTime, trawlPerformance, notes)
+    if (year(haul.all$trawlDate[1]) >= 2021) {
+      haul <- haul.all %>% 
+        mutate(
+          startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+          startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+          stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+          stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+          haulBackTime     = haulbackTime,
+          equilibriumTime  = EquilibriumTime) %>%
+        rename(cruise = Cruise, ship = Ship, haul = Haul, 
+               collection = Collection, notes = Notes)
+      
+    } else {
+      haul <- haul.all %>% 
+        mutate(
+          startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+          startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+          stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+          stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+          equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                             format(haul.all$EquilibriumTime,
+                                                    format = "%H:%M:%S"))),
+          haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                             format(haul.all$haulbackTime,
+                                                    format = "%H:%M:%S")))) %>%
+        mutate(haulBackTime = case_when(
+          haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+          TRUE ~ haulBackTime)) %>%
+        rename(cruise = Cruise, ship = Ship, haul = Haul,
+               collection = Collection, notes = Notes)
+      
+      # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+      eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
+      hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
+      
+      # Correct equilibriumTime or haulBackTime
+      haul$equilibriumTime[eq.fix] <- haul$equilibriumTime[eq.fix] + days(1)
+      haul$haulBackTime[eq.fix]    <- haul$haulBackTime[eq.fix] + days(1)
+    }
     
   } else if (trawl.source == "SQL") {
     # Filter haul data for current survey
@@ -416,8 +430,9 @@ if (sampling.trawl) {
     filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
     # Remove bad trawls
     filter(!trawlPerformance %in% trawl.performance) %>% 
+    arrange(trawlDate) %>% 
     mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-           cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+           cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1)  
   
   # Find midpoint of each haul as the mean lat/lon
   haul.mid <- haul %>% 
@@ -1249,9 +1264,11 @@ i.map <- leaflet() %>%
                       "Saildrone Tracks", "Saildrone Positions"),
     options = layersControlOptions(collapsed = FALSE)) %>%  
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "Backscatter-Krill (Small)", 
-              "CUFES (Negative)", "CUFES Egg Density-Squid", 
+              "CUFES Egg Density", "CUFES Egg Density-Other",
+              "CUFES Egg Density-Squid", "CUFES (Negative)",
               "Vessel Positions", "Saildrone Tracks", 
-              "Planned Transects (Ancillary)", "Saildrone Tracks", "Saildrone Positions")) %>% 
+              "Saildrone Tracks", "Saildrone Positions",
+              "State Waters", "Exclusive Economic Zones")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
