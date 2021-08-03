@@ -56,13 +56,15 @@ source(here("Doc/settings", prj.settings))
 
 ```{r processing-controls}
 # Control script behavior (usually T)
-save.figs       <- T # Save figures
-get.nav         <- T # Download nav data from ERDDAP
-get.nav.sd      <- T # Download nav data from ERDDAP
-copy.files      <- T # Copy data files from data to plotBio directory
-overwrite.files <- T # Overwrite existing files when copying (not CSV, see below)copy.files
-process.csv     <- T # Process acoustic backscatter files
-get.db          <- T # Import trawl database
+save.figs          <- F # Save figures
+get.nav            <- T # Download nav data from ERDDAP
+get.nav.sd         <- T # Download nav data from ERDDAP
+copy.files         <- T # Copy data files from data to plotBio directory
+overwrite.files    <- T # Overwrite existing files when copying (not CSV, see below)copy.files
+process.csv        <- T # Process acoustic backscatter files
+process.csv.krill  <- F # Process krill backscatter files
+process.csv.all    <- F # Process all CSV files (F = new files only)
+get.db             <- T # Import trawl database
 
 # Are we sampling? If no, F. Skips data processing steps.
 sampling.acoustics <- T 
@@ -70,10 +72,9 @@ sampling.cufes     <- T
 sampling.trawl     <- T 
 
 # Control script behavior (often F)
-resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
-overwrite.csv   <- T # Overwrite existing Echoview CSV files when copying
-process.csv.all <- T # Process all CSV files (F = new files only)
-save.imap       <- F # Save interactive map using "mapshot"
+resize.map         <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+overwrite.csv      <- T # Overwrite existing Echoview CSV files when copying
+save.imap          <- F # Save interactive map using "mapshot"
 ```
 
 ```{r config-project}
@@ -800,142 +801,143 @@ if (sampling.acoustics) {
   processed.cps <- unique(fs::path_file(nasc.cps$filename))
   save(processed.cps, file =  here("Output/processed_cps.Rdata")) 
 }
+
+# Combine all backscatter data
+nasc.all <- nasc.cps
+
+# Create file for selecting levels for backscatter plot
+nasc.plot.all   <- nasc.cps.sf %>% 
+  filter(NASC >= 200)  
 ```
 
 ```{r process-csv-krill}
 if (sampling.acoustics) {
-  if (process.csv) {
-    if (!process.csv.all) {
-      if (file.exists(here("Output/processed_krill.Rdata"))) {
-        # Load already processed CSV files
-        load(here("Output/processed_krill.Rdata"))
+  if (process.csv.krill) {
+    if (process.csv) {
+      if (!process.csv.all) {
+        if (file.exists(here("Output/processed_krill.Rdata"))) {
+          # Load already processed CSV files
+          load(here("Output/processed_krill.Rdata"))
+        }
       }
-    }
-    
-    # List local CSV files
-    csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
-                              regex = nasc.pattern.krill[survey.vessel.primary])
-    
-    if (process.csv.all) {
-      # Create final data frame
-      nasc.krill <- data.frame()
-    } else {
-      if (file.exists(here("Output/nasc_krill.Rdata"))) {
-        # Load already processed files
-        load(here("Output/nasc_krill.Rdata")) 
-      } else {
+      
+      # List local CSV files
+      csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
+                                regex = nasc.pattern.krill[survey.vessel.primary])
+      
+      if (process.csv.all) {
         # Create final data frame
         nasc.krill <- data.frame()
-      }
-      
-      if (exists("processed.krill")) {
-        # List only new CSV files
-        csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]  
-      }
-    }
-    
-    # if (process.csv.all) {
-    #   # Create final data frame
-    #   nasc.krill <- data.frame()
-    # } else {
-    #   # Load already processed files
-    #   load(here("Output/nasc_krill.Rdata")) 
-    #   # List only new CSV files
-    #   csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]
-    # }
-    
-    if (length(csv.files.krill) > 0) {
-      # Configure progress bar
-      pb <- winProgressBar(title = "CSV File Processing Progress - Krill", 
-                           label = "0% done", min = 0, max = 100, initial = 0)
-      
-      # Process all .CSV files
-      for (i in 1:length(csv.files.krill)) {
-        # Process i-th file
-        nasc.krill <- bind_rows(nasc.krill, extract_csv(csv.files.krill[i]))
+      } else {
+        if (file.exists(here("Output/nasc_krill.Rdata"))) {
+          # Load already processed files
+          load(here("Output/nasc_krill.Rdata")) 
+        } else {
+          # Create final data frame
+          nasc.krill <- data.frame()
+        }
         
-        # Update the progress bar
-        info <- sprintf("%d%% done", round((i / length(csv.files.krill)) * 100))
-        setWinProgressBar(pb, round((i / length(csv.files.krill)) * 100), label = info)
+        if (exists("processed.krill")) {
+          # List only new CSV files
+          csv.files.krill <- csv.files.krill[!fs::path_file(csv.files.krill) %in% processed.krill]  
+        }
       }
-      close(pb)
       
-      # Calculate summary interval
-      nasc.krill <- nasc.krill %>%
-        mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                         labels = FALSE, include.lowest = TRUE)) 
-      
-      # Save results
-      save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
-      write_csv(nasc.krill, file = here("Output/nasc_krill.csv"))
+      if (length(csv.files.krill) > 0) {
+        # Configure progress bar
+        pb <- winProgressBar(title = "CSV File Processing Progress - Krill", 
+                             label = "0% done", min = 0, max = 100, initial = 0)
+        
+        # Process all .CSV files
+        for (i in 1:length(csv.files.krill)) {
+          # Process i-th file
+          nasc.krill <- bind_rows(nasc.krill, extract_csv(csv.files.krill[i]))
+          
+          # Update the progress bar
+          info <- sprintf("%d%% done", round((i / length(csv.files.krill)) * 100))
+          setWinProgressBar(pb, round((i / length(csv.files.krill)) * 100), label = info)
+        }
+        close(pb)
+        
+        # Calculate summary interval
+        nasc.krill <- nasc.krill %>%
+          mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                           labels = FALSE, include.lowest = TRUE)) 
+        
+        # Save results
+        save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
+        write_csv(nasc.krill, file = here("Output/nasc_krill.csv"))
+      }
+    } else {
+      load(here("Output/nasc_krill.Rdata"))
     }
-  } else {
-    load(here("Output/nasc_krill.Rdata"))
+    
+    # Get intervals with bad lat/long values
+    bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
+    write_csv(bad.nasc.krill, here("Output/nasc_bad_krill.csv"))
+    
+    # Average NASC.350 data over new intervals or number of intervals in a 2 km radius
+    nasc.summ.krill <- nasc.krill %>%
+      filter(lat != 999, long != 999) %>%
+      group_by(transect, int) %>%
+      summarise(
+        bins    = length(int),
+        bin.mid = as.integer(round(bins / 2)),
+        lat     = lat[1],
+        long    = long[1],
+        NASC    = mean(NASC.350)
+      )
+    
+    # Average krill.nasc over defined interval
+    # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
+    nasc.krill.sf <- nasc.krill %>%
+      filter(lat != 999, long != 999) %>%
+      select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
+      group_by(filename, transect, int) %>% 
+      summarise(
+        lat   = lat[1],
+        long  = long[1],
+        NASC  = mean(krill.nasc),
+        label = paste0('Transect: ', transect[1], "; ",
+                       'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
+        popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
+                       '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
+                       '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
+                       '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
+      # Create bins for defining point size in NASC plots%>% 
+      mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
+             bin.level =  as.numeric(bin))  %>% 
+      filter(!is.na(bin)) %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+    
+    nasc.plot.krill <- project_sf(nasc.krill.sf, crs.proj)
+    
+    # create acoustic transect labels
+    nasc.tx.labels.krill <- nasc.krill %>%
+      group_by(transect) %>%
+      summarise(
+        lat = lat[which.max(long)],
+        long = max(long)
+      )
+    
+    # List already processed CSV files and save
+    processed.krill <- unique(fs::path_file(nasc.krill$filename))
+    save(processed.krill, file =  here("Output/processed_krill.Rdata"))
+    
+    # Combine all backscatter data
+    nasc.all <- bind_rows(nasc.all, nasc.krill)
+    
+    # Select plot levels for backscatter data
+    nasc.plot.all   <- rbind(nasc.plot.all, nasc.krill.sf) %>% 
+      filter(NASC >= 200)  
   }
-  
-  # Get intervals with bad lat/long values
-  bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
-  write_csv(bad.nasc.krill, here("Output/nasc_bad_krill.csv"))
-  
-  # Average NASC.350 data over new intervals or number of intervals in a 2 km radius
-  nasc.summ.krill <- nasc.krill %>%
-    filter(lat != 999, long != 999) %>%
-    group_by(transect, int) %>%
-    summarise(
-      bins    = length(int),
-      bin.mid = as.integer(round(bins / 2)),
-      lat     = lat[1],
-      long    = long[1],
-      NASC    = mean(NASC.350)
-    )
-  
-  # Average krill.nasc over defined interval
-  # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
-  nasc.krill.sf <- nasc.krill %>%
-    filter(lat != 999, long != 999) %>%
-    select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
-    group_by(filename, transect, int) %>% 
-    summarise(
-      lat   = lat[1],
-      long  = long[1],
-      NASC  = mean(krill.nasc),
-      label = paste0('Transect: ', transect[1], "; ",
-                     'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
-      popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
-                     '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
-                     '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
-                     '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
-    # Create bins for defining point size in NASC plots%>% 
-    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
-           bin.level =  as.numeric(bin))  %>% 
-    filter(!is.na(bin)) %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) 
-  
-  nasc.plot.krill <- project_sf(nasc.krill.sf, crs.proj)
-  
-  # create acoustic transect labels
-  nasc.tx.labels.krill <- nasc.krill %>%
-    group_by(transect) %>%
-    summarise(
-      lat = lat[which.max(long)],
-      long = max(long)
-    )
-  
-  # List already processed CSV files and save
-  processed.krill <- unique(fs::path_file(nasc.krill$filename))
-  save(processed.krill, file =  here("Output/processed_krill.Rdata"))
-  
-  # Select plot levels for backscatter data
-  nasc.plot.all   <- rbind(nasc.cps.sf, nasc.krill.sf) %>% 
-    filter(NASC >= 200) 
 }
 ```
 
 ```{r find-big-nasc}
-if (exists("nasc.cps")) {
+if (exists("nasc.all")) {
   # Select top 200 nasc values and look for outliers
-  big.nasc <- nasc.cps %>%
-    bind_rows(nasc.krill) %>% 
+  big.nasc <- nasc.all %>%
     arrange(desc(NASC)) %>%
     mutate(NASC  = NASC/19,
            rank  = seq(n()),
@@ -992,7 +994,9 @@ if (save.figs) {
   # Create maps of backscatter, trawl catch, and CUFES egg density
   if (sampling.acoustics) {
     source(here("Code/plot_sA_CPS.R"))
-    source(here("Code/plot_sA_Krill.R"))  
+    if (exists("nasc.krill")) {
+      source(here("Code/plot_sA_Krill.R"))   
+    }
   }
   
   if (sampling.cufes) {
@@ -1348,18 +1352,20 @@ if (sampling.acoustics) {
                 title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
                 opacity = 1, group = "Backscatter-CPS")
   
-  if (nrow(filter(nasc.krill.sf, NASC >= 200)) > 0)
-    i.map <- i.map %>%  
-      addCircleMarkers(data = filter(nasc.krill.sf, NASC >= 200), 
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
-                       label = ~label, popup = ~popup,
-                       group = "Backscatter-Krill") %>% 
-      addLegend("bottomleft", colors = nasc.colors.all, 
-                values = ~sort(unique(nasc.krill.sf$bin.level)),
-                labels = nasc.labels.all, 
-                title = "Krill Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
-                opacity = 1, group = "Backscatter-Krill")
+  if (exists("nasc.krill.sf")) {
+    if (nrow(filter(nasc.krill.sf, NASC >= 200)) > 0)
+      i.map <- i.map %>%  
+        addCircleMarkers(data = filter(nasc.krill.sf, NASC >= 200), 
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                         label = ~label, popup = ~popup,
+                         group = "Backscatter-Krill") %>% 
+        addLegend("bottomleft", colors = nasc.colors.all, 
+                  values = ~sort(unique(nasc.krill.sf$bin.level)),
+                  labels = nasc.labels.all, 
+                  title = "Krill Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
+                  opacity = 1, group = "Backscatter-Krill")  
+  }
   
   if (nrow(filter(nasc.cps.sf, NASC < 200)) > 0)
     i.map <- i.map %>%  
@@ -1369,13 +1375,15 @@ if (sampling.acoustics) {
                        label = ~label, popup = ~popup, 
                        group = "Backscatter-CPS (Small)") 
   
-  if (nrow(filter(nasc.krill.sf, NASC < 200)) > 0)
-    i.map <- i.map %>%  
-      addCircleMarkers(data = filter(nasc.krill.sf, NASC < 200), 
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor = ~nascPal(bin.level), 
-                       label = ~label, popup = ~popup,
-                       group = "Backscatter-Krill (Small)") 
+  if (exists("nasc.krill.sf")) {
+    if (nrow(filter(nasc.krill.sf, NASC < 200)) > 0)
+      i.map <- i.map %>%  
+        addCircleMarkers(data = filter(nasc.krill.sf, NASC < 200), 
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor = ~nascPal(bin.level), 
+                         label = ~label, popup = ~popup,
+                         group = "Backscatter-Krill (Small)") 
+  }
   
   if (nrow(big.nasc.sf) > 0)
     i.map <- i.map %>%  
