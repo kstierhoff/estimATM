@@ -690,33 +690,56 @@ if (sampling.cufes) {
 
 ```{r process-csv-cps}
 if (sampling.acoustics) {
+  
+  # Get fileSnapshot at the beginning of the knit, to compare with the end of the last knit
+  csv.snapshot.start <- fileSnapshot(here("Data/Backscatter", survey.vessel.primary),
+                                     full.names = FALSE)
+  
+  # Load fileSnapshot from last knit, or make equal to the start
+  if (file.exists(here("Output/csv_snapshot_end.rds"))){
+    # saveRDS(csv.snapshot.start, here("Output/csv_snapshot_end.rds"))
+    csv.snapshot.end <- readRDS(here("Output/csv_snapshot_end.rds"))
+  } else {
+    csv.snapshot.end <- csv.snapshot.start
+  }
+  
+  # Identify new and changed files
+  csv.changed    <- changedFiles(csv.snapshot.end, csv.snapshot.start) 
+  # List files that need to be processed
+  csv.to.process <- c(csv.changed$changed, csv.changed$added)
+  
   if (process.csv) {
-    if (!process.csv.all) {
-      if (file.exists(here("Output/processed_cps.Rdata"))) {
-        # Load already processed CSV files
-        load(here("Output/processed_cps.Rdata"))
-      }    
-    }
-    
-    # List local CSV files
+    # Process added and changed CSV files --------------------------
+    # List all CSV files
     csv.files.cps <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
                             regex = nasc.pattern.cps[survey.vessel.primary])
     
     if (process.csv.all) {
-      # Create final data frame
+      # Create an empty data frame
       nasc.cps <- data.frame()
+      
     } else {
       if (file.exists(here("Output/nasc_cps.Rdata"))) {
-        # Load already processed files
+        # Load data frame with already processed backscatter data
         load(here("Output/nasc_cps.Rdata")) 
+        
+        if (length(csv.changed$changed) > 0) {
+          # If files have changed, remove those data
+          nasc.cps <- nasc.cps %>% 
+            filter(!path_file(filename) %in% path_file(fs_path(csv.changed$changed))) 
+        }
       } else {
-        # Create final data frame
+        # Create an empty data frame
         nasc.cps <- data.frame()
       }
       
-      if (exists("processed.cps")) {
+      if (length(csv.to.process) > 0) {
         # List only new CSV files
-        csv.files.cps <- csv.files.cps[!fs::path_file(csv.files.cps) %in% processed.cps]  
+        csv.files.cps <- csv.files.cps[fs::path_file(csv.files.cps) %in% 
+                                         path_file(fs_path(csv.to.process))]  
+      } else {
+        # Set length of csv.files.cps to zero
+        csv.files.cps <- character(0)
       }
     }
     
@@ -739,12 +762,17 @@ if (sampling.acoustics) {
       # Calculate summary interval
       nasc.cps <- nasc.cps %>%
         mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                         labels = FALSE, include.lowest = TRUE))
+                         labels = FALSE, include.lowest = TRUE)) %>% 
+        arrange(datetime)
       
       # Save results
       save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
       write_csv(nasc.cps, file = here("Output/nasc_cps.csv"))
     }
+    
+    # Save snapshot
+    saveRDS(csv.snapshot.start, here("Output/csv_snapshot_end.rds"))
+  
   } else {
     load(here("Output/nasc_cps.Rdata"))
   }
@@ -797,9 +825,9 @@ if (sampling.acoustics) {
       long = max(long)
     )
   
-  # List already processed CSV files and save
-  processed.cps <- unique(fs::path_file(nasc.cps$filename))
-  save(processed.cps, file =  here("Output/processed_cps.Rdata")) 
+  # # List already processed CSV files and save
+  # processed.cps <- unique(fs::path_file(nasc.cps$filename))
+  # save(processed.cps, file =  here("Output/processed_cps.Rdata")) 
 }
 
 # Combine all backscatter data
