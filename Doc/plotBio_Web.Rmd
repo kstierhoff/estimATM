@@ -807,7 +807,7 @@ nasc.all <- nasc.cps
 
 # Create file for selecting levels for backscatter plot
 nasc.plot.all   <- nasc.cps.sf %>% 
-  filter(NASC >= 200)  
+  filter(NASC >= 1)  
 ```
 
 ```{r process-csv-krill}
@@ -1338,6 +1338,14 @@ if (sampling.cufes) {
 
 if (sampling.acoustics) {
   # Add backscatter data
+  if (nrow(filter(nasc.cps.sf, NASC < 200)) > 0)
+    i.map <- i.map %>%  
+      addCircleMarkers(data = filter(nasc.cps.sf, NASC < 200), 
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75,  fillColor = ~nascPal(bin.level), 
+                       label = ~label, popup = ~popup, 
+                       group = "Backscatter-CPS (Small)") 
+  
   if (nrow(filter(nasc.cps.sf, NASC >= 200)) > 0)
     i.map <- i.map %>%  
       addCircleMarkers(data = filter(nasc.cps.sf, NASC >= 200), 
@@ -1366,14 +1374,6 @@ if (sampling.acoustics) {
                   title = "Krill Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
                   opacity = 1, group = "Backscatter-Krill")  
   }
-  
-  if (nrow(filter(nasc.cps.sf, NASC < 200)) > 0)
-    i.map <- i.map %>%  
-      addCircleMarkers(data = filter(nasc.cps.sf, NASC < 200), 
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75,  fillColor = ~nascPal(bin.level), 
-                       label = ~label, popup = ~popup, 
-                       group = "Backscatter-CPS (Small)") 
   
   if (exists("nasc.krill.sf")) {
     if (nrow(filter(nasc.krill.sf, NASC < 200)) > 0)
