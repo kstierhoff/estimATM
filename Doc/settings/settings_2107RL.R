@@ -195,8 +195,9 @@ crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
 map.height <- 10
-# Map height for specific regions; used in makeTransects
-map.height.region <- 7
+# Map height for specific regions; used in makeTransects, checkTransects
+map.height.region <- c(central = 12, mexico = 7, north = 7, south = 10)
+map.label.size <- c(central = 1, mexico = 2, north = 2, south = 2)
 
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- T # Use cached tiles
