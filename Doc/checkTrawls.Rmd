@@ -172,42 +172,42 @@ if (trawl.source == "Access") {
   # Reformat haul data to match SQL
   if (year(haul.all$trawlDate[1]) >= 2021) {
     haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      haulBackTime     = haulbackTime,
-      equilibriumTime  = EquilibriumTime) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes)
-  
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+        haulBackTime     = haulbackTime,
+        equilibriumTime  = EquilibriumTime) %>%
+      rename(cruise = Cruise, ship = Ship, haul = Haul, 
+             collection = Collection, notes = Notes)
+    
   } else {
     haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$EquilibriumTime,
-                                                format = "%H:%M:%S"))),
-      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$haulbackTime,
-                                                format = "%H:%M:%S")))) %>%
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$EquilibriumTime,
+                                                  format = "%H:%M:%S"))),
+        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$haulbackTime,
+                                                  format = "%H:%M:%S")))) %>%
       mutate(haulBackTime = case_when(
         haulBackTime < equilibriumTime ~ haulBackTime + days(1),
         TRUE ~ haulBackTime)) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul,
-           collection = Collection, notes = Notes)
-  
-  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
-  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-
-  # Correct equilibriumTime or haulBackTime
-  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+      rename(cruise = Cruise, ship = Ship, haul = Haul,
+             collection = Collection, notes = Notes)
+    
+    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+    eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+    hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+    
+    # Correct equilibriumTime or haulBackTime
+    haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+    haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
   }
   
   # Reformat length frequency data to match SQL
@@ -1261,8 +1261,14 @@ if (exists("nav.paths.sf")) {
                      opacity = 0.8, fillOpacity = 1, fillColor =  "white",
                      popup = ~popup, label = ~label,
                      group =  "Trawls") %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
     # Add map coordinates
-    addMouseCoordinates()
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft")
 } else {
   leaflet() %>% 
     # Add provider tiles
@@ -1343,16 +1349,16 @@ catch.comp <- catch %>%
 
 catch.comp %>% 
   kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-          digits = c(0,0,4,4,4,4,4,4,4,4),
-          format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-    column_spec(1, italic = TRUE) %>%
-    row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-    row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
-    row_spec(0, align = c("c")) %>%
-    collapse_rows(columns = 1) %>% 
-    scroll_box(height = "500px")  
+        align = c("c","l",rep("r",ncol(catch.comp) - 2)),
+        digits = c(0,0,4,4,4,4,4,4,4,4),
+        format.args = list(big.mark = ",")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+  column_spec(1, italic = TRUE) %>%
+  row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
+  row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
+  row_spec(0, align = c("c")) %>%
+  collapse_rows(columns = 1) %>% 
+  scroll_box(height = "500px")  
 ```
 
 ## Catch errors
@@ -1397,8 +1403,8 @@ summ.lengths <- lengths %>%
 
 # Merge catch table with weight summary and arrange by species and haul
 specimen.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSampleCount),
-                        select(summ.lengths, haul, scientificName, totalWtSpecimens,
-                               totalCtSpecimens, binnedLengths)) %>%
+                           select(summ.lengths, haul, scientificName, totalWtSpecimens,
+                                  totalCtSpecimens, binnedLengths)) %>%
   arrange(scientificName, haul) %>% 
   # Calculate difference between trawl subsample weight and summed weight from individual specimens
   mutate(diffWt    = subSampleWtkg - totalWtSpecimens,
@@ -1494,7 +1500,7 @@ Display specimens with duplicated bar codes (i.e., `individual_ID`).
 duplicate.ids <- lengths %>% 
   filter(!is.na(individual_ID), duplicated(individual_ID) == TRUE) %>%
   select(cruise:individual_ID, specimenNumber, scientificName, commonName)
-  
+
 if (nrow(duplicate.ids) > 0) {
   duplicate.ids %>% 
     kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
