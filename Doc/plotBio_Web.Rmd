@@ -54,6 +54,13 @@ prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", pr
 source(here("Doc/settings", prj.settings))
 ```
 
+```{r experimental-vars}
+# Set columns to use for a fixed integration depth
+nasc.plot.min    <- 1
+nasc.depth.cps   <- "NASC.250"
+nasc.depth.krill <- "NASC.350"
+```
+
 ```{r processing-controls}
 # Control script behavior (usually T)
 save.figs          <- F # Save figures
@@ -62,7 +69,7 @@ get.nav.sd         <- T # Download nav data from ERDDAP
 copy.files         <- T # Copy data files from data to plotBio directory
 overwrite.files    <- T # Overwrite existing files when copying (not CSV, see below)copy.files
 process.csv        <- T # Process acoustic backscatter files
-process.csv.krill  <- F # Process krill backscatter files
+process.csv.krill  <- T # Process krill backscatter files
 process.csv.all    <- F # Process all CSV files (F = new files only)
 get.db             <- T # Import trawl database
 
@@ -781,7 +788,12 @@ if (sampling.acoustics) {
   bad.nasc.cps <- filter(nasc.cps, lat == 999, long == 999)
   write_csv(bad.nasc.cps, here("Output/nasc_bad_cps.csv"))
   
-  # average NASC.70 data over new intervals or number of intervals in a 2 km radius
+  # If missing, set cps.nasc to fixed depth using supplied variable
+  if (is.null(nasc.cps$cps.nasc)) {
+    nasc.cps$cps.nasc <- nasc.cps[ , nasc.depth.cps]
+  }
+  
+  # average NASC data over new intervals or number of intervals in a 2 km radius
   nasc.summ.cps <- nasc.cps %>%
     filter(lat != 999, long != 999) %>% 
     group_by(transect, int) %>%
@@ -790,14 +802,14 @@ if (sampling.acoustics) {
       bin.mid = as.integer(round(bins / 2)),
       lat     = lat[1],
       long    = long[1],
-      NASC    = mean(NASC.70)
+      NASC    = mean(cps.nasc)
     )
   
   # Average cps.nasc over defined interval
   # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
   nasc.cps.sf <- nasc.cps %>%
     filter(lat != 999, long != 999) %>%
-    select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.150) %>% 
+    select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc) %>% 
     group_by(filename, transect, int) %>% 
     summarise(
       lat   = lat[1],
@@ -835,7 +847,7 @@ nasc.all <- nasc.cps
 
 # Create file for selecting levels for backscatter plot
 nasc.plot.all   <- nasc.cps.sf %>% 
-  filter(NASC >= 1) 
+  filter(NASC >= nasc.plot.min) 
 ```
 
 ```{r process-csv-krill}
@@ -904,7 +916,12 @@ if (sampling.acoustics) {
     bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
     write_csv(bad.nasc.krill, here("Output/nasc_bad_krill.csv"))
     
-    # Average NASC.350 data over new intervals or number of intervals in a 2 km radius
+    # If missing, set krill.nasc to fixed depth using supplied variable
+    if (is.null(nasc.krill$krill.nasc)) {
+      nasc.krill$krill.nasc <- nasc.krill[ , nasc.depth.krill]
+    }
+    
+    # Average NASC data over new intervals or number of intervals in a 2 km radius
     nasc.summ.krill <- nasc.krill %>%
       filter(lat != 999, long != 999) %>%
       group_by(transect, int) %>%
@@ -913,14 +930,14 @@ if (sampling.acoustics) {
         bin.mid = as.integer(round(bins / 2)),
         lat     = lat[1],
         long    = long[1],
-        NASC    = mean(NASC.350)
+        NASC    = mean(krill.nasc)
       )
     
     # Average krill.nasc over defined interval
     # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
     nasc.krill.sf <- nasc.krill %>%
       filter(lat != 999, long != 999) %>%
-      select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
+      select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc) %>% 
       group_by(filename, transect, int) %>% 
       summarise(
         lat   = lat[1],
@@ -957,7 +974,7 @@ if (sampling.acoustics) {
     
     # Select plot levels for backscatter data
     nasc.plot.all   <- rbind(nasc.plot.all, nasc.krill.sf) %>% 
-      filter(NASC >= 200)  
+      filter(NASC >= nasc.plot.min)  
   }
 }
 ```
@@ -1531,7 +1548,7 @@ if (get.nav.sd) {
 
 _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`
 
-An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to 100-m deep) and krill (5 to 350-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.
+An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to `r nasc.depth.cps`-m deep) and krill (5 to `r nasc.depth.krill`-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.
 
 ```{r interactive-map,out.height="8in",out.width="100%"}
 # Display map
@@ -1559,7 +1576,7 @@ if (file.exists(here("Output/nasc_backscatter_plotly.Rdata"))) {
 
 ## CPS
 
-(ref:backscatter-map-cps) The distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS.
+(ref:backscatter-map-cps) The distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to `r nasc.depth.cps`-m deep) ascribed to CPS.
 
 ```{r plot-backscatter-cps,fig.cap='(ref:backscatter-map-cps)',out.width="100%"}
 if (file.exists(here("Figs/fig_backscatter_cps.png"))) {
@@ -1573,7 +1590,7 @@ if (file.exists(here("Figs/fig_backscatter_cps.png"))) {
 
 ## Krill
 
-(ref:backscatter-map-krill) The distribution of 200-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 350-m deep) ascribed to krill.
+(ref:backscatter-map-krill) The distribution of 200-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to `r nasc.depth.krill`-m deep) ascribed to krill.
 
 ```{r plot-backscatter-krill,fig.cap='(ref:backscatter-map-krill)',out.width="100%"}
 if (file.exists(here("Figs/fig_backscatter_krill.png"))) {
