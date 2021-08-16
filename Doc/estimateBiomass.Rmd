@@ -302,10 +302,10 @@ if (get.nav) {
     # Get new erddap start date from max date
     erddap.survey.start <- max(date(nav$time)) - days(1)
   } else {
-    nav.lag <- 25
+    nav.lag <- 24
   }
   
-  if (nav.lag > 24) {
+  if (nav.lag >= 24) {
     # Generate ERDDAP URL
     dataURL <- URLencode(paste(
       "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
@@ -470,7 +470,7 @@ if (get.nav.sd) {
       saildrone.gps <- filter(nav.sd, saildrone == i) %>% 
         mutate(GPS_date = format(datetime, format = "%F"),
                GPS_time = format(datetime, format = "%T")) %>% 
-        select(GPS_date, GPS_time, latitude = lat, longitude = long)
+        dplyr::select(GPS_date, GPS_time, latitude = lat, longitude = long)
       
       write_csv(saildrone.gps, here("Output", paste(i, "_erddap.gps.csv", sep = "")))
     }
@@ -585,13 +585,9 @@ survey.plan <- base.map +
           show.legend = "line") +
   geom_sf(data = nav.paths.sf, colour = "gray50", size = 1, alpha = 0.5) +
   scale_colour_manual("Type", 
-                      values = c(Adaptive = "red", Compulsory = "black",
-                                 Offshore = "green", Nearshore = "magenta",
-                                 transit = "orange")) +
+                      values = wpt.colors) +
   scale_linetype_manual("Type", 
-                        values = c(Adaptive = "dashed", Compulsory = "solid",
-                                   Offshore = "dashed", Nearshore = "solid",
-                                   transit = "dashed")) +
+                        values = wpt.linetypes) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))

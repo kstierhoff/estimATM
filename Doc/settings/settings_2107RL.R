@@ -2,15 +2,15 @@
 ## estimateBiomass
 ### Usually T
 get.db            <- F # Download data from databases (fast; generally TRUE)
-get.nav           <- F # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+get.nav           <- T # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
 copy.files        <- T # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
@@ -144,8 +144,16 @@ survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
-wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore","Saildrone")
-wpt.colors           <- c("#FF0000", "#0000FF", "#FF33F5", "#FFA500","#FFFF00") 
+wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
+                          Nearshore = "Nearshore",Offshore = "Offshore",
+                          Saildrone = "Saildrone")
+wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#0000FF",  
+                          Nearshore = "#FF33F5", Offshore = "#FFA500",
+                          Saildrone = "#FFFF00") 
+
+wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
+                          Nearshore = "solid", Offshore = "dashed", 
+                          Saildrone = "solid")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
@@ -168,7 +176,7 @@ erddap.survey.end.sd   <- "2021-10-15T23%3A59%3A00Z"
 # Configure columns and classes
 erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
 erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
-erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"factor")
+erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"character")
 
 # Define date range for each Saildrone to remove overlapping transits
 sd.date.range    <- data.frame(saildrone  = c(1055, 1059),
@@ -451,7 +459,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 5 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
