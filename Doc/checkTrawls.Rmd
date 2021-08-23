@@ -42,7 +42,7 @@ if (doc.type == "latex") {
 }
 ```
 
-```{r project-settings}
+```{r project-settings, include=FALSE}
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(),"/")))
 
@@ -57,7 +57,7 @@ source(here("Doc/settings", prj.settings))
 ```{r user-settings}
 # User-specified settings
 get.nav <- T # Download vessel nav from ERDDAP
-get.db  <- T # Extract data from trawl database (F for testing)
+get.db  <- F # Extract data from trawl database (F for testing)
 ```
 
 ```{r get-nav}
@@ -70,7 +70,9 @@ if (get.nav) {
     nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
     
     # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time)) - days(1)
+    erddap.survey.start <- max(date(nav$time))
+  } else {
+    nav.lag <- 24
   }
   
   if (nav.lag >= 24) {
@@ -235,7 +237,7 @@ haul.bad <- haul.all %>%
 
 # Classify hauls by season (spring or summer)
 haul.all <- haul.all %>% 
-  filter(!haul %in% haul.bad$haul) %>% 
+  filter(!collection %in% haul.bad$collection) %>% 
   mutate(season = case_when(
     month(equilibriumTime) < 6 ~ "spring",
     TRUE ~ "summer"))
@@ -269,7 +271,8 @@ catch <- catch.all %>%
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
   left_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
-         totalWeight = subSampleWtkg + remainingSubSampleWtkg)
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum = (subSampleCount/subSampleWtkg)*totalWeight)
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
@@ -1216,8 +1219,8 @@ Hauls removed due to trawl performance issues (e.g., aborted, bad, poor, etc.).
 ```{r bad-hauls}
 haul.bad %>% 
   filter(cruise %in% cruise.name) %>%
+  mutate(trawlDate = date(equilibriumTime)) %>% 
   select(haul, trawlDate, orderOcc, trawlPerformance) %>% 
-  mutate(trawlDate = date(trawlDate)) %>% 
   datatable(rownames = FALSE)
 ```
 
@@ -1333,12 +1336,12 @@ catch.comp <- catch %>%
   arrange(scientificName, haul) %>% 
   # Calculate difference between trawl subsample weight and summed weight from individual specimens
   mutate(calcWt    = subSampleWtkg + remainingSubSampleWtkg,
-         diffWt    = (subSampleWtkg + remainingSubSampleWtkg) - TotalWtKg,
-         diffCt    = ((subSampleCount/subSampleWtkg)*TotalWtKg) - TotalNum)  %>%
+         diffWt    = (subSampleWtkg + remainingSubSampleWtkg) - totalWeight,
+         diffCt    = ((subSampleCount/subSampleWtkg)*totalWeight) - totalNum)  %>%
   mutate(diffCt = round(diffCt, 3)) %>% 
   # Reorder columns
-  select(scientificName, haul, subSampleWtkg, remainingSubSampleWtkg, TotalWtKg, 
-         calcWt, diffWt, subSampleCount, TotalNum, diffCt) %>% 
+  select(scientificName, haul, subSampleWtkg, remainingSubSampleWtkg, totalWeight, 
+         calcWt, diffWt, subSampleCount, totalNum, diffCt) %>% 
   replace(is.na(.), -999) %>% 
   mutate(
     diffWt           = cell_spec(round(diffWt, digits = 4),

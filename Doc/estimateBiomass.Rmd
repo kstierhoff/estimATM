@@ -32,7 +32,7 @@ pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
                RSQLite,geoR,kableExtra,devtools,scatterpie,marmap,magick,
                beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
                leaflet.extras,maptools,mapview,photobiology,fs,plotly,
-               concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,
+               concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,ggnewscale,
                rworldmap,rworldxtra,data.table,stplanr,ggspatial,htmlwidgets)
 
 # Install and load required packages from Github -------------------------------
@@ -84,6 +84,42 @@ settings.files <- dir(here("Doc/settings"))
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
 ```
+
+```{r user-controls}
+# Processing controls (T/F) ---------------------------------------------------
+### Usually T
+get.db            <- F # Download data from databases (fast; generally TRUE)
+get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
+copy.files        <- F # Copy data files to local directory 
+process.csv       <- F # Process Echoview files
+save.figs         <- F # Draw new figures and maps
+download.hab      <- F # Download habitat map
+process.scs       <- F # Process SCS data 
+
+do.bootstrap      <- T # Generate bootstrap estimates
+estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.offshore  <- F # Process offshore backscatter data
+process.nearshore <- F # Process near backscatter data
+combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+process.seine     <- F # Process purse seine data
+
+### Sometimes F
+do.imap           <- F # Create interactive Leaflet map
+save.imap         <- F # Save Leaflet maps
+overwrite.files   <- T # Overwrite files (TRUE if files have changed)
+overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.krill <- T # Process krill backscatter data
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
+copy.bib          <- F # Copy bibliography files (requires connection to AST2)
+match.intervals   <- F # Match intervals for comparing EK60 and EK80
+get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
+resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+```
+
 
 ```{r create-dirs}
 dir_create(here(), c("Code","Data", "Doc", "Figs", "Images", "Output", "References", "Simulation"))
@@ -143,7 +179,6 @@ if (copy.files) {
                        regex = cufes.db.sqlite)
   
   file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
-  
   
   # Copy CSV files for CPS
   pb <- tkProgressBar("R Progress Bar", "CSV File Copying", 0, 100, 0)
@@ -512,7 +547,8 @@ bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
 # Read 5m bathymetry polygon
 bathy_5m_poly <- bathy_5m_points %>% 
   summarise(do_union = FALSE) %>% 
-  st_cast("POLYGON")
+  st_cast("POLYGON") %>% 
+  st_make_valid()
 
 # Create a reduced coastline for nearshore point estimation
 bathy_5m_df <- bathy_5m_points %>%
@@ -1639,8 +1675,9 @@ catch <- catch.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
   left_join(select(haul, haul, cluster)) %>% 
-  mutate(key = paste(haul, scientificName),  
-         totalWeight = subSampleWtkg + remainingSubSampleWtkg) 
+  mutate(key         = paste(haul, scientificName),  
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum    = (subSampleCount/subSampleWtkg)*totalWeight) 
 
 save(catch, file = here("Output/catch_final.Rdata"))
 
@@ -2601,10 +2638,18 @@ if (get.db) {
       Duration = as.numeric(difftime(Stop, Start, units = "mins")),
       Year = year(Start),
       AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
-    rename(lat = StartLatitude, long = StartLongitude) %>% 
     filter(between(Start, date(cufes.start), date(cufes.end)),
-           Ship == cruise.ship) %>% 
-    project_df(to = crs.proj)
+           Ship == cruise.ship) 
+  
+  if (survey.name %in% c("1507SH")) {
+    cufes.all <- cufes.all %>% 
+      rename(lat = StopLatitude, long = StopLongitude) %>% 
+      project_df(to = crs.proj)
+  } else {
+    cufes.all <- cufes.all %>% 
+      rename(lat = StartLatitude, long = StartLongitude)%>% 
+      project_df(to = crs.proj)
+  }
   
   # Close connection
   dbDisconnect(cufes.con)  
@@ -3072,12 +3117,14 @@ save(clf, file = here("Output/clf_ts_proportions.Rdata"))
 ```{r map-acoustic-proportions,fig.cap='(ref:map-acoustic-proportions)'}
 # Get acoustic proportions for mapping
 acoustic.prop.indiv <- clf %>%
+  filter(!is.na(CPS.wg)) %>% 
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
          prop.mack, prop.sar) %>% 
   replace(. == 0, 0.0000001) %>% 
   project_df(to = crs.proj)
 
 acoustic.prop.wg <- clf %>%
+  filter(!is.na(CPS.wg)) %>% 
   select(cluster, lat, long, prop.anch.wg, prop.jack.wg, prop.her.wg,
          prop.mack.wg, prop.sar.wg) %>% 
   replace(. == 0, 0.0000001) %>% 
@@ -4209,12 +4256,12 @@ strata.points <- tx.i %>%
 strata.points.sf <- st_as_sf(strata.points, coords = c("long","lat"), crs = crs.geog) 
 
 # Create polygons
-strata.super.polygons <- strata.points.sf %>% 
-  group_by(vessel.name) %>% 
-  summarise(do_union = FALSE) %>% 
-  st_cast("POLYGON") %>% 
-  st_make_valid() %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+strata.super.polygons <- strata.points.sf %>%
+  group_by(vessel.name) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("POLYGON") %>%
+  st_make_valid() %>%
+  st_difference(st_union(bathy_5m_poly)) %>%
   mutate(area = st_area(.))
 
 # Convert to lines
@@ -4376,7 +4423,8 @@ for (i in unique(strata.final$scientificName)) {
       summarise(do_union = FALSE) %>% 
       st_cast("POLYGON") %>% 
       mutate(scientificName = i) %>% 
-      st_make_valid()
+      st_make_valid() %>% 
+      st_difference(bathy_5m_poly)
     
     # Find nearest point on the 5 m isobath
     ns.bound.lower <- st_as_sf(primary.poly.j.s, coords = c("long","lat"), crs = crs.geog)
@@ -5735,10 +5783,10 @@ if (do.imap) {
     addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
                      fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
                      group = "CUFES (Negative)") %>%
-    # Add CTD and UCTD data
-    addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
-                     weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
-                     label = ~label, popup = ~popup, group =  "CTD Casts") %>% 
+    # # Add CTD and UCTD data
+    # addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
+    #                  weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
+    #                  label = ~label, popup = ~popup, group =  "CTD Casts") %>% 
     # Add backscatter data
     addCircleMarkers(data = filter(nasc.plot.sf, NASC < 200), 
                      radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
@@ -5941,7 +5989,7 @@ for (i in unique(strata.final$scientificName)) {
   }
   
   # Compute point estimates
-  # Currently has na.rm = TRUE for calculting biomass
+  # Currently has na.rm = TRUE for calculating biomass
   if (exists("point.estimates")) {
     point.estimates <- bind_rows(point.estimates,
                                  data.frame(scientificName = i,
@@ -7218,6 +7266,7 @@ save(lf.summ, file = here("Output/length_frequency_summary.Rdata"))
 abund.summ.total <- lf.summ %>% 
   group_by(scientificName, cluster, cluster.name) %>% 
   summarise(count = round(sum(count))) %>% 
+  filter(count > 0) %>% 
   ungroup()
 
 # Create list for storing lf plots
@@ -7260,6 +7309,8 @@ for (i in unique(strata.final$scientificName)) {
   # % contribution per stratum is the sum(numeric density/interval)/sum(numeric density/stratum)
   #  Numeric density is (nasc * proportion) / (4*pi*sigma.indiv) 
   
+  abund.summ.spp <- filter(abund.summ.total, scientificName == i)
+  
   # Summarize numeric abundance by stratum
   num.abund.stratum <- nasc.temp %>% 
     group_by(stratum) %>% 
@@ -7267,22 +7318,25 @@ for (i in unique(strata.final$scientificName)) {
   
   # Summarize numeric abundance by cluster and overall
   pct.summ.cluster <- nasc.temp %>% 
+    # Remove nasc with no
+    filter(cluster %in% unique(abund.summ.spp$cluster)) %>%
     group_by(stratum, cluster) %>% 
     summarise(num.cluster = sum(num.abund)) %>% 
     left_join(num.abund.stratum) %>% 
     mutate(pct.abund.stratum = num.cluster/num.stratum*100,
-           pct.txt      = paste("(", stratum, ") ", round(pct.abund.stratum, 1),"%", sep = ''),
+           pct.txt      = paste0("(", stratum, ") ", round(pct.abund.stratum, 1),"%"),
            cluster.name = paste("Cluster", cluster)) %>%
     filter(pct.abund.stratum > 0) %>% 
     group_by(cluster, cluster.name) %>%
     summarise(pct = glue_collapse(unique(pct.txt), sep = ", ")) %>%
     ungroup() %>% 
-    mutate(pct = str_replace(pct,"^0%","<0.1%"),
+    mutate(pct = str_replace(pct," 0%"," <0.1%"),
            cluster.name = fct_reorder(as.factor(cluster.name), cluster)) %>% 
     droplevels()
   
   # Summarize numeric abundance by cluster and overall
-  pct.summ.all <- nasc.temp %>% 
+  pct.summ.all <- nasc.temp %>%
+    filter(cluster %in% unique(abund.summ.spp$cluster)) %>%
     group_by(cluster) %>% 
     summarise(num.cluster = sum(num.abund)) %>% 
     mutate(pct = num.cluster/sum(num.abund.stratum$num.stratum)*100,
@@ -7290,7 +7344,7 @@ for (i in unique(strata.final$scientificName)) {
            cluster.name = paste("Cluster", cluster)) %>%
     filter(pct > 0) %>% # Remove rows with no data
     ungroup() %>% 
-    mutate(pct = str_replace(pct.txt,"^0%","<0.1%"),
+    mutate(pct = str_replace(pct.txt," 0%"," <0.1%"),
            cluster.name = fct_reorder(as.factor(cluster.name), cluster)) %>% 
     droplevels()
   
@@ -7347,8 +7401,7 @@ for (i in unique(strata.final$scientificName)) {
   
   # Save plot
   ggsave(lf.summ.plot, 
-         filename = paste(here("Figs/fig_cluster_relative_length_frequency_"), 
-                          i, ".png", sep = ""),
+         filename = paste0(here("Figs/fig_cluster_relative_length_frequency_"), i, ".png"),
          height = 10*a.ratio, width = 10) 
   
   # Add new plot to list
@@ -8052,16 +8105,17 @@ nasc.density.nse <- nasc.nse.final %>%
     `Scomber japonicus`     = mean(mack.dens),
     `Sardinops sagax`       = mean(sar.dens)) %>% 
   gather(scientificName, density, -transect, -int, -lat, -long) %>% 
-  mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
+  mutate(bin       = cut(density, dens.breaks, include.lowest = TRUE,
+                         ordered_result = TRUE),
          bin.level = as.numeric(bin),
          key       = paste(transect, int)) %>% 
   ungroup() %>% 
   project_df(to = crs.proj)
 
 # Create maps of nearshore biomass
-# if (save.figs) {
-#   source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))
-# }
+if (save.figs) {
+  source(here("Code", paste0("mapNearshoreExtrapolation_", survey.name, ".R")))
+}
 ```
 
 ## Results for anchovy (_Engraulis mordax_)

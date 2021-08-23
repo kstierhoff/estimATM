@@ -8,7 +8,7 @@ process.seine     <- F # Process purse seine data
 
 # Survey planning ---------------------------------------------------------
 # Transect spacing (nautical miles)
-tx.spacing.fsv  <- 10.1 # For Lasker 
+tx.spacing.fsv  <- 20.1 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
 tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
 
@@ -49,7 +49,7 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2015-06-19", "2015-07-04", 
+leg.breaks <- as.numeric(lubridate::ymd(c("2015-06-18", "2015-07-04", 
                                           "2015-07-27", "2015-08-21",
                                           "2015-09-11")))
 
@@ -65,8 +65,9 @@ survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_1507SH.csv"
-wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
-wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500") 
+wpt.types            <- c(Compulsory = "Compulsory")
+wpt.colors           <- c(Compulsory = "#000000") 
+wpt.linetypes        <- c(Compulsory = "solid")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
@@ -108,6 +109,9 @@ model.season  <- "summer" # spring or summer; for selecting growth model paramet
 model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
+# Turn off S2 processing in sf
+sf::sf_use_s2(FALSE)
+# Configure basemap options for mapview
 mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
 
 # Coordinate reference systems for geographic and projected data
@@ -151,6 +155,8 @@ pac.herring.color  <- '#F5DEB3'
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus")
 # CUFES
+cufes.start        <- "2015-06-19" # Start of survey for CUFES filtering
+cufes.end          <- "2015-09-07" # End of survey for CUFES filtering
 # For legend objects
 cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
 cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
@@ -249,7 +255,7 @@ nasc.dir               <- c(SH  = "PROCESSED/EV/CSV/SHIMADA")
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(SH  = "-Final_38kHz_CPS-ACIN.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(SH  = "*-Final_38_kHz_Krill-ACIN.csv")
+nasc.pattern.krill     <- c(SH  = "*-Final_120kHz_Krill-ACIN.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(SH  = "\\d{3}N")
 # Regex pattern for identifying offshore transects
@@ -384,8 +390,8 @@ max.diff <- 3
 nTx.min <- 2
 
 # Stratum pruning settings
-nIndiv.min    <- 0
-nClusters.min <- 0
+nIndiv.min    <- 10
+nClusters.min <- 2
 
 # Use manually defined strata?
 stratify.manually    <- TRUE
@@ -406,34 +412,34 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 30:35),
+    transect = 30:39),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 3,
-    transect = 36:39),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 4,
     transect = 40:58),
-  # data.frame(
-  #   scientificName = "Sardinops sagax", 
-  #   stratum = 1,
-  #   transect = 1:4),
-  # data.frame(
-  #   scientificName = "Sardinops sagax", 
-  #   stratum = 2,
-  #   transect = 6:8),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 10:24),
+    transect = 1:4),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 33:42),
+    transect = 6:9),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
+    transect = 10:15),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 4,
+    transect = 18:24),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 5,
+    transect = 33:42),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 6,
     transect = 46:49),
   data.frame(
     scientificName = "Scomber japonicus", 
@@ -450,15 +456,15 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:8),
+    transect = 1:9),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 12:22),
+    transect = 12:20),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 3,
-    transect = 24:62)
+    transect = 25:62)
 )
 
 # Stock boundaries --------------------------------------------------------
@@ -472,7 +478,7 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "1507SH_EK60"
-raw.size      <-  50   # file size in megabytes (MB)
+raw.size      <-  25   # file size in megabytes (MB)
 raw.log.range <- 700  # depth of ER60 logging (m)
 
 # Echoview settings
