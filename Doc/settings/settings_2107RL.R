@@ -69,7 +69,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210702_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints_20210824.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -150,7 +150,6 @@ wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory",
 wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#0000FF",  
                           Nearshore = "#FF33F5", Offshore = "#FFA500",
                           Saildrone = "#FFFF00") 
-
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
                           Nearshore = "solid", Offshore = "dashed", 
                           Saildrone = "solid")
@@ -243,6 +242,8 @@ pac.herring.color  <- '#F5DEB3'
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus")
 # CUFES
+cufes.start        <- "2021-07-01" # Start of survey for CUFES filtering
+cufes.end          <- "2021-10-16" # End of survey for CUFES filtering
 # For legend objects
 cufes.date.range   <- c(start = ymd_hms("2021-07-12 19:30:00 UTC"), 
                         stop  = now())

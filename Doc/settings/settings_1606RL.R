@@ -151,6 +151,8 @@ pac.herring.color  <- '#F5DEB3'
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus")
 # CUFES
+cufes.start        <- "2016-06-28" # Start of survey for CUFES filtering
+cufes.end          <- "2016-09-22" # End of survey for CUFES filtering
 # For legend objects
 cufes.breaks       <- c(0, 0.1, 1, 10, 25, 50, 250, 500, 10000) 
 cufes.labels       <- c("<0.1", "0.1-1", "1-10", "10-25", "25-50", 
