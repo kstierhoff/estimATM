@@ -65,8 +65,9 @@ survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_1606RL.csv"
-wpt.types            <- c("Compulsory","Adaptive","Nearshore","Offshore")
-wpt.colors           <- c("#FF0000", "#0000FF", "#EDEA37", "#FFA500") 
+wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory")
+wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000") 
+wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
@@ -108,6 +109,8 @@ model.season  <- "summer" # spring or summer; for selecting growth model paramet
 model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
+# Turn off S2 processing in sf
+sf::sf_use_s2(FALSE)
 mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
 
 # Coordinate reference systems for geographic and projected data
@@ -251,7 +254,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER")
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "-Final_38kHz_CPS*.*csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "-Final_38kHz_Krill*.csv")
+nasc.pattern.krill     <- c(RL  = "-Final_120kHz_Krill*.*csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N")
 # Regex pattern for identifying offshore transects
@@ -408,39 +411,67 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 2,
-    transect = 80:90),
+    transect = 74:79),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 3,
-    transect = 91:100),
+    transect = 80:96),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 4,
+    transect = 97:100),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:17),
+    transect = 1:20),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 23:41),
+    transect = 22:28),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 2,
+    transect = 30:41),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 65:70),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 4,
     transect = 74:88),
   data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 5,
+    transect = 91:96),
+  data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 9:12),
+    transect = 1:3),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 23:30),
+    transect = 8:12),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 33:41),
+    transect = 22:28),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 42:50),
+    transect = 32:51),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 5,
+  #   transect = 42:43),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 5,
+  #   transect = 44:48),
+  # data.frame(
+  #   scientificName = "Sardinops sagax", 
+  #   stratum = 6,
+  #   transect = 49:51),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 5,
@@ -448,7 +479,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 6,
-    transect = 71:84),
+    transect = 72:84),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 7,
@@ -460,48 +491,69 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 39:51),
+    transect = 32:51),
+  # data.frame(
+  #   scientificName = "Scomber japonicus", 
+  #   stratum = 3,
+  #   transect = 42:43),
+  # data.frame(
+  #   scientificName = "Scomber japonicus", 
+  #   stratum = 3,
+  #   transect = 44:48),
+  # data.frame(
+  #   scientificName = "Scomber japonicus", 
+  #   stratum = 4,
+  #   transect = 49:51),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 5,
+    stratum = 3,
     transect = 56:64),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 6,
-    transect = 68:81),
+    stratum = 4,
+    transect = 66:81),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 7,
+    stratum = 5,
     transect = 85:88),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 8,
-    transect = 92:95),
+    stratum = 6,
+    transect = 91:95),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 2:15),
+    transect = 1:15),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 25:31),
+    transect = 25:34),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 3,
-    transect = 39:54),
+    transect = 36:48),
+  # data.frame(
+  #   scientificName = "Trachurus symmetricus", 
+  #   stratum = 4,
+  #   transect = 42:43),
+  # data.frame(
+  #   scientificName = "Trachurus symmetricus", 
+  #   stratum = 4,
+  #   transect = 44:48),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 4,
-    transect = 55:90),
+    transect = 49:54),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 5,
-    transect = 93:99)
+    transect = 55:99),
 )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
 stock.break.sar  <- 34.7 # Latitude of Pt. Conception (or change based on SST)
+
 # Transects used to define stock boundaries (primary or other)
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 

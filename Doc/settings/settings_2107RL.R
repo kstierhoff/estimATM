@@ -147,7 +147,7 @@ wpt.filename         <- "waypoints_2107RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
                           Nearshore = "Nearshore",Offshore = "Offshore",
                           Saildrone = "Saildrone")
-wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#0000FF",  
+wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
                           Nearshore = "#FF33F5", Offshore = "#FFA500",
                           Saildrone = "#FFFF00") 
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
@@ -194,6 +194,8 @@ model.season  <- "summer" # spring or summer; for selecting growth model paramet
 model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
+# Turn off S2 processing in sf
+sf::sf_use_s2(FALSE)
 mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
 
 # Coordinate reference systems for geographic and projected data

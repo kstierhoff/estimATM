@@ -70,7 +70,7 @@ if (doc.type == "latex") {
 }
 ```
 
-```{r project-info}
+```{r project-info, include=FALSE}
 # Get session.info to include in document
 session.info <- session_info()
 
@@ -93,7 +93,7 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
@@ -111,7 +111,7 @@ save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- T # Process krill backscatter data
+process.csv.krill <- F # Process krill backscatter data
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
@@ -3920,9 +3920,9 @@ strata.summ %>%
   mutate(nTx = cell_spec(nTx, knitr.format, color = "black",
                          background = ifelse(nTx >= nTx.min,"green","red")),
          nClust = cell_spec(nClust, knitr.format, color = "black",
-                            background = ifelse(nClust >= nClusters.min,"green","red")),
+                            background = ifelse(nClust >= 2,"green","red")),
          nIndiv = cell_spec(nIndiv, knitr.format, color = "black",
-                            background = ifelse(nIndiv >= nIndiv.min,"green","red"))) %>% 
+                            background = ifelse(nIndiv >= 10,"green","red"))) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c","r","r","r","r","r")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
@@ -3941,7 +3941,7 @@ View results of strata definition algorithm compated to transect spacing, biomas
 # Create data frame with relevant landmarks
 landmarks <- data.frame(
   name = c("Pt. Conception", "Cape Mendocino", "Cape Flattery"),
-  lat.start = c(34.448266, 40.430520, 48.490),
+  lat.start = c(stock.break.sar, stock.break.anch, 48.490),
   y = rep(0,3))
 
 # Get max density for setting y limits
@@ -3959,7 +3959,7 @@ if (nrow(strata.summ.rm) > 0) {
                                          group = stratum.orig),
               fill = 'gray50', alpha = 0.5, linetype = "dotted") +
     geom_hline(yintercept = 0, colour = 'gray20') +
-    geom_vline(xintercept = c(34.448266, 40.430520, 48.490), linetype = "dashed") +
+    geom_vline(xintercept = c(stock.break.sar, stock.break.anch, 48.490), linetype = "dashed") +
     geom_text(data = landmarks, 
               aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
@@ -4069,7 +4069,7 @@ if (nrow(strata.summ.rm) > 0) {
                   group = stratum, colour = factor(stratum)), 
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
-    geom_vline(xintercept = c(34.448266, 40.430520, 48.490), linetype = "dashed") +
+    geom_vline(xintercept = c(stock.break.sar, stock.break.anch, 48.490), linetype = "dashed") +
     geom_text(data = landmarks, 
               aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
@@ -4137,7 +4137,7 @@ include_graphics(here("Figs/fig_biomass_density_transect_lat.png"))
 
 ## Define stratum polygons and compute area  
 
-For each species, polygons are drawn around backscatter within each strata and the area of each polygon is calculated. The results are stored in a named list (by scientific name) and made availble to the point and bootstrap estimate functions below.  
+For each species, polygons are drawn around backscatter within each strata and the area of each polygon is calculated. The results are stored in a named list (by scientific name) and made available to the point and bootstrap estimate functions below.  
 
 ```{r create-pseudo-transects}
 # Draw pseudo-transects --------------------------------------------------------
@@ -4494,33 +4494,34 @@ strata.primary <- strata.primary %>%
                    scientificName, stratum, vessel.name))
 
 # Manually substitute stratum polygons
-if (survey.name == "1606RL") {
-  
-  source(here("Sandbox/externalStrata.R"))
-  
-  # area.orig <- filter(strata.primary, scientificName == "Sardinops sagax", stock == "Northern") %>% 
-  #   select(stratum, area) %>% 
-  #   st_set_geometry(NULL)
-  # 
-  # area.juan <- filter(strata.polygon.final) %>% 
-  #   select(stratum, area) %>% 
-  #   st_set_geometry(NULL)
-  # 
-  # area.comp <- area.orig %>% 
-  #   left_join(select(area.juan, stratum, area.juan = area))
-  # 
-  # ggplot(area.comp, aes(as.numeric(area), as.numeric(area.juan), label = stratum)) + 
-  #   geom_text() + 
-  #   geom_abline(slope = 1, intercept = 0) + 
-  #   coord_equal()
-  # 
-  
-  strata.primary <- strata.primary %>%
-    mutate(key = paste(scientificName, stock, stratum)) %>% 
-    filter(!key %in% strata.polygon.final$key) %>% 
-    bind_rows(strata.polygon.final) %>% 
-    arrange(key)
-}
+# if (survey.name == "1606RL") {
+#   polygon.reorder <- FALSE
+#   
+#   source(here("Sandbox/externalStrata.R"))
+#   
+#   # area.orig <- filter(strata.primary, scientificName == "Sardinops sagax", stock == "Northern") %>% 
+#   #   select(stratum, area) %>% 
+#   #   st_set_geometry(NULL)
+#   # 
+#   # area.juan <- filter(strata.polygon.final) %>% 
+#   #   select(stratum, area) %>% 
+#   #   st_set_geometry(NULL)
+#   # 
+#   # area.comp <- area.orig %>% 
+#   #   left_join(select(area.juan, stratum, area.juan = area))
+#   # 
+#   # ggplot(area.comp, aes(as.numeric(area), as.numeric(area.juan), label = stratum)) + 
+#   #   geom_text() + 
+#   #   geom_abline(slope = 1, intercept = 0) + 
+#   #   coord_equal()
+#   # 
+#   
+#   strata.primary <- strata.primary %>%
+#     mutate(key = paste(scientificName, stock, stratum)) %>% 
+#     filter(!key %in% strata.polygon.final$key) %>% 
+#     bind_rows(strata.polygon.final) %>% 
+#     arrange(key)
+# }
 
 # Ensure that strata are ordered by number
 strata.primary <- arrange(strata.primary, scientificName, stratum)
