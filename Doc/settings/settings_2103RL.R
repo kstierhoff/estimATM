@@ -1,39 +1,12 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
-### Figure and mapping controls
-save.figs         <- T # Save figures
-download.hab      <- F # Download habitat map from AST site
-resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
-do.imap           <- F # Make interactive maps in plotBio, estimateBiomass, etc. (F if not working)
-
-### File handling
-copy.bib          <- F # Copy bibliography from the AST server; requires VPN if off site
-copy.files        <- F # Copy data files from data to plotBio directory
-overwrite.files   <- T # Overwrite existing files when copying (not CSV, see below)
-overwrite.csv     <- T # Overwrite existing CSV files when copying
-
-### Data imports
-get.db            <- T # Import trawl database
-get.nav           <- F # Download nav data from ERDDAP
-get.nav.sd        <- F # Download nav data from ERDDAP
-
-### File processing
-process.csv       <- F # Process acoustic backscatter files
-process.csv.all   <- F # Process acoustic backscatter files
-process.csv.krill <- F # Process krill backscatter data
-process.ctd       <- T # Process CTD/UCTD cast files
-process.cal       <- T # Process calibration data
-process.scs       <- F # Process SCS data 
-
 ### Biomass estimation
-do.bootstrap      <- F # Do bootstrap resampling on biomass estimates
-match.intervals   <- F # Match intervals for comparing EK60 and EK80
-process.nearshore <- F # Process near backscatter data
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.seine     <- T # Process purse seine data, if present
+process.nearshore <- T # Process near backscatter data
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-process.seine     <- F # Process purse seine data, if present
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
@@ -141,7 +114,7 @@ wpt.filename         <- "waypoints_2103RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
                           Nearshore = "Nearshore",Offshore = "Offshore",
                           Saildrone = "Saildrone")
-wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#0000FF",  
+wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
                           Nearshore = "#FF33F5", Offshore = "#FFA500",
                           Saildrone = "#FFFF00") 
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
@@ -188,6 +161,8 @@ model.season  <- "spring" # spring or summer; for selecting growth model paramet
 model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 
 # Mapping preferences -----------------------------------------------------
+# Turn off S2 processing in sf
+sf::sf_use_s2(FALSE)
 mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
 
 # Coordinate reference systems for geographic and projected data
@@ -205,7 +180,7 @@ useCrossOrigin <- F # USe cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
-scale.pies <- TRUE # Scale pie charts (TRUE/FALSE)
+scale.pies <- FALSE # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.02 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
 # Map landmarks
@@ -289,7 +264,7 @@ lf.ncols <- 5
 nasc.vessels           <- c("RL","LBC") 
 nasc.vessels.offshore  <- NA_character_
 nasc.vessels.nearshore <- c("LBC")
-nasc.vessels.krill     <- "RL"
+nasc.vessels.krill     <- c("RL")
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
@@ -363,7 +338,8 @@ nasc.max               <- NA # 10000*19
 
 # If T, read cps.nasc from file; else use NASC.50 
 source.cps.nasc        <- c(RL  = FALSE,
-                            LBC = FALSE) # in the nearshore strata
+                            LBC = FALSE,
+                            NS  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2103RL.csv")) # in the nearshore strata 
@@ -382,19 +358,19 @@ strip.tx.chars         <- c(RL  = FALSE,
 
 # If T, removes transects with names including "transit"
 rm.transit             <- c(RL  = TRUE,
-                            LBC = FALSE) 
+                            LBC = TRUE) 
 
 # If T, removes transects with names including "offshore"
 rm.offshore            <- c(RL  = TRUE,
-                            LBC = FALSE)
+                            LBC = TRUE)
 
 # If T, removes transects with names including "inshore"
 rm.inshore             <- c(RL  = TRUE,
-                            LBC = FALSE)
+                            LBC = TRUE)
 
 # If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL  = TRUE,
-                            LBC = FALSE) 
+                            LBC = TRUE) 
 
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
@@ -476,7 +452,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 500 # 1000 during final
+boot.num <- 5 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -495,8 +471,8 @@ max.diff <- 3
 nTx.min <- 2
 
 # Stratum pruning settings
-nIndiv.min    <- 0
-nClusters.min <- 0
+nIndiv.min    <- 10
+nClusters.min <- 2
 
 # Use manually defined strata?
 stratify.manually    <- TRUE
@@ -517,20 +493,20 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 5:14),
+    transect = 4:14),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 3:5),
+    transect = 2:6),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:11)
+    transect = 1:14)
   )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 32.516578 # Latitude of US-Mexico Border (or change based on SST)
+stock.break.sar  <- 34.700000 # Latitude of US-Mexico Border (or change based on SST)
 
 # Transects used to define stock boundaries (primary or other)
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous

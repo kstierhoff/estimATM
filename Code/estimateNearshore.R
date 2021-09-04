@@ -201,9 +201,9 @@ if (save.figs) {
                     aes(X, Y, label = cluster),
                     colour = 'gray20', bg.colour = "white", size = 2) +
     # Plot positive trawl cluster midpoints
-    geom_text_repel(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster),
+    geom_shadowtext(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster),
                     aes(X, Y, label = cluster, colour = sample.type),
-                    size = 2, fontface = 'bold') +
+                    size = 2, fontface = 'bold', bg.colour = "white") +
     # geom_shadowtext(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster), 
     #                 aes(X, Y, label = cluster, colour = sample.type), 
     #                 size = 2, bg.colour = "white", fontface = "bold") +
@@ -256,7 +256,7 @@ if (save.figs) {
                     color = 'black', alpha = 0.8) +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt", 
+                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
                                  "P. herring", "P. mackerel", "Sardine"),
                       values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                  pac.herring.color, pac.mack.color, sardine.color)) +
@@ -484,6 +484,19 @@ nasc.density.summ.ns <- nasc.density.summ.ns %>%
 
 # For each vessel (v) and region (r), get transect ends
 # If the region is an island, use transect waypoints to draw strata
+
+# Get boundaries for bathymetry grid
+bathy.bounds <- region.wpts %>%
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
+  st_bbox() 
+
+# Download bathy grid
+noaa.bathy <- getNOAA.bathy(
+  lon1 = floor(bathy.bounds$xmin) - 1, 
+  lon2 = floor(bathy.bounds$xmax) + 1,
+  lat1 = floor(bathy.bounds$ymax) + 1, 
+  lat2 = floor(bathy.bounds$ymin) - 1, 
+  resolution = 4)
 
 # Remove nearshore strata, if exists
 if (exists("tx.ends.ns"))       rm(tx.ends.ns) # inshore- and offshore-most intervals
