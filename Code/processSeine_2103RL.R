@@ -1,12 +1,5 @@
 # Import purse seine data ----------------------------------------------------
 # Import set info
-# lm.sets <- read_csv(here("Data/Seine/lm_sets.csv")) %>% 
-#   mutate(date = mdy(date),
-#          lat = lat_deg + lat_decmin/60,
-#          long = -(long_deg + long_decmin/60),
-#          vessel.name = "LM",
-#          key.set = paste(vessel_name, date, set))
-
 lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv")) %>% 
   mutate(date = date(mdy_hm(datetime)),
          vessel_name = "Long Beach Carnage",
@@ -22,27 +15,6 @@ set.clusters <- select(lbc.sets, key.set, vessel.name, lat, long) %>%
 save(lbc.sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
 
 # Import specimen info
-# lm.specimens <- read_csv(here("Data/Seine/lm_catch.csv")) %>% 
-#   mutate(date = mdy(date),
-#          key.set = paste(vessel_name, date, set),
-#          vessel.name = "LM",
-#          label = paste("Date:", date, "Set:", set, "Fish num:", specimen_number),
-#          scientificName = case_when(
-#            common_name == "Pacific Herring" ~ "Clupea pallasii",
-#            common_name == "Pacific Sardine" ~ "Sardinops sagax",
-#            common_name == "Jack Mackerel" ~ "Trachurus symmetricus",
-#            common_name == "Northern Anchovy" ~ "Engraulis mordax"
-#          ),
-#          totalLength_mm = case_when(
-#            scientificName == "Clupea pallasii"       ~ -0.323 + 1.110*forkLength_mm,
-#            scientificName == "Engraulis mordax"      ~  2.056 + 1.165*standardLength_mm,
-#            scientificName == "Sardinops sagax"       ~  3.574 + 1.149*standardLength_mm,
-#            scientificName == "Scomber japonicus"     ~  2.994 + 1.092*forkLength_mm,
-#            scientificName == "Trachurus symmetricus" ~  7.295 + 1.078*forkLength_mm),
-#          missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ FALSE),
-#          missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
-#   filter(!is.na(scientificName), !is.na(set))
-
 lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>% 
   left_join(select(lbc.sets, date, set, key.set)) %>% 
   mutate(vessel.name = "LBC",
@@ -59,16 +31,6 @@ lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
 
 # Estimate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
-# lm.specimens <- lm.specimens %>% 
-#   mutate(
-#     weightg = case_when(
-#       is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
-#       TRUE  ~ weightg),
-#     totalLength_mm = case_when(
-#       is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
-#       TRUE ~ totalLength_mm),
-#     K = round((weightg/totalLength_mm*10^3)*100))
-
 lbc.specimens <- lbc.specimens %>% 
   mutate(
     weightg = case_when(
@@ -82,15 +44,6 @@ lbc.specimens <- lbc.specimens %>%
 save(lbc.specimens, file = here("Output/purse_seine_specimens.Rdata"))
 
 # Summarize specimen data ------------------------------------------------
-# lm.spec.summ <- lm.specimens %>%
-#   group_by(key.set, vessel.name, scientificName) %>% 
-#   summarise(totalWeight = sum(weightg),
-#             totalCount  = n()) %>% 
-#   ungroup() %>% 
-#   left_join(select(lm.sets, key.set, lat, long)) %>% 
-#   filter(!is.na(lat)) %>% 
-#   mutate()
-
 lbc.spec.summ <- lbc.specimens %>%
   group_by(key.set, vessel.name, scientificName) %>% 
   summarise(totalWeight = sum(weightg),
@@ -99,10 +52,7 @@ lbc.spec.summ <- lbc.specimens %>%
   left_join(select(lbc.sets, key.set, lat, long)) %>% 
   filter(!is.na(lat))
 
-# # Make specimen summaries spatial -----------------------------------------
-# lm.spec.summ.sf <- lm.spec.summ %>% 
-#   st_as_sf(coords = c("long","lat"), crs = 4326)
-
+# Make specimen summaries spatial -----------------------------------------
 lbc.spec.summ.sf <- lbc.spec.summ %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
@@ -176,10 +126,6 @@ super.clusters.ns <- filter(set.clusters, cluster %in% unique(set.pos$cluster)) 
   select(-key.set, -vessel.name)
 
 # Subset data from all platforms
-# lm.lengths <- lm.specimens %>% 
-#   select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>% 
-#   mutate(vessel.name = "LM")
-
 lbc.lengths <- lbc.specimens %>% 
   select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>% 
   mutate(vessel.name = "LBC")

@@ -1,8 +1,7 @@
 # Load output from estimateBiomass ----------------------------------------
 # Load biomass estimate tables
 load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
-# load(here("Output/biomass_bootstrap_estimates_final_os.Rdata"))
-# load(here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
+load(here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
 load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 
 # Get survey estiamtes for all strata
@@ -10,14 +9,10 @@ be.all     <- be %>%
   mutate(Region = "Core") %>% 
   select(Species, Stock, Region, everything()) %>% 
   filter(Stratum == "All")
-# be.all.os  <- be.os %>% 
-#   mutate(Region = "Offshore") %>% 
-#   select(Species, Stock, Region, everything()) %>% 
-#   filter(Stratum == "All")
-# be.all.ns  <- be.ns %>% 
-#   mutate(Region = "Nearshore") %>% 
-#   select(Species, Stock, Region, everything()) %>% 
-#   filter(Stratum == "All")
+be.all.ns  <- be.ns %>%
+  mutate(Region = "Nearshore") %>%
+  select(Species, Stock, Region, everything()) %>%
+  filter(Stratum == "All")
 be.all.nse <- be.nse %>% 
   mutate(Region = "NSE") %>% 
   select(Species, Stock, Region, everything()) %>% 
@@ -32,7 +27,7 @@ be.all.var <- be.all %>%
 
 # Combine core and nearshore biomass
 be.all.summ <- be.all %>% 
-  # bind_rows(be.all.ns) %>% 
+  bind_rows(be.all.ns) %>%
   group_by(Species, Stock) %>% 
   select(-Region, -Stratum, -biomass.sd, -biomass.cv) %>% 
   summarise_all(list(sum)) %>% 
@@ -44,7 +39,7 @@ be.all.summ <- be.all %>%
 load(here("Output/length_frequency_summary.Rdata"))
 load(here("Output/abundance_table_all.Rdata"))
 # load(here("Output/abundance_table_all_os.Rdata"))
-# load(here("Output/abundance_table_all_ns.Rdata"))
+load(here("Output/abundance_table_all_ns.Rdata"))
 
 # Summarise length-disaggregated abundances to describe length ranges
 length.summ <- abund.summ %>% 
@@ -56,7 +51,7 @@ length.summ <- abund.summ %>%
 # Combine abundance summaries for tables
 abund.summ.all <- abund.summ %>% 
   mutate(Region = "Core") %>% 
-  # bind_rows(abund.summ.ns) %>% 
+  bind_rows(abund.summ.ns) %>%
   # bind_rows(abund.summ.os) %>% 
   filter(!is.nan(abundance)) %>% 
   ungroup() %>% 
@@ -91,7 +86,7 @@ load(here("Output/transect_spacing.Rdata"))
 load(here("Output/cal_output_table.Rdata"))
 
 # Load purse seine data
-# load(here("Output/purse_seine_specimens.Rdata"))
-# load(here("Output/purse_seine_sets.Rdata"))
+load(here("Output/purse_seine_specimens.Rdata"))
+load(here("Output/purse_seine_sets.Rdata"))
 
 

@@ -111,15 +111,12 @@ survey.long          <- c(-130,-117)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2103RL.csv"
-wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
-                          Nearshore = "Nearshore",Offshore = "Offshore",
-                          Saildrone = "Saildrone")
-wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
-                          Nearshore = "#FF33F5", Offshore = "#FFA500",
-                          Saildrone = "#FFFF00") 
-wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
-                          Nearshore = "solid", Offshore = "dashed", 
-                          Saildrone = "solid")
+wpt.types            <- c(Compulsory = "Compulsory", 
+                          Nearshore = "Nearshore")
+wpt.colors           <- c(Compulsory = "#000000",  
+                          Nearshore = "#FF33F5") 
+wpt.linetypes        <- c(Compulsory = "solid",
+                          Nearshore = "solid")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
@@ -458,11 +455,11 @@ boot.num <- 5 # 1000 during final
 do.lf    <- TRUE
 
 # Estimate biomass in nearshore and offshore strata
-estimate.nearshore <- FALSE
+estimate.nearshore <- TRUE
 estimate.offshore  <- FALSE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core")
+estimate.regions   <- c("Core","Nearshore")
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata
@@ -477,7 +474,7 @@ nClusters.min <- 2
 # Use manually defined strata?
 stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
-stratify.manually.ns <- TRUE
+stratify.manually.ns <- FALSE
 
 # Manually define sampling strata for each species
 # Create a new data frame with each species, stratum, and vector containing transects
@@ -504,6 +501,30 @@ strata.manual <- bind_rows(
     transect = 1:14)
   )
 
+# # Offshore strata
+# strata.manual.ns <- bind_rows(
+#   data.frame(
+#     scientificName = "Clupea pallasii",
+#     stratum = 1,
+#     transect = 1:n_distinct(nasc.nearshore$transect)),
+#   data.frame(
+#     scientificName = "Engraulis mordax",
+#     stratum = 1,
+#     transect = 1:n_distinct(nasc.nearshore$transect)),
+#   data.frame(
+#     scientificName = "Sardinops sagax",
+#     stratum = 1,
+#     transect = 1:n_distinct(nasc.nearshore$transect)),
+#   data.frame(
+#     scientificName = "Scomber japonicus",
+#     stratum = 1,
+#     transect = 1:n_distinct(nasc.nearshore$transect)),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus",
+#     stratum = 1,
+#     transect = 1:n_distinct(nasc.nearshore$transect))
+# )
+
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
 stock.break.sar  <- 34.700000 # Latitude of US-Mexico Border (or change based on SST)
@@ -521,7 +542,7 @@ raw.log.range <- 350  # depth of ER60 logging (m)
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
 ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v11.XX" # Echoview version
+ev.version    <- "v12.XX" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <- 1000  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
