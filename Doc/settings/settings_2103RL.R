@@ -527,7 +527,7 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.700000 # Latitude of US-Mexico Border (or change based on SST)
+stock.break.sar  <- 32.000000 # Latitude of US-Mexico Border (or change based on SST)
 
 # Transects used to define stock boundaries (primary or other)
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
