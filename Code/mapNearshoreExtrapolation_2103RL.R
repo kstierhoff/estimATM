@@ -350,7 +350,7 @@ ggsave(nse.map.final,
 
 # Pacific sardine-Southern -------------------------------------------------------------
 i = "Sardinops sagax"
-j = "Southern"
+j = "Northern"
 
 # Get primary and nse strata for species i
 strata.nse.spp <- filter(strata.nse, scientificName == i, stock == j)
