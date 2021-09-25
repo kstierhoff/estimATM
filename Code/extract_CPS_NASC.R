@@ -23,9 +23,21 @@ list.files(path = path.in, pattern = "CPS-Final 38 kHz CPS.csv", recursive = FAL
 estimate.cps.nasc(path.input = path.in, 
                   pattern = "CPS-Final 38 kHz CPS.csv", 
                   path.output = path.out, 
-                  expand.right = TRUE, 
-                  expansion = 4)
-
+                  expand.right = F,
+                  expand.left = F,
+                  expansion = 4, max.range = 350, root = 2,  scaling = 0.5)
+2 # here
+1
+0
 # Close both graphics devices
 dev.off()
 dev.off()
+dev.off()
+dev.off()
+dev.off()
+dev.off()
+dev.off()
+dev.off()
+dev.off()
+dev.off()
+
