@@ -93,11 +93,11 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- F # Process Echoview files
-save.figs         <- T # Draw new figures and maps
+save.figs         <- F # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- T # Generate bootstrap estimates
+do.bootstrap      <- F # Generate bootstrap estimates
 # estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
 # estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 # process.offshore  <- F # Process offshore backscatter data
@@ -106,7 +106,7 @@ do.bootstrap      <- T # Generate bootstrap estimates
 # process.seine     <- F # Process purse seine data
 
 ### Sometimes F
-do.imap           <- F # Create interactive Leaflet map
+do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
@@ -432,7 +432,9 @@ write_csv(nav.gps, here("Output/nav.gps.csv"))
 # Get most recent vessel position for plotting
 nav.now <- tail(nav, 1) %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  mutate(label = paste("Last position:", datetime, "UTC"))
+  mutate(label = paste("Last position:", datetime, "UTC"),
+         popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
+                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
 ```
 
 ```{r process-nav-saildrone}
@@ -5609,8 +5611,7 @@ cpsPal <- colorFactor(
     "Sardinops sagax", "Scomber japonicus", "Trachurus symmetricus"))
 
 # Create color pallette for planned transects
-txPal    <- colorFactor(c("red","blue","orange","green", "yellow"), 
-                        c("Adaptive","Compulsory","Nearshore","Offshore", "Transit"))
+txPal    <- colorFactor(wpt.colors, wpt.types)
 
 # Create color palette for trawls casts (presently unused)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
@@ -5637,7 +5638,6 @@ strata.nse.sub <- strata.nse %>%
   filter(!st_geometry_type(.) == "GEOMETRYCOLLECTION")
 
 if (do.imap) {
-  # Create leaflet map
   i.map <- leaflet() %>% 
     # Enable tile caching
     enableTileCaching() %>% 
@@ -5646,7 +5646,7 @@ if (do.imap) {
                      group = "Esri.OceanBasemap",
                      options = tileOptions(useCache = useCachedTile,
                                            crossOrigin = useCrossOrigin)) %>%
-  # Add EEZs
+    # Add EEZs
     addPolylines(data = eez_usa, color = "#000414", weight = 3, 
                  label = "EEZ-U.S.", group = "Exclusive Economic Zones") %>% 
     addPolylines(data = eez_can, color = "#000414", weight = 3, 
@@ -5671,194 +5671,22 @@ if (do.imap) {
     # Add OR MPAs
     addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
                 fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
-    # Add planned transects
-    addPolylines(data = transects.sf,
+    # Add core planned transects
+    addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
                  color = ~txPal(Type), weight = 3, opacity = 0.5,
                  label = ~htmlEscape(paste(Type, Transect)),
                  popup = ~popup,
-                 group = "Planned Transects") %>%
-    addCircleMarkers(data = wpts.sf,
+                 group = "Planned Transects (Core)") %>%
+    addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
                      radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
-                     fillOpacity = 0.5, fillColor =  ~txPal(Type), 
+                     fillOpacity = 0.5, fillColor =  ~txPal(Type),
                      label = ~htmlEscape(paste(Type, Waypoint)),
                      popup = ~popup,
-                     group = "Planned Transects") %>%
-    # Add core planned transects
-    # addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
-    #              color = ~txPal(Type), weight = 3, opacity = 0.5,
-    #              label = ~htmlEscape(paste(Type, Transect)),
-    #              popup = ~popup,
-    #              group = "Planned Transects (Core)") %>%
-    # addCircleMarkers(data = filter(wpts.sf, Type %in% c("Compulsory", "Adaptive")),
-    #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
-    #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-    #                  label = ~htmlEscape(paste(Type, Waypoint)),
-    #                  popup = ~popup,
-  #                  group = "Planned Transects (Core)") %>%
-  # # Add ancillary planned transects 
-  # addPolylines(data = filter(transects.sf, !Type %in% c("Compulsory", "Adaptive")),
-  #              color = ~txPal(Type), weight = 3, opacity = 0.5,
-  #              label = ~htmlEscape(paste(Type, Transect)), 
-  #              popup = ~popup,
-  #              group = "Planned Transects (Ancillary)") %>%
-  # addCircleMarkers(data = filter(wpts.sf, !Type %in% c("Compulsory", "Adaptive")),
-  #                  radius = 3, color = "#000414", stroke = FALSE, opacity = 0.5,
-  #                  fillOpacity = 0.5, fillColor =  ~txPal(Type), 
-  #                  label = ~htmlEscape(paste(Type, Waypoint)),
-  #                  popup = ~popup,
-  #                  group = "Planned Transects (Ancillary)") %>%
-  # Add nearshore stratum polygons
-  addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
-              weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-              fillOpacity = 0.50, group = "Biomass (Herring)") %>%
-    addPolygons(data = filter(strata.nse.sub, scientificName == "Engraulis mordax"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-                fillOpacity = 0.50, group = "Biomass (Anchovy)") %>%
-    addPolygons(data = filter(strata.nse.sub, scientificName == "Sardinops sagax"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-                fillOpacity = 0.50, group = "Biomass (Sardine)") %>%
-    addPolygons(data = filter(strata.nse.sub, scientificName == "Scomber japonicus"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-                fillOpacity = 0.50, group = "Biomass (P. mackerel)") %>%
-    addPolygons(data = filter(strata.nse.sub, scientificName == "Trachurus symmetricus"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
-                fillOpacity = 0.50, group = "Biomass (J. mackerel)") %>%
-    # Add primary stratum polygons
-    addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-                group = "Biomass (Herring)") %>%
-    addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent", 
-                group = "Biomass (Anchovy)") %>%
-    addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-                group = "Biomass (Sardine)") %>%
-    addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-                group = "Biomass (P. mackerel)") %>%
-    addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
-                weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
-                group = "Biomass (J. mackerel)") %>%
-    # Add biomass density
-    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Clupea pallasii"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                     label = ~label, popup = ~popup, 
-                     group = "Biomass (Herring)") %>% 
-    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     label = ~label, popup = ~popup, 
-                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                     group = "Biomass (Anchovy)") %>% 
-    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Sardinops sagax"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     label = ~label, popup = ~popup, 
-                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                     group = "Biomass (Sardine)") %>% 
-    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Scomber japonicus"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     label = ~label, popup = ~popup, 
-                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                     group = "Biomass (P. mackerel)") %>% 
-    addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Trachurus symmetricus"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     label = ~label, popup = ~popup, 
-                     fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
-                     group = "Biomass (J. mackerel)") %>% 
-    # Add nav data
-    addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
-                 label = ~leg, group = "Vessel Track") %>%
-    # Add CUFES data
-    addCircleMarkers(data = filter(cufes.sf, Species != "SquidEggs"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density") %>%
-    addCircleMarkers(data = cufes.squid.sf,
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Squid") %>% 
-    addCircleMarkers(data = cufes.ofe.sf,
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Other") %>% 
-    addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
-                     fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
-                     group = "CUFES (Negative)") %>%
-    # # Add CTD and UCTD data
-    # addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE, 
-    #                  weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
-    #                  label = ~label, popup = ~popup, group =  "CTD Casts") %>% 
-    # Add backscatter data
-    addCircleMarkers(data = filter(nasc.plot.sf, NASC < 200), 
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  "#000414", 
-                     label = ~label, popup = ~popup, 
-                     group = "Backscatter-CPS (Small)") %>%
-    addCircleMarkers(data = filter(nasc.plot.sf, NASC >= 200), 
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
-                     label = ~label, popup = ~popup,
-                     group = "Backscatter-CPS") %>%
-    # Add trawl paths 
-    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
-                 popup = ~popup, label = ~label, 
-                 group = "Trawls") %>% 
-    # Add trawl catch
-    addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
-                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
-                     popup = ~popup, label = ~label,
-                     group =  "Trawls") %>%
-    # Add NASC super clusters
-    addPolygons(data = nasc.super.clusters, 
-                weight = 2, fillColor = "#4046ED", color = "#000414", 
-                label = ~label, popup = ~popup,
-                group = "Trawl Cluster Polygons") %>% 
-    addMarkers(data = nav.now, label = ~label, group = "Vessel Positions") %>% 
-    # Add backscatter outliers
-    addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
-               group = "Backscatter (Large)") %>%
-    # Add backscatter legend
-    leaflet::addLegend("bottomleft", colors = nasc.colors.all,
-                       values = sort(unique(nasc.plot.sf$bin.level)),
-                       labels = nasc.labels.all,
-                       title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)",
-                       opacity = 1, group = "Backscatter-CPS") %>%
-    # Add CUFES legend
-    leaflet::addLegend("bottomleft", colors = cufes.colors,
-                       values = sort(unique(cufes.sf$Species)),
-                       labels = cufes.spp.labels,
-                       title = "CUFES Egg Density <br/> (eggs m<sup>-3</sup>)",
-                       opacity = 1, group = "CUFES Egg Density") %>%
-    # Add biomass density legend
-    leaflet::addLegend("bottomleft", colors = dens.colors,
-                       values = sort(unique(nasc.density.sf$bin.level)),
-                       labels = dens.labels,
-                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                       opacity = 1, group = "Biomass (Anchovy)") %>%
-    leaflet::addLegend("bottomleft", colors = dens.colors,
-                       values = sort(unique(nasc.density.sf$bin.level)),
-                       labels = dens.labels,
-                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                       opacity = 1, group = "Biomass (Sardine)") %>%
-    leaflet::addLegend("bottomleft", colors = dens.colors,
-                       values = sort(unique(nasc.density.sf$bin.level)),
-                       labels = dens.labels,
-                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                       opacity = 1, group = "Biomass (J. mackerel)") %>%
-    leaflet::addLegend("bottomleft", colors = dens.colors,
-                       values = sort(unique(nasc.density.sf$bin.level)),
-                       labels = dens.labels,
-                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                       opacity = 1, group = "Biomass (P. mackerel)") %>%
-    leaflet::addLegend("bottomleft", colors = dens.colors,
-                       values = sort(unique(nasc.density.sf$bin.level)),
-                       labels = dens.labels,
-                       title = "Biomass Density <br/> (t nmi<sup>-2</sup>)",
-                       opacity = 1, group = "Biomass (Herring)") %>%
+                     group = "Planned Transects (Core)") %>%
     # Add scale bar
     addScaleBar(position = "bottomright") %>%
     # Add map coordinates
-    leafem::addMouseCoordinates() %>% 
+    addMouseCoordinates() %>% 
     # Add measurement tool
     addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
                primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
@@ -5867,7 +5695,7 @@ if (do.imap) {
     addLayersControl(
       overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours",
-                        "Planned Transects",
+                        "Planned Transects (Core)", "Planned Transects (Ancillary)",
                         "Vessel Track", "Vessel Positions", "Trawls", 
                         "Trawl Cluster Polygons", "CTD Casts",
                         "Backscatter-CPS", "Backscatter-CPS (Small)",
@@ -5889,15 +5717,252 @@ if (do.imap) {
       "Biomass (Herring)", "CTD Casts")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2])
+  # Add nav data and vessel positions
   
-  # Save Leaflet map to HTML file
-  if (save.imap) {
-    mapshot(i.map, url = here("Output/estimateBiomass_explorer.HTML"))
-  }
+  if (exists("nav.paths.sf"))
+    i.map <- i.map %>% 
+      # Add nav data
+      addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+                   label = ~leg, group = "Vessel Track") %>%
+      addMarkers(data = nav.now, label = ~label, popup = ~popup, 
+                 group = "Vessel Positions")
   
-  # Save imap
-  dir_create(here("Output/imap"))
-  save(i.map, file = here("Output/imap/estimateBiomass_explorer.Rdata"))
+  # Add nearshore extrapolation polygons
+  if(nrow(filter(strata.nse.sub, scientificName == "Clupea pallasii")) > 0)
+    i.map <- i.map %>% 
+      addPolygons(data = filter(strata.nse.sub, scientificName == "Clupea pallasii"), 
+                  weight = 2, color = ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                  fillOpacity = 0.50, group = "Biomass (Herring)") 
+  if(nrow(filter(strata.nse.sub, scientificName == "Engraulis mordax")) > 0)
+    i.map <- i.map %>% 
+      addPolygons(data = filter(strata.nse.sub, scientificName == "Engraulis mordax"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                  fillOpacity = 0.50, group = "Biomass (Anchovy)")
+  if(nrow(filter(strata.nse.sub, scientificName == "Sardinops sagax")) > 0)
+    i.map <- i.map %>% 
+      addPolygons(data = filter(strata.nse.sub, scientificName == "Sardinops sagax"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                  fillOpacity = 0.50, group = "Biomass (Sardine)") 
+  if(nrow(filter(strata.nse.sub, scientificName == "Scomber japonicus")) > 0)
+    i.map <- i.map %>% 
+      addPolygons(data = filter(strata.nse.sub, scientificName == "Scomber japonicus"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                  fillOpacity = 0.50, group = "Biomass (P. mackerel)") 
+  if(nrow(filter(strata.nse.sub, scientificName == "Trachurus symmetricus")) > 0)
+    i.map <- i.map %>% 
+      addPolygons(data = filter(strata.nse.sub, scientificName == "Trachurus symmetricus"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = ~cpsPal(scientificName),
+                  fillOpacity = 0.50, group = "Biomass (J. mackerel)")
+  
+  # Add ancillary planned transects
+  if(nrow(filter(transects.sf, Type == "Nearshore")) > 0)
+    i.map <- i.map %>%
+      addPolylines(data = filter(transects.sf, Type == "Nearshore"),
+                   color = ~txPal(Type), weight = 3, opacity = 0.5,
+                   label = ~htmlEscape(paste(Type, Transect)),
+                   popup = ~popup,
+                   group = "Planned Transects (Ancillary)")
+  if(nrow(filter(transects.sf, Type == "Offshore")) > 0)
+    i.map <- i.map %>%
+      addPolylines(data = filter(transects.sf, Type == "Offshore"),
+                   color = ~txPal(Type), weight = 3, opacity = 0.5,
+                   label = ~htmlEscape(paste(Type, Transect)),
+                   popup = ~popup,
+                   group = "Planned Transects (Ancillary)")
+  if(nrow(filter(transects.sf, Type == "Saildrone")) > 0)
+    i.map <- i.map %>%
+      addPolylines(data = filter(transects.sf, Type == "Saildrone"),
+                   color = ~txPal(Type), weight = 3, opacity = 0.5,
+                   label = ~htmlEscape(paste(Type, Transect)),
+                   popup = ~popup,
+                   group = "Planned Transects (Ancillary)")
+  if(nrow(filter(transects.sf, Type == "Transit")) > 0)
+    i.map <- i.map %>%
+      addPolylines(data = filter(transects.sf, Type == "Transit"),
+                   color = ~txPal(Type), weight = 3, opacity = 0.5,
+                   label = ~htmlEscape(paste(Type, Transect)),
+                   popup = ~popup,
+                   group = "Planned Transects (Ancillary)")
+  
+  # Add primary stratum polygons and biomass densities
+  if(nrow(filter(strata.primary.sub, scientificName == "Clupea pallasii")) > 0)
+    i.map <- i.map %>%
+      addPolygons(data = filter(strata.primary.sub, scientificName == "Clupea pallasii"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                  group = "Biomass (Herring)") %>% 
+      addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Clupea pallasii"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                       label = ~label, popup = ~popup, 
+                       group = "Biomass (Herring)") %>% 
+      addLegend("bottomleft", colors = dens.colors,
+                values = sort(unique(nasc.density.sf$bin.level)),
+                labels = dens.labels,
+                title = "Biomass Density (Herring) <br/> (t nmi<sup>-2</sup>)",
+                opacity = 1, group = "Biomass (Herring)") 
+  
+  if(nrow(filter(strata.primary.sub, scientificName == "Engraulis mordax")) > 0)
+    i.map <- i.map %>%
+      addPolygons(data = filter(strata.primary.sub, scientificName == "Engraulis mordax"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent", 
+                  group = "Biomass (Anchovy)") %>% 
+      addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Engraulis mordax"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       label = ~label, popup = ~popup, 
+                       fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                       group = "Biomass (Anchovy)") %>% 
+      addLegend("bottomleft", colors = dens.colors,
+                values = sort(unique(nasc.density.sf$bin.level)),
+                labels = dens.labels,
+                title = "Biomass Density (Anchovy) <br/> (t nmi<sup>-2</sup>)",
+                opacity = 1, group = "Biomass (Anchovy)")
+  
+  if(nrow(filter(strata.primary.sub, scientificName == "Sardinops sagax")) > 0)
+    i.map <- i.map %>%
+      addPolygons(data = filter(strata.primary.sub, scientificName == "Sardinops sagax"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                  group = "Biomass (Sardine)") %>% 
+      addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Sardinops sagax"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       label = ~label, popup = ~popup, 
+                       fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                       group = "Biomass (Sardine)") %>% 
+      addLegend("bottomleft", colors = dens.colors,
+                values = sort(unique(nasc.density.sf$bin.level)),
+                labels = dens.labels,
+                title = "Biomass Density (Sardine) <br/> (t nmi<sup>-2</sup>)",
+                opacity = 1, group = "Biomass (Sardine)")
+  
+  if(nrow(filter(strata.primary.sub, scientificName == "Scomber japonicus")) > 0)
+    i.map <- i.map %>%
+      addPolygons(data = filter(strata.primary.sub, scientificName == "Scomber japonicus"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                  group = "Biomass (P. mackerel)") %>% 
+      addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Scomber japonicus"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       label = ~label, popup = ~popup, 
+                       fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                       group = "Biomass (P. mackerel)") %>% 
+      addLegend("bottomleft", colors = dens.colors,
+                values = sort(unique(nasc.density.sf$bin.level)),
+                labels = dens.labels,
+                title = "Biomass Density (P. Mackerel) <br/> (t nmi<sup>-2</sup>)",
+                opacity = 1, group = "Biomass (P. mackerel)")
+  
+  if(nrow(filter(strata.primary.sub, scientificName == "Trachurus symmetricus")) > 0)
+    i.map <- i.map %>%
+      addPolygons(data = filter(strata.primary.sub, scientificName == "Trachurus symmetricus"), 
+                  weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
+                  group = "Biomass (J. mackerel)") %>% 
+      addCircleMarkers(data = filter(nasc.density.sf, scientificName == "Trachurus symmetricus"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       label = ~label, popup = ~popup, 
+                       fillOpacity = 0.75, fillColor =  ~densPal(bin.level),
+                       group = "Biomass (J. mackerel)") %>% 
+      addLegend("bottomleft", colors = dens.colors,
+                values = sort(unique(nasc.density.sf$bin.level)),
+                labels = dens.labels,
+                title = "Biomass Density (Jack Mackerel) <br/> (t nmi<sup>-2</sup>)",
+                opacity = 1, 
+                group = "Biomass (J. mackerel)")
+  
+  # Add CUFES data
+  if (nrow(cufes.neg.sf) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                       fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                       group = "CUFES (Negative)")
+  
+  if (nrow(filter(cufes.sf, Species == "AnchovyEggs")) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                       popup = ~popup, group = "CUFES Egg Density")
+  
+  if (nrow(filter(cufes.sf, Species == "JackMackerelEggs")) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = filter(cufes.sf, Species == "JackMackerelEggs"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                       popup = ~popup, group = "CUFES Egg Density")
+  
+  if (nrow(filter(cufes.sf, Species == "SardineEggs")) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                       popup = ~popup, group = "CUFES Egg Density")
+  
+  if (nrow(cufes.squid.sf) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = cufes.squid.sf,
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                       popup = ~popup, group = "CUFES Egg Density-Squid")
+  
+  if (nrow(cufes.ofe.sf) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = cufes.ofe.sf,
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                       popup = ~popup, group = "CUFES Egg Density-Other") 
+  
+  # Add backscatter data
+  if (nrow(filter(nasc.plot.sf, NASC < 200)) > 0)
+    i.map <- i.map %>%  
+      addCircleMarkers(data = filter(nasc.plot.sf, NASC < 200), 
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75,  fillColor = ~nascPal(bin.level), 
+                       label = ~label, popup = ~popup, 
+                       group = "Backscatter-CPS (Small)")
+  
+  if (nrow(filter(nasc.plot.sf, NASC >= 200)) > 0)
+    i.map <- i.map %>%  
+      addCircleMarkers(data = filter(nasc.plot.sf, NASC >= 200), 
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  ~nascPal(bin.level), 
+                       label = ~label, popup = ~popup,
+                       group = "Backscatter-CPS") %>%
+      addLegend("bottomleft", colors = nasc.colors.all, 
+                values = sort(unique(nasc.cps.sf$bin.level)),
+                labels = nasc.labels.all, 
+                title = "CPS Backscatter<br/> (s<sub>A</sub>; m<sup>2</sup> nmi<sup>-2</sup>)", 
+                opacity = 1, group = "Backscatter-CPS")
+  
+  # Add trawl paths 
+  if (nrow(haul.paths) > 0)
+    i.map <- i.map %>%  
+      addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                   popup = ~popup, label = ~label, 
+                   group = "Trawls") 
+  if (nrow(cluster.catch.sf) > 0)
+    i.map <- i.map %>% 
+      # Add trawl catch
+      addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+                       opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                       popup = ~popup, label = ~label,
+                       group =  "Trawls") 
+  if (nrow(nasc.super.clusters) > 0)
+    i.map <- i.map %>%
+      # Add NASC super clusters
+      addPolygons(data = nasc.super.clusters, 
+                  weight = 2, fillColor = "#4046ED", color = "#000414", 
+                  label = ~label, popup = ~popup,
+                  group = "Trawl Cluster Polygons")
+  
+  # Add backscatter outliers
+  if (nrow(big.nasc.sf) > 0)
+    i.map <- i.map %>%
+      addMarkers(data = big.nasc.sf, label = ~label, popup = ~popup,
+                 group = "Backscatter (Large)")
+  
+  # Add CTD and UCTD data
+  if (exists("ctd.sf"))
+    i.map <- i.map %>% 
+      addCircleMarkers(data = ctd.sf, radius = 8, color = "#000414", stroke = TRUE,
+                       weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
+                       label = ~label, popup = ~popup, group =  "CTD Casts")
   
   # Display map
   i.map
