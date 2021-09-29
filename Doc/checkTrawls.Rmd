@@ -238,7 +238,6 @@ haul.bad <- haul.all %>%
 
 # Classify hauls by season (spring or summer)
 haul.all <- haul.all %>% 
-  filter(!collection %in% haul.bad$collection) %>% 
   mutate(season = case_when(
     month(equilibriumTime) < 6 ~ "spring",
     TRUE ~ "summer"))
@@ -247,7 +246,8 @@ haul.all <- haul.all %>%
 haul <- filter(haul.all, cruise %in% cruise.name) %>% 
   arrange(haul) %>% 
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% # Assign cluster
+  filter(!collection %in% haul.bad$collection)
 
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
@@ -692,7 +692,8 @@ lengths %>%
 Length frequency by cruise leg. Length measurements are "native lengths", which are _SL_ for sardine and anchovies, and _FL_ for mackerels and herring.
 
 ```{r length-freq-leg}
-ggplot(lengths, aes(nativeLength_mm, group = factor(leg))) +
+ggplot(filter(lengths, !is.na(leg)), 
+       aes(nativeLength_mm, group = factor(leg))) +
   geom_histogram(aes(fill = factor(leg)), alpha = 0.5) + 
   facet_wrap(~scientificName, scales = "free") +
   scale_fill_viridis_d("Leg") +

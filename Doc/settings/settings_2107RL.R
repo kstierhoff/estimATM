@@ -1,41 +1,16 @@
-# Processing controls (T/F) ---------------------------------------------------
-## estimateBiomass
-### Usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
-get.nav           <- T # Download primary vessel nav data from ERDDAP
-get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
-copy.files        <- T # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- T # Draw new figures and maps
-download.hab      <- F # Download habitat map
-process.scs       <- F # Process SCS data 
-
-do.bootstrap      <- T # Generate bootstrap estimates
-estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+# Processing controls ----------------------------------------------------
+## Settings in this section control various behaviors and tasks used in the main data processing scripts
+### Biomass estimation
+process.seine     <- F # Process purse seine data, if present
+process.nearshore <- F # Process near backscatter data
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
-process.nearshore <- F # Process near backscatter data
+estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
 combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
-process.seine     <- F # Process purse seine data
-
-### Sometimes F
-do.imap           <- F # Create interactive Leaflet map
-save.imap         <- F # Save Leaflet maps
-overwrite.files   <- T # Overwrite files (TRUE if files have changed)
-overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- F # Process krill backscatter data
-process.cal       <- F # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
-copy.bib          <- F # Copy bibliography files (requires connection to AST2)
-match.intervals   <- F # Match intervals for comparing EK60 and EK80
-get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
-resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
-
-## Other documents
 
 # Survey planning ---------------------------------------------------------
-# Transect spacing (nautical miles)
+## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
+### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
 tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
@@ -50,13 +25,10 @@ min.tx.length <- 0 # nmi
 # UCTD spacing (nautical miles)
 uctd.spacing   <- 15
 
-# Number of transects to remove from the start (if near Mexico)
+### Transect removal and renumbering
+rm.n.transects     <- 0 # Number of transects to remove from the start (if near Mexico)
+rm.i.transects <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 renumber.transects <- FALSE # Renumber transects to start at zero if transect are removed
-rm.n.transects <- 0
-# Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
-rm.i.transects <- NA
-# rm.i.transects <- c(paste(60:127, "Compulsory"), paste(60:127, "Adaptive"), 
-#                     paste(119:300, "Nearshore"), "1 Transit") 
 
 # Locations to remove from planning (e.g., north, central, south, and mexico)
 rm.location <- NA # c("mexico")
@@ -115,7 +87,7 @@ survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shim
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2107RL"        # SWFSC/AST survey name
-survey.start           <- "2 July"       # Survey start date
+survey.start           <- "5 July"       # Survey start date
 survey.end             <- "15 October"   # Survey end date
 survey.year            <- "2021"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
@@ -128,9 +100,9 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2021-07-02", "2021-07-22", 
-                                          "2021-08-22", "2021-09-21",
-                                          "2021-10-15")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2021-07-02", "2021-07-23", 
+                                          "2021-08-22", "2021-09-22",
+                                          "2021-10-16")))
 
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
@@ -304,6 +276,12 @@ nasc.vessels.offshore  <- NA_character_
 nasc.vessels.nearshore <- NA_character_
 nasc.vessels.krill     <- c("RL")
 
+# Define columns to use for a fixed integration depth (if cps.nasc is not present)
+# Options include 0-100 (by 5), 100, 150, 250, and 350 m.
+# Defined by the atm::extract_csv() function.
+nasc.depth.cps   <- "NASC.250"
+nasc.depth.krill <- "NASC.350"
+
 # Purse seine data info
 # Survey vessels that collected purse seine data
 seine.vessels          <- c("LBC","LM")
@@ -344,63 +322,103 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-FRD
 nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv")
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
+                            LM  = "Final 38 kHz CPS.csv",
+                            LBC = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
+                            LM  = "*Krill-Juan Krill Final 120.csv",
+                            LBC = "*Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
-nasc.pattern.nearshore <- c(RL  = "\\d{3}N")
+nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
+                            LM  = "\\d{3}N",
+                            LBC = "\\d{3}N")
 # Regex pattern for identifying offshore transects
-nasc.pattern.offshore  <- c(RL  = "\\d{3}O")
+nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
+                            LM  = "\\d{3}O",
+                            LBC = "\\d{3}O")
 # Regex pattern for identifying offshore transects
-nasc.pattern.inshore   <- c(RL  = "\\d{3}I")
+nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
+                            LM  = "\\d{3}I",
+                            LBC = "\\d{3}I")
 # Regex pattern for identifying transits
-nasc.pattern.transit   <- c(RL  = "\\d{3}T")
+nasc.pattern.transit   <- c(RL  = "\\d{3}T",
+                            LM  = "\\d{3}T",
+                            LBC = "\\d{3}T")
 # Recursively search NASC directories
-nasc.recurse           <- c(RL = TRUE)
+nasc.recurse           <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            LBC = TRUE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = FALSE) # in the nearshore strata
+source.cps.nasc        <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            LBC = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL  = "[^0-9]") 
+tx.char.pattern        <- c(RL  = "[^0-9]",
+                            LM  = "[^0-9]",
+                            LBC = "[^0-9]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL  = TRUE) 
+strip.tx.nums          <- c(RL  = TRUE,
+                            LM  = FALSE,
+                            LBC = FALSE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = FALSE) 
+strip.tx.chars         <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            LBC = FALSE) 
 
 # If T, removes transects with names including "transit"
-rm.transit             <- c(RL  = TRUE) 
+rm.transit             <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            LBC = FALSE)  
 
 # If T, removes transects with names including "offshore"
-rm.offshore            <- c(RL  = TRUE)
+rm.offshore            <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            LBC = TRUE) 
 
 # If T, removes transects with names including "inshore"
-rm.inshore             <- c(RL  = TRUE)
+rm.inshore             <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            LBC = TRUE)
 
 # If T, removes transects with names including "nearshore"
-rm.nearshore           <- c(RL  = TRUE) 
+rm.nearshore           <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            LBC = TRUE) 
 
 # If T, subtracts NASC.5 from cps.nasc
-rm.surface             <- c(RL  = FALSE) 
+rm.surface             <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            LBC = FALSE) 
 
 # regex for matching number pattern
-tx.num.pattern         <- c(RL  = "-\\d{1}") 
+tx.num.pattern         <- c(RL  = "-\\d{1}",
+                            LM  = "-\\d{1}",
+                            LBC = "-\\d{1}")
 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL  = TRUE) 
+use.tx.number          <- c(RL  = TRUE,
+                            LM  = TRUE,
+                            LBC = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- list(RL = NA)
+tx.rm                  <- list(RL  = c("4142"),
+                               LM  = NA,
+                               LBC = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 25)
+min.tx.length          <- c(RL  = 25,
+                            LM  = 1,
+                            LBC = 1)
 
 # Enforce nearest trawl cluster distance limits?
 limit.cluster.dist     <- c(OS  = FALSE,
@@ -595,7 +613,7 @@ cal.datetime       <- "1 July"     # Date/time of calibration
 cal.plot.date      <- "2021-07-01" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
-cal.personnel      <- "TBD"        # Calibration participants
+cal.personnel      <- "J. Renfree, D. Demer"        # Calibration participants
 cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
 cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
@@ -609,11 +627,11 @@ cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about 
 cal.notes          <- "UPDATE CAL LOCATION. Lasker calibration sphere #1"
 
 # Physical conditions during calibration
-cal.temp           <-   18.7   # enter water temperature
-cal.sal            <-   33.8   # enter salinity
-cal.c              <- 1516.8   # enter sound speed (m/s)
+cal.temp           <-   21.1   # enter water temperature
+cal.sal            <-   34.0   # enter salinity
+cal.c              <- 1524.9   # enter sound speed (m/s)
 cal.min.z          <-    5     # enter minimum water depth below transducers
-cal.max.z          <-    8     # enter maximum water depth below transducers
+cal.max.z          <-   10     # enter maximum water depth below transducers
  
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency

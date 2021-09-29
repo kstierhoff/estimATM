@@ -88,22 +88,16 @@ source(here("Doc/settings", prj.settings))
 ```{r user-controls}
 # Processing controls (T/F) ---------------------------------------------------
 ### Usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
+get.db            <- T # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+copy.files        <- T # Copy data files to local directory 
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
-# estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-# estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
-# process.offshore  <- F # Process offshore backscatter data
-# process.nearshore <- F # Process near backscatter data
-# combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
-# process.seine     <- F # Process purse seine data
+do.bootstrap      <- T # Generate bootstrap estimates
 
 ### Sometimes F
 do.imap           <- T # Create interactive Leaflet map
@@ -112,7 +106,7 @@ overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- F # Process krill backscatter data
-process.cal       <- F # Process calibration results
+process.cal       <- T # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
@@ -929,21 +923,17 @@ if (process.csv) {
               left_join(select(cps.nasc.temp, time.align, cps.nasc))  
           }
         } else {
-          # Use fixed integration depth (NASC.70), with or without surface noise removal
-          if (rm.surface[i]) {
-            # Remove surface noise, often from Saildrone backscatter
-            if ("cps.NASC" %in% colnames(nasc.vessel)) {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.NASC - NASC.5)
-            } else {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70 - NASC.5)
-            }
+          # Use cps.NASC extractdd using extract_cps_nasc.R
+          if ("cps.NASC" %in% colnames(nasc.vessel)) {
+            nasc.vessel$cps.nasc <- nasc.vessel$cps.NASC
           } else {
-            # Keep surface backscatter
-            if ("cps.NASC" %in% colnames(nasc.vessel)) {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.NASC)
-            } else {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
-            }
+            # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
+            nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
+          }
+          
+          # Remove surface noise, often from Saildrone backscatter
+          if (rm.surface[i]) {
+            nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.nasc - NASC.5)
           }
         }
         
@@ -3494,7 +3484,7 @@ nasc <- nasc %>%
 # Format for plotting
 nasc.density <- nasc %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
-         sar.dens, transect, int) %>% 
+         sar.dens, transect = transect.orig, int) %>% 
   group_by(transect, int) %>% 
   summarise(
     lat = lat[1],

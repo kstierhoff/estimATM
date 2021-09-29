@@ -34,7 +34,7 @@ renumber.transects <- FALSE # Renumber transects to start at zero if transect ar
 rm.location <- NA # c("mexico")
 
 # Randomize
-do.random <- TRUE
+do.random <- FALSE
 save.csv  <- TRUE
 show.maps <- TRUE
 
@@ -262,6 +262,12 @@ nasc.vessels           <- c("RL","LBC")
 nasc.vessels.offshore  <- NA_character_
 nasc.vessels.nearshore <- c("LBC")
 nasc.vessels.krill     <- c("RL")
+
+# Define columns to use for a fixed integration depth (if cps.nasc is not present)
+# Options include 0-100 (by 5), 100, 150, 250, and 350 m.
+# Defined by the atm::extract_csv() function.
+nasc.depth.cps   <- "NASC.250"
+nasc.depth.krill <- "NASC.350"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
@@ -570,7 +576,7 @@ cal.datetime       <- "1 March"     # Date/time of calibration
 cal.plot.date      <- "2021-03-01" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
-cal.personnel      <- "TBD"        # Calibration participants
+cal.personnel      <- "S. Sessions, J. Renfree, D. Murfin, D. Demer"        # Calibration participants
 cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
 cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
