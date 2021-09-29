@@ -88,7 +88,7 @@ source(here("Doc/settings", prj.settings))
 ```{r user-controls}
 # Processing controls (T/F) ---------------------------------------------------
 ### Usually T
-get.db            <- T # Download data from databases (fast; generally TRUE)
+get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- T # Copy data files to local directory 
@@ -105,7 +105,7 @@ save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- F # Process krill backscatter data
+process.csv.krill <- T # Process krill backscatter data
 process.cal       <- T # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
@@ -2528,11 +2528,14 @@ lw.models %>%
 # Plot L/W data from past and current survey -----------------------------------
 lw.plot <- ggplot() + 
   # Plot L/W data from all years/surveys
-  geom_point(data = filter(lengths.all, season == tolower(survey.season)), 
+  geom_point(data = filter(lengths.all, 
+                           scientificName %in% unique(lengths$scientificName),
+                           season == tolower(survey.season)), 
              aes(totalLength_mm, weightg),
              colour = "gray70", alpha = 0.3) +
   # Plot seasonal length models for each species
-  geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
+  geom_line(data = filter(lw.df, scientificName %in% unique(lengths$scientificName)), 
+            aes(L, W), linetype = 'dashed') +
   scale_colour_manual(name = "Season", values = c("forestgreen","blue")) +
   # Plot L/W data for current survey
   geom_point(data = lengths, 
@@ -2565,7 +2568,8 @@ lengths.leg <- lengths %>%
 
 lw.plot.leg <- ggplot() + 
   # Plot seasonal length models for each species
-  geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
+  geom_line(data = filter(lw.df, scientificName %in% unique(lengths$scientificName)), 
+            aes(L, W), linetype = 'dashed') +
   # Plot L/W data for current survey
   geom_point(data = lengths.leg, 
              aes(totalLength_mm, weightg, group = sex, fill = factor(leg)), 
@@ -2597,6 +2601,7 @@ include_graphics(here("Figs/fig_LW_plots.png"))
 # Process CUFES data
 
 ## Import CUFES data  
+
 During surveys, or for surveys for which CUFES data have not been verified and uploaded to SQL Server, data in SQLite format may be obtained by contacting [Amy Hays](Amy.Hays@NOAA.gov). To import from the SQL Server, a machine ODBC connection must be configured to the CUFES databases on the Estrella server (IP address: 161.55.235.187). To request access to the CUFES database, contact [Ed Weber](Ed.Weber@NOAA.gov). 
 
 ```{r import-cufes-data}
@@ -3483,9 +3488,13 @@ nasc <- nasc %>%
 
 # Format for plotting
 nasc.density <- nasc %>%
-  select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
-         sar.dens, transect = transect.orig, int) %>% 
-  group_by(transect, int) %>% 
+  select(transect, transect.orig, int, lat, long, 
+         anch.dens, her.dens, jack.dens, mack.dens, sar.dens) %>% 
+  # When transects have multiple sections (e.g., 041-1, 041-2), interval is not unique
+  # So create a int.key for computing density along unique intvervals for plotting
+  mutate(int.key = paste(transect.orig, int)) %>% 
+  # Then summarize by transect and unique interval
+  group_by(transect, int.key) %>%
   summarise(
     lat = lat[1],
     long = long[1],
@@ -3494,7 +3503,7 @@ nasc.density <- nasc %>%
     `Trachurus symmetricus` = mean(jack.dens),
     `Scomber japonicus`     = mean(mack.dens),
     `Sardinops sagax`       = mean(sar.dens)) %>% 
-  gather(scientificName, density, -transect, -int, -lat, -long) %>% 
+  gather(scientificName, density, -transect, -int.key, -lat, -long) %>% 
   mutate(bin       = cut(density, dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin))
 
@@ -3592,6 +3601,7 @@ include_graphics(here("Figs/fig_cluster_interval_distance_histogram.png"))
 ```{r biomass-by-cluster-distance,fig.cap='(ref:biomass-by-cluster-distance)'}
 # Compute acoustic biomass for each interval versus distance to positive clusters
 nasc.clust.biom <- nasc.clust.hist %>% 
+  filter(density > 0) %>% 
   mutate(
     dist.bin = cut(cluster.distance,
                    seq(0, ceiling(max(cluster.distance)), 
@@ -3933,8 +3943,10 @@ View results of strata definition algorithm compated to transect spacing, biomas
 # Create data frame with relevant landmarks
 landmarks <- data.frame(
   name = c("Pt. Conception", "Cape Mendocino", "Cape Flattery"),
-  lat.start = c(stock.break.sar, stock.break.anch, 48.490),
-  y = rep(0,3))
+  lat.start = c(34.7, 40.430520, 48.490),
+  y = rep(0,3)) %>% 
+  filter(lat.start > min(nasc.density$lat),
+         lat.start < max(nasc.density$lat))
 
 # Get max density for setting y limits
 max.tx.dens.log <- ceiling(max(log(nasc.density.summ$density + 1), na.rm = TRUE))
@@ -3951,7 +3963,7 @@ if (nrow(strata.summ.rm) > 0) {
                                          group = stratum.orig),
               fill = 'gray50', alpha = 0.5, linetype = "dotted") +
     geom_hline(yintercept = 0, colour = 'gray20') +
-    geom_vline(xintercept = c(stock.break.sar, stock.break.anch, 48.490), linetype = "dashed") +
+    geom_vline(xintercept = landmarks$lat.start, linetype = "dashed") +
     geom_text(data = landmarks, 
               aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
@@ -3976,11 +3988,6 @@ if (nrow(strata.summ.rm) > 0) {
     theme(strip.text.x       = element_text(face = "bold.italic"),
           strip.background.x = element_rect(fill = NA)) +
     coord_flip()
-  
-  # Save plot
-  ggsave(biomass.dens.plot.lat, 
-         filename = here("Figs/fig_biomass_density_transect_lat.png"),
-         height = 10, width = 8.5*n_distinct(strata.summ$vessel.name))
   
   # Original plot, based on transect number on the x-axis
   biomass.dens.plot.tx <- ggplot(strata.summ) +
@@ -4012,47 +4019,6 @@ if (nrow(strata.summ.rm) > 0) {
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic"))
   
-  ggsave(biomass.dens.plot.tx, 
-         filename = here("Figs/fig_biomass_density_transect_tx.png"),
-         height = 13, width = 13)
-  
-  # Original plot, based on transect name on the x-axis, with non log-transformed densities
-  biomass.dens.plot.tx.name <- ggplot(strata.summ) +
-    # geom_rect(aes(xmin = start - 0.4, xmax = end + 0.4, 
-    #               ymin = 0, ymax = max.tx.dens, 
-    #               group = stratum, colour = factor(stratum)),
-    #           fill = 'gray70', alpha = 0.5) +
-    # geom_rect(data = strata.summ.rm, aes(xmin = start - 0.4, xmax = end + 0.4, 
-    #                                      ymin = 0, ymax = max.tx.dens, 
-    #                                      group = stratum.orig),
-    #           fill = 'gray50', alpha = 0.5, linetype = "dotted") +
-    geom_hline(yintercept = 0, colour = 'gray20') +
-    geom_path(data = nasc.density.summ, 
-              aes(transect.name, density, group = scientificName)) +
-    geom_point(data = nasc.density.summ, 
-               aes(transect.name, density, group = scientificName, fill = dist.bin), 
-               shape = 21, size = 3) +
-    # Label non-zero biomass density to facilitate picking strata
-    geom_text_repel(data = filter(nasc.density.summ, density > 0.01),
-                    aes(transect.name, density, label = transect.name, group = scientificName),
-                    colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1,
-                    angle = 90) +
-    scale_colour_discrete("Stratum") +
-    scale_fill_discrete("Spacing (nmi)") +
-    facet_wrap(~scientificName, ncol = 1, scales = "free_y") +
-    xlab("Transect") + 
-    scale_y_continuous(expression(Biomass~density~(t~nmi^-2))) +
-    # scale_y_continuous(expression(Biomass~density~(t~nmi^-2)), 
-    #                    limits = c(-0.5, max.tx.dens), expand = c(0,0)) +
-    theme_bw() +
-    theme(strip.background.x = element_blank(),
-          strip.text.x       = element_text(face = "italic"),
-          axis.text.x        = element_text(angle = 90))
-  
-  ggsave(biomass.dens.plot.tx.name, 
-         filename = here("Figs/fig_biomass_density_transect_tx_name.png"),
-         height = 10, width = 20)
-  
 } else {
   # If no strata were removed
   # Biomass density by species and transect, showing stratum breaks
@@ -4061,7 +4027,7 @@ if (nrow(strata.summ.rm) > 0) {
                   group = stratum, colour = factor(stratum)), 
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
-    geom_vline(xintercept = c(stock.break.sar, stock.break.anch, 48.490), linetype = "dashed") +
+    geom_vline(xintercept = landmarks$lat.start) +
     geom_text(data = landmarks, 
               aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
@@ -4086,11 +4052,6 @@ if (nrow(strata.summ.rm) > 0) {
     theme(strip.text.x       = element_text(face = "bold.italic"),
           strip.background.x = element_rect(fill = NA)) +
     coord_flip()
-  
-  # Save plot
-  ggsave(biomass.dens.plot.lat, 
-         filename = here("Figs/fig_biomass_density_transect_lat.png"),
-         height = 12, width = 10*n_distinct(strata.summ$vessel.name))
   
   # Original plot, based on transect number on the x-axis
   biomass.dens.plot.tx <- ggplot(strata.summ) +
@@ -4117,10 +4078,25 @@ if (nrow(strata.summ.rm) > 0) {
     theme_bw() +
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic"))
+}
+
+# Save plots
+if (diff(range(nasc.density.summ$start.lat)) > 6) {
+  ggsave(biomass.dens.plot.lat, 
+         filename = here("Figs/fig_biomass_density_transect_lat.png"),
+         height = 10, width = 8.5*n_distinct(strata.summ$vessel.name))
   
   ggsave(biomass.dens.plot.tx, 
          filename = here("Figs/fig_biomass_density_transect_tx.png"),
-         height = 13, width = 10)
+         height = 13, width = 13)  
+} else {
+  ggsave(biomass.dens.plot.lat, 
+         filename = here("Figs/fig_biomass_density_transect_lat.png"),
+         height = 8, width = 8*n_distinct(strata.summ$vessel.name))
+  
+  ggsave(biomass.dens.plot.tx, 
+         filename = here("Figs/fig_biomass_density_transect_tx.png"),
+         height = 8, width = 8) 
 }
 
 # Add plot by latitude

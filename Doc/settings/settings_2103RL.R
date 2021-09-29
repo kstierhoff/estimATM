@@ -299,7 +299,7 @@ sounder.type           <- c(RL  = "EK80")
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-SMANUGIAN-D", "SWC-JRENFREE1-D")) {
+if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", "SWC-JRENFREE1-D","SWC-KSTIERH1-L")) {
   survey.dir <- c(RL  = "C:/SURVEY/2103RL",
                   LBC = "C:/SURVEY/2103RL")   
 } else {
@@ -335,7 +335,7 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LBC = "\\d{3}T")
 # Recursively search NASC directories
 nasc.recurse           <- c(RL  = TRUE,
-                            LBC = TRUE)
+                            LBC = FALSE)
 # Max NASC value for removing outliers
 nasc.max               <- NA # 10000*19
 
@@ -422,7 +422,7 @@ cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIO
 cufes.db.sqlite        <- "cufes202103RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 # Trawl data
-trawl.source           <- "SQL" # "SQL" or "Access"
+trawl.source           <- "SQL"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2103RL.accdb"

@@ -1333,6 +1333,10 @@ pos.clusters.ns <- pos.clusters
 
 nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
 
+# Save nasc.nearshore prior to removing overlapping intervals
+save(nasc.nearshore, 
+     file = here("Output/nasc_nearshore_all.Rdata"))
+
 # Remove overlapping intervals --------------------------------------------
 if (process.nearshore) {
   # Subset nearshore backscatter and remove overlap with Lasker
