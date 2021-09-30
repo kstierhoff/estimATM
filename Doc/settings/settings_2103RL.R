@@ -173,12 +173,12 @@ map.height.region <- 6
 
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
-useCrossOrigin <- F # USe cross origin
+useCrossOrigin <- F # Use cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
 scale.pies <- FALSE # Scale pie charts (TRUE/FALSE)
-pie.scale  <- 0.02 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
+pie.scale  <- 0.025 # 0.0125 works well for coast-wide survey (i.e., summer), and 0.025 for spring
 
 # Map landmarks
 label.list <- c("Monterey Bay","San Francisco","Crescent City",

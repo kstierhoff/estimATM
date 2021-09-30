@@ -1,11 +1,11 @@
 ---
-title: "Acoustic Line Kilometers-Summer 2019 Lasker (1907RL)"
+title: "Acoustic Line Kilometers"
 author: "Kevin L. Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 css: css/ast.css
 output:
   bookdown::html_document2:
-    toc: yes
+    toc: no
     toc_float: yes
 ---
 
@@ -21,7 +21,7 @@ pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf,
 # Install and load required packages from Github -------------------------------
 # surveyR
 pacman::p_load_gh("kstierhoff/surveyR")
-# atm
+# atm==
 pacman::p_load_gh("kstierhoff/atm")
 # rnaturalearth data
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
@@ -46,7 +46,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, error = FALSE, warning = FA
 dir_create(here(), c("Data", "Figs", "Output"))
 ```
 
-```{r project-settings}
+```{r project-settings, include=FALSE}
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(), "/")))
 
@@ -60,9 +60,9 @@ source(here("Doc/settings", prj.settings))
 
 ```{r user-input}
 # Set processing controls -------------------------------------------------
-save.figs     <- F # Create new figures
-get.nav       <- T # Download Lasker nav data from ERDDAP
-get.nav.sd    <- T # Download Saildrone nav data from ERDDAP
+save.figs     <- T # Create new figures
+get.nav       <- F # Download Lasker nav data from ERDDAP
+get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
 get.bathy     <- F # Download ETOPO1 bathymetry data in the survey footprint
 extract.bathy <- F # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -154,7 +154,7 @@ transects.sf <- wpts.sf %>%
     distance = round(as.numeric(st_length(.))/1852,1),
     label    = paste("Transect", Transect),
     popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
-                       'Distance:', distance, 'nmi<br/>')
+                     'Distance:', distance, 'nmi<br/>')
   )
 
 # Summarise nav
@@ -176,7 +176,7 @@ if (resize.map) {
 
 ```{r process-nav-saildrone}
 if (get.nav.sd) {
-   # Load existing nav data
+  # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data_saildrone.Rdata"))) {
     load(here("Data/Nav/nav_data_saildrone.Rdata"))
     
@@ -226,7 +226,7 @@ if (get.nav.sd) {
       slice(n()) %>% 
       mutate(label = paste("Saildrone", saildrone, "Last position:", datetime, "UTC"),
              popup = paste0('<b>Saildrone: </b>', saildrone, '<br/>',
-                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
+                            '<b>Last position: </b>', datetime, ' UTC<br/>'))
     
     # Convert saildrone nav to spatial
     nav.sd.sf <- nav.sd.sf %>% 
@@ -234,7 +234,7 @@ if (get.nav.sd) {
       summarise(do_union = F) %>% 
       st_cast("LINESTRING") %>% 
       mutate(tracklength = st_length(.))
-
+    
     # Save nav data
     save(nav.sd, nav.sd.sf, nav.now.sd, 
          file = here("Data/Nav/nav_data_saildrone.Rdata"))
@@ -245,8 +245,10 @@ if (get.nav.sd) {
   }
 }
 
-# Filter Saildrones by number
-nav.sd <- filter(nav.sd, saildrone %in% sd.numbers)
+if (exists("nav.sd")) {
+  # Filter Saildrones by number
+  nav.sd <- filter(nav.sd, saildrone %in% sd.numbers)  
+}
 ```
 
 ```{r get-bathy}
@@ -363,100 +365,103 @@ write_csv(nav.summ, paste0(here("Output"), "/", survey.name, "_LineKilometers_",
 ```
 
 ```{r summarize-results-sd}
-# Summarize NASC by date and lat/long
-nav.sun.sd <- nav.sd %>% 
-  mutate(date = date(datetime)) %>% 
-  group_by(date) %>% 
-  summarise(lat = mean(lat),
-            long = mean(long)) %>% 
-  as.data.frame()
-
-# Get sunrise/sunset for each survey day
-nav.daynight.sd <- data.frame()
-
-for (i in 1:nrow(nav.sun.sd)) {
-  tmp <- day_night(date = nav.sun.sd$date[i], 
-                   geocode = data.frame(lat = nav.sun.sd$lat[i], lon = nav.sun.sd$long[i]),
-                   twilight = survey.twilight)
-  nav.daynight.sd <- bind_rows(nav.daynight.sd, tmp)
-}
-
-# Format the results
-nav.daynight.sd <- nav.daynight.sd %>% 
-  mutate(sunrise = ymd_hms(paste(day, hms::as_hms(sunrise*3600))) - minutes(survey.twilight.offset),
-         sunset  = sunrise + daylength*3600 + minutes(survey.twilight.offset),
-         sunrise = as.character(sunrise), # convert to character to work with gather()
-         sunset  = as.character(sunset)) %>% 
-  select(day, sunrise, sunset) %>% 
-  gather(period, time, -day) %>% 
-  mutate(time    = ymd_hms(time, tz = "UTC"), # convert back to POSIX
-         sun_key = as.character(time)) %>% 
-  arrange(time) %>% 
-  mutate(id = seq(1, nrow(.)))
-
-
-# Process FSV data from ERDDAP
-nav.sd <- nav.sd %>%
-  mutate(time = ymd_hms(time),
-         date = date(time),
-         dist = SOG*60/1000) %>%  # Distance in km
-  filter(between(long, min.long, max.long), between(lat, min.lat, max.lat))
-
-if (extract.bathy) {
-  # Get nav depth and compute photoperiod
-  nav.depth.sd <- get.depth(noaa.bathy, nav.sd$long, nav.sd$lat, locator = F, distance = T) %>%
-    rename(long = lon) %>%
-    bind_cols(select(nav.sd, datetime, dist)) %>%
-    mutate(dist.depth = c(0, diff(dist.km))) %>%
-    filter(dist.depth < 100)  %>% # Remove distant points
-    mutate(depth_bin = cut(depth, c(min(depth), -200, 0), include.lowest = T, labels = F),
-           id = cut(as.numeric(datetime), as.numeric(nav.daynight.sd$time),
-                    include.lowest = T, labels = F),
-           depth_bin = case_when(
-             depth_bin == 1 ~ "Deep (>200 m)",
-             depth_bin == 2 ~ "Shallow (<200 m)")) %>%
-    filter(!is.na(depth_bin)) %>%
-    left_join(select(nav.daynight.sd, id, period)) %>%
-    mutate(day_night = case_when(
-      period == "sunrise" ~ "Day",
-      period == "sunset"  ~ "Night")) %>%
-    mutate(pings = case_when(
-      abs(depth) < 250              ~ 60*(750/abs(250)),
-      between(abs(depth), 250, 750) ~ 60*(750/abs(depth)),
-      abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
-    project_df(to = crs.proj) %>% 
-    arrange(desc(day_night), datetime)
+if (exists("nav.sd")) {
+  # Summarize NASC by date and lat/long
+  nav.sun.sd <- nav.sd %>% 
+    mutate(date = date(datetime)) %>% 
+    group_by(date) %>% 
+    summarise(lat = mean(lat),
+              long = mean(long)) %>% 
+    as.data.frame()
   
-  # Save results
-  save(nav.depth.sd, file = here("Output/nav_bathy_Saildrone.Rdata"))
+  # Get sunrise/sunset for each survey day
+  nav.daynight.sd <- data.frame()
   
-} else {
-  # Load extracted bathymetry
-  load(here("Output/nav_bathy_Saildrone.Rdata"))
+  for (i in 1:nrow(nav.sun.sd)) {
+    tmp <- day_night(date = nav.sun.sd$date[i], 
+                     geocode = data.frame(lat = nav.sun.sd$lat[i], lon = nav.sun.sd$long[i]),
+                     twilight = survey.twilight)
+    nav.daynight.sd <- bind_rows(nav.daynight.sd, tmp)
+  }
+  
+  # Format the results
+  nav.daynight.sd <- nav.daynight.sd %>% 
+    mutate(sunrise = ymd_hms(paste(day, hms::as_hms(sunrise*3600))) - minutes(survey.twilight.offset),
+           sunset  = sunrise + daylength*3600 + minutes(survey.twilight.offset),
+           sunrise = as.character(sunrise), # convert to character to work with gather()
+           sunset  = as.character(sunset)) %>% 
+    select(day, sunrise, sunset) %>% 
+    gather(period, time, -day) %>% 
+    mutate(time    = ymd_hms(time, tz = "UTC"), # convert back to POSIX
+           sun_key = as.character(time)) %>% 
+    arrange(time) %>% 
+    mutate(id = seq(1, nrow(.)))
+  
+  
+  # Process FSV data from ERDDAP
+  nav.sd <- nav.sd %>%
+    mutate(time = ymd_hms(time),
+           date = date(time),
+           dist = SOG*60/1000) %>%  # Distance in km
+    filter(between(long, min.long, max.long), between(lat, min.lat, max.lat))
+  
+  if (extract.bathy) {
+    # Get nav depth and compute photoperiod
+    nav.depth.sd <- get.depth(noaa.bathy, nav.sd$long, nav.sd$lat, locator = F, distance = T) %>%
+      rename(long = lon) %>%
+      bind_cols(select(nav.sd, datetime, dist)) %>%
+      mutate(dist.depth = c(0, diff(dist.km))) %>%
+      filter(dist.depth < 100)  %>% # Remove distant points
+      mutate(depth_bin = cut(depth, c(min(depth), -200, 0), include.lowest = T, labels = F),
+             id = cut(as.numeric(datetime), as.numeric(nav.daynight.sd$time),
+                      include.lowest = T, labels = F),
+             depth_bin = case_when(
+               depth_bin == 1 ~ "Deep (>200 m)",
+               depth_bin == 2 ~ "Shallow (<200 m)")) %>%
+      filter(!is.na(depth_bin)) %>%
+      left_join(select(nav.daynight.sd, id, period)) %>%
+      mutate(day_night = case_when(
+        period == "sunrise" ~ "Day",
+        period == "sunset"  ~ "Night")) %>%
+      mutate(pings = case_when(
+        abs(depth) < 250              ~ 60*(750/abs(250)),
+        between(abs(depth), 250, 750) ~ 60*(750/abs(depth)),
+        abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
+      project_df(to = crs.proj) %>% 
+      arrange(desc(day_night), datetime)
+    
+    # Save results
+    save(nav.depth.sd, file = here("Output/nav_bathy_Saildrone.Rdata"))
+    
+  } else {
+    # Load extracted bathymetry
+    load(here("Output/nav_bathy_Saildrone.Rdata"))
+  }
+  
+  # Summarise distance by day/night and depth
+  # Number of pings per km were estimated as ...
+  nav.summ.sd <- nav.depth.sd %>% 
+    filter(!is.nan(dist), !is.na(day_night)) %>% 
+    group_by(depth_bin, day_night) %>% 
+    summarise(
+      dist_km  = round(sum(dist)),
+      pings_ek = round(sum(pings))) %>% 
+    ungroup() %>% 
+    mutate(
+      dist_nmi = round(dist_km * 0.539957)) %>% 
+    select(depth_bin:dist_km, dist_nmi, everything())
+  
+  # Write results to file
+  write_csv(nav.summ.sd, paste0(here("Output"), "/", survey.name, "_LineKilometers_Saildrone", ".csv")) 
 }
-
-# Summarise distance by day/night and depth
-# Number of pings per km were estimated as ...
-nav.summ.sd <- nav.depth.sd %>% 
-  filter(!is.nan(dist), !is.na(day_night)) %>% 
-  group_by(depth_bin, day_night) %>% 
-  summarise(
-    dist_km  = round(sum(dist)),
-    pings_ek = round(sum(pings))) %>% 
-  ungroup() %>% 
-  mutate(
-    dist_nmi = round(dist_km * 0.539957)) %>% 
-  select(depth_bin:dist_km, dist_nmi, everything())
-
-# Write results to file
-write_csv(nav.summ.sd, paste0(here("Output"), "/", survey.name, "_LineKilometers_Saildrone", ".csv"))
 ```
 
-# Summarize effort by depth and day/night
+# `r survey.name.long`(`r survey.name`)
+## Summarize effort by depth and day/night
 
 Total transit distance (km and nmi) and number of pings emitted from the multifrequency echosounders are summarized by period (day or night, based on daily sunrise and sunset time at the vessel's location) and seabed depth (greater or less than 200 m). Number of pings are estimated every 1 minute based on the seabed depth (m), where the number of pings per second is equal to 750/depth. Deeper than 750 m, the ping rate is assume to be 1 ping per second (pps). A maximum ping rate of be 3 pps is assume for depths shallower than 250 m.  
 
-## Reuben Lasker
+### Reuben Lasker
 
 ```{r effort-summary}
 # Print nav summary
@@ -473,21 +478,21 @@ nav.summ %>%
   row_spec(0, align = c("c"))
 ```
 
-## Saildrone
+### Saildrone
 
 ```{r effort-summary-saildrone}
 if (exists("nav.summ.sd")) {
- nav.summ.sd %>% 
-  rename(Depth            = depth_bin,
-         Period           = day_night,
-         "Distance (km)"  = dist_km,
-         "Distance (nmi)" = dist_nmi,
-         Pings            = pings_ek) %>%  
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
-        align = c("c")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = F) %>%
-  row_spec(0, align = c("c")) 
+  nav.summ.sd %>% 
+    rename(Depth            = depth_bin,
+           Period           = day_night,
+           "Distance (km)"  = dist_km,
+           "Distance (nmi)" = dist_nmi,
+           Pings            = pings_ek) %>%  
+    kable(format = knitr.format, booktabs = TRUE, escape = F,
+          align = c("c")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                  full_width = F) %>%
+    row_spec(0, align = c("c")) 
 } else {
   print("No Saildrone data.")
 }
@@ -497,7 +502,7 @@ if (exists("nav.summ.sd")) {
 # Configure base map options -----------------
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
- project_df(to = crs.proj)
+  project_df(to = crs.proj)
 
 # Get state data
 states <- ne_states(country = 'United States of America', returnclass = 'sf')
@@ -527,8 +532,8 @@ if (save.figs) {
 }
 ```
 
-# Map vessel nav by depth and day/night  
-## _Reuben Lasker_
+## Map vessel nav by depth and day/night  
+### _Reuben Lasker_
 
 ```{r map-daynight-bathy}
 if (save.figs) {
@@ -568,7 +573,7 @@ if (save.figs) {
 include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_", survey.vessel, ".png"))
 ```  
 
-## Saildrone
+### Saildrone
 
 ```{r map-daynight-bathy-saildrone}
 if (save.figs) {
@@ -614,8 +619,8 @@ if (file.exists(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_Saildrone
 
 ```
 
-# Map vessel nav by depth (daytime only)
-## _Reuben Lasker_
+## Map vessel nav by depth (daytime only)
+### _Reuben Lasker_
 
 ```{r map-daytime-bathy}
 if (save.figs) {
@@ -639,34 +644,32 @@ if (save.figs) {
 include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_", survey.vessel, ".png"))
 ```
 
-## Saildrone
+### Saildrone
 
 ```{r map-daytime-bathy-saildrone}
-if (save.figs) {
-  # Map only daytime nav by depth
-  day.plot.sd <- base.map + 
-    geom_point(data = filter(nav.depth.sd, day_night == "Day"), 
-               aes(X, Y, colour = depth_bin), size = 0.5) +
-    scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
-    theme(legend.position      = c(0,0),
-          legend.justification = c(0,0),
-          legend.background    = element_blank(),
-          legend.key           = element_blank()) +
-    ggtitle("Daytime vessel nav by depth")
-  
-  # Save daytime only plot
-  ggsave(day.plot.sd, 
-         filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_Saildrone.png"),
-         height = map.height, width = map.width)
-}
+if (exists("nav.depth.sd")) {
+  if (save.figs) {
+    # Map only daytime nav by depth
+    day.plot.sd <- base.map + 
+      geom_point(data = filter(nav.depth.sd, day_night == "Day"), 
+                 aes(X, Y, colour = depth_bin), size = 0.5) +
+      scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
+      theme(legend.position      = c(0,0),
+            legend.justification = c(0,0),
+            legend.background    = element_blank(),
+            legend.key           = element_blank()) +
+      ggtitle("Daytime vessel nav by depth")
+    
+    # Save daytime only plot
+    ggsave(day.plot.sd, 
+           filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_Saildrone.png"),
+           height = map.height, width = map.width)
+  }
+}  
 
 if (file.exists(paste0(here("Figs"), "/", survey.name, "_nav_depth_Saildrone.png"))) {
   include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_Saildrone.png"))
 } else {
   print("No Saildrone data.")
-}
-
+}  
 ```
-
-
-
