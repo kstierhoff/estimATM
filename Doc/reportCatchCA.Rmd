@@ -9,9 +9,9 @@ output: html_document
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,lubridate,sp,rgeos,mapview,
-          knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
-          odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial)
+pacman::p_load(tidyverse,swfscMisc,lubridate,sp,rgeos,mapview,RODBC,
+               knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -42,7 +42,7 @@ if (doc.type == "latex") {
 }
 ```
 
-```{r project-info}
+```{r project-info,include=FALSE}
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(),"/")))
 
@@ -55,8 +55,8 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r user-controls}
-get.db     <- T
-get.nav    <- T
+get.db     <- F
+get.nav    <- F
 save.figs  <- T
 resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 do.spatial <- T
@@ -165,7 +165,7 @@ wpts <- read_csv(here("Data/Nav", wpt.filename)) %>%
 wpts.sf <- wpts %>% 
   filter(Type %in% wpt.types) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-   mutate(
+  mutate(
     label    = paste("Transect", Transect),
     popup    = paste('<b>Transect:</b>', Transect, Type)
   )
@@ -180,16 +180,16 @@ transects.sf <- wpts.sf %>%
          brg      = 360 + stplanr::line_bearing(.),
          label    = paste("Transect", Transect),
          popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
-                       'Distance:', distance, 'nmi<br/>')) 
+                          'Distance:', distance, 'nmi<br/>')) 
 
 st_write(transects.sf, here("Output/planned_transects.shp"), 
          delete_layer = TRUE)
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
-      mutate(GPS_date = format(datetime, format = "%F"),
-             GPS_time = format(datetime, format = "%T")) %>% 
-      select(GPS_date, GPS_time, latitude = lat, longitude = long)
+  mutate(GPS_date = format(datetime, format = "%F"),
+         GPS_time = format(datetime, format = "%T")) %>% 
+  select(GPS_date, GPS_time, latitude = lat, longitude = long)
 
 write_csv(nav.gps, here("Output/nav.gps.csv"))
 
@@ -412,7 +412,7 @@ if (do.spatial) {
 
 # Filter hauls in CA waters
 haul.out <- haul.mid %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   filter(!haul %in% haul.ca$haul)
 ```
 
@@ -553,8 +553,8 @@ if (get.db) {
 
 # Convert to sf; CRS =4326 (WGS84)
 tows <- st_as_sf(tows, coords = c("long","lat"), crs = 4326) %>% 
-      mutate(long = map_dbl(geometry, ~st_centroid(.x)[[1]]),
-             lat  = map_dbl(geometry, ~st_centroid(.x)[[2]]))
+  mutate(long = map_dbl(geometry, ~st_centroid(.x)[[1]]),
+         lat  = map_dbl(geometry, ~st_centroid(.x)[[2]]))
 
 if (do.spatial) {
   # Find tows in CA waters
@@ -619,7 +619,11 @@ tows.out <- filter(tows, !key %in% tows.ca$key)
 
 # Create leaflet map
 leaflet() %>% 
-  addProviderTiles(leaflet.tile) %>% 
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.OceanBasemap, 
+                   group = "Esri.OceanBasemap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
   addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
   addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
               label = ~htmlEscape(MPA)) %>% 
