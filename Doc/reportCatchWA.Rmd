@@ -1,0 +1,663 @@
+---
+title: "WA Scientific Collection Permit Reporting"
+author: "Kevin Stierhoff"
+output: html_document
+---
+
+```{r set-up, error=FALSE, message=FALSE, warning=FALSE, echo=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,swfscMisc,lubridate,sp,rgeos,mapview,RODBC,leafem,
+               knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# Set global knitr chunk options
+if (.Platform$OS.type == "unix") {
+  # Do not specify Cairo device for MacOS
+  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', out.width = '100%', dev = "png", dpi = 150)
+} else {
+  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', out.width = '100%', dev = "png", dpi = 150,
+                        dev.args = list(type = "cairo"))
+}
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+```
+
+```{r project-info,include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r user-controls}
+get.db     <- F
+get.nav    <- F
+save.figs  <- T
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+do.spatial <- T
+```
+
+```{r get-data}
+# Copy trawl Access database
+haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                  regexp = trawl.db.access)
+
+file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+
+if (trawl.source == "SQL") {
+  # Configure ODBC connection to TRAWL database
+  trawl.con  <- dbConnect(odbc(), 
+                          Driver = "SQL Server", 
+                          Server = "161.55.235.187", 
+                          Database = "Trawl", 
+                          Trusted_Connection = "True")
+} else if (trawl.source == "Access") {
+  trawl.con  <- dbConnect(odbc(), 
+                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                          DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+}
+
+# Import trawl database tables
+catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
+haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
+lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+
+# Close database channel
+dbDisconnect(trawl.con)
+```
+
+```{r process-nav,include=FALSE}
+if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+    load(here("Data/Nav/nav_data.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time)) - days(1)
+  }
+  
+  if (nav.lag > 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      sep = ""))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
+                                    row.names = NULL, skip = 0))
+    names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = long - 360,
+             SOG      = SOG * 1.94384,
+             datetime = ymd_hms(time),
+             SST      = na_if(SST, NaN),
+             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(lat, min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
+  }
+  
+  # Convert nav to spatial
+  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  
+  nav.paths.sf <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Save results
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
+} else {
+  # Load nav data
+  load(here("Data/NAV/nav_data.Rdata"))
+}
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename)) %>% 
+  rename(lat = Latitude, long = Longitude) %>% 
+  project_df(to = crs.proj)
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+# Create transect lines from waypoint files and add line bearing
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.),
+         label    = paste("Transect", Transect),
+         popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                          'Distance:', distance, 'nmi<br/>')) 
+
+st_write(transects.sf, here("Output/planned_transects.shp"), 
+         delete_layer = TRUE)
+
+# Create gps.csv file from nav to replace missing data in Echoview
+nav.gps <- nav %>% 
+  mutate(GPS_date = format(datetime, format = "%F"),
+         GPS_time = format(datetime, format = "%T")) %>% 
+  select(GPS_date, GPS_time, latitude = lat, longitude = long)
+
+write_csv(nav.gps, here("Output/nav.gps.csv"))
+
+# Get most recent vessel position for plotting
+nav.now <- tail(nav, 1) %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  mutate(label = paste("Last position:", datetime, "UTC"))
+```
+
+```{r configure-base-map,include=F}
+# Get map data -------------------------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
+  project_df(to = crs.proj)
+
+# Get land features --------------------------
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+wa     <- filter(states, name == "Washington")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Read isoline
+bathy_5m_line <- st_read(here("Data/GIS/bathy_us_wc_5m.shp")) %>% 
+  st_transform(4326) %>% 
+  rename(Depth = CONTOUR)
+
+# Read 5m bathymetry points shapefile
+bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
+
+# Read 5m bathymetry polygon
+bathy_5m_poly <- bathy_5m_points %>% 
+  summarise(do_union = F) %>% 
+  st_cast("POLYGON")
+
+# Create a reduced coastline for nearshore point estimation
+bathy_5m_df <- bathy_5m_points %>%
+  mutate(
+    long = as.data.frame(st_coordinates(.))$X,
+    lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL)
+
+write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
+
+# Read State Waters shapefiles -------------------------------
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>%
+  st_transform(4326)
+
+# Read CA MPAs shapefile --------------------------------------
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>%
+  st_transform(4326) %>%
+  mutate(MPA = paste(NAME, Type))
+
+# Create State Waters shapefile -------------------------------
+wa_waters <- wa %>% 
+  # Convert to meters for accurate buffer
+  st_transform(crs = 3310) %>% 
+  st_buffer(dist = 1852*3) %>% 
+  # Transform back to WGS84 for mapping
+  st_transform(4326)
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav.sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox() 
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- wa_waters %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+
+# Create base map for inset maps
+base.map.bw <- ggplot() +
+  # Plot bathymetry contours
+  geom_sf(data = bathy, colour = "gray90") +
+  # Plot high-res land polygons
+  geom_sf(data = countries, fill = "gray90", color = "gray50") +
+  geom_sf(data = states, fill = "gray90", colour = "gray50") +
+  # Format axes and titles
+  xlab("Longitude") + ylab("Latitude") + 
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
+  theme_bw() + 
+  theme(axis.text.x  = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank())
+
+# Save the basemap
+ggsave(base.map,file = here("Figs/fig_basemap_wa.png"), 
+       height = map.height, width = map.width)
+
+ggsave(base.map.bw,
+       file = here("Figs/fig_basemap_wa_bw.png"), 
+       height = map.height, width = map.width)
+```
+
+```{r ca-waters-map, eval=F}
+# Add CA state waters layer
+base.map + geom_sf(data = wa_waters, colour = "red", fill = NA) +
+  coord_sf(crs = crs.proj, 
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+```
+
+```{r modify-data}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  # Reformat haul data to match SQL
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)),
+      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$EquilibriumTime, 
+                                                format = "%H:%M:%S"))),
+      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$haulbackTime,
+                                                format = "%H:%M:%S")))) %>% 
+    mutate(haulBackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) %>%
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, notes = Notes)
+  
+  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+  
+  # Correct equilibriumTime or haulBackTime
+  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  
+  # Reformat length frequency data to match SQL
+  lengths.all <- lengths.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, species = Species)
+  
+  # Reformat length frequency data to match SQL
+  lengthFreq.all <- lengthFreq.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
+           species = Species, length = Length, lengthType = LengthType, 
+           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
+           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
+           subSampleNumber = SubSampleNumber)
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    mutate(
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime))
+}
+
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>% 
+  mutate(season = case_when(
+    month(equilibriumTime) < 6 ~ "spring",
+    TRUE ~ "summer"),
+    duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+    cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul.all %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Create haul paths from starts and ends
+haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+```
+
+```{r filter-trawl-data}
+if (do.spatial) {
+  # Find hauls in CA waters
+  haul.wa <- haul.mid %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    st_intersection(wa_waters)
+  # 
+  # haul.mpa <- haul.mid %>% 
+  #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  #   st_intersection(ca_mpas) 
+  
+  save(haul.wa, file = here("Output/haul_data_reportCatchWa.Rdata"))
+} else {
+  load(here("Output/haul_data_reportCatch.Rdata"))
+}
+
+# Filter hauls in CA waters
+haul.out <- haul.mid %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  filter(!haul %in% haul.wa$haul)
+```
+
+```{r wa-hauls-map, eval=F}
+# Add CA state waters layer
+base.map + 
+  geom_sf(data = wa_waters, colour = "red", fill = NA) +
+  geom_sf(data = haul.wa, colour = "blue", shape = 21) +
+  coord_sf(crs = crs.proj, 
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+```
+
+```{r extract-catch}
+catch.wa <- catch.all %>% 
+  filter(haul %in% haul.wa$haul) %>% 
+  # left_join(select(haul.ca, key, date_time)) %>% 
+  left_join(spp.codes)
+
+catch.table <- catch.wa %>% 
+  left_join(select(haul.all, haul, lat = DecLatitude, long = DecLongitude, 
+                   date_time = equilibriumTime)) %>% 
+  # left_join(select(as.data.frame(haul.mpa), haul, MPA)) %>%
+  mutate(county = NA,
+         utm_e = NA, 
+         utm_n = NA,
+         utm_zone = NA,
+         gps_datum = "WGS84",
+         map_scaling = "10K",
+         num_M = NA,
+         num_F = NA,
+         num_UNK = NA,
+         method = "Nordic trawl",
+         disposition = "S",
+         facility = "SWFSC",
+         totalWt = subSampleWtkg + remainingSubSampleWtkg,
+         meanWt = subSampleWtkg/subSampleCount,
+         totalCt = round(totalWt/meanWt),
+         blank1 = NA,
+         blank2 = NA) %>% 
+  arrange(date_time) %>% 
+  select(commonName, blank1, scientificName, blank2, county, utm_e, utm_n, utm_zone, long, lat, gps_datum,
+         map_scaling, date_time, num_M, num_F, num_UNK, totalCt, method, disposition, facility) %>% 
+  mutate(date_time = format(date_time, "%m/%d/%Y"))
+
+# Save to CSV
+write_csv(catch.table, here("Output/catch_table_WDFW.csv"), na = "")
+```
+
+# Interactive trawl plot
+A map showing all trawl hauls (black points), trawls in CA State waters (red points), and trawls occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection.  
+
+```{r catch-map-leaflet}
+# Configure palette for MPAs
+# factpal <- colorFactor(topo.colors(10), ca_mpas$MPA)
+
+# Create leaflet map
+if (nrow(haul.wa) > 0) {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
+    addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
+    # addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
+    #             label = ~htmlEscape(MPA)) %>% 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.wa, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft") 
+} else {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
+    addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.wa, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul))  %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft")
+}
+
+```
+
+```{r extract-ca-net-tows,eval=FALSE}
+if (get.db) {
+  # Define connection to CalCOFI database
+  odbc_channel <- RODBC::odbcConnect("CalCOFI")
+  
+  # SQL query for net tows
+  t_sql <- "select DISTINCT
+       CC.TOWS.T_S_C AS cruise,
+	   CC.TOWS.T_S_SC AS ship,
+	   CC.CRUISETYPES.CT_code cruise_type_code,
+	   cc.CRUISETYPE_CODES.type cruise_type,
+	   CC.TOWS.T_S_OO Order_Occupied,
+	   CC.TOWS.T_TD date,
+      ROUND(t_tbt/100,0,1) hours,CAST((T_TBT) AS INT)%100 minutes, CC.STATIONS.S_L AS line, CC.STATIONS.S_S AS station,
+       
+         CC.STATIONS.S_LATD ++ CC.STATIONS.S_LATM / 60  AS lat, 
+       (-1)*(CC.STATIONS.S_LONGD + CC.STATIONS.S_LONGM / 60) AS long,
+   --   CC.TOWS.t_nl,
+	    CC.TOWS.T_TT_STT tow_type
+       FROM CC.CRUISETYPES  
+	   join 
+	    cc.CRUISETYPE_CODES on CODE=ct_code
+		join
+	   CC.STATIONS  on ct_s_c=s_c and ct_s_sc=s_sc 
+	    JOIN
+             CC.TOWS ON CC.STATIONS.S_C = CC.TOWS.T_S_C AND CC.STATIONS.S_SC = CC.TOWS.T_S_SC AND 
+              CC.STATIONS.S_OO = CC.TOWS.T_S_OO 
+               WHERE --   (CC.TOWS.T_S_C in ('1704')) 
+					 CC.TOWS.T_S_C BETWEEN 1501 AND 1709"
+  
+  # Query CalCOFI database for net tows
+  tows <- sqlQuery(odbc_channel, t_sql) %>% 
+    mutate(
+      date = ymd(date),
+      key = paste(cruise, ship, Order_Occupied)) 
+  
+  # Close ODBC channel  
+  close(odbc_channel)
+  
+  save(tows, file = here("Output/tow_data_SQL.Rdata"))
+} else {
+  load(here("Output/tow_data_SQL.Rdata"))
+}
+
+# Convert to sf; CRS =4326 (WGS84)
+tows <- st_as_sf(tows, coords = c("long","lat"), crs = 4326) %>% 
+  mutate(long = map_dbl(geometry, ~st_centroid(.x)[[1]]),
+         lat  = map_dbl(geometry, ~st_centroid(.x)[[2]]))
+
+if (do.spatial) {
+  # Find tows in CA waters
+  tows.ca <- st_intersection(tows, ca_waters) %>% 
+    arrange(date)
+  
+  # Find tows in CA MPAs
+  tows.mpa <- st_intersection(tows, ca_mpas) %>% 
+    arrange(date)
+  
+  save(tows.ca, tows.mpa, file = here("Data/tow_sf.Rdata"))
+} else {
+  load(here("Data/tow_sf.Rdata"))
+}
+
+# Create final table
+tow.table <- as.data.frame(tows.ca) %>%
+  left_join(select(as.data.frame(tows.mpa), key, MPA)) %>% 
+  mutate(
+    method = case_when(
+      tow_type == "CB" ~ "Bongo",
+      tow_type == "MT" ~ "Manta",
+      tow_type == "PV" ~ "Pairovet")) %>% 
+  group_by(key, date, long, lat, MPA, cruise_type, cruise, ship, line, station) %>% 
+  summarise(
+    tows = n(),
+    method = glue::collapse(unique(method),sep = ", ")) %>% 
+  mutate(
+    county         = NA,
+    utm_e          = NA, 
+    utm_n          = NA,
+    utm_zone       = NA,
+    gps_datum      = "WGS84",
+    map_scaling    = "10K",
+    num_M          = NA,
+    num_F          = NA,
+    num_UNK        = NA,
+    disposition    = "S",
+    facility       = "SWFSC",
+    blank1         = NA,
+    blank2         = NA,
+    blank3         = NA,
+    scientificName = "Plankton tows",
+    commonName     = "Misc. plankton") %>% 
+  arrange(cruise_type, date, method) %>% 
+  ungroup() %>% 
+  select(scientificName, commonName, blank1, blank2, county, MPA, utm_e, utm_n, utm_zone, long, lat, gps_datum,
+         map_scaling, date, num_M, num_F, num_UNK, blank3, method, disposition, facility,
+         cruise_type, cruise, ship, line, station) %>% 
+  mutate(date = format(date, "%m/%d/%Y")) 
+
+# Save to CSV
+write_csv(tow.table, here("Output/tow_table_Project9.csv"), na = "")
+```  
+
+<!-- # Interactive plankton tow plot -->
+<!-- A map showing all plankton tows (black points), tows in CA State waters (red points), and tows occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection. -->
+
+```{r tow-leaflet-map,eval=FALSE}
+# Remove tows outside of CA waters
+tows.out <- filter(tows, !key %in% tows.ca$key)
+
+# Create leaflet map
+leaflet() %>% 
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.OceanBasemap, 
+                   group = "Esri.OceanBasemap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
+  addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
+              label = ~htmlEscape(MPA)) %>% 
+  addCircleMarkers(data = tows.out, radius = 3, color = "gray50", stroke = FALSE, fillOpacity = 0.75,
+                   label = ~htmlEscape(key)) %>% 
+  addCircleMarkers(data = tows.ca,  radius = 5, color = "red", stroke = FALSE, fillOpacity = 0.75,
+                   label = ~htmlEscape(key)) %>% 
+  addMarkers(data = tows.mpa, popup = ~key, label = ~htmlEscape(key)) %>% 
+  # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft")
+```
