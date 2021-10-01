@@ -1,5 +1,5 @@
 # Load backscatter data
-load("E:/CODE/R_packages/estimATM/2107RL/Output/nasc_cps.Rdata")
+load(here::here("Output/nasc_cps.Rdata"))
 
 library(tidyverse)
 library(lubridate)
@@ -8,6 +8,8 @@ nasc <- nasc.cps %>%
   mutate(datetime_pdt = with_tz(datetime, tzone = "America/Los_Angeles"))
 
 nasc.summ <- nasc %>% 
+  filter(!transect %in% c("4142","046.1","046.2","048.1","048.2")) %>% 
+  mutate(transect = str_replace(transect, "-\\d", "")) %>%  
   group_by(transect) %>% 
   summarize(
     start = format(min(datetime_pdt), format = "%F %T", tz = "America/Los_Angeles", usetz = TRUE),
