@@ -606,7 +606,7 @@ strata.super.polygons.os <- strata.points.os.sf %>%
   summarise(do_union = F) %>% 
   st_cast("POLYGON") %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+  st_difference(st_union(bathy_20m_final)) %>% 
   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
   mutate(area = st_area(.))
 
@@ -911,7 +911,7 @@ strata.summ.os <- strata.final.os %>%
 
 strata.offshore <- strata.offshore %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+  st_difference(st_union(bathy_20m_final)) %>% 
   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
   ungroup() %>% 
   mutate(area = st_area(.)) 

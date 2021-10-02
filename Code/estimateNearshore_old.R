@@ -746,7 +746,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
         summarise(do_union = F) %>% 
         st_cast("POLYGON") %>% 
         st_make_valid() %>% 
-        st_difference(st_union(bathy_5m_poly)) %>% 
+        st_difference(st_union(bathy_20m_poly)) %>% 
         mutate(area = st_area(.)) %>% 
         ungroup()
       
@@ -1242,7 +1242,7 @@ strata.super.polygons.ns <- strata.super.polygons %>%
 # strata.nearshore <- select(strata.nearshore, -vessel.name.1, -area.1)
 strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+  st_difference(st_union(bathy_20m_poly)) %>% 
   st_difference(select(strata.super.polygons.ns, geometry)) %>%
   ungroup() %>% 
   mutate(area = st_area(.)) 

@@ -52,7 +52,7 @@ for (j in unique(nasc$vessel.name)) {
     summarise(do_union = F) %>% 
     st_cast("POLYGON") %>% 
     st_make_valid() %>% 
-    st_difference(st_union(bathy_5m_poly)) %>% 
+    st_difference(st_union(bathy_20m_poly)) %>% 
     mutate(area = st_area(.))
   
   if (exists("survey.polygons")) {

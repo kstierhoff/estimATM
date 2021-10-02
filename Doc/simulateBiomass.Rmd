@@ -2935,6 +2935,9 @@ bathy_5m_df <- bathy_5m_points %>%
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL)
 
+# Read 20m bathymetry polygon
+bathy_20m_poly <- st_read(here("Data/GIS/bathy_20m_polygon.shp"))
+
 # Draw pseudo-transects --------------------------------------------------------
 # Get transect ends, calculate bearing, and add transect spacing
 tx.ends <- nasc %>% 
@@ -3056,7 +3059,7 @@ strata.super.polygons <- strata.points.sf %>%
   summarise(do_union = F) %>% 
   st_cast("POLYGON") %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+  st_difference(st_union(bathy_20m_poly)) %>% 
   mutate(area = st_area(.))
 
 # Convert to lines
@@ -3281,7 +3284,7 @@ save(strata.nse.temp,
 # Clip primary polygons using the 5 m isobathy polygon -------------------------
 strata.primary <- strata.primary %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+  st_difference(st_union(bathy_20m_poly)) %>% 
   ungroup() %>% 
   mutate(area = st_area(.)) %>% 
   left_join(select(strata.summ, 
@@ -3315,7 +3318,7 @@ for (k in unique(strata.nse.temp$scientificName)) {
   strata.nse.diff <- strata.nse.temp %>% 
     filter(scientificName == k) %>%
     ungroup() %>% 
-    st_difference(bathy_5m_poly) %>% 
+    st_difference(bathy_20m_poly) %>% 
     mutate(area = st_area(.))
   
   # Combine features
