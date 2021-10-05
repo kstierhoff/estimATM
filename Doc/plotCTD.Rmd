@@ -61,7 +61,7 @@ source(here("Doc/settings", prj.settings))
 process.files   <- T # process CTD/UCTD files
 copy.files      <- T # copy data files from data to plotCTD directory
 overwrite.files <- T # overwrite existing files
-get.nav         <- T # download nav data from ERDDAP
+get.nav         <- F # download nav data from ERDDAP
 
 save.figs       <- T # create new figures
 get.map         <- F # download map from rnaturalearth
@@ -257,8 +257,8 @@ if (length(uctd.hdr) == 0) {
     
     # Arrange and filter results
     all.uctd.casts <- arrange(all.uctd.casts, cast, scan) %>% 
-      filter(between(S, min.S, max.S)) # Remove bad salinity data
-    
+      filter(between(S, min.S, max.S)) %>%  # Remove bad salinity data
+      filter(dZt < 7)
     # Save results
     save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc,
          file = here("Data/UCTD/uctd_data.Rdata"))
@@ -675,7 +675,7 @@ if (save.figs) {
 }
 ```  
 
-```{r i-map-uctd}
+```{r i-map-uctd, out.width='100%'}
 # Create color pallette for planned transects
 txPal    <- colorFactor(wpt.colors, wpt.types)
 
@@ -719,12 +719,13 @@ i.map.uctd
 
 Descent rate of the UCTD by depth and vessel speed.  
 
-```{r uctd-dZt-plot,out.width="90%",out.height="90%"}
+```{r uctd-dZt-plot,out.width="100%",out.height="10in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
       # plot descent rate v depth
-      uctd.dZt <- ggplot(data = all.uctd.casts, aes(dZt, Z, group = cast, colour = SOG)) + 
+      uctd.dZt <- ggplot(data = all.uctd.casts, 
+                         aes(dZt, Z, group = cast, colour = SOG)) + 
         geom_path(alpha = 0.75) +
         xlab("\nDescent rate (m/s)") + ylab("Depth (m)\n") + 
         scale_x_continuous(limits = c(0,ceiling(max(all.uctd.casts$dZt, na.rm = TRUE))),
@@ -759,7 +760,7 @@ if (exists("all.uctd.casts")) {
 ## Depth v. Time plot
 The dashed line represent the Loess-smoothed depth profiles.  
 
-```{r uctd-depth-time-plot,out.width="90%",out.height="90%"}
+```{r uctd-depth-time-plot,out.width="100%",out.height="10in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -800,7 +801,7 @@ if (exists("all.uctd.casts")) {
 
 ## Temperature v. Depth plot
 
-```{r uctd-temp-depth-plot,out.width="90%",out.height="90%"}
+```{r uctd-temp-depth-plot,out.width="100%",out.height="10in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -836,7 +837,7 @@ if (exists("all.uctd.casts")) {
 
 ## Salinity v. Depth plot
 
-```{r uctd-sal-depth-plot,out.width="90%",out.height="90%"}
+```{r uctd-sal-depth-plot,out.width="100%",out.height="10in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -874,7 +875,7 @@ if (exists("all.uctd.casts")) {
 
 ## Sound speed v. Depth plot
 
-```{r uctd-sv-depth-plot,out.width="90%",out.height="90%"}
+```{r uctd-sv-depth-plot,out.width="100%",out.height="10in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -1005,7 +1006,7 @@ if (exists("all.ctd.casts")) {
 
 Location of underway CTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. CTD cast numbers correspond to those in the previous table. Casts with a Casts with a **<span style="color:red">red</span>** border have not yet been processed.  border have not yet been processed.  
 
-```{r ctd-map-all}
+```{r ctd-map-all, out.width='100%'}
 if (save.figs) {
   if (exists("ctd.hdr")) {
     if (length(ctd.hdr) > 0) {
@@ -1107,7 +1108,7 @@ if (save.figs) {
 
 ## Temperature v. Depth plot
 
-```{r ctd-temp-depth-plot,out.width="90%",out.height="90%"}
+```{r ctd-temp-depth-plot,out.width="100%",out.height="10in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
@@ -1147,7 +1148,7 @@ if (exists("all.ctd.casts")) {
 
 ## Salinity v. Depth plot
 
-```{r ctd-sal-depth-plot,out.width="90%",out.height="90%"}
+```{r ctd-sal-depth-plot,out.width="100%",out.height="10in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
@@ -1185,7 +1186,7 @@ if (exists("all.ctd.casts")) {
 
 ## Sound speed v. Depth plot
 
-```{r ctd-sv-depth-plot,out.width="90%",out.height="90%"}
+```{r ctd-sv-depth-plot,out.width="100%",out.height="10in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
@@ -1226,7 +1227,7 @@ if (exists("all.ctd.casts")) {
 ## Temperature-Salinity plot
 Temperature-salinity plot for all CTD casts (left) and the location of CTD casts (right), symbolized by water mass.
 
-```{r ctd-temp-sal-plot,out.width="90%",out.height="90%"}
+```{r ctd-temp-sal-plot,out.width="100%",out.height="10in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
