@@ -18,6 +18,8 @@ hab.dates <- c(date(erddap.survey.start),
                date(erddap.survey.start) + hab.days*2,
                hab.date.end)
 
+load(here("Data/Nav/nav_data.Rdata"))
+
 if (survey.year >= 2021) {
   # Starting in 2021, sardine habitat data are available for downloaded from ERDDAP
   # The daily MODIS data are available for 2006-present, so in theory this code should
@@ -55,9 +57,12 @@ if (survey.year >= 2021) {
   saveRDS(hab.data, file = here("Data/Habitat/habitat_data.rds"))
   
   # Get map bounds for setting map extent
-  map.bounds <- hab.data %>% 
-    st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+  map.bounds <- nav.sf %>% 
     st_bbox()
+  
+  # map.bounds <- hab.data %>% 
+  #   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+  #   st_bbox()
   
   # Get map features --------------------------
   # Get state data
