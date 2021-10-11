@@ -40,7 +40,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r user-input}
+```{r user-input,include=FALSE}
 # Get project name from directory name
 prj.name <- last(unlist(str_split(here(), "/")))
 
@@ -68,7 +68,7 @@ if (copy.files) {
   
   # Copy CUFES files
   cufes.file <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES"), 
-                           regex = cufes.db.sqlite)
+                       regex = cufes.db.sqlite)
   file_copy(cufes.file, here("Data/CUFES"), overwrite = overwrite.files)
 }
 ```
@@ -95,19 +95,20 @@ if (get.nav) {
       sep = ""))
     
     # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                                    row.names = NULL, skip = 0))
-    names(nav.temp) <- erddap.headers
-    
-    # Filter to remove bad SST values
-    nav.temp <- nav.temp %>% 
+    nav.temp <- read_csv(dataURL, lazy = FALSE,
+                         col_names = erddap.headers) %>% 
       mutate(long     = long - 360,
              SOG      = SOG * 1.94384,
-             datetime = ymd_hms(time),
              SST      = na_if(SST, NaN),
-             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                         leg.breaks, labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             wind_brg = case_when(
+               wind_dir < 180 ~ wind_dir + 180,
+               TRUE ~ wind_dir - 180),
+             wind_angle = (wind_dir/360)*2*pi,
+             leg      = paste("Leg", 
+                              cut(as.numeric(date(time)), 
+                                  leg.breaks, 
+                                  labels = FALSE))) %>%
+      filter(is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
              between(lat, min(survey.lat), max(survey.lat)), 
              between(long, min(survey.long), max(survey.long)))
     
@@ -151,15 +152,15 @@ transects.sf <- wpts.sf %>%
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
-      mutate(GPS_date = format(datetime, format = "%F"),
-             GPS_time = format(datetime, format = "%T")) %>% 
-      select(GPS_date, GPS_time, latitude = lat, longitude = long)
+  mutate(GPS_date = format(time, format = "%F"),
+         GPS_time = format(time, format = "%T")) %>% 
+  select(GPS_date, GPS_time, latitude = lat, longitude = long)
 
 write_csv(nav.gps, here("Output/nav.gps.csv"))
 
 # Get most recent vessel position for plotting
 nav.now <- tail(nav.sf, 1) %>% 
-  mutate(label = paste("Last position:", datetime, "UTC"))
+  mutate(label = paste("Last position:", time, "UTC"))
 ```
 
 ```{r process-cufes}
@@ -288,8 +289,8 @@ map.width  <- map.height*map.aspect
 
 # Create base map
 base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) #+
-  # Add scalebar
-  # annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+# Add scalebar
+# annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
 # Save the basemap
 ggsave(base.map, file = here("Figs/fig_basemap.png"), 
@@ -386,7 +387,7 @@ imap.bounds <- map_bounds(nav$lat, nav$long, 0.1)
 
 # Create color palette for MPAs
 all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
-                   unique(as.character(or_mpas$Label))))
+                             unique(as.character(or_mpas$Label))))
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
 
@@ -451,47 +452,50 @@ i.map <- leaflet() %>%
                       "CUFES Egg Density-Jack Mackerel", "CUFES Egg Density-Other",
                       "CUFES Egg Density-Squid", "CUFES (Negative)"),
     options = layersControlOptions(collapsed = F)) %>%  
-  hideGroup(c("CUFES Egg Density-Squid", "Vessel Positions", "Planned Transects (Ancillary)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
 # Add CUFES data
 if (nrow(cufes.neg.sf) > 0)
   i.map <- i.map %>% 
-    addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
-                     fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
-                     group = "CUFES (Negative)")
+  addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                   fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                   group = "CUFES (Negative)")
 if (nrow(filter(cufes.sf, Species == "AnchovyEggs")) > 0)
   i.map <- i.map %>% 
-    addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Anchovy")
+  addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Anchovy")
 
 if (nrow(filter(cufes.sf, Species == "JackMackerelEggs")) > 0)
   i.map <- i.map %>% 
-    addCircleMarkers(data = filter(cufes.sf, Species == "JackMackerelEggs"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Jack Mackerel")
+  addCircleMarkers(data = filter(cufes.sf, Species == "JackMackerelEggs"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Jack Mackerel")
 if (nrow(filter(cufes.sf, Species == "SardineEggs")) > 0)
   i.map <- i.map %>% 
-    addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Sardine")
+  addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Sardine")
 if (nrow(cufes.squid.sf) > 0)
   i.map <- i.map %>% 
-    addCircleMarkers(data = cufes.squid.sf,
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Squid")
+  addCircleMarkers(data = cufes.squid.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Squid")
 if (nrow(cufes.ofe.sf) > 0)
   i.map <- i.map %>% 
-    addCircleMarkers(data = cufes.ofe.sf,
-                     radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                     fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
-                     popup = ~popup, group = "CUFES Egg Density-Other") 
+  addCircleMarkers(data = cufes.ofe.sf,
+                   radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                   fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                   popup = ~popup, group = "CUFES Egg Density-Other") 
+
+# Configure layer display
+i.map <- i.map %>% 
+    hideGroup(c("CUFES Egg Density-Squid", "Vessel Positions", "Planned Transects (Ancillary)"))
 ```
 
 ### Continuous Underway Fish Egg Sampler (CUFES) egg density for the `r survey.name` 
@@ -502,7 +506,7 @@ _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", u
 
 An interactive map of the CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel. Other fish eggs (cyan points) are plotted that have Pacific mackerel eggs. Hover-over or click on some map objects for more info.  
 
-```{r plot-leaflet-map, out.width="100%"}
+```{r plot-leaflet-map, out.height = "12in", out.width="100%"}
 # Display map
 i.map
 ```

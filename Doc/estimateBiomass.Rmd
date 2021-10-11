@@ -349,18 +349,19 @@ if (get.nav) {
       sep = ""))
     
     # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = FALSE, colClasses = erddap.classes, 
-                                    row.names = NULL, skip = 0))
-    names(nav.temp) <- erddap.headers
-    
-    # Filter to remove bad SST values
-    nav.temp <- nav.temp %>% 
+    nav.temp <- read_csv(dataURL, lazy = FALSE,
+                         col_names = erddap.headers) %>% 
       mutate(long     = long - 360,
              SOG      = SOG * 1.94384,
-             datetime = ymd_hms(time),
              SST      = na_if(SST, NaN),
-             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                         leg.breaks, labels = FALSE))) %>%
+             wind_brg = case_when(
+               wind_dir < 180 ~ wind_dir + 180,
+               TRUE ~ wind_dir - 180),
+             wind_angle = (wind_dir/360)*2*pi,
+             leg      = paste("Leg", 
+                              cut(as.numeric(date(time)), 
+                                  leg.breaks, 
+                                  labels = FALSE))) %>%
       filter(is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
              between(lat, min(survey.lat), max(survey.lat)), 
              between(long, min(survey.long), max(survey.long)))
@@ -423,8 +424,8 @@ st_write(transects.sf, here("Output/planned_transects.shp"),
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
-  mutate(GPS_date = format(datetime, format = "%F"),
-         GPS_time = format(datetime, format = "%T")) %>% 
+  mutate(GPS_date = format(time, format = "%F"),
+         GPS_time = format(time, format = "%T")) %>% 
   select(GPS_date, GPS_time, latitude = lat, longitude = long)
 
 write_csv(nav.gps, here("Output/nav.gps.csv"))
@@ -432,7 +433,7 @@ write_csv(nav.gps, here("Output/nav.gps.csv"))
 # Get most recent vessel position for plotting
 nav.now <- tail(nav, 1) %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  mutate(label = paste("Last position:", datetime, "UTC"),
+  mutate(label = paste("Last position:", time, "UTC"),
          popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
                         '<b>Last position: </b>', datetime, ' UTC<br/>'))
 ```
