@@ -399,6 +399,11 @@ min.tx.length          <- c(RL  = 3,
 limit.cluster.dist     <- c(OS  = FALSE,
                             NS  = FALSE) 
 
+# Define source of species proportions and length frequency data (either clf or hlf)
+# Uses either haul or cluster data for a given region (NS or OS)
+cluster.source <- c(OS = "cluster",
+                    NS = "haul")
+
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 
