@@ -41,7 +41,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20210702_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints_20210925.gpx" #"rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints_20211012.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -413,7 +413,7 @@ use.tx.number          <- c(RL  = TRUE,
                             LBC = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- list(RL  = c("4142"),
+tx.rm                  <- list(RL  = c("4142","2627"),
                                LM  = NA,
                                LBC = NA)
 

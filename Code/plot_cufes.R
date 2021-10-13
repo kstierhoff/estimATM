@@ -48,16 +48,6 @@ cufes.density.facet <- base.map +
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
-# Save CUFES plot
-ggsave(cufes.density.all,
-       filename = here("Figs/fig_cufes_egg_density.png"),
-       width = map.width, height = map.height)
-
-# Save CUFES plot
-ggsave(cufes.density.facet,
-       filename = here("Figs/fig_cufes_egg_density_facet.png"),
-       width = map.width*3, height = map.height)
-
 if (doc.name == "simulateBiomass.Rmd") {
   # Save nasc plot
   ggsave(cufes.density.all,
@@ -78,6 +68,16 @@ if (doc.name == "simulateBiomass.Rmd") {
   #        filename = here("Figs/fig_cufes_egg_density_facet.png"),
   #        width = map.width*3, height = map.height) 
 }
+
+# # Save CUFES plot
+# ggsave(cufes.density.all,
+#        filename = here("Figs/fig_cufes_egg_density.png"),
+#        width = map.width, height = map.height)
+# 
+# # Save CUFES plot
+# ggsave(cufes.density.facet,
+#        filename = here("Figs/fig_cufes_egg_density_facet.png"),
+#        width = map.width*3, height = map.height)
 
 # # Project nav for plotting
 # nav.cufes <- project_df(nav, to = 3310) 
