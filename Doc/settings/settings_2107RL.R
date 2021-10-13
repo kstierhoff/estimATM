@@ -111,8 +111,8 @@ erddap.survey.end    <- "2021-10-16" # End of survey for ERDDAP vessel data quer
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
-survey.lat           <- c(32,51)
-survey.long          <- c(-130,-117)
+survey.lat           <- c(27,51)
+survey.long          <- c(-130,-113)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
