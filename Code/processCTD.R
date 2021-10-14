@@ -2,24 +2,23 @@
 # from the CTD cast to create Echoview-calibration files (.ecs) containing the
 # appropriate temperature, salinity, absorption depths, and sound speed.
 
-# Load required packages ---------------
-#-----------------------------------
+# Load required packages --------------------------------------------------
 
 library(readr)    # For reading and writing plain text files
 
 # User Settings -----------------------------------------------------------
 
 # Directory of CTD files to process
-dir.CTD <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\CTD_to_Process\\'
+dir.CTD <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\'
+dir.output <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\PSA\\'
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\UCTD.con'
+file.con <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\test.XMLCON'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
@@ -37,7 +36,7 @@ pause <- 0.5
 # Process CTD data --------------------------------------------------------
 
 # Find all raw data files in CTD directory
-files.CTD <- list.files(path = dir.CTD, pattern = "*.asc")
+files.CTD <- list.files(path = dir.CTD, pattern = "*.hex")
 
 # Loop through each file
 for (i in files.CTD) {
@@ -45,15 +44,16 @@ for (i in files.CTD) {
   # Retain just the file name (i.e., remove extension)
   file.name <- tools::file_path_sans_ext(i)
   
-  # Use ASCII In to convert from .asc to .cnv
-  cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
-                 paste(dir.SBE, 'ASCII_InW.exe', sep = ''),
-                 paste(dir.CTD, file.name, '.asc', sep = ''),
+  # Use DatCnv to convert from .hex to .cnv
+  cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
+                 paste(dir.SBE, 'DatCnvW.exe', sep = ''),
+                 file.con,
+                 paste(dir.CTD, file.name, '.hex', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
-                 paste(dir.PSA, 'ASCII_In_uCTD.psa', sep = ''))
+                 paste(dir.PSA, 'DatCnv.psa', sep = ''))
   system("cmd.exe", input = cmd)
-  Sys.sleep(pause)
+  Sys.sleep(5)
   
   # Perform Filter
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
@@ -61,17 +61,7 @@ for (i in files.CTD) {
                  paste(dir.output, file.name, '.cnv', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
-                 paste(dir.PSA, 'Filter_uCTD.psa', sep = ''))
-  system("cmd.exe", input = cmd)
-  Sys.sleep(pause)
-  
-  # Perform Align CTD
-  cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
-                 paste(dir.SBE, 'AlignCTDW.exe', sep = ''),
-                 paste(dir.output, file.name, '.cnv', sep = ''),
-                 dir.output,
-                 paste(file.name, '.cnv', sep = ''),
-                 paste(dir.PSA, 'AlignCTD_uCTD.psa', sep = ''))
+                 paste(dir.PSA, 'Filter.psa', sep = ''))
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
@@ -124,7 +114,7 @@ for (i in files.CTD) {
                  paste(dir.output, file.name, '.cnv', sep = ''),
                  dir.output,
                  paste(file.name, '_processed.asc', sep = ''),
-                 paste(dir.PSA, 'AsciiOut_uCTD.psa', sep = ''))
+                 paste(dir.PSA, 'AsciiOut.psa', sep = ''))
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
@@ -172,8 +162,8 @@ for (i in files.CTD) {
                   sprintf('SoundSpeed = %.2f ', avgSoundSpeed.CPS),
                   ECS)
   ECS.Krill <- gsub('SoundSpeed = [^#]*', 
-                    sprintf('SoundSpeed = %.2f ', avgSoundSpeed.Krill),
-                    ECS)
+                  sprintf('SoundSpeed = %.2f ', avgSoundSpeed.Krill),
+                  ECS)
   
   # Replace the temperature
   ECS.CPS <- gsub('Temperature = [^#]*', 
