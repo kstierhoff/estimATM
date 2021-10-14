@@ -61,77 +61,16 @@ source(here("Doc/settings", prj.settings))
 ```{r user-input}
 # Set processing controls -------------------------------------------------
 save.figs     <- T # Create new figures
-get.nav       <- F # Download Lasker nav data from ERDDAP
-get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
+get.nav       <- T # Download Lasker nav data from ERDDAP
+get.nav.sd    <- T # Download Saildrone nav data from ERDDAP
 get.bathy     <- F # Download ETOPO1 bathymetry data in the survey footprint
 extract.bathy <- F # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
 ```{r process-nav}
-if (get.nav) {
-  # Load existing nav data
-  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
-    load(here("Data/Nav/nav_data.Rdata"))
-    
-    # Calculate difference between max nav time and now
-    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
-    
-    # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time))
-  } else {
-    nav.lag <- 24
-  }
-  
-  if (nav.lag >= 24) {
-    # Generate ERDDAP URL
-    dataURL <- URLencode(paste(
-      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-      erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
-      sep = ""))
-    
-    # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                                    row.names = NULL, skip = 0))
-    names(nav.temp) <- erddap.headers
-    
-    # Filter to remove bad SST values
-    nav.temp <- nav.temp %>% 
-      mutate(long     = long - 360,
-             SOG      = SOG * 1.94384,
-             datetime = ymd_hms(time),
-             SST      = na_if(SST, NaN),
-             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                         leg.breaks, labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
-             between(lat, min(survey.lat), max(survey.lat)), 
-             between(long, min(survey.long), max(survey.long)))
-    
-    # Append new nav data
-    if (exists("nav")) {
-      nav <- bind_rows(nav, nav.temp) %>% 
-        distinct()
-    } else {
-      nav <- nav.temp
-    }
-  }
-  
-  # Convert nav to spatial
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  
-  # Cast nav to transects
-  nav.paths.sf <- nav.sf %>% 
-    group_by(leg) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("LINESTRING")
-  
-  # Save results
-  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
-} else {
-  # Load nav data
-  load(here("Data/Nav/nav_data.Rdata"))
-}
+# Source code to get nav data from ERDDAP
+source(here("Code/get_nav_erddap.R"))
 
 # Read transect waypoints
 wpts <- read_csv(here("Data/Nav", wpt.filename))
@@ -181,7 +120,7 @@ if (get.nav.sd) {
     load(here("Data/Nav/nav_data_saildrone.Rdata"))
     
     # Calculate difference between max nav time and now
-    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime)), units = "hours")
+    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$time)), units = "hours")
     
     # Get new erddap start date from max date
     erddap.survey.start.sd <- paste0(format(max(date(nav.sd$time)), ""), "T00%3A00%3A00Z")
@@ -204,7 +143,7 @@ if (get.nav.sd) {
       
       # Filter to remove bad SST values
       nav.temp.sd <- nav.temp.sd %>% 
-        mutate(datetime = ymd_hms(time)) %>%
+        mutate(time = ymd_hms(time)) %>%
         filter(!is.nan(lat), !is.nan(long)) %>%
         filter(long != 0, lat != 0)
       
@@ -224,9 +163,9 @@ if (get.nav.sd) {
     nav.now.sd <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
       slice(n()) %>% 
-      mutate(label = paste("Saildrone", saildrone, "Last position:", datetime, "UTC"),
+      mutate(label = paste("Saildrone", saildrone, "Last position:", time, "UTC"),
              popup = paste0('<b>Saildrone: </b>', saildrone, '<br/>',
-                            '<b>Last position: </b>', datetime, ' UTC<br/>'))
+                            '<b>Last position: </b>', time, ' UTC<br/>'))
     
     # Convert saildrone nav to spatial
     nav.sd.sf <- nav.sd.sf %>% 
@@ -278,7 +217,7 @@ if (get.bathy) {
 ```{r summarize-results}
 # Summarize NASC by date and lat/long
 nav.sun <- nav %>% 
-  mutate(date = date(datetime)) %>% 
+  mutate(date = date(time)) %>% 
   group_by(date) %>% 
   summarise(lat = mean(lat),
             long = mean(long)) %>% 
@@ -319,11 +258,11 @@ if (extract.bathy) {
   # Get nav depth and compute photoperiod
   nav.depth <- get.depth(noaa.bathy, nav$long, nav$lat, locator = F, distance = T) %>%
     rename(long = lon) %>%
-    bind_cols(select(nav, datetime, dist)) %>%
+    bind_cols(select(nav, time, dist)) %>%
     mutate(dist.depth = c(0, diff(dist.km))) %>%
     filter(dist.depth < 100)  %>% # Remove distant points
     mutate(depth_bin = cut(depth, c(min(depth), -200, 0), include.lowest = T, labels = F),
-           id = cut(as.numeric(datetime), as.numeric(nav.daynight$time),
+           id = cut(as.numeric(time), as.numeric(nav.daynight$time),
                     include.lowest = T, labels = F),
            depth_bin = case_when(
              depth_bin == 1 ~ "Deep (>200 m)",
@@ -338,7 +277,7 @@ if (extract.bathy) {
       between(abs(depth), 250, 750) ~ 60*(750/abs(depth)),
       abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
     project_df(to = crs.proj) %>% 
-    arrange(desc(day_night), datetime) 
+    arrange(desc(day_night), time) 
   
   # Save results
   save(nav.depth, file = here("Output/nav_bathy_Lasker.Rdata"))
@@ -372,7 +311,8 @@ if (exists("nav.sd")) {
     group_by(date) %>% 
     summarise(lat = mean(lat),
               long = mean(long)) %>% 
-    as.data.frame()
+    as.data.frame() %>% 
+    filter(!is.na(date))
   
   # Get sunrise/sunset for each survey day
   nav.daynight.sd <- data.frame()
@@ -381,6 +321,7 @@ if (exists("nav.sd")) {
     tmp <- day_night(date = nav.sun.sd$date[i], 
                      geocode = data.frame(lat = nav.sun.sd$lat[i], lon = nav.sun.sd$long[i]),
                      twilight = survey.twilight)
+    
     nav.daynight.sd <- bind_rows(nav.daynight.sd, tmp)
   }
   
@@ -409,11 +350,11 @@ if (exists("nav.sd")) {
     # Get nav depth and compute photoperiod
     nav.depth.sd <- get.depth(noaa.bathy, nav.sd$long, nav.sd$lat, locator = F, distance = T) %>%
       rename(long = lon) %>%
-      bind_cols(select(nav.sd, datetime, dist)) %>%
+      bind_cols(select(nav.sd, time, dist)) %>%
       mutate(dist.depth = c(0, diff(dist.km))) %>%
       filter(dist.depth < 100)  %>% # Remove distant points
       mutate(depth_bin = cut(depth, c(min(depth), -200, 0), include.lowest = T, labels = F),
-             id = cut(as.numeric(datetime), as.numeric(nav.daynight.sd$time),
+             id = cut(as.numeric(time), as.numeric(nav.daynight.sd$time),
                       include.lowest = T, labels = F),
              depth_bin = case_when(
                depth_bin == 1 ~ "Deep (>200 m)",
@@ -428,7 +369,7 @@ if (exists("nav.sd")) {
         between(abs(depth), 250, 750) ~ 60*(750/abs(depth)),
         abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
       project_df(to = crs.proj) %>% 
-      arrange(desc(day_night), datetime)
+      arrange(desc(day_night), time)
     
     # Save results
     save(nav.depth.sd, file = here("Output/nav_bathy_Saildrone.Rdata"))
@@ -456,12 +397,18 @@ if (exists("nav.sd")) {
 }
 ```
 
+```{r process-transect-data}
+
+```
+
+
 # `r survey.name.long`(`r survey.name`)
 ## Summarize effort by depth and day/night
 
 Total transit distance (km and nmi) and number of pings emitted from the multifrequency echosounders are summarized by period (day or night, based on daily sunrise and sunset time at the vessel's location) and seabed depth (greater or less than 200 m). Number of pings are estimated every 1 minute based on the seabed depth (m), where the number of pings per second is equal to 750/depth. Deeper than 750 m, the ping rate is assume to be 1 ping per second (pps). A maximum ping rate of be 3 pps is assume for depths shallower than 250 m.  
 
 ### Reuben Lasker
+#### Total acoustic km
 
 ```{r effort-summary}
 # Print nav summary
@@ -477,6 +424,51 @@ nav.summ %>%
                 full_width = F) %>%
   row_spec(0, align = c("c"))
 ```
+
+#### Transect effort only
+
+In addition to the total kilometers, the ship often requests a summary of transect distance sampled by the ship during each leg.
+
+```{r transect-summary}
+# Load backscatter data
+load(here("Data/Backscatter/nasc_all.Rdata"))
+
+if (extract.bathy) {
+  # Extract depth for each interval
+  nasc.depth <- get.depth(noaa.bathy, nasc$long, nasc$lat, 
+                          locator = F, distance = T) %>%
+    rename(long = lon) 
+  
+  # Save results
+  save(nasc.depth, file = here("Output/nasc_bathy_Lasker.Rdata"))
+  
+} else {
+  # Load extracted bathymetry
+  load(here("Output/nasc_bathy_Lasker.Rdata"))
+}
+
+# Add depth data to nasc
+nasc$depth <- nasc.depth$depth
+
+# Summarize transect distance by leg
+nasc.summ <- nasc %>% 
+  group_by(Leg = leg) %>% 
+  summarise(
+    Transects = n_distinct(transect),
+    dist_km = length(Interval)/10,
+    dist_nmi = dist_km * 0.539957)
+
+nasc.summ %>% 
+  rename("Distance (km)"  = dist_km,
+         "Distance (nmi)" = dist_nmi) %>%  
+  kable(format = knitr.format, booktabs = TRUE, escape = F,
+        align = c("c"),
+        digits = c(0,0,0,0)) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = F) %>%
+  row_spec(0, align = c("c"))
+```
+
 
 ### Saildrone
 

@@ -1444,18 +1444,21 @@ Display specimens with duplicated bar codes (i.e., `individual_ID`).
 # Find duplicated bar codes in specimen table
 # individual_ID is the bar code signature
 duplicate.ids <- lengths %>% 
-  filter(!is.na(individual_ID), duplicated(individual_ID) == TRUE) %>%
-  select(cruise:individual_ID, specimenNumber, scientificName, commonName)
+  filter(!is.na(individual_ID), duplicated(individual_ID) == TRUE) %>% 
+  pull(individual_ID)
 
-if (nrow(duplicate.ids) > 0) {
-  duplicate.ids %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-    scroll_box(height = "500px")
-} else {
-  print("Hooray, no duplicated barcodes!")
-}
+# Print duplicates table  
+  if (length(duplicate.ids) > 0) {
+    lengths %>%
+      filter(individual_ID %in% duplicate.ids) %>% 
+      select(cruise:individual_ID, specimenNumber, scientificName, commonName) %>% 
+      kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+            format.args = list(big.mark = ",")) %>% 
+      kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+      scroll_box(height = "500px")
+  } else {
+    print("Hooray, no duplicated barcodes!")
+  }
 ```
 
 # References
