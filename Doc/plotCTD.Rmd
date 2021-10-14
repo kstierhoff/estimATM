@@ -139,15 +139,15 @@ transects.sf <- wpts.sf %>%
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
-  mutate(GPS_date = format(datetime, format = "%F"),
-         GPS_time = format(datetime, format = "%T")) %>% 
+  mutate(GPS_date = format(time, format = "%F"),
+         GPS_time = format( time, format = "%T")) %>% 
   select(GPS_date, GPS_time, latitude = lat, longitude = long)
 
 write_csv(nav.gps, here("Output/nav.gps.csv"))
 
 # Get most recent vessel position for plotting
 nav.now <- tail(nav.sf, 1) %>% 
-  mutate(label = paste("Last position:", datetime, "UTC"))
+  mutate(label = paste("Last position:", time, "UTC"))
 ```
 
 ```{r process-uctd}
@@ -210,14 +210,14 @@ if (length(uctd.hdr) == 0) {
   nav.match.uctd <- data.frame()
   
   for (i in seq_along(all.uctd.hdr$cast)) {
-    min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], nav$datetime)))
+    min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], nav$time)))
     nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
   }
   
   # Combine header and nav data
   all.uctd.hdr <- all.uctd.hdr %>% 
     bind_cols(nav.match.uctd) %>% 
-    mutate(lag = difftime(cast.date, datetime)) %>% 
+    mutate(lag = difftime(cast.date, time)) %>% 
     arrange(cast.date)
   
   # Summarize UCTD cast results
