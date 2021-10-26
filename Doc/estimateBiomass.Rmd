@@ -93,7 +93,7 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
@@ -2015,7 +2015,7 @@ nasc.sp <- nasc.match %>%
 # Compute distances with {geosphere}
 ## Must be done in WGS84 projection
 nasc.match <- nasc.match %>% 
-  mutate(cluster = nearest.cluster,
+  mutate(cluster = cluster.match$cluster[nearest.cluster],
          cluster.distance = distGeo(nasc.sp, cluster.sp)*0.000539957) 
 
 # Create cluster polygons
@@ -2495,24 +2495,24 @@ $$W = a*L^b\text{,  and}$$
 
 $$L = (W/a)^{(1/b)}\text{.}$$   
 
-Coefficients used to estimate total length (TL, mm) or weight in the equations above. Model types are: 'lm' = linear model, 'nlm' = naive linear model, and 'glm' = general linear model (Palance et al., in prep). Season is presently either spring or summer, and is defined in the survey info file.    
+Coefficients used to estimate total length (TL, mm) or weight in the equations above. Model types are: 'lm' = linear model, 'nlm' = naive linear model, and 'glm' = general linear model [@Palance2019]. Season is presently either spring or summer, and is defined in the survey info file.    
 
 ```{r lw-model-table, eval = FALSE}
-# Filter table of L/W models used
-lw.models %>% 
-  arrange(scientificName) %>% 
-  left_join(select(spp.codes, scientificName, commonName)) %>%
-  select(scientificName, commonName, everything()) %>% 
-  rename(`Scientific name` = scientificName,
-         `Common name`     = commonName,
-         `Model type`      = model_type) %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        digits = c(0,0,8,5,0),
-        align = c("l","l","r","r","l")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>%
-  column_spec(1, italic = TRUE)
+# # Filter table of L/W models used
+# lw.models %>% 
+#   arrange(scientificName) %>% 
+#   left_join(select(spp.codes, scientificName, commonName)) %>%
+#   select(scientificName, commonName, everything()) %>% 
+#   rename(`Scientific name` = scientificName,
+#          `Common name`     = commonName,
+#          `Model type`      = model_type) %>% 
+#   kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+#         digits = c(0,0,8,5,0),
+#         align = c("l","l","r","r","l")) %>% 
+#   kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+#                 full_width = FALSE) %>%
+#   row_spec(0, align = c("c")) %>%
+#   column_spec(1, italic = TRUE)
 ```  
 
 (ref:lw-plot) Length-weight relationships from the current survey [pink (female), blue (male), and green (unknown) points] and all previous surveys in the same season (gray points). Dashed lines represent the modeled (linear model with bias correction) relationships between length and weight for each species during the survey season. Large red and blue points indicate individuals where length or weight (typically individuals with binned lengths) were missing, respectively. Those missing values were estimated using the relationship between length and weight for each species.
@@ -2946,7 +2946,7 @@ if (save.figs) {
     theme(strip.background.x = element_blank(),
           strip.text.x       = element_text(face = "italic"))
   
-  # Comtine results of haul and cluster summaries and save
+  # Combine results of haul and cluster summaries and save
   sigma.plot.all <- plot_grid(sigma.plot.haul, sigma.plot.cluster, 
                               nrow = 2, align = 'h', labels = c("a)","b)"))
   ggsave(sigma.plot.all, 
@@ -2996,7 +2996,7 @@ names(ts.sub.her) <- paste(names(ts.sub.her), "her", sep = ".")
 # Create final files for biomass estimation  
 ## Summarize `sigmawg` and `sigmaindiv`  
 
-Calculate and combine sigmas by weight (`sigmawg`) and number (`sigmaindiv`) for each species and summarise total CPS catch by weight (`CPS.wg`) and number (`CPS.num`).
+Calculate and combine sigmas by weight (`sigmawg`) and number (`sigmaindiv`) for each species and summarize total CPS catch by weight (`CPS.wg`) and number (`CPS.num`).
 
 ```{r combine-species-proportions}
 # Combine all TS estimates
@@ -3100,7 +3100,7 @@ write.csv(clf, file = here("Output/clf_ts_proportions.csv"),
 save(clf, file = here("Output/clf_ts_proportions.Rdata"))
 
 # Calculate haul length frequencies, for use with nearshore sampling
-# source(here("Code/calculate_haul_length_frequency.R"))
+source(here("Code/calculate_haul_length_frequency.R"))
 ```
 
 ## Map acoustic proportions by number and weight  
@@ -3267,6 +3267,7 @@ Calculate length frequencies and create final files for biomass estimation.
 ```{r calculate-length-frequencies}
 # Calculate length frequencies for each species and trawl cluster --------------------
 # Create a list for storing final species-specific cluster results
+haul.final    <- list()
 cluster.final <- list()
 lf.final      <- data.frame()
 
@@ -3296,6 +3297,7 @@ for (i in unique(lengths$scientificName)) {
     # Add results to data frame
     lf.df <- rbind(lf.df, data.frame(haul = ii, lf.bin, lf.labels, f))
   }
+  
   # Replace NaN values with zeros
   lf.df$f[is.nan(lf.df$f)] <- 0
   
@@ -3327,46 +3329,68 @@ for (i in unique(lengths$scientificName)) {
   lf.final <- bind_rows(lf.final, lf.df)
   
   # Reshape data frame by cluster for adding to clf
-  lf.table <- reshape2::dcast(lf.df,cluster ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
+  lf.table <- reshape2::dcast(lf.df, cluster ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
+  lf.table.h <- reshape2::dcast(lf.df, haul ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
   
   # Convert counts to relative frequencies
   lf.table[ ,2:ncol(lf.table)] <- lf.table[ , 2:ncol(lf.table)]/lf.table$`(all)`
+  lf.table.h[ ,2:ncol(lf.table.h)] <- lf.table.h[ , 2:ncol(lf.table.h)]/lf.table.h$`(all)`
   
   # Rename columns
-  names(lf.table)[2:ncol(lf.table)] <- paste("L",names(lf.table)[2:ncol(lf.table)], sep = "")
+  names(lf.table)[2:ncol(lf.table)] <- paste0("L",names(lf.table)[2:ncol(lf.table)])
   lf.table <- left_join(select(cluster.mid, cluster), lf.table)
+  
+  names(lf.table.h)[2:ncol(lf.table.h)] <- paste0("L",names(lf.table.h)[2:ncol(lf.table.h)])
+  lf.table.h <- left_join(select(haul.mid, haul), lf.table.h) %>% 
+    ungroup() %>% 
+    select(-cluster)
   
   # Replace NA values with zeros
   lf.table[is.na(lf.table)] <- 0
+  lf.table.h[is.na(lf.table.h)] <- 0
   
   # Add length frequencies for each species to clf for final analysis
   clf.final <- left_join(clf, lf.table, by = 'cluster')
+  hlf.final <- left_join(hlf, lf.table.h, by = "haul")
   
   # Add the species name to clf (for plotting)
   clf.final$species <- i
+  hlf.final$species <- i
   
   # Write final data frame to .csv for each species
-  write.csv(clf.final,
-            file = paste(here("Output/cluster_length_frequency_"), 
-                         i, "_",survey.name, ".csv", sep = ""),
-            row.names = FALSE)
+  write_csv(clf.final,
+            file = paste0(here("Output/cluster_length_frequency_"), 
+                          i, "_",survey.name, ".csv"))
+  write_csv(hlf.final,
+            file = paste0(here("Output/haul_length_frequency_"), 
+                          i, "_",survey.name, ".csv"))
   
   # Add species-specific results to list of results
   cluster.final[[i]] <- clf.final
+  haul.final[[i]]    <- hlf.final
   
   # Plot length frequencies by species and cluster
   lf.plot <- ggplot(lf.df, aes(lf.labels, counts)) + geom_bar(stat = 'identity') + 
     facet_wrap(~cluster,scales = 'free_y') + theme_bw() + 
     xlab("Standard length (cm)") + ylab("Counts") + ggtitle(i)
+  
+  lf.plot.haul <- ggplot(lf.df, aes(lf.labels, counts)) + geom_bar(stat = 'identity') + 
+    facet_wrap(~haul,scales = 'free_y') + theme_bw() + 
+    xlab("Standard length (cm)") + ylab("Counts") + ggtitle(i)
+
   # Save plot
   ggsave(lf.plot, 
-         filename = paste(here("Figs/fig_cluster_length_frequency_"), 
-                          i, ".png", sep = ""),
-         height = 7, width = 10) 
+         filename = paste0(here("Figs/fig_cluster_length_frequency_"), i, ".png"),
+         height = 7, width = 10)
+  
+  ggsave(lf.plot.haul, 
+         filename = paste0(here("Figs/fig_haul_length_frequency_"), i, ".png"),
+         height = 7, width = 10)
 }
 
 # Save results
 save(cluster.final, file = here("Output/cluster_length_frequency_all.Rdata"))
+save(haul.final,    file = here("Output/haul_length_frequency_all.Rdata"))
 save(lf.final,      file = here("Output/cluster_length_frequency_tables.Rdata"))
 ```
 
@@ -3376,7 +3400,7 @@ Species proportions by weight and number are assigned to each 100-m vertically i
 
 ```{r create-final-nasc-file}
 # Save nasc and clf for troubleshooting
-save(nasc, clf, file = here("Output/nasc_clf.Rdata"))
+save(nasc, clf, hlf, file = here("Output/nasc_clf.Rdata"))
 
 # Join NASC and cluster length frequency data frames by cluster
 nasc <- nasc %>% 
@@ -3603,7 +3627,7 @@ nasc.clust.biom <- nasc.clust.hist %>%
                    labels = FALSE) - 1) %>% 
   group_by(species, dist.bin) %>% 
   summarise(total.density = sum(density)) %>% 
-  mutate(distance = dist.bin * ceiling(max(cluster.distance$cluster.distance)/30))
+  mutate(distance = dist.bin * ceiling(max(nasc.match$cluster.distance)/30))
 
 # Calculate cumulative acoustic biomass versus distance to positive clusters
 nasc.clust.biom <- nasc.clust.biom %>% 
@@ -3807,6 +3831,7 @@ strata.final <- strata.final %>%
 ```  
 
 ## Prune sparse strata
+
 Remove strata that have a minimum number of trawl clusters (`nClusters` $\geq$ `r nClusters.min`) or number of individuals (`nIndiv` $\geq$ `r nIndiv.min`).
 
 ```{r prune-strata}
@@ -3929,6 +3954,7 @@ strata.summ %>%
 ```  
 
 ## Plot biomass density by transect  
+
 View results of strata definition algorithm compated to transect spacing, biomass density, etc.
 
 (ref:stratification-biomass-density) Biomass density (log(t + 1) nmi^-2^) versus latitude (easternmost portion of each transect) and strata used to estimate biomass and abundance (shaded regions; outline indicates stratum number) for each species and survey vessel (labels above plots; e.g., SH = _Bell M. Shimada_, RL = _Reuben Lasker_, LM = _Lisa Marie_). Blue number labels correspond to the transect numbers with positive biomass (log(t + 1) > 0.01) to facilitate discrimination of stratum breaks. Point fills indicate transect spacing (i.e., the shortest distance between the midpoint of each transect and midpoint of all other transects, in nmi), which is used to define different sampling strata, for example when adaptive sampling occurs. Dashed lines indicate prominent biogeographic landmarks that delineate stock boundaries (e.g., Cape Mendocino for the central and nothern stocks of Northern anchovy and Pt. Conception for the northern and southern stocks of Pacific sardine).
@@ -5557,7 +5583,12 @@ eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>%
 
 (ref:interactive-data-explorer) Interactively explore acoustic backscatter (_s_~A~, m^2^ nmi^-2^) and trawl data. Base maps may be changed and other layers may be toggled on/off using the layer controls below the map inset. Blue markers ("big NASC") are potential outliers; hover over the markers to identify the transect-interval for further exploration.
 
-```{r interactive-data-explorer, fig.align='left', fig.cap='(ref:interactive-data-explorer)',echo=FALSE}
+```{r interactive-data-explorer}
+# | fig.align: 'left'
+# | fig.cap: '(ref:interactive-data-explorer)'
+# | fig.height: '10in'
+# | out.width: '100%'
+
 # Leaflet options
 # https://rstudio.github.io/leaflet/
 
@@ -5678,20 +5709,11 @@ if (do.imap) {
                         "Biomass (Anchovy)", "Biomass (Sardine)",
                         "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
                         "Biomass (Herring)"),
-      options = layersControlOptions(collapsed = FALSE)) %>%  
-    hideGroup(c(
-      "Exclusive Economic Zones",
-      "Backscatter (Large)", "Backscatter-Krill", 
-      "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
-      "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
-      "Trawl Cluster Polygons",
-      "Biomass (Anchovy)", "Biomass (Sardine)",
-      "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
-      "Biomass (Herring)", "CTD Casts")) %>% 
+      options = layersControlOptions(collapsed = FALSE)) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2])
-  # Add nav data and vessel positions
   
+  # Add nav data and vessel positions
   if (exists("nav.paths.sf"))
     i.map <- i.map %>% 
       # Add nav data
@@ -5937,8 +5959,21 @@ if (do.imap) {
                        weight = 2, opacity = 1, fillOpacity = 0.75, fillColor =  ~ctdPal(type),
                        label = ~label, popup = ~popup, group =  "CTD Casts")
   
+  # Hide groups
+  i.map <- i.map %>% 
+    hideGroup(c(
+      "Exclusive Economic Zones",
+      "Backscatter (Large)", "Backscatter-Krill", 
+      "CUFES Egg Density", "CUFES (Negative)", "CUFES Egg Density-Other",
+      "CUFES Egg Density-Squid", "Vessel Positions", "Saildrone Tracks", 
+      "Trawl Cluster Polygons",
+      "Biomass (Anchovy)", "Biomass (Sardine)",
+      "Biomass (J. mackerel)", "Biomass (P. mackerel)", 
+      "Biomass (Herring)", "CTD Casts"))
+  
   # Display map
   i.map
+  
 } else {
   print("No interactive map created. Check \"do.imap\" if unexpected.")
 }
@@ -7047,6 +7082,7 @@ if (exists("be.os")) {
 ``` 
 
 ### Nearshore strata
+
 If desired, estimate biomass in the nearshore strata.
 
 ```{r estimate-nearshore-biomass}

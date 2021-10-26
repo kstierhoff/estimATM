@@ -28,7 +28,7 @@ if (process.nearshore) {
       stratum       = 1,
       int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
                               nasc.summ.interval),
-                labels = F, include.lowest = TRUE)) %>% 
+                labels = FALSE, include.lowest = TRUE)) %>% 
     mutate(transect = as.numeric(transect))
   
   # Combine nasc data for all NASC vessels
@@ -59,8 +59,8 @@ if (process.nearshore) {
       left_join(select(cps.nasc.temp, datetime, cps.nasc))
     
   } else {
-    nasc.nearshore <- nasc.nearshore %>%
-      mutate(cps.nasc = NASC.50)
+    # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
+    nasc.nearshore$cps.nasc <- purrr::pluck(nasc.nearshore, nasc.depth.cps)
   }
   
   # Process purse seine data
@@ -68,61 +68,92 @@ if (process.nearshore) {
     source(here("Code", paste0("processSeine_", survey.name, ".R")))  
     
     if (use.seine.data) {
-      # Combine clf and clf.seine
+      # Combine clf, hlf, and clf.seine
       clf <- clf %>%
         mutate(sample.type = "Trawl") %>% 
         bind_rows(clf.seine)
+      
+      hlf <- hlf %>% 
+        ungroup() %>% 
+        mutate(sample.type = "Trawl") %>% 
+        bind_rows(clf.seine)
+      
+      # hlf <- hlf %>% 
+      #   ungroup() %>% 
+      #   mutate(sample.type = "Trawl") %>% 
+      #   # project_df(to = 3310) %>%
+      #   bind_rows(clf.seine) %>% 
+      #   select(-cluster)
       
       lf.final <- lf.final %>% 
         bind_rows(lf.final.seine)
       
       # Combine super.clusters and super.clusters.ns
       super.clusters <- bind_rows(super.clusters, super.clusters.ns)
+      super.hauls    <- bind_rows(super.hauls, super.clusters.ns)
       
+      # Save super clusters and hauls
+      save(super.clusters, super.hauls,
+           file = here("Output/super_clusters_hauls.Rdata"))
     }
   } else {
     load(here("Output/seine_summaries.Rdata"))
     load(here("Output/cluster_length_frequency_all_seine.Rdata"))
     load(here("Output/cluster_length_frequency_tables_seine.Rdata"))
+    load(here("Output/super_clusters_hauls.Rdata"))
   }
   
   # Save after processing nearshore
-  save(clf, super.clusters, lf.final, set.pie, 
+  save(clf, hlf, super.clusters, super.hauls, lf.final, set.pie, 
        file = here("Output/clf_nearshore.Rdata"))
   
   # Assign backscatter to trawl clusters ------------------------------------
-  # Create varialble for nearest cluster and minumum distance
-  cluster.distance.ns <- data.frame(cluster = rep(NA, nrow(nasc.nearshore)),
-                                    cluster.distance = rep(NA, nrow(nasc.nearshore)))
-  # Configure progress bar
-  pb <- tkProgressBar("R Progress Bar", "Cluster Assignment", 0, 100, 0)
+  saveRDS(nasc.nearshore, here("Output/nasc_match_ns.rds"))
+  # nasc.nearshore <- readRDS(here("Output/nasc_match_ns.rds"))
   
-  # Assign trawl clusters
-  for (i in 1:nrow(nasc.nearshore)) {
-    # Calculate distance between each NASC interval and all trawl clusters
-    temp.distance <- distance(nasc.nearshore$lat[i], nasc.nearshore$long[i], 
-                              super.clusters$lat, super.clusters$long, 
-                              units = "nm")
-    
-    # Assign cluster with minimum distance to NASC interval
-    cluster.distance.ns$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
-    cluster.distance.ns$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
-    
-    # Update progress bar
-    pb.prog <- round(i/nrow(nasc.nearshore)*100)
-    info <- sprintf("%d%% done", pb.prog)
-    setTkProgressBar(pb, pb.prog, sprintf("Cluster Assignment (%s)", info), info)
-  }
+  nasc.match.ns <- nasc.nearshore %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
   
-  # Close progress bar
-  close(pb)
+  cluster.match.ns <- super.clusters %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
   
-  # Add cluster distances to nasc
-  nasc.nearshore <- bind_cols(nasc.nearshore, cluster.distance.ns) %>% 
-    project_df(to = crs.proj)
+  haul.match.ns <- super.hauls %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
   
-  # Save nasc cluster vector
-  save(cluster.distance.ns, file = here("Output/nasc_cluster_distance_nearshore.Rdata"))
+  # Find nearest cluster ----------------------------
+  # Returns a vector of nearest clusters
+  nearest.cluster.ns <- st_nearest_feature(nasc.match.ns, cluster.match.ns)
+  nearest.haul.ns <- st_nearest_feature(nasc.match.ns, haul.match.ns)
+  
+  # Expand clf to match nasc ------------------------
+  cluster.ns.sp <- cluster.match.ns[nearest.cluster.ns, ] %>% 
+    select(geometry) %>% 
+    as_Spatial()
+  
+  haul.ns.sp <- haul.match.ns[nearest.haul.ns, ] %>% 
+    select(geometry) %>% 
+    as_Spatial()
+  
+  # Make nasc sp
+  # Removing the other data (i.e., only retaining the geometry) decreases the size of nasc from 50 to 1 MB
+  nasc.ns.sp <- nasc.match.ns %>% 
+    select(geometry) %>% 
+    as_Spatial()
+  
+  # Compute distances with {geosphere}
+  ## Must be done in WGS84 projection
+  nasc.match.ns <- nasc.match.ns %>% 
+    mutate(cluster = cluster.match.ns$cluster[nearest.cluster.ns],
+           cluster.distance = distGeo(nasc.ns.sp, cluster.ns.sp)*0.000539957,
+           haul = haul.match.ns$haul[nearest.haul.ns],
+           haul.distance = distGeo(nasc.ns.sp, haul.ns.sp)*0.000539957) 
+  
+  # Remove geometry
+  nasc.match.ns <- st_set_geometry(nasc.match.ns, NULL) 
+  
+  # Add clusters and cluster distances to nasc
+  nasc.nearshore <- nasc.nearshore %>% 
+    bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance)) 
   
   # Save results of processing
   save(nasc.nearshore, file = here("Data/Backscatter/nasc_nearshore.Rdata"))
@@ -136,7 +167,8 @@ if (process.nearshore) {
 
 # Filter unwanted transects
 nasc.nearshore <- nasc.nearshore %>% 
-  filter(!transect.name %in% unlist(tx.rm[nasc.vessels.nearshore]))
+  filter(!transect.name %in% unlist(tx.rm[nasc.vessels.nearshore])) %>% 
+  project_df(to = crs.proj)
 
 # Convert nav to spatial
 nav.ns.sf <- st_as_sf(nasc.nearshore, coords = c("long","lat"), crs = crs.geog) 
@@ -172,16 +204,18 @@ nasc.nearshore.summ <- nasc.nearshore %>%
   ungroup()
 
 # Map trawl clusters -------------------------------------------------------
-# Create hulls around positive clusters
+# Create hull polygons around positive clusters and hauls
 nasc.super.clusters.ns <- nasc.nearshore %>% 
-  filter(cluster %in% nasc.nearshore.summ$cluster) %>% 
-  plyr::ddply("cluster", find_hull) %>% 
-  select(long, lat, cluster) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   group_by(cluster) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("POLYGON") %>% 
-  ungroup()
+  summarise() %>% 
+  st_convex_hull()
+
+nasc.super.hauls.ns <- nasc.nearshore %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise() %>% 
+  st_convex_hull()
 
 if (save.figs) {
   nasc.cluster.plot.ns <- base.map +
@@ -189,11 +223,6 @@ if (save.figs) {
     geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
     # Plot convex hull around NASC clusters
     geom_sf(data = nasc.super.clusters.ns, colour = 'black', alpha = 0.5, show.legend = FALSE) +
-    # geom_point(data = nasc.nearshore, aes(X, Y, colour = factor(cluster)),
-    #            size = 0.5, show.legend = FALSE) +
-    # # Plot convex hull around NASC clusters
-    # geom_sf(data = nasc.super.clusters.ns, aes(fill = factor(cluster)),
-    #         colour = 'black', alpha = 0.5, show.legend = FALSE) +
     scale_fill_discrete(name = "Cluster") +
     scale_colour_manual(name = "Cluster", values = c("Trawl" = "blue", "Purse seine" = "red")) +
     # Plot cluster midpoints
@@ -203,12 +232,28 @@ if (save.figs) {
     # Plot positive trawl cluster midpoints
     geom_shadowtext(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster),
                     aes(X, Y, label = cluster, colour = sample.type),
-                    size = 2, fontface = 'bold', bg.colour = "white") +
-    # geom_shadowtext(data = filter(clf, CPS.num > 0, cluster %in% nasc.nearshore$cluster), 
-    #                 aes(X, Y, label = cluster, colour = sample.type), 
-    #                 size = 2, bg.colour = "white", fontface = "bold") +
+                    size = 2, bg.colour = "white", fontface = "bold") +
     # Plot panel label
-    # ggtitle("Integrated NASC Clusters-Nearshore") +
+    coord_sf(crs = crs.proj, 
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  nasc.haul.plot.ns <- base.map +
+    # Plot nasc data
+    geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
+    # Plot convex hull around NASC clusters
+    geom_sf(data = nasc.super.hauls.ns, colour = 'black', alpha = 0.5, show.legend = FALSE) +
+    scale_fill_discrete(name = "Haul") +
+    scale_colour_manual(name = "Haul", values = c("Trawl" = "blue", "Purse seine" = "red")) +
+    # Plot cluster midpoints
+    geom_shadowtext(data = filter(hlf, CPS.num == 0), 
+                    aes(X, Y, label = haul),
+                    colour = 'gray20', bg.colour = "white", size = 2) +
+    # Plot positive trawl cluster midpoints
+    geom_shadowtext(data = filter(hlf, CPS.num > 0, haul %in% nasc.nearshore$haul),
+                    aes(X, Y, label = haul, colour = sample.type),
+                    size = 2, bg.colour = "white", fontface = "bold") +
+    # Plot panel label
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -218,6 +263,10 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_cluster_map_ns.png"),
          width = map.width, height = map.height)
   
+  ggsave(nasc.haul.plot.ns,
+         filename = here("Figs/fig_nasc_haul_map_ns.png"),
+         width = map.width, height = map.height)
+  
   save(nasc.cluster.plot.ns, file = here("Output/nasc_cluster_plot_ns.Rdata"))
 }
 
@@ -225,12 +274,22 @@ if (save.figs) {
 # Select and rename trawl data for pie charts
 if (use.seine.data) {
   cluster.pie <- bind_rows(cluster.pie, set.pie)
+  
+  haul.pie <- set.pie %>% 
+    select(-cluster) %>% 
+    bind_rows(haul.pie)
 }
 
 cluster.pie.ns <- cluster.pie %>% 
-  filter(cluster %in% unique(nasc.nearshore.summ$cluster)) 
+  filter(cluster %in% unique(nasc.nearshore$cluster)) 
 
 cluster.pos.ns <- filter(cluster.pie.ns, AllCPS > 0) %>% 
+  arrange(desc(X))
+
+haul.pie.ns <- haul.pie %>% 
+  filter(haul %in% unique(nasc.nearshore$haul)) 
+
+haul.pos.ns <- filter(haul.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
 # Substitute very small value for species with zero catch, just for pie charts
@@ -239,12 +298,19 @@ if (nrow(cluster.pos.ns) > 0) {
     replace(. == 0, 0.0000001) 
 }
 
+if (nrow(haul.pos.ns) > 0) {
+  haul.pos.ns <- haul.pos.ns %>% 
+    replace(. == 0, 0.0000001) 
+}
+
 # Filter for empty trawls
 cluster.zero.ns <- filter(cluster.pie.ns, AllCPS == 0)
+haul.zero.ns    <- filter(haul.pie.ns, AllCPS == 0)
 
 if (save.figs) {
   # Create trawl figure
-  trawl.catch.plot.ns <- base.map +
+  # Use clustered trawl data (clf)
+  trawl.catch.plot.cluster.ns <- base.map +
     # Plot nasc data
     geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
                size = 0.5, colour = "gray50", alpha = 0.5) +
@@ -269,18 +335,56 @@ if (save.figs) {
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
+  # Use individual trawl haul data (hlf)
+  trawl.catch.plot.haul.ns <- base.map +
+    # Plot nasc data
+    geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
+               size = 0.5, colour = "gray50", alpha = 0.5) +
+    # Plot trawl pies
+    geom_scatterpie(data = haul.pos.ns, 
+                    aes(X, Y, group = haul, r = pie.radius),
+                    cols = c("Anchovy","JackMack","Jacksmelt",
+                             "PacHerring","PacMack","Sardine"),
+                    color = 'black', alpha = 0.8) +
+    # Configure trawl scale
+    scale_fill_manual(name = 'Species',
+                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                                 "P. herring", "P. mackerel", "Sardine"),
+                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                                 pac.herring.color, pac.mack.color, sardine.color)) +
+    # Plot empty trawl locations
+    geom_point(data = haul.zero.ns, aes(X, Y), 
+               size = 2, shape = 21, fill = 'black', colour = 'white') +
+    # Plot panel label
+    ggtitle("CPS Species Proportions in Net Samples") +
+    coord_sf(crs = crs.proj, 
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, trawl.catch.plot.ns,
+  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, trawl.catch.plot.cluster.ns,
+                                        nrow = 1, labels = c("a)", "b)"))
+  
+  nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, trawl.catch.plot.haul.ns,
                                         nrow = 1, labels = c("a)", "b)"))
   
   ggsave(nasc.trawl.cluster.wt.ns,
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
+  
+  ggsave(nasc.trawl.haul.wt.ns,
+         filename = here("Figs/fig_nasc_trawl_haul_wt_ns.png"),
+         width = map.width*2, height = map.height)
 }
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
-nasc.nearshore <- nasc.nearshore %>% 
-  left_join(select(clf, -lat, -long, -X, -Y), by = c("cluster" = "cluster"))
+if (cluster.source["NS"] == "cluster") {
+  nasc.nearshore <- nasc.nearshore %>% 
+    left_join(select(clf, -lat, -long, -X, -Y, -haul), by = c("cluster" = "cluster"))  
+} else {
+  nasc.nearshore <- nasc.nearshore %>% 
+    left_join(select(hlf, -lat, -long, -X, -Y,-cluster), by = c("haul" = "haul"))
+}
 
 # Save results
 save(nasc.nearshore, file = here("Output/cps_nasc_prop_ns.Rdata"))
@@ -505,7 +609,7 @@ if (get.bathy) {
   
   # Save bathy results
   save(noaa.bathy.ns, file = paste(here("Data/GIS"), "/bathy_data_ns_",
-                                survey.name,".Rdata", sep = ""))  
+                                   survey.name,".Rdata", sep = ""))  
 } else {
   load(paste0(here("Data/GIS"), "/bathy_data_ns_", survey.name,".Rdata"))
 }
@@ -906,7 +1010,7 @@ strata.final.ns <- strata.final.ns %>%
 # ggplot(strata.final.ns, aes(long, lat, colour = paste(vessel.name, stratum))) +
 #   geom_point() +
 #   facet_wrap(~scientificName) +
-#   # coord_map() +
+#   coord_map() +
 #   theme_bw()
 
 # Ungroup tx.ends so it joins properly with strata.points.ns  
@@ -1148,11 +1252,11 @@ for (i in unique(nearshore.spp$scientificName)) {
 #   facet_wrap(~scientificName) +
 #   theme_bw()
 # 
-# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "vessel.name")
-# mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "vessel.name")
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
 
 # Save strata polygons
 save(strata.nearshore, 
@@ -1278,9 +1382,8 @@ save(strata.nearshore.points,
      file = here("Output/strata_points_nearshore.Rdata"))
 
 # Write nearshore stata points to CSV
-write.csv(strata.nearshore.points,  
-          file = here("Output/strata_points_nearshore.csv"),
-          quote = F, row.names = F)
+write_csv(strata.nearshore.points,  
+          file = here("Output/strata_points_nearshore.csv"))
 
 # Summarize nasc.strata by stock
 strata.summ.nearshore <- strata.nearshore %>% 
@@ -2148,8 +2251,6 @@ if (save.figs) {
                                  pac.mack.color, sardine.color)) +
     # Configure legend guides
     guides(fill = guide_legend(), size = guide_legend()) +
-    # Plot panel label
-    # ggtitle("Acoustic Proportions (Number) by Cluster") +
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -2162,3 +2263,4 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_acoustic_cluster_ns.png"),
          width = map.width*2, height = map.height)
 }
+

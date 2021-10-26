@@ -1,11 +1,11 @@
 # Summarize target strength proportions by trawl haul and species --------------
-ts.summ.h <- select(l.summ.haul, haul, scientificName, 
+ts.summ.h <- ungroup(l.summ.haul) %>% 
+  select(haul, scientificName, 
                     meanwg, num, sigmawg, sigmaindiv) %>% 
   ungroup()
 
 # Save to file
-write.csv(ts.summ.h, file = here("Output/ts_summ_haul.csv"), 
-          quote = FALSE, row.names = FALSE)
+write_csv(ts.summ.h, file = here("Output/ts_summ_haul.csv"))
 
 # Subset sardine results
 ts.sub.sar <- filter(ts.summ.h, scientificName == "Sardinops sagax") %>% 
@@ -30,7 +30,9 @@ names(ts.sub.her) <- paste(names(ts.sub.her), "her", sep = ".")
 
 # Combine all TS estimates ----------------------------------------------------
 # Add sardine TS estimates to individual trawls
-hlf <- haul.mid %>% 
+hlf <- ungroup(haul.mid) %>% 
+  select(-cluster) %>% 
+  project_df(to = crs.proj) %>% 
   left_join(ts.sub.sar,by  = c("haul" = "haul.sar")) %>% 
   # Add anchovy TS estimates to hlf
   left_join(ts.sub.anch,by = c("haul" = "haul.anch")) %>% 
@@ -96,9 +98,9 @@ write_csv(ts.proportions.h, file = here("Output/ts_proportions_raw_haul.csv"))
 
 # Add cluster weights, numbers, and TS proportions
 hlf <- hlf %>% 
-  left_join(catch.summ.num.h,  by = 'haul') %>% 
-  left_join(haul.summ.wt, by = 'haul') %>% 
-  left_join(ts.proportions.h,  by = 'haul')
+  left_join(catch.summ.num.h, by = 'haul') %>% 
+  left_join(haul.summ.wt,     by = 'haul') %>% 
+  left_join(ts.proportions.h, by = 'haul')
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
 hlf$sigmaindiv.anch[hlf$prop.anch == 0] <- 1
@@ -121,7 +123,6 @@ save(hlf, file = here("Output/hlf_ts_proportions.Rdata"))
 # Save figures to compare results
 # Get acoustic proportions for mapping
 acoustic.prop.indiv.h <- hlf %>%
-  ungroup() %>% 
   filter(!is.na(CPS.wg)) %>% 
   select(haul, lat, long, prop.anch, prop.jack, prop.her,
          prop.mack, prop.sar) %>% 
@@ -129,7 +130,6 @@ acoustic.prop.indiv.h <- hlf %>%
   project_df(to = crs.proj)
 
 acoustic.prop.wg.h <- hlf %>%
-  ungroup() %>% 
   filter(!is.na(CPS.wg)) %>% 
   select(haul, lat, long, prop.anch.wg, prop.jack.wg, prop.her.wg,
          prop.mack.wg, prop.sar.wg) %>% 
