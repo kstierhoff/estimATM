@@ -259,6 +259,10 @@ wa_waters <- wa %>%
   # Transform back to WGS84 for mapping
   st_transform(4326)
 
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(4326)
+
 # Set padding around data  
 if (resize.map) {
   # Use nav data to resize map to survey progress
@@ -403,10 +407,13 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
 
 ```{r filter-trawl-data}
 if (do.spatial) {
-  # Find hauls in CA waters
+  # Find hauls in WA waters
   haul.wa <- haul.mid %>% 
+    # Filter hauls N of the WA/OR border
+    filter(lat >= 46.23622) %>% 
     st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    st_intersection(wa_waters)
+    # Find hauls in the US EEZ
+    st_intersection(eez_usa)
   # 
   # haul.mpa <- haul.mid %>% 
   #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
@@ -480,9 +487,10 @@ A map showing all trawl hauls (black points), trawls in CA State waters (red poi
 if (nrow(haul.wa) > 0) {
   leaflet() %>% 
     addProviderTiles(providers$Esri.OceanBasemap) %>%  
+        # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.") %>% 
     addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
-    # addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
-    #             label = ~htmlEscape(MPA)) %>% 
     addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
                  popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
     addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
@@ -504,6 +512,9 @@ if (nrow(haul.wa) > 0) {
 } else {
   leaflet() %>% 
     addProviderTiles(providers$Esri.OceanBasemap) %>%  
+     # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.") %>% 
     addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
     addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
                  popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
@@ -653,11 +664,11 @@ leaflet() %>%
                    label = ~htmlEscape(key)) %>% 
   addMarkers(data = tows.mpa, popup = ~key, label = ~htmlEscape(key)) %>% 
   # Add scale bar
-    addScaleBar(position = "bottomright") %>%
-    # Add map coordinates
-    addMouseCoordinates() %>% 
-    # Add measurement tool
-    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
-               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
-               position = "topleft")
+  addScaleBar(position = "bottomright") %>%
+  # Add map coordinates
+  addMouseCoordinates() %>% 
+  # Add measurement tool
+  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+             position = "topleft")
 ```
