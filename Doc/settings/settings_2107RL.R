@@ -201,7 +201,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
 stock.ns      <- "Central"
-stratum.ns    <- 1
+stratum.ns    <- 3
 
 # Figure preferences ------------------------------------------------------
 # Set species colors
@@ -510,7 +510,7 @@ nIndiv.min    <- 10
 nClusters.min <- 3
 
 # Use manually defined strata?
-stratify.manually    <- FALSE
+stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
@@ -520,64 +520,112 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 37:60),
+    transect = 46:53),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 2,
+    transect = 55:66),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 3,
+    transect = 69:79),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 4,
+    transect = 81:84),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:28),
+    transect = 1:13),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 30:35),
+    transect = 14:26),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 3,
-    transect = 36:39),
+    transect = 27:40),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 4,
-    transect = 40:58),
+    transect = 41:51),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 5,
+    transect = 52:59),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 6,
+    transect = 70:79),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 10:24),
+    transect = 1:13),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 33:42),
+    transect = 14:26),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 46:49),
+    transect = 27:35),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 4,
+    transect = 47:60),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 5,
+    transect = 65:68),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 6,
+    transect = 69:77),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 24:28),
+    transect = 1:13),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 33:36),
+    transect = 14:26),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 3,
-    transect = 38:47),
+    transect = 41:46),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 4,
+    transect = 58:68),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 5,
+    transect = 74:77),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:8),
+    transect = 1:13),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 12:22),
+    transect = 14:26),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 3,
-    transect = 24:62)
+    transect = 27:38),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 4,
+    transect = 47:68),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 5,
+    transect = 69:83)
 )
 
 # Stock boundaries --------------------------------------------------------
-stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.3 # Latitude of Pt. Conception (or change based on SST)
+stock.break.anch <- 40.46 # Latitude of Cape Mendocino
+stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
 # Transects used to define stock boundaries (primary or other)
 
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous

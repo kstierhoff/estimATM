@@ -1619,14 +1619,52 @@ catch <- catch.all %>%
   rename(totalNum = TotalNum,
          totalWeight = TotalWtKg)
 
-# catch <- catch.all %>% 
-#   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-#   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-#            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-#   left_join(select(haul, haul, cluster)) %>% 
-#   mutate(key         = paste(haul, scientificName),  
-#          totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-#          totalNum    = (subSampleCount/subSampleWtkg)*totalWeight) 
+if (survey.name %in% c("2107RL")) {
+  # Haul 97 had specimen lengths taken but not weights, so weight had to be 
+  # estimated from length, and average weight is estimated to estimate the totalNum
+  catch.weight.missing <- catch %>% 
+    filter(totalNum == 0) 
+  
+  lengths.missing.weights <- lengths.all %>% 
+    left_join(spp.codes) %>% 
+    mutate(key = paste(haul, scientificName)) %>% 
+    # Get specimens with missing weights
+    filter(key %in% unique(catch.weight.missing$key)) %>% 
+    # Convert native length to total length, which us used to estimate weight
+    mutate(
+      totalLength_mm = case_when(
+        scientificName == "Clupea pallasii" ~ 
+          convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+        scientificName == "Engraulis mordax" ~ 
+          convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+        scientificName == "Sardinops sagax" ~ 
+          convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+        scientificName == "Scomber japonicus" ~ 
+          convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+        scientificName == "Trachurus symmetricus" ~ 
+          convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
+        scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm))) %>% 
+    mutate(
+      weightg = estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)))
+  
+  # Summarize subSampleWtkg, used to estimate totalNum in the catch table
+  missing.weight.summ <- lengths.missing.weights %>% 
+    group_by(key) %>% 
+    summarise(subSampleWt.est = sum(weightg)/1000)
+  
+  # Add estimated subsample weight to the catch table
+  # When totalNum is missing, estimate the total number from the mean specimen weight
+  catch <- catch %>% 
+    left_join(missing.weight.summ) %>% 
+    mutate(
+      subSampleWtkg = case_when(
+        subSampleWtkg == 0 ~ subSampleWt.est,
+        TRUE ~ subSampleWtkg),
+      totalNum = case_when(
+        totalNum == 0 ~ as.integer((subSampleCount/subSampleWtkg)*totalWeight),
+        TRUE ~ totalNum)) %>%
+    select(-subSampleWt.est)
+}
 
 save(catch, file = here("Output/catch_final.Rdata"))
 
@@ -1700,6 +1738,7 @@ haul.pie <- haul.summ.wt %>%
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
+  arrange(haul) %>% 
   project_df(to = crs.proj) %>% 
   mutate(
     label = paste("Haul", haul),
@@ -1949,45 +1988,6 @@ include_graphics(here("Figs/fig_haul_target_strength_map.png"))
 
 ```{r assign-trawl-clusters}
 # Assign nearest trawl cluster to each NASC interval -------------------------------------------------------
-# if (process.csv) {
-#   # Create variable for nearest cluster and minimum distance
-#   cluster.distance <- data.frame(
-#     datetime = rep(NA_POSIXct_, nrow(nasc)),
-#     cluster = rep(NA, nrow(nasc)), 
-#     cluster.distance = rep(NA, nrow(nasc)))
-#   
-#   # Configure progress bar
-#   pb <- tkProgressBar("R Progress Bar", "Cluster Assignment", 0, 100, 0)
-#   
-#   # Assign trawl clusters
-#   for (i in 1:nrow(nasc)) {
-#     # Calculate distance between each NASC interval and all trawl clusters
-#     temp.distance <- distance(nasc$lat[i], nasc$long[i], 
-#                               super.clusters$lat, super.clusters$long, 
-#                               units = "nm")
-#     
-#     # Assign cluster with minimum distance to NASC interval
-#     cluster.distance$datetime[i]         <- nasc$datetime[i]
-#     cluster.distance$cluster[i]          <- super.clusters$cluster[which.min(temp.distance)]
-#     cluster.distance$cluster.distance[i] <- temp.distance[which.min(temp.distance)]
-#     
-#     # Update progress bar
-#     pb.prog <- round(i/nrow(nasc)*100)
-#     info <- sprintf("%d%% done", pb.prog)
-#     setTkProgressBar(pb, pb.prog, sprintf("Cluster Assignment (%s)", info), info)
-#   }
-#   
-#   # Close progress bar
-#   close(pb)
-#   
-#   # Save nasc cluster vector
-#   save(cluster.distance, file = here("Output/nasc_cluster_distance.Rdata"))
-#   
-# } else {
-#   load(here("Output/nasc_cluster_distance.Rdata"))  
-#   
-# }
-
 saveRDS(nasc, here("Output/nasc_match.rds"))
 # nasc <- readRDS(here("Output/nasc_match.rds"))
 
@@ -2243,7 +2243,6 @@ for (i in unique(L.max$scientificName)) {
   lw.df <- bind_rows(lw.df, data.frame(scientificName = i, L, W))
 }
 
-# Estimate missing weights from lengths -------------------------------------------------------
 # Estimate missing weights from lengths -------------------------------------------------------
 # Use Palance et al. 2019 models to estimate missing L and W
 lengths.all <- lengths.all %>% 
@@ -3065,7 +3064,8 @@ ts.proportions <- clf %>%
     prop.jack    = (num.jack    * sigmaindiv.jack) / weighted.num,
     prop.jack.wg = (meanwg.jack * sigmawg.jack * num.jack) / weighted.wg,
     prop.her     = (num.her     * sigmaindiv.her)  / weighted.num,
-    prop.her.wg  = (meanwg.her  * sigmawg.her  * num.her) / weighted.wg)
+    prop.her.wg  = (meanwg.her  * sigmawg.her  * num.her) / weighted.wg) %>% 
+  replace(is.na(.), 0) 
 
 # Replace all NaNs with zeros
 ts.proportions[atm:::is.nan.df(ts.proportions)] <- NA
@@ -3627,7 +3627,7 @@ nasc.clust.biom <- nasc.clust.hist %>%
                    labels = FALSE) - 1) %>% 
   group_by(species, dist.bin) %>% 
   summarise(total.density = sum(density)) %>% 
-  mutate(distance = dist.bin * ceiling(max(nasc.match$cluster.distance)/30))
+  mutate(distance = dist.bin * ceiling(max(nasc$cluster.distance)/30))
 
 # Calculate cumulative acoustic biomass versus distance to positive clusters
 nasc.clust.biom <- nasc.clust.biom %>% 
@@ -4136,8 +4136,7 @@ tx.ends <- nasc %>%
     lat.i  = lat[which.max(long)],
     long.i = max(long),
     lat.o  = lat[which.min(long)],
-    long.o = min(long)
-  ) %>% 
+    long.o = min(long)) %>% 
   left_join(select(tx.nn, transect.name, spacing)) %>% 
   mutate(
     brg = swfscMisc::bearing(lat.i, long.i,
@@ -4343,7 +4342,7 @@ for (i in unique(strata.final$scientificName)) {
   
   # Define strata to stock
   nasc.stock.temp <- strata.points %>% 
-    filter(loc == "inshore") %>%
+    filter(loc == "inshore", grp == "original") %>%
     mutate(stock = case_when(
       i == "Engraulis mordax" & lat >= stock.break.anch ~ "Northern",
       i == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
@@ -4796,7 +4795,7 @@ Assemble together latitude and longitude data from NASC and ERDDAP for matching 
 
 ```{r get-ctd-nav}
 # Assemble lat/long data from nav and nasc
-ctd.nav <- select(nav, datetime, long, lat) %>% 
+ctd.nav <- select(nav, datetime = time, long, lat) %>% 
   bind_rows(select(nasc, datetime, long, lat)) %>% 
   arrange(datetime)
 ```  
@@ -6864,6 +6863,7 @@ save(be.survey.nse, file = here("Output/biomass_bootstrap_estimates_survey_nears
 ```
 
 ### Nearshore Extrapolation  
+
 Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for all CPS by stratum extrapolated to the unsampled nearshore area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.
 
 ```{r biomass-bootstrap-estimates-final-nse}

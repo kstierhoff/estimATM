@@ -16,7 +16,7 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf,
                mapview,mapdata,photobiology,ggmap,knitr,bookdown,
-               rnaturalearth,ggspatial,kableExtra)
+               rnaturalearth,ggspatial,kableExtra,geosphere,janitor)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -246,12 +246,11 @@ nav.daynight <- nav.daynight %>%
   arrange(time) %>% 
   mutate(id = seq(1, nrow(.)))
 
-
 # Process FSV data from ERDDAP
 nav <- nav %>%
   mutate(time = ymd_hms(time),
          date = date(time),
-         dist = SOG*60/1000) %>%  # Distance in km
+         dist = SOG*0.51444*60/1000) %>%  # Distance in km, from SOG (in knots)
   filter(between(long, min.long, max.long), between(lat, min.lat, max.lat))
 
 if (extract.bathy) {
@@ -343,7 +342,7 @@ if (exists("nav.sd")) {
   nav.sd <- nav.sd %>%
     mutate(time = ymd_hms(time),
            date = date(time),
-           dist = SOG*60/1000) %>%  # Distance in km
+           dist = SOG*0.51444*60/1000) %>%  # Distance in km, from speed in
     filter(between(long, min.long, max.long), between(lat, min.lat, max.lat))
   
   if (extract.bathy) {
@@ -397,11 +396,6 @@ if (exists("nav.sd")) {
 }
 ```
 
-```{r process-transect-data}
-
-```
-
-
 # `r survey.name.long`(`r survey.name`)
 ## Summarize effort by depth and day/night
 
@@ -413,16 +407,17 @@ Total transit distance (km and nmi) and number of pings emitted from the multifr
 ```{r effort-summary}
 # Print nav summary
 nav.summ %>% 
+  adorn_totals() %>% 
   rename(Depth            = depth_bin,
          Period           = day_night,
          "Distance (km)"  = dist_km,
          "Distance (nmi)" = dist_nmi,
          Pings            = pings_ek) %>%  
   kable(format = knitr.format, booktabs = TRUE, escape = F,
-        align = c("c")) %>% 
+        align = c("c"), digits = c(0),
+        format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = F) %>%
-  row_spec(0, align = c("c"))
+                full_width = F) 
 ```
 
 #### Transect effort only
@@ -464,29 +459,33 @@ nav.das <- nav %>%
   summarise(das = n_distinct(date))
 
 nasc.summ %>% 
-  rename("Distance (km)"  = dist_km,
+  adorn_totals() %>%
+  rename("Leg" = leg,
+         "Distance (km)"  = dist_km,
          "Distance (nmi)" = dist_nmi) %>%  
   kable(format = knitr.format, booktabs = TRUE, escape = F,
         align = c("c"),
-        digits = c(0,0,0,0)) %>% 
+        digits = c(0,0,0,0),
+        format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
                 full_width = F) %>%
   row_spec(0, align = c("c"))
 ```
-
 
 ### Saildrone
 
 ```{r effort-summary-saildrone}
 if (exists("nav.summ.sd")) {
   nav.summ.sd %>% 
+    adorn_totals() %>% 
     rename(Depth            = depth_bin,
            Period           = day_night,
            "Distance (km)"  = dist_km,
            "Distance (nmi)" = dist_nmi,
            Pings            = pings_ek) %>%  
     kable(format = knitr.format, booktabs = TRUE, escape = F,
-          align = c("c")) %>% 
+          align = c("c"),
+          format.args = list(big.mark = ",")) %>% 
     kable_styling(bootstrap_options = c("striped","hover","condensed"),
                   full_width = F) %>%
     row_spec(0, align = c("c")) 
