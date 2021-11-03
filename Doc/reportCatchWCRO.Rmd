@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
                png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
-               odbc,cowplot,mapview,fs,beepr)
+               odbc,cowplot,mapview,fs,beepr,sf)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -63,16 +63,64 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r load-catch-data}
-# Load catch data
+# Load haul and catch data
 load(here("Data/Trawl/trawl_data.Rdata"))
 ```
 
-```{r}
-# Filter and format
+```{r load-spatial-data, include = FALSE}
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  select(geometry)
+```
+
+```{r process-hauls}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  # Reformat haul data to match SQL
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+      haulBackTime     = haulbackTime,
+      equilibriumTime  = EquilibriumTime) %>% 
+    mutate(haulbackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) %>%
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, notes = Notes)
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    mutate(
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime))
+  
+}
+
+# Filter haul data for current survey
+haul <- haul.all %>% 
+  select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 
+         stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
+         trawlPerformance, notes) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
+  st_as_sf(coords = c("startLongDecimal","startLatDecimal"), crs = crs.geog) %>% 
+  st_intersection(eez_usa)
+
+# Get hauls inside the US EEZ
+us.hauls <- sort(unique(haul$haul))
+```
+
+```{r process-catch}
+# Filter and format catch data
 catch <- catch.all %>% 
-  filter(cruise == cruise.name) %>% 
-  filter(!subSampleWtkg == 0) %>% 
-  left_join(spp.codes)
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
+  rename(totalNum = TotalNum,
+         totalWeight = TotalWtKg) %>% 
+  filter(haul %in% us.hauls) %>% 
+  filter(!subSampleWtkg == 0) 
 
 # Summarize species catch by weight and number
 catch.summary <- catch %>% 
