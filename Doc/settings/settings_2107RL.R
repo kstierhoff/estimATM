@@ -271,7 +271,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL") 
+nasc.vessels           <- c("RL","LBC","LM") 
 nasc.vessels.offshore  <- NA_character_
 nasc.vessels.nearshore <- NA_character_
 nasc.vessels.krill     <- c("RL")
@@ -315,17 +315,21 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2107RL")   
+  survey.dir           <- c(RL  = "C:/SURVEY/2107RL",
+                            LBC = "C:/SURVEY/2107RL",
+                            LM  = "C:/SURVEY/2107RL")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SummerCPS")
 }
 
 # Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER") 
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+                            LM  = "PROCESSED/EV/CSV/LISAMARIE",
+                            LBC = "PROCESSED/EV/CSV/CARNAGE") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
-                            LM  = "Final 38 kHz CPS.csv",
+                            LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
