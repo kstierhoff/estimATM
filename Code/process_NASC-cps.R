@@ -13,7 +13,8 @@ if (process.csv) {
   for (i in nasc.vessels) {
     # List all CSV files
     nasc.files <- dir_ls(file.path(here("Data/Backscatter", i)),
-                         regex = nasc.pattern.cps[i])
+                         regepx = nasc.pattern.cps[i],
+                         ignore.case = TRUE)
     
     if (!process.csv.all) {
       # List only new CSV files

@@ -1,12 +1,12 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
-process.seine     <- F # Process purse seine data, if present
-process.nearshore <- F # Process near backscatter data
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.seine     <- T # Process purse seine data, if present
+process.nearshore <- T # Process near backscatter data
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
@@ -273,7 +273,7 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LBC","LM") 
 nasc.vessels.offshore  <- NA_character_
-nasc.vessels.nearshore <- NA_character_
+nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -286,7 +286,7 @@ nasc.depth.krill <- "NASC.350"
 # Survey vessels that collected purse seine data
 seine.vessels          <- c("LBC","LM")
 # Use seine data to apportion backscatter
-use.seine.data         <- FALSE
+use.seine.data         <- TRUE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
@@ -328,7 +328,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             LBC = "PROCESSED/EV/CSV/CARNAGE") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
+nasc.pattern.cps       <- c(RL  = "CPS.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
@@ -361,7 +361,8 @@ nasc.max               <- NA
 # If T, read cps.nasc from file; else use NASC.50 
 source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
-                            LBC = FALSE) # in the nearshore strata
+                            LBC = FALSE,
+                            NS  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv")) # in the nearshore strata 
@@ -501,7 +502,7 @@ estimate.nearshore <- FALSE
 estimate.offshore  <- FALSE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core")
+estimate.regions   <- c("Core", "Nearshore")
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata

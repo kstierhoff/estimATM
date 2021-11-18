@@ -14,7 +14,8 @@ if (process.csv.krill) {
     # for (i in nasc.vessels) {
     # List all CSV files
     nasc.files.krill <- dir_ls(file.path(here("Data/Backscatter", i)),
-                               regex = nasc.pattern.krill[i])
+                               regexp = nasc.pattern.krill[i],
+                               ignore.case = TRUE)
     
     if (!process.csv.all) {
       # List only new CSV files

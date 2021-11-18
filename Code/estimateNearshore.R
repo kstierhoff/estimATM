@@ -366,7 +366,7 @@ if (save.figs) {
                                         nrow = 1, labels = c("a)", "b)"))
   
   nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, trawl.catch.plot.haul.ns,
-                                        nrow = 1, labels = c("a)", "b)"))
+                                     nrow = 1, labels = c("a)", "b)"))
   
   ggsave(nasc.trawl.cluster.wt.ns,
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
