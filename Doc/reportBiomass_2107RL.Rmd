@@ -1,0 +1,1501 @@
+---
+title: "DISTRIBUTION, BIOMASS, AND DEMOGRAPHY OF COASTAL PELAGIC FISHES IN THE CALIFORNIA CURRENT ECOSYSTEM DURING SUMMER 2021 BASED ON ACOUSTIC-TRAWL SAMPLING"
+author: "Kevin L. Stierhoff, Juan P. Zwolinski, and David A. Demer"
+date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
+output:
+  bookdown::pdf_document2:
+    includes:
+      in_header: yaml/header.tex
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+  bookdown::word_document2:
+    reference_docx: template/report_template_Rmarkdown.docx
+    toc: yes
+    toc_depth: 3
+    pandoc_args:
+    - --filter
+    - yaml/pandoc-newpage-filter.R
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+csl: csl/ices-journal-of-marine-science.csl
+bibliography: bib/ast_bib.bib
+css: css/ast.css
+always_allow_html: yes
+linkcolor: blue
+---
+
+\pagenumbering{gobble}
+
+\newpage
+
+\listoftables
+
+\newpage
+
+\listoffigures
+
+\newpage
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate,knitr,here,
+               png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
+               odbc,cowplot,mapview,fs,beepr)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# set system time zone to UTC
+Sys.setenv(tz = "UTC")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# global pander options
+panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
+panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+
+# output options
+png.res       <- 150 # dpi for saved PNG images (to reduce file size while at sea)
+```
+
+```{r loop-controls}
+# User-defined loop controls
+combine.regions  <- T # Combine core and nearshore biomass plots
+plot.time.series <- F # Plot biomass time series 
+get.db           <- F # Query biomass estimates from AST database
+copy.files       <- F # Copy bib and CSL from AST server; requires internet
+```
+
+```{r copy-bib,include=F,eval=T}
+if (copy.files) {
+  # Copy bibliography
+  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
+            here("Doc/csl"), overwrite = TRUE)
+  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
+            here("Doc/bib"), overwrite = TRUE)  
+}
+```
+
+```{r user-input, include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Survey information files ------------------------------------------------------
+settings.files <- dir(here("Doc/settings"))
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# Output files ------------------------------------------------------------------
+prj.output <- settings.files[str_detect(settings.files, paste0("output_", prj.name, ".R"))]
+source(here("Doc/settings", prj.output))
+```  
+
+\pagenumbering{arabic}
+
+# Executive Summary {-}
+
+This report provides: 1) a detailed description of the acoustic-trawl method (ATM) used by NOAA's Southwest Fisheries Science Center (SWFSC) for direct assessments of the dominant species of coastal pelagic species (CPS; i.e., Pacific Sardine _Sardinops sagax_, Northern Anchovy _Engraulis mordax_, Pacific Mackerel _Scomber japonicus_, Jack Mackerel _Trachurus symmetricus_, and Pacific Herring _Clupea pallasii_) in the California Current Ecosystem (CCE) off the west coast of North America; and 2) estimates of the biomasses, distributions, and demographies of those CPS encountered in the survey area between `r survey.start` and `r survey.end` `r survey.year`. The core survey region spanned most of the continental shelf between `r survey.landmark.n` and `r survey.landmark.s`. Throughout the core region, NOAA Ship _`r survey.vessel.long`_ (hereafter, _`r survey.vessel`_) sampled along transects oriented approximately perpendicular to the coast, from the shallowest navigable depth (~30 m) to either a distance of 35 nmi or to the 1,000 fathom (~1830 m) isobath, whichever is farthest. To estimate the biomass of CPS in the nearshore region, to ~10 m depth, where sampling by _`r survey.vessel`_ is unsafe, a fishing vessel (F/V _Long Beach Carnage_) sampled along 5 nmi-long transects spaced 5 nmi-apart off the mainland coast between Pt. Conception and `r survey.landmark.n`, and around Santa Cruz and Santa Catalina Islands in the Southern CA Bight (SCB).  
+
+For the survey area and period, the estimated biomass of the central stock of Northern Anchovy was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=4)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=4)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"] / (be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"] + be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"]))*100,big.mark=",",digits=2)`% of the total biomass. The central stock ranged from approximately Fort Bragg to San Diego, CA and $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Central"]` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Central"]` cm with modes at 8 and 12 cm.  
+
+The estimated biomass of the northern stock of Pacific Sardine was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"] / (be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"] + be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"]))*100,big.mark=",",digits=2)`% of the total biomass. Within the survey area, the northern stock ranged from approximately Pt. Conception to San Diego. $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Northern"]` to `r length.summ$L.max[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Northern"]` cm with a mode at 16 cm.  
+
+The estimated biomass of Pacific Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%). A negligible amount of biomass was observed in the core survey area, and `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%) were observed in the nearshore region. Pacific Mackerel ranged from approximately Del Mar, CA to San Diego. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Scomber japonicus']` to `r length.summ$L.max[length.summ$scientificName == 'Scomber japonicus']` cm.  
+
+The estimated biomass of Jack Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] + be.all$Biomass[be.all$Species == 'Trachurus symmetricus']))*100,big.mark=",",digits=2)`% of the total biomass. Jack Mackerel ranged from approximately Pt. Conception to San Diego. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Trachurus symmetricus']` to `r length.summ$L.max[length.summ$scientificName == 'Trachurus symmetricus']` cm with a prominent mode at 13 cm.  
+
+No southern stock of Pacific Sardine or Pacific Herring were encountered in the survey area during this period.  
+
+\newpage
+
+# Introduction {#introduction}  
+
+In the California Current Ecosystem (CCE), multiple coastal pelagic fish species (CPS; i.e., Pacific Sardine _Sardinops sagax_, Northern Anchovy _Engraulis mordax_, Jack Mackerel _Trachurus symmetricus_, Pacific Mackerel _Scomber japonicus_, and Pacific Herring _Clupea pallasii_) comprise the bulk of the forage fish assemblage. These populations that can change by an order of magnitude within a few years, represent important prey for marine mammals, birds, and larger migratory fishes [@Field2001], and are targets of commercial fisheries.   
+
+During summer and fall, the northern stock of Pacific Sardine typically migrates north to feed in the productive coastal upwelling off OR, WA, and Vancouver Island [@Zwolinski2012, and references therein, **Fig. \@ref(fig:sardine-distribution)**]. The predominantly piscivorous adult Pacific and Jack Mackerels also migrate north in summer, but go farther offshore to feed [@Zwolinski2014 and references therein]. In the winter and spring, the Pacific Sardine stock typically migrates south  to its spawning grounds, generally off central and southern California [@Demer2012] and occasionally off Oregon and Washington [@Lo2011]. These migrations vary in extent with population size; fish age and length; and oceanographic conditions. For example, the transition zone chlorophyll front [TZCF; @Polovina2001] may delineate the offshore and southern limit of both Pacific Sardine and Pacific Mackerel habitat [e.g., @Demer2012; @Zwolinski2012], and juveniles may have nursery areas in the Southern California Bight, downstream of upwelling regions. In contrast, Northern Anchovy spawn predominantly during winter and closer to the coast where seasonal down-welling increases retention of their eggs and larvae [@Bakun1982]. Pacific Herring spawn in intertidal beach areas [@Love1996]. The northern stock of Northern Anchovy is located off Washington and Oregon and the central stock is located off Central and Southern California. Whether a species migrates or remains in an area depends on its reproductive and feeding behaviors and affinity to certain oceanographic or seabed habitats.  
+
+Acoustic-trawl method (ATM) surveys, which combine information collected with echosounders and nets, were introduced to the CCE more than 45 years ago to survey CPS off the west coast of the U.S. [@Mais1974;@Mais1977;@Smith1978]. Following a two-decade hiatus, the ATM was reintroduced in the CCE in spring 2006 to sample the then abundant Pacific Sardine population [@Cutter2008]. Since then, this sampling effort has continued and expanded through annual or semi-annual surveys [@Zwolinski2014]. Beginning in 2011, the ATM estimates of Pacific Sardine abundance, age structure, and distribution have been incorporated in the annual assessments of the northern stock [@Hill2017]. Additionally, ATM survey results are applied to estimate the abundances, demographies, and distributions of epipelagic and semi-demersal fishes [e.g., @Swartzman1997;@Williams2013;@Zwolinski2014] and plankton [@Hewitt2000].  
+
+This document, and references herein, describes in detail the ATM as presently used by NOAA's Southwest Fisheries Science Center (SWFSC) to survey the distributions and abundances of CPS and their oceanographic environments [e.g., @Cutter2008;@Demer2012;@Zwolinski2014]. In general terms, the contemporary ATM combines information from satellite-sensed oceanographic conditions, calibrated multifrequency echosounders, probe-sampled oceanographic conditions, pumped samples of fish eggs, and trawl-net catches of juvenile and adult CPS. The survey area is initially defined with consideration to the potential habitat of a priority stock or stock assemblage, e.g., that for the northern stock of Pacific Sardine (**Fig. \@ref(fig:sardine-distribution)**) or the central or northern stock of Northern Anchovy. The survey area is further expanded to encompass as much of the potential habitat as possible for other CPS present off the West Coast of the U.S., as time permits.  
+
+Along transects in the survey area, multi-frequency split-beam echosounders transmit sound pulses downward beneath the ship and receive echoes from animals and the seabed in the path of the sound waves. Measurements of sound speed and absorption from conductivity-temperature-depth (CTD) probes allow accurate compensation of these echoes for propagation losses. The calibrated echo intensities, normalized to the range-dependent observational volume, provide indications of the target type and behavior [e.g., @Demer2009].  
+
+\newpage  
+
+(ref:sardine-distribution) Conceptual spring (shaded region) and summer (hashed region) distributions of potential habitat for the northern stock of Pacific Sardine along the west coasts of Mexico, the United States, and Canada. The dashed and dotted lines represent, respectively, the approximate summer and spring positions of the 0.2 mg m^–3^ chlorophyll-a concentration isoline. This isoline appears to oscillate in synchrony with the transition zone chlorophyll front [TZCF, @Polovina2001] and the offshore limit of the northern stock Pacific Sardine potential habitat [@Zwolinski2011]. Mackerels are found within and on the edge of the same oceanographic  habitat [e.g., @Demer2012; @Zwolinski2012]. The TZCF may delineate the offshore and southern limit of both Pacific Sardine and Pacific Mackerel distributions, and juveniles may have nursery areas in the Southern California Bight (SCB), downstream of upwelling regions.
+
+```{r sardine-distribution,fig.cap='(ref:sardine-distribution)',out.height='7.5in',fig.pos='H'}
+include_graphics(here("Images/img_survey_region.png"))  
+```  
+
+\newpage  
+
+Echoes from marine organisms are a function of their body composition, shape, and size relative to the sensing-sound wavelength, and their orientation relative to the incident sound waves [@Cutter2009;@Demer2009;@Renfree2009]. Variations in echo intensity across frequencies, known as echo spectra, often indicate the taxonomic groups contributing to the echoes. The CPS, with highly reflective swim bladders, create high intensity echoes of sound pulses at all echosounder frequencies [e.g., @Conti2003]. In contrast, krill, with acoustic properties closer to those of the surrounding sea-water, produce lower intensity echoes, particularly at lower frequencies [e.g., @Demer2003]. The echo energy attributed to CPS, based on empirical echo spectra [@Demer2012], are apportioned to species using trawl-catch proportions [@Zwolinski2014].  
+
+Animal densities are estimated by dividing the summed intensities attributed to a species by the length-weighted average echo intensity (the mean backscattering cross-section) from animals of that species [e.g., @Demer2012]. Transects with similar densities are grouped into post-sampling strata that mimic the natural patchiness of the target species [e.g., @Zwolinski2014]. An estimate of abundance is obtained by multiplying the average estimated density in the stratum by the stratum area [@Demer2012]. The associated sampling variance is calculated using non-parametric bootstrap of the mean transect densities. The total abundance estimate in the survey area is the sum of abundances in all strata. Similarly, the total variance estimate is the sum of the variance in each stratum.  
+
+The primary objectives of the SWFSC’s ATM surveys are to survey the distributions and abundances of CPS, krill, and their abiotic environments in the CCE. Typically, spring surveys are conducted during 25-40 days-at-sea (DAS) between March and May, and summer surveys are conducted during 50-80 DAS between June and October. In spring, the ATM surveys focus primarily on the northern stock of Pacific Sardine and the central stock of Northern Anchovy. In summer, the ATM surveys also focus on the northern stock of Northern Anchovy. During spring and summer, the biomasses of other CPS (e.g., Pacific Mackerel, Jack Mackerel, and Pacific Herring) present in the survey area are estimated.  
+
+In `r tolower(survey.season)` `r survey.year`, the ATM survey performed aboard _`r survey.vessel`_ was augmented with coordinated sampling by a fishing vessel F/V _Long Beach Carnage_ to estimate the biomasses of CPS in offshore and nearshore regions where sampling by _`r survey.vessel`_ was not possible or safe.  
+
+Presented here are 1) a detailed description of the ATM used to survey CPS in the CCE off the west coast of North America; and 2) estimates of the abundance, biomass, size structure, and distribution of CPS, specifically the northern stock of Pacific Sardine; the central stock of Northern Anchovy; Pacific Mackerel; and Jack Mackerel for the core and nearshore survey regions. Additional details about the survey may be found in the survey report **[Stierhoff2021a]**.  
+
+# Methods {#methods}
+## Data collection {#methods-data-collection}
+### Survey design {#methods-survey-design}  
+
+The `r tolower(survey.season)` `r survey.year` survey was conducted principally using _`r survey.vessel`_. The sampling domain, between `r survey.landmark.n` and `r survey.landmark.s`, was defined by the modeled distribution of potential habitat for the northern stock of Pacific Sardine at the beginning of the survey (**Fig. \@ref(fig:sardine-potential-habitat)a**), and information recently gathered from other research projects [e.g., California Cooperative Oceanic Fisheries Investigations (CalCOFI) samples] or the fishing industry (e.g., catch and bycatch data). This area encompassed the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S. and Canada from approximately San Diego, CA to Cape Scott, BC, but also spanned portions of the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, and Pacific Herring (**Fig. \@ref(fig:sardine-potential-habitat)b-d**). East to west, the sampling domain extends from the coast to at least the 1,000 fathom (~1830 m) isobath (**Fig. \@ref(fig:survey-plan)**). Considering the expected distribution of the target species, the acceptable uncertainty in biomass estimates, and the available ship time (`r survey.das` days at sea, DAS), the principal survey objectives were the estimations of biomass for the northern stock of Pacific Sardine and the central stock of Northern Anchovy in the survey region. Additionally, biomass estimates were sought for Pacific Mackerel and Jack Mackerel in the survey region.  
+
+Additional sampling was conducted nearshore along 5-nmi-long transects spaced 5 nmi apart between San Francisco and San Diego using F/V _Long Beach Carnage_ equipped with multi-frequency (**MTA4**) echosounders (magenta lines, **Fig. \@ref(fig:survey-plan)**). The goal of the nearshore sampling was to estimate the abundance and biomass of the central stock of Northern Anchovy and northern stock of Pacific Sardine close to shore, in shallow water, or both, where _`r survey.vessel`_ could not safely navigate or trawl.  
+
+The transects are perpendicular to the coast, extending from the shallowest navigable depth (~30 m) to either a distance of 35 nmi or to the 1,000 fathom isobath, whichever is farthest (**Fig. \@ref(fig:survey-plan)**). When CPS are observed within the westernmost 3 nmi of a transect, that transect and the next one to the south are extended in 5-nmi increments until no CPS are observed in the last 3 nmi of the extension.  
+
+(ref:sardine-potential-habitat) Distribution of potential habitat for the northern stock of Pacific Sardine (a) before, (b, c) during, and (d) at the end of the `r tolower(survey.season)` `r survey.year` survey.
+
+```{r sardine-potential-habitat,fig.cap='(ref:sardine-potential-habitat)',out.height='6in',fig.pos='H'}
+include_graphics(here("Figs/fig_habitat_map.png"))  
+```  
+
+\newpage  
+
+(ref:survey-plan) Planned compulsory (solid black lines) transect lines sampled by _`r survey.vessel`_ and nearshore transect lines sampled by F/V _Long Beach Carnage_ (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms). _`r survey.vessel`_'s actual daytime and nighttime movements are overlaid (heavy gray line).
+
+```{r survey-plan,fig.cap='(ref:survey-plan)',out.height='8in',fig.pos='H'}
+include_graphics(here("Figs/fig_survey_plan.png"))  
+```  
+
+\newpage  
+
+### Acoustic sampling {#methods-acoustic-sampling}
+#### Acoustic equipment {#methods-acoustic-equipment}  
+
+On _`r survey.vessel`_, multi-frequency Wideband Transceivers (18-, 38-, 70-, 120-, 200-, and 333-kHz EK80 WBTs; Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise. In addition, acoustic data were also collected using a multibeam echosounder (ME70, Simrad), multibeam sonar (MS70, Simrad), and scanning sonar (SX90, Simrad). Transducer position and motion were measured at 5 Hz using an inertial motion unit (POS-MV, Trimble/Applanix).  
+
+On _Long Beach Carnage_, the SWFSC's multi-frequency echosounders (38-, 70-, 120-, and 200-kHz EK60 GPTs; Simrad) were configured with the SWFSC's multi-frequency transducer array (MTA4) with split-beam transducers (ES38-12, ES70-7C, ES120-7C and ES200-7C; Simrad) mounted on the bottom of a pole.  
+
+(ref:cb-config) Echosounder transducers mounted on the bottom of the retractable centerboard on _`r survey.vessel`_. During the survey, the centerboard was extended, typically positioning the transducers at ~2 m below the keel at a water depth of ~7 m.
+
+```{r cb-config,fig.cap='(ref:cb-config)',out.width='6in',fig.pos='H'}
+if (survey.vessel.primary == "RL") {
+  include_graphics(here("Images/img_centerboard_config_RL.png"))
+} else if (survey.vessel.primary == "SH") {
+  include_graphics(here("Images/img_centerboard_config_SH.png"))
+}
+```  
+
+#### Echosounder calibrations {#methods-echosounder-calibration}  
+##### _`r survey.vessel`_  
+
+First, the transducer integrities were verified through transducer-impedance measurements in water and air using an inductance-capacitance-resistance (LCR) meter (Agilent E4980A) and custom software (Matlab, MathWorks). The impedance magnitude ($|Z|$, $\Omega$), phase ($\theta$, $^\circ$), conductance ($G$, $S$), susceptance ($B$, $S$), resistance ($R$, $\Omega$), and reactance ($X$, $\Omega$) were measured over broadband frequency ranges for each transducer quadrants connected in parallel. Impedance measurements are presented in the survey report [@Stierhoff2020a].  
+
+The echosounder systems aboard _`r survey.vessel`_ were calibrated on `r cal.datetime` while the vessel was docked at `r cal.loc` (`r cal.lat.dd` $^{\circ}\textrm{N}$, `r cal.lon.dd` $^{\circ}\textrm{W}$) using the standard sphere technique [@Foote1987; @Demer2015]. Each WBT was calibrated in both CW (i.e., continuous wave or chirp mode) and FM mode (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere`; calibrations of WBTs in FM mode used both the WC38.1 and a smaller 25 mm WC sphere. A CTD was cast to measure temperature and salinity versus depth, to estimate sound speeds at the transducer and sphere depths, and the time-averaged sound speed and absorption coefficients for the range between them. The theoretical target strength ($TS$; dB re 1 m^2^) of the sphere was calculated using the Standard Sphere Target Strength Calculator^[http://swfscdata.nmfs.noaa.gov/AST/SphereTS/] and values for the sphere, sound-pulse, and seawater properties. The sphere was positioned throughout the main lobe of each of the transducer beams using three motorized downriggers, two on one side of the vessel and one on the other. The GPTs and WBTs were configured using the calibration results via the control software (EK80 `r ek80.version`, Simrad; **Table \@ref(tab:cal-results)**). Calibration results for WBTs in FM mode are presented in the survey report [@Stierhoff2020a] and are available upon request.  
+
+(ref:cal-results) EK60 general purpose transceiver (GPT, Simrad) information, pre-calibration settings, and beam model results following calibration (below the horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into ER60.
+
+```{r cal-results, results='asis'}
+# Copy calibration results
+cal.results <- all.output
+
+# Get number of columns for table formatting
+cal.cols <- ncol(cal.results)
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  regulartable(cal.results)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(cal.results, 
+        format = knitr.format, 
+        align = c("l","l",rep("c", cal.cols - 2)),
+        booktabs = TRUE, linesep = "", escape = FALSE,
+        caption = '(ref:cal-results)') %>% 
+    kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>%
+    add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
+    row_spec(18, hline_after = T)
+}
+```
+\newpage
+
+##### F/V _Long Beach Carnage_  
+
+The echosounders were calibrated using the standard sphere technique with a WC38.1 in a tank at the SWFSC. Beam model results were entered into the GPT-control software and are presented in **Table \@ref(tab:cal-results-lbc)**.  
+
+(ref:cal-results-lbc) General purpose transceiver (EK60 GPT, Simrad) beam model results estimated from a tank calibration of echosounders aboard _Long Beach Carnage_ using a WC38.1. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
+
+```{r cal-results-lbc,results='asis'}
+if (file.exists(here("Output/cal_output_table_LBC.Rdata"))) {
+  load(here("Output/cal_output_table_LBC.Rdata"))   
+  
+  if (doc.type == "docx") {
+    # create kable object (for Word)
+    pander(all.output.lbc)
+  } else {
+    # print LaTeX table for HTML or PDF
+    kable(all.output.lbc, format = knitr.format, 
+          align = c("l","l", rep("c",ncol(all.output.lbc) - 2)),
+          booktabs = TRUE, escape = FALSE, linesep = "",
+          caption = '(ref:cal-results-lbc)') %>% 
+      kable_styling(position = "center", 
+                    latex_options = c("hold_position"),
+                    font_size = 8) %>%  
+      add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.lbc) - 2))
+  }
+}
+```  
+
+#### Data collection {#methods-acoustic-data-collection}
+
+Computer clocks were synchronized with the GPS clock (UTC) using synchronization software (NetTime^[http://timesynctool.com]). The 18-kHz GPT, operated by a separate PC from the other echosounders, was programmed to track the seabed and output the detected depth to the ship’s Scientific Computing System (SCS). The echosounders were controlled by the ER60 Adaptive Logger [EAL^[https://swfsc.noaa.gov/eal/], @Renfree2016]. The EAL optimizes the pulse interval based on the seabed depth, while avoiding aliased seabed echoes, and was programmed such that once an hour the echosounders would operate in passive mode and record three pings, for obtaining estimates of the background noise level. The echosounders collected data continuously throughout the survey, but transect sampling was conducted only during daylight hours, approximately between sunrise and sunset.  
+
+Measurements of volume backscattering strength ($S_V$; dB re 1 m^2^ m^-3^) and $TS$ (dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were logged to 60 m beyond the detected seabed range or to a maximum of `r raw.log.range` m, and stored in Simrad format (i.e., .raw) with a `r raw.size`-MB maximum file size. During daytime, the echosounders were set to operate in CW mode to remain consistent with echo integration methods used during prior surveys and to reduce data volume; at nighttime, echosounders were set to FM mode to improve target strength estimation and species differentiation for CPS near the surface. For each acoustic instrument, the prefix for the file names is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software. For example, file generated by the Simrad EK80 software (`r ek80.version`) for a WBT operated in CW mode is named `2103RL-CW-D20210401-T125901.raw`.  
+
+To minimize acoustic interference, transmit pulses from the EK60, EK80, ME70, MS70, SX90, and acoustic Doppler current profiler (ADCP; Ocean Surveyor Model OS75, Teledyne RD Instruments) were triggered using a synchronization system (K-Sync, Simrad). The K-Sync trigger rate, and thus echosounder ping interval, was modulated by the EAL using the 18-kHz seabed depth provided by the SCS. During daytime, the ME70, SX90, and ADCP were operated continuously, while the MS70 was only operated at times when CPS were present. At nighttime, only the EK60, EK80, and ADCP were operated. All other instruments that produce sound within the echosounder bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Sperry Marine Model SRD-500A), or both. Data from the ME70, MS70, and SX90 are not presented in this report.  
+
+### Oceanographic sampling {#methods-oceanographic-sampling}
+#### Conductivity and temperature versus depth (CTD) sampling {#methods-ctd-sampling}
+
+Conductivity and temperature were measured versus depth to `r ctd.depth` m (or to within ~10 m of the seabed when less than `r ctd.depth` m) with calibrated sensors on a CTD rosette (Model SBE911+, Seabird) or underway probe [UnderwayCTD (UCTD), Oceanscience] cast from the vessel. At least one cast was planned along each acoustic transect. These data were used to calculate the harmonic mean sound speed [@Demer2015] for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients for compensating signal attenuation of the sound pulse between the transducer and scatters [@Simmonds2005] (see **Section \@ref(methods-sound-calcs)**). These data also indicated the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth and remove non-CPS backscatter during acoustic data processing (see **Section \@ref(methods-backscatter-removal)**).  
+
+#### Scientific Computer System sampling {#methods-scs-sampling}  
+
+While underway, information about the position and direction (e.g., latitude, longitude, speed, course over ground, and heading), weather (air temperature, humidity, wind speed and direction, and barometric pressure), and sea-surface oceanography (e.g., temperature, salinity, and fluorescence) were measured continuously and logged using _`r survey.vessel`_'s Scientific Computer System (SCS). During and after the survey, data from a subset of these sensors, logged with a standardized form at 1-min resolution, are available on the internet via NOAA's ERDDAP data server^[https://coastwatch.pfeg.noaa.gov/erddap/index.html].  
+
+###  Fish egg sampling {#methods-cufes-sampling}  
+
+During the day, fish eggs were sampled using continuous underway fish egg sampler [CUFES, @Checkley1997], which collects water and plankton at a rate of ~640 l min^-1^ from an intake at ~3-m depth on the hull of the ship. The particles in the sampled water were sieved by a 505-$\mu$m mesh. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs." Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the duration of the initial stages of the egg phase is short for most fish species, the egg distributions inferred from CUFES indicated the nearby presence of actively spawning fish, and were used in combination with CPS echoes to select trawl locations.  
+
+### Trawl sampling {#methods-trawl-sampling}  
+
+After sunset, CPS schools tend to ascend and disperse and are less likely to avoid a net [@Mais1977]. Therefore, trawling was conducted during the night to better sample the fish aggregations dispersed near the surface to obtain information about species composition, lengths, and weights.  
+
+#### Sampling gear {#methods-trawl-gear}  
+
+The net, a Nordic 264 rope trawl (NET Systems, Bainbridge Island, WA; **Fig. \@ref(fig:trawl-diagrams)a,b**), was towed at the surface for 45 min at a speed of 3.5-4.5 kn. The net has a rectangular opening with an area of approximately 300 m^2^ (~15-m tall x 20-m wide), a throat with variable-sized mesh and a "marine mammal excluder device" to prevent the capture of large animals, such as dolphins, turtles, or sharks while retaining target species [@Dotson2010], and an 8-mm square-mesh cod-end liner (to retain a large range of animal sizes). The trawl doors were foam-filled and the trawl headrope was lined with floats so the trawl towed at the surface.  
+
+#### Sampling locations {#methods-trawl-locations}  
+
+Up to three nighttime (i.e., 30 min after sunset to 30 min before sunrise) surface trawls, typically spaced 10-nmi apart, were conducted in areas where echoes from putative CPS schools were observed earlier that day. Each evening, trawl locations were selected by an acoustician who monitored CPS echoes and a member of the trawl group who measured the densities of CPS eggs in the CUFES. The locations were provided to the watch Officers who charted the proposed trawl sites.  
+
+Trawl locations were selected using the following criteria, in descending priority: CPS schools in echograms that day; CPS eggs in CUFES that day; and the trawl locations and catches during the previous night. If no CPS echoes or CPS eggs were observed along a transect that day, the trawls were alternatively placed nearshore one night and offshore the next night, with consideration given to the seabed depth and the modeled distribution of CPS habitat. Each morning, after the last trawl or 30 min prior to sunrise, _`r survey.vessel`_ resumed sampling at the location where the acoustic sampling stopped the previous day.  
+
+#### Sample processing {#methods-trawl-processing}  
+
+**[Check trawl processing methods]** If the total volume of the trawl catch was five 35-l baskets (~175 l) or less, all target species were separated from the catch, sorted by species, weighed, and enumerated. If the volume of the entire catch was more than five baskets, a five-basket random subsample that included non-target species was collected, sorted by species, weighed, and enumerated; the remainder of the total catch was weighed. In these cases, the weight of the entire catch was calculated as the sum of the subsample and remainder weights. The weight of the $e$-th species in the total catch ($C_{T,e}$) was obtained by summing the catch weight of the respective species in the subsample ($C_{S,e}$) and the corresponding catch in the remainder ($C_{R,e}$), which was calculated as:  
+
+\begin{equation}
+C_{R,e} = C_R*P_{w,e}\text{,}
+(\#eq:remainder-catch-weight)
+\end{equation}
+
+where $P_{w,e} = C_{S,e}/\sum_1^sC_{S,e}$, is the proportion in weight of the $e$-th species in the subsample. The number of specimens of the $e$-th species in the total catch ($N_{T,e}$) was estimated by:  
+
+\begin{equation}
+N_{T,e} = \frac{C_{T,e}}{\overline{w}_e}\text{,}
+(\#eq:number-specimens-catch)
+\end{equation}
+**[Check these also]** where $\overline{w}_e$ is the mean weight of the $e$-th species in the subsample. For each of the target species with 50 specimens or less, individual measurements of length in mm (standard length, $L_S$, for Pacific Sardine and Northern Anchovy, and fork length, $L_F$, for Pacific Herring and Jack and Pacific Mackerels) and total weight ($w$) in g were recorded. In addition, sex and maturity were recorded for up to 50 specimens from all species. Ovaries were preserved for up to 10 specimens of each CPS species except Pacific Herring. Fin clips were removed from 50 Pacific Sardine and Northern Anchovy specimens from five different geographic zones (designated by J. Hyde and M. Craig, SWFSC) and preserved in ethanol for genetic analysis. Otoliths were removed from all 50 Pacific Sardine in the subsample; for other CPS species, 25 otoliths were removed "as equally as possible" from the range of sizes present. The combined catches in up to three trawls per night (i.e., trawl cluster) were used to estimate the proportions of species contributing to the nearest samples of acoustic backscatter.  
+
+#### Quality Assurance and Quality Control {#methods-trawl-qaqc}  
+
+At sea, trawl data were entered into a database (Microsoft Access). During and following the survey, data were further scrutinized and verified, or corrected. Missing length ($L_{miss}$) and weight ($W_{miss}$) measurements were estimated using the season-specific length-versus-weight relationships derived from catches during CPS surveys conducted between 2003 and 2017 [@Palance2019], where $W_{miss} = \beta_0{L}^{\beta_1}$, $L_{miss} = (W/\beta_0)^{(1/\beta_1)}$, and values for $\beta_0$ and $\beta_1$. To identify measurement or data-entry errors, length and weight data were graphically compared (**Fig.** \@ref(fig:lw-plot)) to measurements from previous surveys and models of season-specific length-versus-weight from previous surveys [@Palance2019]. Outliers and missing values were flagged, reviewed by the trawl team, and mitigated. Catch data were removed from aborted trawl hauls, or hauls otherwise deemed unacceptable due to operational issues.  
+
+(ref:trawl-diagrams) Schematic drawings of the Nordic 264 rope trawl a) net and b) cod-end.
+
+```{r trawl-diagrams, fig.cap='(ref:trawl-diagrams)',out.height='6.5in',fig.pos='H'}
+include_graphics(here("Images/img_Nordic_264.png")) 
+``` 
+
+\newpage  
+
+(ref:lw-plot) Specimen length-versus-weight from the current survey (colored points, by sex) compared to those from previous SWFSC surveys during the same season (gray points, all sexes) and models [dashed lines; @Palance2019].
+
+```{r lw-plot, fig.cap='(ref:lw-plot)',out.width='6in',fig.pos='H'}
+include_graphics(here("Figs/fig_LW_plots.png"))
+```  
+
+## Purse seine sampling {#methods-seine-sampling}
+
+Purse seines were set to provide information about size, age, and species composition of fishes observed in the echosounders mounted on the fishing vessels that sampled the nearshore region. _Long Beach Carnage_ **[check net dimensions]** used an approximately 200 m-long and 27 m-deep net with 17 mm-wide mesh; a small section on the back end of the net had 25 mm-wide mesh (R. Ashley, pers. comm.). All specimens collected by _Long Beach Carnage_ were frozen and later processed by the California Department of Fish and Wildlife (CDFW).  
+
+**[Review trawl sampling protocol]** On _Long Beach Carnage_, a maximum of **one** set per day was planned during daylight hours. In the event of abundant CPS or an unsuccessful daytime set, a set was made at night. For each set, three dip net samples, spatially separated as much as possible, were collected, and specimens were frozen for later analysis by CDFW biologists. The total weight (tons) of the school was estimated by the captain. After the survey, each dip net sample was sorted, weighed, and counted to provide a combined weight and count for each species. Next, all three dip net samples were combined and up to 50 specimens were randomly sampled to provide a combined weight for each set. The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 50 randomly selected specimens of each species. Otoliths were extracted and macroscopic maturity stage was determined visually. Since samples were frozen, no gonad samples were analyzed from female specimens.
+
+## Data processing {#methods-data-processing}  
+### Acoustic and oceanographic data {#methods-acoustic-processing}  
+
+The calibrated echosounder data from each transect were processed using commercial software ([Echoview](https://www.echoview.com/) `r ev.version`, Echoview Software Pty Ltd.) and estimates of the sound speed and absorption coefficient calculated with contemporaneous data from CTD probes cast while stationary or underway (UCTD, see **Section \@ref(methods-ctd-sampling)**). Data collected along the daytime transects at speeds $\geq$ 5 kn were used to estimate CPS densities. Nighttime acoustic data were assumed to be negatively biased due to diel-vertical migration (DVM) and disaggregation of the target species’ schools [@Cutter2008]. 
+
+### Sound speed and absorption calculation {#methods-sound-calcs}  
+
+Depth derived from pressure in CTD casts was used to bin samples into 1-m depth increments. Sound speed in each increment ($c_{w,i}$, m s^-1^) was estimated from the average salinity, density, and pH [if measured, else pH = 8; @Chen1977;@Seabird2013]. The harmonic sound speed in the water column ($\overline{c}_w$, m s^-1^) was calculated over the upper 70 m as:  
+
+\begin{equation}
+\overline{c}_w = \frac{\sum_{i=1}^{N} \Delta r_i}{\sum_{i=1}^{N} \Delta r_i/c_{w,i}}\text{,}
+(\#eq:time-avg-sound-speed)
+\end{equation}
+
+where $\Delta r$ is the depth of increment $i$ [@Seabird2013]. Measurements of seawater temperature ($t_w$, $^{\circ}\textrm{C}$), salinity ($s_w$, psu), depth, pH, and $\overline{c}_w$ are also used to calculate the mean species-specific absorption coefficients ($\overline{\alpha}_a$, dB m^-1^) over the entire profile using equations in Francois and Garrison [-@Francois1982a], Ainslie and McColm [-@Ainslie1998], and Doonan et al. [-@Doonan2003]. Both $\overline{c}_w$ and $\overline{\alpha}_a$ are later used to estimate ranges to the sound scatterers to compensate the echo signal for spherical spreading and attenuation during propagation of the sound pulse from the transducer to the scatterer range and back [@Simmonds2005]. The CTD rosette, when cast, also provides measures of fluorescence and dissolved oxygen concentration versus depth, which may be used to estimate the vertical dimension of Pacific Sardine potential habitat [@Zwolinski2011], particularly the depth of the upper-mixed layer where most epipelagic CPS reside. The latter information is used to inform echo classification (see **Section \@ref(methods-echo-classification)**).  
+
+### Echo-classification {#methods-echo-classification}  
+
+Echoes from schooling CPS were identified using a semi-automated data processing algorithm implemented using Echoview software **(`r ev.version`)**. The filters and thresholds were based on a subsample of echoes from randomly selected CPS schools. The aim of the filter criteria is to retain at least 95% of the noise-free backscatter from CPS schools while rejecting at least 95% of the non-CPS backscatter (**Fig. \@ref(fig:ev-filtering-example)**). Data from _`r survey.vessel`_ and _Long Beach Carnage_ were processed using the following steps:  
+
+1. Match geometry of the 70-, 120-, 200-, and 333-kHz $S_v$ to the 38-kHz $S_v$;
+2. Remove passive-mode pings;
+3. Estimate and subtract background noise using the background noise removal function [@DeRobertis2007] in Echoview (**Figs. \@ref(fig:ev-filtering-example)b, e**);
+4. Average the noise-free $S_v$ echograms using non-overlapping 11-sample by 3-ping bins;
+5. Expand the averaged, noise-reduced _S~v~_ echograms with a 7 pixel x 7 pixel dilation;
+6. For each pixel, compute: $S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}}$, $S_{v,\mathrm{120kHz}}-S_{v,\mathrm{38kHz}}$, and $S_{v,\mathrm{70kHz}}-S_{v,\mathrm{38kHz}}$;
+7. Create a Boolean echogram for $S_v$ differences in the CPS range: $-13.85 < S_{v,\mathrm{70kHz}}-S_{v,\mathrm{38kHz}} < 9.89 \text{ and} -13.5 < S_{v,\mathrm{120kHz}}-S_{v,\mathrm{38kHz}} < 9.37 \text{ and} -13.51 < S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}} < 12.53$;
+8. Compute the 120- and 200-kHz Variance-to-Mean Ratios [$VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$, respectively, @Demer2009] using the difference between noise-filtered $S_v$ (Step 3) and averaged $S_v$ (Step 4);
+9. Expand the $VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$ echograms with a 7 pixel x 7 pixel dilation;
+10. Create a Boolean echogram based on the $VMR$s in the CPS range: $VMR_{\mathrm{120kHz}}$ > -65 dB and $VMR_{\mathrm{200kHz}}$ > -65 dB. Diffuse backscattering layers have low $VMR$ [@Zwolinski2010] whereas fish schools have high $VMR$ [@Demer2009];
+11. Intersect the two Boolean echograms to create an echogram with "TRUE" samples for candidate CPS schools and "FALSE" elsewhere;
+12. Mask the noise-reduced echograms using the CPS Boolean echogram (**Figs. \@ref(fig:ev-filtering-example)c, f**);
+13. Create an integration-start line `r int.start` m below the transducer (~10 m depth);
+14. Create an integration-stop line `r adz.range` m above the estimated seabed [@Demer2009], or to the maximum logging range (e.g., `r int.stop` m), whichever is shallowest;
+15. Set the minimum $S_v$ threshold to -60 dB (corresponding to a density of approximately three 20-cm-long Pacific Sardine per 100 m^3^);
+16. Integrate the volume backscattering coefficients ($s_V$, m^2^ m^-3^) attributed to CPS over 5-m depths and averaged over 100-m distances;
+17. Output the resulting nautical area scattering coefficients ($s_A$; m^2^ nmi^-2^) and associated information from each transect and frequency to comma-delimited text (.csv) files.
+
+When necessary, the start and stop integration lines were manually edited to exclude reverberation due to bubbles, to include the entirety of shallow CPS aggregations, or to exclude seabed echoes.  
+
+### Removal of non-CPS backscatter {#methods-backscatter-removal}  
+
+In addition to echoes from target CPS, echoes may also be present from other CPS (Pacific Saury, _Cololabis saira_), or semi-demersal fish such as Pacific Hake and rockfishes ($Sebastes$ spp.). When analyzing the acoustic-survey data, it was therefore necessary to filter "acoustic by-catch," i.e., backscatter not from the target species. To exclude echoes from mid-water, demersal, and benthic fishes, vertical temperature profiles were superimposed on the echo-integrated data for each transect. Echoes below the surface mixed layer were excluded from the CPS analysis (**Fig. \@ref(fig:ctd-app)**). In areas dominated by Pacific Herring, for example off Vancouver Island, backscatter was integrated to a maximum depth of 75 m.  
+
+(ref:ev-filtering-example) Two examples of echograms depicting CPS schools (red) and plankton aggregations (blue and green) at 38 kHz (top) and 120 kHz (bottom). Example data processing steps include the original echogram (a, d), after noise subtraction and bin-averaging (b, e), and after filtering to retain only putative CPS echoes (d, f).
+
+```{r ev-filtering-example,fig.cap='(ref:ev-filtering-example)',out.width='6.5in',fig.pos='H'}
+include_graphics(here("Images/img_echoview_filtering_example-labeled.png"))
+```  
+
+(ref:ctd-app) **[Update figure to represent the new cps.nasc app]** Temperature profiles (left) and the distribution of echoes from fishes with swimbladders (blue points, scaled by backscatter intensity; right) along an example acoustic transect. In this example, temperature profiles indicate an ~25 m-deep mixed-layer above an ~20-30 m thermocline, so the 11 $^{\circ}\textrm{C}$ isotherm (bold, blue line; right panel) was used to remove echoes from deeper, bottom-dwelling schools of non-CPS fishes with swimbladders. The proximity of the echoes to the seabed (bold, red line; right panel) was also used to define the lower limit for vertical integration.
+
+```{r ctd-app,fig.cap='(ref:ctd-app)',out.width='5.5in',fig.pos='H'}
+include_graphics(here("Images/img_ctd_app.png"))
+```  
+
+### Quality Assurance and Quality Control {#methods-acoustics-qaqc}  
+
+The largest 38-kHz integrated backscattering coefficient values ($s_A$, m^2^ nmi^-2^) were graphically examined to identify potential errors in the integrated data from Echoview processing (e.g.,  when a portion of the seabed was accidentally integrated). If found, errors were corrected and data were re-integrated prior to use for biomass estimation.  
+
+(ref:nasc-outliers) Ranked 38-kHz integrated backscattering coefficient values ($s_A$, m^2^ nmi^-2^; n = 100), labeled with the vessel name ($RL$ = _`r survey.vessel`_, SD1024 = Saildrone USV), transect number, and echogram distance interval. The $s_A$ values for the 100-m intervals are divided by 19 for scaling to the traditional horizontal bin length, or Elementary Distance Sampling Unit (EDSU), of 1 nmi.
+
+```{r nasc-outliers,fig.cap='(ref:nasc-outliers)',out.width = '4.15in',fig.pos='H',eval=FALSE}
+# **Fig. \@ref(fig:nasc-outliers)**
+include_graphics(here("Figs/fig_nasc_outliers.png"))
+```
+
+(ref:sv-diff) $S_V$-differences (minimum, maximum; dB) for putative CPS species.
+
+```{r sv-diff, results='asis',eval=F}
+# create table for Sv difference values
+sv.diff <- read.delim(here("Data/sv_diff_table.txt"))
+names(sv.diff) <- c("$S_\\mathrm{v70kHz}-S_\\mathrm{v38kHz}$", 
+                    "$S_\\mathrm{v120kHz}-S_\\mathrm{v38kHz}$", 
+                    "$S_\\mathrm{v200kHz}-S_\\mathrm{v38kHz}$")
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(sv.diff)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(sv.diff,align = rep("c",ncol(sv.diff)),escape = FALSE,
+        caption = '(ref:sv-diff)') %>% 
+    kable_styling(position = "center")
+}
+```  
+
+### Echo integral partitioning and acoustic inversion {#methods-echointegration}  
+
+For fishes with swimbladders, the acoustic backscattering cross-section of an individual ($\sigma_{bs}$, m^2^) depends on many factors but mostly on the acoustic wavelength and the swimbladder size and orientation relative to the incident sound pulse. For echosounder sampling conducted in this survey, $\sigma_{bs}$ is a function of the dorsal-surface area of the swimbladder and was approximated by a function of fish length, i.e.:
+
+\begin{equation}
+\sigma_{bs} = 10^{\frac{m\,\log_{10}(L)+b}{10}}\text{,}
+(\#eq:sigma-bs)
+\end{equation}
+
+where $m$ and $b$ are frequency and species-specific parameters that are obtained theoretically or experimentally (see references below). $TS$, a logarithmic representation of $\sigma_{bs}$, is defined as:
+
+\begin{equation}
+TS = 10\,\log_{10}(\sigma_{bs}) = m\,\log_{10}(L) + b\text{.}
+(\#eq:ts-sigma-bs-equation)
+\end{equation}
+
+$TS$ has units of dB re 1 m^2^ if defined for an individual, or dB re 1 m^2^ kg^-1^ if defined by weight. The following equations for $TS_{38\mathrm{kHz}}$ were used in this analysis:  
+
+\begin{equation}
+TS_{\mathrm{38kHz}} = -14.90 \times \log_{10} (L_T) - 13.21 \text{, for Pacific Sardine;}
+(\#eq:tl-ts-sardine)
+\end{equation}
+
+\begin{equation}
+TS_{\mathrm{38kHz}} = -11.97 \times \log_{10} (L_T) - 11.58561 \text{, for Pacific Herring;}
+(\#eq:tl-ts-herring)
+\end{equation}
+
+\begin{equation}
+TS_{\mathrm{38kHz}} = -13.87 \times \log_{10} (L_T) - 11.797 \text{, for Northern Anchovy; and}
+(\#eq:tl-ts-anchovy)
+\end{equation}
+
+\begin{equation}
+TS_{\mathrm{38kHz}} = -15.44 \times \log_{10} (L_T) - 7.75 \text{, for Pacific and Jack Mackerels,}
+(\#eq:tl-ts-mackerel)
+\end{equation}
+
+where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.  
+
+Equations \@ref(eq:tl-ts-sardine) and \@ref(eq:tl-ts-mackerel) were derived from echosounder measurements of in situ $\sigma_{bs}$ and measures of $L_T$ and $W$ from concomitant catches of South American Pilchard (_Sardinops ocellatus_) and Horse Mackerel (_Trachurus trachurus_) off South Africa [@Barange1996]. Because mackerels have similar $TS$ [@Pena2008], Equation \@ref(eq:tl-ts-mackerel) is used for both Pacific and Jack Mackerels. For Pacific Herring, Equation \@ref(eq:tl-ts-herring) was derived from that of Thomas et al. [-@Thomas2002] measured at 120 kHz with the following modifications: 1) the intercept used here was calculated as the average intercept of Thomas et al.'s spring and fall regressions; 2) the intercept was compensated for swimbladder compression after Zhao et al. [-@Zhao2008] using the average depth for Pacific Herring of 44 m; 3) the intercept was increased by 2.98 dB to account for the change of frequency from 120 to 38 kHz [@Saunders2012]. For Northern Anchovy, Equation \@ref(eq:tl-ts-anchovy) was derived from that of Kang et al. [-@Kang2009], after compensation of the swimbladder volume [@Ona2003;@Zhao2008] for the average depth of Northern Anchovy observed in summer 2016 [19 m, @Zwolinski2017].  
+
+To calculate $TS_{38\mathrm{kHz}}$, $L_T$ was estimated from measurements of standard length ($L_S$) or fork length ($L_F$) using linear relationships between length and weight derived from specimens collected in the CCE: for Pacific Sardine, $L_T = 0.3574 + 1.149L_S$; for Northern Anchovy, $L_T = 0.2056 + 1.1646 L_S$; for Pacific Mackerel, $L_T = 0.2994 + 1.092 L_F$; for Jack Mackerel $L_T = 0.7295 + 1.078 L_F$; and for Pacific Herring $L_T = -0.105 + 1.2 L_F$.  
+
+```{r ll-conversions,eval=FALSE}
+# (ref:ll-conversions) Slopes (_m_) and intercepts (_b_) from linear models used to convert standard length ($L_S$) and fork length ($L_F$) measurements to total length ($L_T$) using the equations: $L_T = \beta_1{L_S} + \beta_{0_{L_S}}$ and $L_T = \beta_1{L_F} + \beta_{0_{L_F}}$.
+
+# Set kable options for NAs
+options(knitr.kable.NA = '')
+
+# Spread and select columns to make a printable table
+ll.table <- tidyr::spread(ll.data, type, coef) %>% 
+  select(scientificName, contains("TLSL"), contains("TLFL")) 
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(ll.table)
+} else {
+  # Filter table of L/W models used
+  ll.table  %>% 
+    rename("$\\beta_{0_{L_S}}$" = TLSL_b,
+           "$\\beta_{0_{L_F}}$" = TLFL_b,
+           "$\\beta_{1_{L_S}}$" = TLSL_m,
+           "$\\beta_{1_{L_F}}$" = TLFL_m,
+           "Scientific name" = scientificName) %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+          digits = c(0,7,7,7,7),
+          align = c("l","r","r","r","r"),
+          caption = '(ref:ll-conversions)') %>% 
+    kable_styling(bootstrap_options = c("hover","condensed"), 
+                  full_width = F) %>%
+    row_spec(0, align = c("c")) %>%
+    column_spec(1, italic = T)
+}
+```
+
+The proportions of species in a trawl cluster were considered representative of the proportions of species in the vicinity of the cluster. Therefore, the proportion of the echo-integral from the $e$-th species ($P_e$) in an ensemble of $s$ species can be calculated from the species catches $N_1, N_2,..., N_s$ and the respective average backscattering cross-sections $\sigma_{bs_1}, \sigma_{bs_2},...,\sigma_{bs_s}$ [@Nakken1975]. The acoustic proportion for the $e$-th species in the $a$-th trawl ($P_{ae}$) is:
+
+\begin{equation}
+P_{ae} = \frac{N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae}}{\sum_{e=1}^{s_a} (N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae})}\text{, }
+(\#eq:acoustic-prop-spp)
+\end{equation}
+
+where $\overline{\sigma}_{bs,ae}$ is the arithmetic counterpart of the average target strength ($\overline{TS}_{ae}$) averaged for all $n_{ae}$ individuals of species $e$ in the random sample of trawl $a$:  
+
+\begin{equation}
+\overline{\sigma}_{bs,ae} = \frac{\sum_{i=1}^{n_{ae}}10^{(TS_i/10)}}{n_{ae}}\text{, }
+(\#eq:avg-ts-all-spp)
+\end{equation}
+
+and $\overline{w}_{ae}$ is the average weight: $\overline{w}_{ae} = \sum_{i=1}^{n_{ae}}{w_{aei}}/{n_{ae}}$. The total number of individuals of species $e$ in a trawl $a$ ($N_{ae}$) is obtained by: $N_{ae}=\frac{n_{ae}}{w_{s,ae}} \times w_{t,ae}$, where $w_{s,ae}$ is the weight of the $n_{ae}$ individuals sampled randomly, and $w_{t,ae}$ is the total weight of the respective species' catch.  
+
+The trawls within a cluster were combined to reduce sampling variability (see **Section \@ref(methods-trawl-clustering)**), and the number of individuals caught from the $e$-th species in a cluster $g$ ($N_{ge}$) was obtained by summing the catches across the $h$ trawls in the cluster: $N_{ge}=\sum_{a=1}^{h_g}N_{ae}$.  The backscattering cross-section for species $e$ in the $g$-th cluster with $a$ trawls is then given by:  
+
+\begin{equation}
+\overline{\sigma}_{bs,ge}=\frac{\sum_{a=1}^{h_g} N_{ae} \times \overline{w}_{ae} \times \overline{\sigma}_{bs,ae}}{\sum_{a=1}^{s_g} N_{ae} \times \overline{w}_{ae}}\text{, }
+(\#eq:sigma-spp-j)
+\end{equation}
+
+where:  
+
+\begin{equation}
+\overline{w}_{ge} = \frac{\sum_{a=1}^{h_g} N_{ae} \times \overline{w}_{ae}}{\sum_{a=1}^{h_g} N_{ae}}\text{, }
+(\#eq:w-spp-j)
+\end{equation}
+
+and the proportion ($P_{ge}$) is;
+
+\begin{equation}
+P_{ge} = \frac{N_{ge} \times \overline{w}_{ge} \times \overline{\sigma}_{bs,ae}}{\sum_{e=1}^{s}(N_{ge} \times \overline{w}_{ge} \times \overline{\sigma}_{bs,ge})}\text{.}
+(\#eq:prop-spp-j)
+\end{equation}  
+
+### Trawl clustering and species proportions {#methods-trawl-clustering}  
+
+Trawls that occurred on the same night were assigned to a trawl cluster. Biomass densities ($\rho$) were calculated for 100-m transect intervals by dividing the integrated area backscatter coefficients for each CPS species by the mean backscattering cross-sectional area [@MacLennan2002] estimated in the trawl cluster nearest in space. Survey data were post-stratified to account for spatial heterogeneity in sampling effort and biomass density in a similar way to that performed for Pacific Sardine [@Zwolinski2016].  
+
+For a generic 100-m long acoustic interval, the area backscattering coefficient for species $e$: $s_{A,e} = s_{A,cps} \times P_{ge}$, where $P_{ge}$ is the species acoustic proportion of the nearest trawl cluster (Equation \@ref(eq:prop-spp-j)), was used to estimate the biomass density ($\rho_{w,e}$) [@MacLennan2002; @Simmonds2005] for every 100-m interval, using the size and species composition of the nearest (space and time) trawl cluster (**Fig. \@ref(fig:trawl-cluster-map)**):
+
+\begin{equation}
+\rho_{w,e} = \frac{s_{A,e}}{4\pi\overline{\sigma}_{bs,e}}\text{.}
+(\#eq:biomass-density)
+\end{equation}  
+
+The biomass densities were converted to numerical densities using: $\rho_{n,e}=\rho_{w,e}/\overline{w}_e$, where $\overline{w}_e$ is the corresponding mean weight. Also, for each acoustic interval, the biomass or numeric densities are partitioned into length classes according to the species' length distribution in the respective trawl cluster.  
+
+## Data analysis {#methods-data-analysis}
+### Post-stratification {#methods-post-stratification}  
+
+The transects were used as sampling units [@Simmonds1996]. Because each species does not generally span the entire survey area [@Zwolinski2014;@Demer2017], the sampling domain was stratified for each species and stock. Strata were defined by uniform transect spacing (sampling intensity) and either presences (positive densities and potentially structural zeros) or absences (real zeros) of species biomass. Each stratum has: 1) at least three transects, with approximately equal spacing, 2) fewer than three consecutive transects with zero-biomass density, and 3) bounding transects with zero-biomass density (**Fig. \@ref(fig:tx-biom-dens)**). This approach tracks stock patchiness and creates statistically-independent, stationary, post-sampling strata [@Johannesson1983; @Simmonds1992]. For Northern Anchovy, we define the separation between the northern and central stock at Cape Mendocino (`r round(stock.break.anch,1)` $^{\circ}\textrm{N}$). For Pacific Sardine, the northern and southern stocks that were likely present in the survey area [@Hill2014; @Felix-Uraga2004; @Felix-Uraga2005; @Garcia-Morales2012] were separated using the approximate satellite-derived sea-surface temperature (SST) isoline of 16.7$^{\circ}$ [@Demer2014], which in this survey coincided geographically with Point Conception (`r round(stock.break.sar,1)` $^{\circ}\textrm{N}$) and the northern Channel Islands (**Fig. \@ref(fig:sardine-potential-habitat)**) and also a break in the distribution of Pacific Sardine biomass (**Fig. \@ref(fig:tx-biom-dens)**).  
+
+\newpage
+\blandscape
+
+ (ref:trawl-cluster-map) a) Polygons enclosing 100-m acoustic intervals from _`r survey.vessel`_ assigned to each trawl cluster, and b) the acoustic proportions of CPS in trawl clusters. The numbers inside each polygon in panel a) are the cluster numbers, which are located at the average latitude and longitude of all trawls in that cluster. Black points in panel b) indicate trawl clusters with no CPS present.
+
+```{r trawl-cluster-map,fig.cap='(ref:trawl-cluster-map)',out.width='8.5in',fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_acoustic_cluster.png"))
+```  
+\elandscape
+\newpage  
+
+(ref:tx-biom-dens) Biomass density ($\log_{10}(t\,\mathrm{nmi}^2+1)$) versus latitude (easternmost portion of each transect) and strata used to estimate biomass and abundance (shaded regions; outline indicates stratum number) for each species and survey vessel (labels above plots; _RL_ = _`r survey.vessel`_). Strata with no outline were not included because of too few specimens (< `r nIndiv.min` individuals), trawl clusters (< `r nClusters.min` clusters), or both. Blue number labels correspond to transects with positive biomass ($\log_{10}(t+1)$ > 0.01). Point fills indicate transect spacing (nmi).
+
+\newpage
+
+```{r tx-biom-dens,fig.cap='(ref:tx-biom-dens)',out.height='7.5in',fig.pos='H'}
+include_graphics(here("Figs/fig_biomass_density_transect_lat.png"))
+```  
+
+\newpage 
+
+(ref:acoustic-strata-map) Post-survey stratification indicating stratum polygons (outline indicates stratum number; fill indicates the species' stock designation) used to estimate the biomasses of CPS. Point sizes indicate the relative intensity ($s_A$; m^2^ nmi^-2^) of acoustic backscatter from all CPS (black points) and individual species (red points).
+
+```{r acoustic-strata-map,fig.cap='(ref:acoustic-strata-map)',out.height='8in',fig.pos='H',eval=FALSE}
+include_graphics(here("Figs/fig_nasc_acoustic_proportions_strata.png"))
+```  
+
+\newpage  
+
+### Estimation of biomass and sampling precision {#methods-biomass-and-precision}  
+
+For each stratum and stock, the biomass ($\hat{B}$; kg) of each species was estimated by: 
+
+\begin{equation}
+\hat{B} = A \times \hat{D}\text{, }
+(\#eq:biomass-mean)
+\end{equation}
+
+where $A$ is the stratum area (nmi^2^) and $\hat{D}$ is the estimated mean biomass density (kg nmi^-2^):
+
+\begin{equation}
+\hat{D} = \frac{\sum_{l=1}^{k}\overline{\rho}_{w,l} c_l}{\sum_{l=1}^{k}c_l}\text{, }
+(\#eq:biomass-mean-density)
+\end{equation}
+
+where $\overline{\rho}_{w,l}$ is the mean biomass density of the species on transect $l$, $c_l$ is the transect length, and $k$ is the total number of transects. The variance of $\hat{B}$ is a function of the variability of the transect-mean densities and associated lengths. Treating transects as replicate samples of the underlying population [@Simmonds1996], the variance was calculated using bootstrap resampling [@Efron1981] based on transects as sampling units. Provided that each stratum has independent and identically-distributed transect means (i.e., densities on nearby transects are not correlated, and they share the same statistical distribution), bootstrap or other random-sampling estimators provide unbiased estimates of variance.
+
+The 95% confidence intervals (CI~95%~) for the mean biomass densities ($\hat{D}$) were estimated as the 0.025 and 0.975 percentiles of the distribution of `r boot.num` bootstrap survey-mean biomass densities. Coefficient of variation (CV, %) values were obtained by dividing the bootstrapped standard error by the mean estimate [@Efron1981]. Total biomass in the survey area was estimated as the sum of the biomasses in each stratum, and the associated sampling variance was calculated as the sum of the variances across strata.  
+
+### Abundance- and biomass-at-length estimates {#methods-abundance-at-length}  
+
+The numerical densities by length class (**Section \@ref(methods-trawl-clustering)**) were averaged for each stratum in a similar way for that used for biomass (Equation \@ref(eq:biomass-mean-density)), and raised to the stratum area to obtain abundance per length class.  
+
+### Percent contribution of biomass per cluster {#methods-cluster-biomass-density}  
+
+The percent contribution of each cluster to the estimated abundance in a stratum (**Appendix \@ref(appendix-cluster-length-percent)**) was calculated as:  
+
+\begin{equation}
+\frac{\Sigma_{i = 1}^{l}\overline{\rho}_{ci}}{\Sigma_{c=1}^{C}\Sigma_{i=1}^{l}\overline{\rho}_{ci}}{\text{,}}
+(\#eq:pct-acoustic-biomass)
+\end{equation}
+
+where $\overline{\rho}_{ci}$ is the numerical density in interval $i$ represented by the nearest trawl cluster $c$.  
+
+\newpage  
+
+# Results {#results}
+
+## Sampling effort and allocation {#results-sampling-effort}  
+
+```{r}
+# Summarise survey distance (nmi) by vessel
+## Core survey area
+dist.summ <- nasc.summ %>%
+  mutate(vessel = case_when(
+    str_detect(transect.name, "RL")  ~ "RL",
+    str_detect(transect.name, "SD")  ~ "SD",
+    str_detect(transect.name, "LBC") ~ "LBC",
+    str_detect(transect.name, "LM")  ~ "LM",
+    TRUE ~ "Other")) %>% 
+  group_by(vessel) %>% 
+  summarise(distance = round(sum(distance)),
+            n.tx     = n(),
+            mean.tx.dist = distance/n.tx)
+
+## Nearshore survey area
+if (exists("nasc.summ.ns")) {
+  dist.summ.ns <- nasc.summ.ns %>%
+    mutate(vessel = case_when(
+      str_detect(transect.name, "RL")  ~ "RL",
+      str_detect(transect.name, "SD")  ~ "SD",
+      str_detect(transect.name, "LBC") ~ "LBC",
+      str_detect(transect.name, "LM")  ~ "LM",
+      TRUE ~ "Other")) %>% 
+    group_by(vessel) %>% 
+    summarise(distance = round(sum(distance)),
+              n.tx     = n(),
+              mean.tx.dist = distance/n.tx)  
+}
+
+## Offshore survey area
+if (exists("nasc.summ.os")) {
+  dist.summ.os <- nasc.summ.os %>%
+    mutate(vessel = case_when(
+      str_detect(transect.name, "RL")  ~ "RL",
+      str_detect(transect.name, "SD")  ~ "SD",
+      str_detect(transect.name, "LBC") ~ "LBC",
+      str_detect(transect.name, "LM")  ~ "LM",
+      TRUE ~ "Other")) %>% 
+    group_by(vessel) %>% 
+    summarise(distance = round(sum(distance)),
+              n.tx     = n(),
+              mean.tx.dist = distance/n.tx)
+}
+```
+
+The `r tolower(survey.season)` `r survey.year` survey took place between San Francisco and San Diego during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. In the core survey area, acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=0)` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. In the nearshore survey area, acoustic sampling was conducted along `r nrow(nasc.summ.ns)` daytime east-west transects by _Long Beach Carnage_ in that totaled `r prettyNum(sum(nasc.summ.ns$distance),big.mark=",",digits=0)` nmi. As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.  
+
+**[Leg summaries have not been provided for this survey, and I don't have the green book; please update]**
+
+**Leg I**  
+On 13 June, _`r survey.vessel`_ departed from the Exploratorium (Pier 15) in San Francisco, CA at ~1800 (all times UTC) and began the transit to northern Vancouver Island. Throughout the transit, sampling was conducted during the day with CUFES, EK60s, EK80s, ME70, MS70 and SX90. On 17 June, _`r survey.vessel`_ arrived at the first offshore station off Cape Scott, British Columbia at ~1230 to begin acoustic sampling along transect 129. On 1 July, acoustic sampling ceased after the completion of transect 84 off Newport, OR. On 2 July, _`r survey.vessel`_ arrived at the Marine Operations-Pacific (MOC-P) Pier in Newport at ~2100 to complete Leg I.  
+
+**Leg II**
+
+On 22 August, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in San Diego at ~1500. Training on the ship’s dynamic-positioning system was performed in San Diego Harbor until ~2000, after which _`r survey.vessel`_ transited to transect 019 off Pismo Beach. On 23 August, at ~1700, _`r survey.vessel`_ deployed a benthic acoustic lander off Pt. Conception, then resumed acoustic sampling along transect 019 at ~1800. On 1 September, _`r survey.vessel`_'s fog horn was repaired using parts received from ashore via skiff. At ~1500 on 1 September, the UCTD probe was lost when a small vessel running parallel to the ship made a sharp turn across the stern and severed the line. At ~0200 on 7 September, acoustic sampling ceased after the completion of transect 001 off San Diego. _`r survey.vessel`_ arrived at the 10th Avenue Marine Terminal in San Diego at ~2100 on 8 September to complete the survey.  
+
+## Acoustic backscatter {#results-backscatter-distribution} 
+
+Acoustic backscatter ascribed to CPS was observed throughout the core survey area, but was most prevalent south of Monterey Bay, especially offshore in the Southern CA Bight south of the northern Channel Islands (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Acoustic backscatter ascribed to CPS was also observed throughout the nearshore survey area, but was most prevalent between Long Beach and Oceanside, CA (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Although not visible at this scale, zero-biomass intervals were observed at the offshore end of each transect. The majority (greater than `r cum.biomass.limit*100`%) of biomass for each species was apportioned using catch data from trawl clusters conducted within a distance of $\leq$ 20 nmi (**Fig. \@ref(fig:biomass-cluster-distance)**).  
+
+## Egg densities and distributions {#results-cufes-density}  
+
+Northern Anchovy eggs were abundant in CUFES samples throughout the survey area south of Monterey Bay, but were most abundant and coincident with much of the observed acoustic backscatter in the offshore portion of transects in the SCB (**Fig. \@ref(fig:nasc-cufes-trawl)b**). A few samples in the SCB contained Pacific Sardine eggs, mostly along the southeast coast of Santa Catalina Island (**Fig. \@ref(fig:nasc-cufes-trawl)b**). No Jack Mackerel eggs were observed.  
+
+## Trawl catch {#results-trawl-catch}  
+
+Northern Anchovy was the predominant species in trawl catches throughout the survey area (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were caught in relatively small numbers offshore of the northern Channel Islands and east of San Nicolas Island (**Fig. \@ref(fig:nasc-cufes-trawl)c**; not visible at this scale). A few Pacific Mackerel were caught west of San Nicolas Island (**Fig. \@ref(fig:nasc-cufes-trawl)c**; not visible at this scale). Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Anchovy'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'Sardine'),big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(sum(cluster.summ.wt$'PacMack'),big.mark=",",digits=3)` kg of Pacific Mackerel, and `r prettyNum(sum(cluster.summ.wt$'JackMack'),big.mark=",",digits=3)` kg of Jack Mackerel; no Pacific Herring were collected).  
+
+## Purse seine catch {#results-seine-catch}
+
+```{r summarise-seine-catch}
+# Summarise Lisa Marie catch
+seine.summ.lm <- lm.specimens %>% 
+  group_by(scientificName) %>% 
+  summarise(
+    total.wt = sum(weightg)/1000,
+    total.ct = n()
+  )
+
+# # Summarise Long Beach Carnage catch
+# seine.summ.lbc <- lbc.specimens %>% 
+#   group_by(scientificName) %>% 
+#   summarise(
+#     total.wt = sum(weightg)/1000,
+#     total.ct = n()
+#   )
+```
+
+Pacific Sardine were predominant, by weight, in purse seine samples collected off WA, OR, and central CA by _Lisa Marie_. Overall, the `r num2words(nrow(lm.sets))` seines captured a combined `r prettyNum(sum(seine.summ.lm$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Engraulis mordax"],big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Scomber japonicus"],big.mark=",",digits=3)` kg of Pacific Mackerel,; no Jack Mackerel, or Pacific Herring were collected). 
+
+\newpage  
+\blandscape  
+
+(ref:nasc-cufes-trawl) Spatial distributions of: a) 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for Northern Anchovy, Pacific Sardine, and Jack Mackerel; and c) acoustic proportions of CPS in trawl clusters and purse seine sets (black points indicate trawl clusters with no CPS).
+
+```{r nasc-cufes-trawl, fig.cap='(ref:nasc-cufes-trawl)',out.width='9in',fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster.png"))
+```  
+
+\newpage  
+
+(ref:nasc-prop-ns) Spatial distributions of: a) 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS from nearshore sampling and b) acoustic proportions of CPS in purse seine sets (off WA and OR) and trawl clusters (off CA). **This figure presently shows all nearshore backscatter, not just the backscatter that doesn't overlap with Lasker. And the catch proportions include Lasker clusters when those clusters are the closest in space.**
+
+```{r nasc-prop-ns, fig.cap='(ref:nasc-prop-ns)',out.width='9in',fig.pos='H'}
+include_graphics(here("Figs/fig_nasc_acoustic_cluster_ns.png"))
+```
+
+\newpage
+
+(ref:biomass-cluster-distance) Total (top) and cumulative (bottom) biomass(t) versus distance to the nearest positive trawl cluster. Dashed vertical lines (bottom) represent the cluster distance where cumulative biomass equals `r cum.biomass.limit*100`%.
+
+```{r biomass-cluster-distance,fig.cap='(ref:biomass-cluster-distance)',out.width='9in',fig.pos='H'}
+include_graphics(here("Figs/fig_cluster_distance_cumulative_biomass.png"))
+```  
+
+\elandscape  
+\newpage  
+
+```{r biomass-table-all,results='asis'}
+# Configure bootstrap estimate table
+be.table <- be  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         "$\\hat{B}$"     = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)  
+
+# be.table.os <- be.os  %>%
+#   rename(Name = Species,
+#          Number           = Stratum,
+#          Transects        = nTransects,
+#          Clusters         = nClusters,
+#          Individuals      = nIndiv,
+#          "$\\hat{B}$"     = Biomass,
+#          SD               = biomass.sd,
+#          CV               = biomass.cv,
+#          "CI$_{L,95\\%}$" = lower.ci.B,
+#          "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+#   select(-SD)  
+
+be.table.ns <- be.ns  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         "$\\hat{B}$"     = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)
+
+be.table.nse <- be.nse  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         "$\\hat{B}$"     = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)
+```  
+
+## Biomass distribution and demography {#results-biomass-distribution} 
+### Northern Anchovy {#results-anchovy}
+
+```{r}
+# Extract only central stock Northern Anchovy data
+be.anch.c <- be %>% 
+  filter(Species == "Engraulis mordax", Stock == "Central", Stratum != "All")
+```
+
+#### Central stock {#results-anchovy-central}  
+
+The total estimated biomass of the central stock of Northern Anchovy was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c)**); the stock was distributed throughout much of the survey area from approximately Santa Cruz to San Diego, CA (**Fig. \@ref(fig:biom-dens-anch-c)a**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Central"]` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Central"]` cm with a single mode between 10 and 13 cm (**Table \@ref(tab:l-freq-summ-anch-c)**, **Fig. \@ref(fig:l-disagg-anch-c)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c)**), was distributed between approximately Ventura, CA and San Diego (**Fig. \@ref(fig:biom-dens-anch-c)b**), and had a similar length distribution to the core region (**Table \@ref(tab:l-freq-summ-anch-c)**, **Fig. \@ref(fig:l-disagg-anch-c)**). Biomass in the nearshore region comprised a negligible amount (`r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"] / (be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"] + be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"]))*100,big.mark=",",digits=2)`%) of the total biomass. 
+
+(ref:biomass-anch-c) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; and coefficient of variation, CV) for the central stock of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions. Stratum areas are nmi^2^.
+
+```{r biomass-anch-c}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Engraulis mordax", Stock == "Central") %>% 
+  mutate(Region = "Nearshore")
+
+be.table.sub <- be.table %>% 
+  filter(Name == "Engraulis mordax", Stock == "Central") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-anch-c)') %>% 
+      kable_styling(latex_options = c("hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = 1:3, valign = "top") %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage  
+
+(ref:l-freq-summ-anch-c) Abundance versus standard length ($L_S$, cm) for the central stock of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions.
+
+```{r l-freq-summ-anch-c}
+# Print table for anchovy
+if ("Engraulis mordax" %in% unique(abund.summ.all$Species)) {
+  abund.summ.table <- abund.summ.all %>% 
+    filter(Species == "Engraulis mordax", Stock == "Central") %>% 
+    rename('$L_S$' = SL) 
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center", part = "header") %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, format = "latex", booktabs = FALSE,
+            escape = FALSE, longtable = TRUE,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-anch-c)') %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
+        column_spec(1, italic = TRUE) %>% 
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
+        add_header_above(c(" " = 3, "Region" = 2)) %>% 
+        row_spec(0, align = c("c"))  
+    }
+  }
+} else {
+  print("No anchovy present.")
+}
+```
+
+\newpage  
+\blandscape
+
+(ref:biom-dens-anch-c) Biomass densities of central stock of Northern Anchovy (_Engraulis mordax_), per strata, in the a) core and b) nearshore survey regions. The blue numbers represent the locations of trawl clusters with at least one Northern Anchovy. The gray line represents the vessel track.
+
+```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.width='9in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```  
+\elandscape
+\newpage  
+
+(ref:l-disagg-anch-c) Abundance versus standard length ($L_S$, upper panel) and biomass (t) versus $L_S$ (lower panel) for the central stock of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions.
+
+```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+
+# if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
+#   include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))  
+# } else {
+#   print("No results for this species/stock.")
+# }
+```
+
+\newpage  
+
+### Pacific Sardine {#results-sardine} 
+```{r}
+# Extract only northern stock Pacific Sardine data
+be.sar.s <- be %>% 
+  filter(Species == "Sardinops sagax", Stock == "Northern", Stratum != "All")
+```
+
+#### Northern stock {#results-sardine-northern}  
+The total estimated biomass of the northern stock of Pacific Sardine was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n)**), and was distributed from approximately Pt. Conception to Oceanside (**Fig. \@ref(fig:biom-dens-sar-n)a**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Northern"]` to `r length.summ$L.max[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == 'Sorthern']` cm with a mode at 13 cm (**Table \@ref(tab:l-freq-summ-sar-n)**, **Fig. \@ref(fig:l-disagg-sar-n)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n)**), and was distributed between Pt. Conception and San Diego, but biomass was greatest near Santa Barbara, between Long Beach and Oceanside, and around Santa Cruz Island (**Fig. \@ref(fig:biom-dens-sar-n)b**). The length distribution was similar to the core region (**Table \@ref(tab:l-freq-summ-sar-n)**, **Fig. \@ref(fig:l-disagg-sar-n)**). **Biomass in the nearshore region comprised `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"] / (be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"] + be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"]))*100,big.mark=",",digits=2)`% of the total.**  
+
+(ref:biomass-sar-n) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; and coefficient of variation, CV) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions. Stratum areas are nmi^2^.
+
+```{r biomass-sar-n}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Sardinops sagax", Stock == "Northern") %>% 
+  mutate(Region = "Nearshore")
+
+be.table.sub <- be.table %>% 
+  filter(Name == "Sardinops sagax", Stock == "Northern") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-sar-n)') %>% 
+      kable_styling(latex_options = c("hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = 1:3, valign = "top") %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+\newpage
+
+(ref:l-freq-summ-sar-n) Abundance versus standard length ($L_S$, cm) for the northern stock of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions.
+
+```{r l-freq-summ-sar-n}
+# Print table for sardine
+if ("Sardinops sagax" %in% unique(abund.summ.all$Species)) {
+  abund.summ.table <- abund.summ.all %>% 
+    filter(Species == "Sardinops sagax", Stock == "Northern") %>% 
+    rename('$L_S$' = SL) 
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, format = "latex", booktabs = FALSE,
+            escape = FALSE, longtable = TRUE,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-sar-n)') %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
+        column_spec(1, italic = TRUE) %>% 
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
+        add_header_above(c(" " = 3, "Region" = 2)) %>% 
+        row_spec(0, align = c("c"))   
+    }
+  }
+} else {
+  print("No sardine present.")
+}
+```  
+
+\newpage
+\blandscape
+
+(ref:biom-dens-sar-n) Biomass densities of the northern stock of Pacific Sardine (_Sardinops sagax_), per strata, in the a) core and b) nearshore survey regions. The blue numbers represent the locations of trawl clusters with at least one Pacific Sardine. The gray line represents the vessel track.
+
+```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.width='9in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```  
+
+\elandscape
+\newpage  
+
+(ref:l-disagg-sar-n) Estimated abundance (upper panel) and biomass (lower panel) versus standard length ($L_S$, cm) for the northern stock of Pacific Sardine (_Sardinops sagax_)  in the core and nearshore survey regions.
+
+```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+
+# if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
+#   include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))  
+# } else {
+#   print("No results for this species/stock.")
+# }
+```  
+
+\newpage
+
+### Pacific Mackerel {#results-mack}  
+
+In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-mack)**, **Fig. \@ref(fig:biom-dens-mack)b**) and distributed from San Clemente, CA to San Diego. $L_F$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Scomber japonicus']` to `r length.summ$L.max[length.summ$scientificName == 'Scomber japonicus']` cm with a mode at 18 cm (**Table \@ref(tab:l-freq-summ-mack)**, **Fig. \@ref(fig:l-disagg-mack)**). A negligible amount of Pacific Mackerel was observed in the core survey region.  
+
+(ref:biomass-mack) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; and coefficient of variation, CV) for Pacific Mackerel (_Scomber japonicus_) in nearshore survey region. Stratum areas are nmi^2^.
+
+```{r biomass-mack}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Scomber japonicus") %>% 
+  mutate(Region = "Nearshore")
+
+be.table.sub <- be.table %>% 
+  filter(Name == "Scomber japonicus") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-mack)') %>% 
+      kable_styling(latex_options = c("hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = 1:3, valign = "top") %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+```{r}
+# Extract only Pacific Mackerel data
+be.mack <- be %>% 
+  filter(Species == "Scomber japonicus", Stock == "All", Stratum != "All")
+```
+
+\newpage  
+
+(ref:l-freq-summ-mack) Abundance versus fork length ($L_F$, cm) for Pacific Mackerel (_Scomber japonicus_) in the core and nearshore survey regions.
+
+```{r l-freq-summ-mack}
+# Print table for mackerel
+if ("Scomber japonicus" %in% unique(abund.summ.all$Species)) {
+  abund.summ.table <- abund.summ.all %>% 
+    filter(Species == "Scomber japonicus") %>% 
+    rename('$L_F$' = SL) 
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, format = "latex", booktabs = FALSE,
+            escape = FALSE, longtable = TRUE,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-mack)') %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
+        column_spec(1, italic = TRUE) %>% 
+        collapse_rows(columns = 1:2, longtable_clean_cut = FALSE) %>%
+        add_header_above(c(" " = 3, "Region" = 2)) %>% 
+        row_spec(0, align = c("c"))   
+    }
+  }
+} else {
+  print("No mackerel present.")
+}
+``` 
+
+\newpage
+\blandscape
+(ref:biom-dens-mack) Biomass densities of the Pacific Mackerel (_Scomber japonicus_), per strata, in the a) core and b) nearshore survey regions. The blue numbers represent the locations of trawl clusters with at least one Pacific Mackerel. The gray line represents the vessel track.
+
+```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.width='9in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
+
+\elandscape
+\newpage  
+
+(ref:l-disagg-mack) Estimated abundance (upper panel) and biomass (lower panel) versus fork length ($L_F$, cm) for Pacific Mackerel (_Scomber japonicus_)  in the core and nearshore survey regions.
+
+```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+
+# if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
+#   include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))  
+# } else {
+#   print("No results for this species/stock.")
+# }
+```  
+
+\newpage
+
+### Jack Mackerel {#results-jack}  
+
+The total estimated biomass of Jack Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-jack)**), was distributed from approximately Pt. Conception to San Diego (**Fig. \@ref(fig:biom-dens-jack)a**). $L_F$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Trachurus symmetricus']` to `r length.summ$L.max[length.summ$scientificName == 'Trachurus symmetricus']` cm, with a mode at 13 cm (**Table \@ref(tab:l-freq-summ-jack)**, **Fig. \@ref(fig:l-disagg-jack)**). In the nearshore region, the relatively small amount of biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-jack)**, **Fig. \@ref(fig:biom-dens-jack)b**); was distributed around Pt. Conception, Los Angeles, and Santa Cantalina Island (**Fig. \@ref(fig:l-disagg-jack)**); and had a length distribution similar to the core region (**Table \@ref(tab:l-freq-summ-jack)**). Biomass in the nearshore region comprised `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] + be.all$Biomass[be.all$Species == 'Trachurus symmetricus']))*100,big.mark=",",digits=2)`% of the total.  
+
+(ref:biomass-jack) Biomass estimates (metric tons, t) and their precision (upper and lower 95% confidence intervals, CI~95%~; and coefficient of variation, CV) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions. Stratum areas are nmi^2^.
+
+```{r biomass-jack}
+be.table.sub.ns <- be.table.ns %>% 
+  filter(Name == "Trachurus symmetricus") %>% 
+  mutate(Region = "Nearshore")
+
+be.table.sub <- be.table %>% 
+  filter(Name == "Trachurus symmetricus") %>% 
+  mutate(Region = "Core") %>% 
+  bind_rows(be.table.sub.ns) %>% 
+  select(Name, Stock, Region, everything())
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-jack)') %>% 
+      kable_styling(latex_options = c("hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = 1:3, valign = "top") %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```  
+
+```{r}
+# Extract only Jack Mackerel data
+be.jack <- be %>% 
+  filter(Species == "Trachurus symmetricus", Stock == "All", Stratum != "All")
+```
+
+\newpage  
+
+(ref:l-freq-summ-jack) Abundance versus fork length ($L_F$, cm) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions.
+
+```{r l-freq-summ-jack}
+# Print table for mackerel
+if ("Trachurus symmetricus" %in% unique(abund.summ.all$Species)) {
+  abund.summ.table <- abund.summ.all %>% 
+    filter(Species == "Trachurus symmetricus") %>% 
+    rename('$L_F$' = SL) 
+  
+  if (nrow(abund.summ.table) != 0) {
+    if (doc.type == "docx") {
+      regulartable(abund.summ.table) %>% 
+        align(align = "center",part = "header") %>% 
+        autofit()
+    } else {
+      kable(abund.summ.table, format = "latex", booktabs = FALSE,
+            escape = FALSE, longtable = TRUE,
+            digits = c(0),
+            format.args = list(big.mark = ","),
+            caption = '(ref:l-freq-summ-jack)') %>%
+        kable_styling(latex_options = c("repeat_header")) %>%
+        column_spec(1, italic = TRUE) %>% 
+        collapse_rows(columns = 1:2, longtable_clean_cut = TRUE) %>%
+        add_header_above(c(" " = 3, "Region" = 2)) %>% 
+        row_spec(0, align = c("c"))   
+    }
+  }
+} else {
+  print("No Jack Mackerel present.")
+}
+``` 
+
+\newpage
+\blandscape
+
+(ref:biom-dens-jack) Biomass densities of Jack Mackerel (_Trachurus symmetricus_), per strata, in the a) core and b) nearshore survey regions. The blue numbers represent the locations of trawl clusters with at least one Jack Mackerel. The gray line represents the vessel track.
+
+```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.width='9in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  
+  if (file.exists(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+```
+\elandscape
+\newpage  
+
+(ref:l-disagg-jack) Estimated abundance (upper panel) and biomass (lower panel) versus fork length ($L_F$, cm) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions.
+
+```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.height='6in',fig.pos='H'}
+if (combine.regions) {
+  if (file.exists(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  } 
+  
+} else {
+  if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
+    include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+  } else {
+    print("No results for this species/stock.")
+  }
+}
+
+# if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
+#   include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))  
+# } else {
+#   print("No results for this species/stock.")
+# }
+```  
+
+\newpage
+
+# Discussion {#discussion}  
+
+The principal objectives of the `r survey.das`-day, spring 2021 CPS survey were to survey the northern stock of Pacific Sardine and the central stock of Northern Anchovy. Then, as possible, estimates were also sought for Pacific Mackerel, Jack Mackerel. With the benefit of favorable weather and few technical problems, _`r survey.vessel`_ surveyed from San Francisco to San Diego. **All transects south of Pt. Conception, where the biomass of Northern Anchovy was expected to be greatest, were spaced `r adaptive.spacing`-nmi apart; north of Pt. Conception, transects were spaced 15-nmi apart to maximize the extent of the survey area with the available days at sea.**  
+
+**Given that purse seine sets were used to apportion backscatter from LBC, this paragraph can be deleted, or at least modified to state that the nearest trawl cluster or purse seine set was used to apportion biomass from LBC, since a few Lasker clusters were used to apportion backscatter in areas where purse seine sets were unsuccessful or aborted.**  
+
+Biomass estimates were derived using the best available data in the nearshore region. For example, both _Lisa Marie_ and a USV conducted acoustic transects off the coasts of WA and OR; however, only _Lisa Marie_ data in the overlapping region were used to estimate biomass because acoustic sampling was more contemporaneous with _`r survey.vessel`_ and there was no biological sampling from the USV to apportion backscatter. Purse seine catches from _Lisa Marie_, used to aportion backscatter from _Lisa Marie_, were consistent with trawl catches from _`r survey.vessel`_. Purse seine sets from _Long Beach Carnage_ did not adhere to the sampling protocol, which aimed to sample the proportions of CPS present in the acoustically sampled areas. For example, sets were occasionally conducted outside the areas where acoustic sampling occurred, and often the catch did not reflect the species composition of nearby trawls conducted by _`r survey.vessel`_ nor the contemporaneous observations in _Long Beach Carnage_'s log book entries. Therefore, species proportions from _`r survey.vessel`_'s nearest trawl clusters were used to apportion nearshore backscatter from _Long Beach Carnage_ in the SCB.  
+
+## Biomass and abundance of CPS
+### Northern Anchovy {#discussion-anchovy-biomass} 
+#### Central stock {#discussion-anchovy-biomass-central}  
+
+The estimated biomass of the central stock of Northern Anchovy in the core survey region was `r prettyNum(sum(be.anch.c$Biomass), big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=5)` - `r prettyNum(be$upper.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=5)` t) in spring 2021, which represents a **`r round(1/(sum(be.anch.c$Biomass)/810634)*100)`%** increase over the 810,634 t (CI~95%~ = 587,317 - 1,066,265) observed in summer 2019 [@Stierhoff2020b]. **The length distribution of the stock in spring 2021 had one mode ($L_S$ between ~10 and 13 cm)...**  
+
+### Pacific Sardine {#discussion-sardine}     
+#### Northern stock {#discussion-sardine-biomass-northern}  
+
+**I have not modified the text for the northern stock of sardine.** The potential habitat of the northern stock of Pacific Sardine did not extend into the SCB at the time it was sampled (**Fig. \@ref(fig:sardine-potential-habitat)c,d**). Therefore, the `r prettyNum(sum(be.sar.s$Biomass), big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Sardinops sagax" & be$Stock == "Northern" & be$Stratum == "All"], big.mark=",",digits=5)` - `r prettyNum(be$upper.ci.B[be$Species == "Sardinops sagax" & be$Stock == "Northern" & be$Stratum == "All"],big.mark=",",digits=5)` t) of biomass estimated there was attributed to the northern stock of Pacific Sardine. An unknown portion of the northern stock of Pacific Sardine may have extended in to Mexico.  
+
+### Pacific Mackerel {#discussion-mack}  
+
+**There was a negligible amount of P. mackerel observed by Lasker and LBC.** In 2019, the estimated biomass of Pacific Mackerel in the core survey region was `r prettyNum(be.all$Biomass[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t), which was greater than the estimate of 8,000 t (CI~95%~ = 1,000-20,000 t) in summer 2013 [@Zwolinski2014] but lower than the estimates of 41,139 t (CI~95%~ = 18,019 -58,425 t) in 2017 [@Zwolinski2019a] and 31,211 t (CI~95%~ = 18,309 - 45,106 t) in 2018 [@Stierhoff2019b].  
+
+The species was distributed between Astoria and Cape Mendocino in the north and between Morro Bay and San Diego in the south. Their length distribution had modes at 8 and 32 cm. The first mode is indicative of a newly recruited cohort, while the largest mode, approaching the maximum length for Pacific Mackerel, probably includes fish from multiple year classes.  
+
+### Jack Mackerel {#discussion-jack}  
+
+**Have not modified this yet.** In 2019, the estimated biomass of Jack Mackerel in the core survey region was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t), which was three-fold higher that the estimate of 128,313 t (CI~95%~ = 70,594 -180,676 t) in summer 2017 [@Zwolinski2019a], and was nearly 50% higher than the estimate of 202,471 t (CI~95%~ = 128,718 - 260,175 t) in summer 2018 [@Stierhoff2019b]. Their length distribution had three distinct modes indicating the presence of several distinct year classes. Jack Mackerel was the second most abundant species overall and was most abundant between Newport and Crescent City in the primary survey area, and offshore in the SCB.  
+
+## Ecosystem dynamics: Forage fish community {#discussion-ecosystem-dynamics}  
+
+```{r process-biomass-ts}
+if (plot.time.series) {
+  source(here("Code/plot_BiomassTimeSeries.R"))
+} else {
+  if (file.exists(here("Output/biomass_timeseries_final.Rdata"))) {
+    load(here("Output/biomass_timeseries_final.Rdata"))  
+  } else {
+    print("No time series data available")
+  }
+}
+``` 
+**Need to update the biomass time series plots!**
+
+The acoustic-trawl method (ATM) has been used worldwide to monitor the biomasses and distributions of pelagic and mid-water fish stocks worldwide [e.g., @Coetzee2008; @Karp1994; @Simmonds2009]. In the CCE, ATM surveys have been used to directly assess Pacific Hake [@JTC2014; @Edwards2018], rockfishes [@Starr1996; @Demer2012b; @Demer2012c; @Demer2012d], Pacific Herring [@Thomas2003], and CPS [@Mais1974; @Mais1977; @Hill2017]. Focused initially, in 2006, on Pacific Sardine [@Cutter2008], the SWFSC's ATM surveys of CPS in the CCE have evolved to assess the five most abundant forage-fish species [@Zwolinski2014]: Pacific Sardine, Northern Anchovy, Jack Mackerel, Pacific Mackerel, and Pacific Herring. The proportions of these stocks that are in water too shallow to be sampled by NOAA shops are estimated using samples collected from fishing vessels and USVs. Also, concurrent satellite- and ship-based measures of their biotic and abiotic habitats are used to provide an ecosystem perspective.  
+
+Collectively, these annual or bi-annual ATM surveys provide a unique insight into the dynamics of forage fishes in the CCE, including their distributions, abundances, interactions, and environments. For example, results from 2006 through 2013 indicate that Pacific Sardine dominated the CPS assemblage, but their biomass was declining [@Demer2012a; @Zwolinski2012a] and their seasonal migration was contracting [@Zwolinski2014]. Meanwhile, harvest rates for the declining stock increased [@Demer2017], and the total forage-fish biomass decreased to less than 200,000 t in 2014 and 2015 (**Figs. \@ref(fig:biomass-ts-line), \@ref(fig:biomass-ts-bar)**). The U.S. fishery for Pacific Sardine was closed in 2015 [@NMFS2015], and there were reports of mass strandings, deaths, and reproductive failures in Brown Pelicans (_Pelecanus occidentalis_^[https://e360.yale.edu/features/brown_pelicans_a_test_case_for_the_endangered_species_act]), Common Murres (_Uria aalge_), Brandt’s Cormorants (_Phalacrocorax penicillatus_), and California sea lions (_Zalophus californianus_^[https://www.fisheries.noaa.gov/national/marine-life-distress/2013-2017-california-sea-lion-unusual-mortality-event-california]) [@McClatchie2016], all of which depend on forage species. Since 2016, the forage-fish biomass has increased, mainly due to resurgences of Jack Mackerel and the now dominant central stock of Northern Anchovy (**Figs. \@ref(fig:biomass-ts-line), \@ref(fig:biomass-ts-bar)**).  
+
+(ref:biomass-ts-line) Estimated biomasses ($t$) of CPS in the CCE since 2008. Error bars are 95% confidence intervals.
+
+```{r biomass-ts-line,fig.cap='(ref:biomass-ts-line)', out.width='7in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_ts_line.png"))) {
+  include_graphics(here("Figs/fig_biomass_ts_line.png"))  
+} else {
+  print("No time series plot available.")
+} 
+```
+
+(ref:biomass-ts-bar) Cumulative biomass ($t$) for the five most abundant CPS in the CCE during summer. The forage-fish assemblage was dominated by Pacific Sardine prior to 2014 and by the central stock of Northern Anchovy after 2015. During the transition period with minimum forage-fish biomass, the U.S. fishery for Pacific Sardine was closed, NOAA recognized an unusual mortality event for California Sea lions, and multiple species of seabirds experienced reproductive failures.
+
+```{r biomass-ts-bar,fig.cap='(ref:biomass-ts-bar)', out.width='7in',fig.pos='H'}
+if (file.exists(here("Figs/fig_biomass_ts_bar.png"))) {
+  include_graphics(here("Figs/fig_biomass_ts_bar.png"))  
+} else {
+  print("No time series bar chart available.")
+} 
+```
+
+# Acknowledgements {-}  
+
+**Juan, please update based on those involved** The authors greatly appreciate that the ATM surveys require an enormous effort by multiple groups of people, particularly the Advanced Survey Technologies group (**Gabriel Johnson and Scott Mau**) and trawl team (**Update trawl group list** Lanora Vasquez de Mercado, Matt Craig, Anne Freire, Megan Human, Emily Gardner, Bill Watson, and many others from the SWFSC) and their volunteers; the officers and crew of _`r survey.vessel`_; and the Fisheries Resources Division administrative staff. **Some mention of the added effort required to conduct such a survey during Covid?** Furthermore, the authors acknowledge that the methods used are the culmination of more than a half century of development efforts from numerous researchers from around the globe. We thank Capts. **Rich Ashley and Tom Brinton** (_Long Beach Carnage_) for their coordination and cooperation during the nearshore sampling, and to Joel van Noord for leading the at-sea processing of purse seine specimens. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey of the SCB. We thank **Dianna Porzio, Trung Nguyen, Kelly Kloos, and Trevor Stocking** (CA Department of Fish and Wildlife) for their assistance processing specimens from purse-seine set from the _Long Beach Carnage_. Finally, reviews by **[List of reviewers]** improved this report.  
+
+\newpage  
+
+# References {-}  
+
+<div id = 'refs'></div>  
+
+\newpage  
+
+# (APPENDIX) Appendix {-}
+# Appendix {-} 
+
+# Length distributions and percent contribution to biomass by species and cluster {#appendix-cluster-length-percent}
+## Northern Anchovy {#appendix-cluster-length-percent-anchovy}  
+
+Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.  
+
+(ref:rlf-anchovy) Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
+
+```{r rlf-anchovy,out.height='6in',fig.pos='H'}
+include_graphics(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))
+```  
+
+\newpage
+
+## Pacific Sardine {#appendix-cluster-length-percent-sardine}  
+
+Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.  
+
+(ref:rlf-sardine) Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
+
+```{r rlf-sardine,out.width='6in',fig.pos='H'}
+include_graphics(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))
+```  
+
+\newpage  
+
+## Jack Mackerel {#appendix-cluster-length-percent-jack}  
+
+Fork length ($L_F$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.  
+
+(ref:rlf-jack) Fork length ($L_F$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
+
+```{r rlf-jack,out.width='6in',fig.pos='H'}
+include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))
+```  
+
+\newpage  
+
+```{r work-complete}
+beep(4)
+```
