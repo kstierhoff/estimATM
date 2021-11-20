@@ -94,7 +94,7 @@ get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
-download.hab      <- T # Download habitat map
+download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
 do.bootstrap      <- T # Generate bootstrap estimates
@@ -1387,7 +1387,9 @@ if (trawl.source == "Access") {
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
       TRUE ~ haulBackTime)) %>%
     rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes)
+           collection = Collection, notes = Notes) %>% 
+    rename(totalNum = TotalNum,
+           totalWeight = TotalWtKg)
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -1416,6 +1418,14 @@ if (trawl.source == "Access") {
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
   
+  # Compute totalWeight and totalNum, which only exist in the Access database
+  catch.all <- catch.all %>% 
+    # replace_na(list(subSampleWtkg = 0, 
+    #                 subSampleCount = 0,
+    #                 remainingSubSampleWtkg = 0)) %>% 
+    mutate(
+      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
 }
 
 # Classify hauls by season (spring or summer)
@@ -1575,9 +1585,7 @@ catch <- catch.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
   left_join(select(haul, haul, cluster)) %>% 
-  mutate(key = paste(haul, scientificName)) %>% 
-  rename(totalNum = TotalNum,
-         totalWeight = TotalWtKg)
+  mutate(key = paste(haul, scientificName))
 
 # Save haul data
 saveRDS(catch, file = here("Output/catch_info.rds"))
@@ -1586,7 +1594,7 @@ if (survey.name %in% c("2107RL")) {
   # Haul 97 had specimen lengths taken but not weights, so weight had to be 
   # estimated from length, and average weight is estimated to estimate the totalNum
   catch.weight.missing <- catch %>% 
-    filter(totalNum == 0) 
+    filter(totalNum == Inf) 
   
   lengths.missing.weights <- lengths.all %>% 
     left_join(spp.codes) %>% 
@@ -1624,7 +1632,7 @@ if (survey.name %in% c("2107RL")) {
         subSampleWtkg == 0 ~ subSampleWt.est,
         TRUE ~ subSampleWtkg),
       totalNum = case_when(
-        totalNum == 0 ~ as.integer((subSampleCount/subSampleWtkg)*totalWeight),
+        totalNum == Inf ~ (subSampleCount/subSampleWtkg)*totalWeight,
         TRUE ~ totalNum)) %>%
     select(-subSampleWt.est)
 }

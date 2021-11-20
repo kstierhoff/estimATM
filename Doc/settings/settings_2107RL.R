@@ -459,7 +459,7 @@ cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIO
 cufes.db.sqlite        <- "cufes202107RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 # Trawl data
-trawl.source           <- "Access" # "SQL" or "Access"
+trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2107RL.accdb"

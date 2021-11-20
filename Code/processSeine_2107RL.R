@@ -6,14 +6,14 @@ lm.sets <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>%
          vessel.name = "LM",
          key.set = paste(vessel_name, date, set))
 
-# lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>% 
-#   mutate(date = date(mdy_hm(datetime)),
-#          vessel_name = "Long Beach Carnage",
-#          vessel.name = "LBC",
-#          key.set = paste(vessel_name, date, set))
+lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
+  mutate(date = date(mdy_hm(datetime)),
+         vessel_name = "Long Beach Carnage",
+         vessel.name = "LBC",
+         key.set = paste(vessel_name, date, set))
 
 set.clusters <- select(lm.sets, key.set, vessel.name, lat, long) %>%
-  # bind_rows(select(lbc.sets, key.set, vessel.name, lat, long)) %>% 
+  bind_rows(select(lbc.sets, key.set, vessel.name, lat, long)) %>%
   filter(vessel.name %in% seine.vessels) %>% 
   # Begin clustering after Lasker clusters
   mutate(cluster = max(cluster.mid$cluster) + as.numeric(as.factor(key.set)),
@@ -21,9 +21,7 @@ set.clusters <- select(lm.sets, key.set, vessel.name, lat, long) %>%
   project_df(to = crs.proj)
 
 
-save(lm.sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
-
-# save(lm.sets, lbc.sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
+save(lm.sets, lbc.sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
 
 # Import specimen info
 lm.specimens <- read_csv(here("Data/Seine/lm_catch.csv"), lazy = FALSE) %>% 
@@ -122,7 +120,7 @@ lm.spec.summ.sf <- lm.spec.summ %>%
 set.summ.wt <- lm.spec.summ %>% 
   # bind_rows(lbc.spec.summ) %>% 
   filter(vessel.name %in% seine.vessels) %>% 
-  tidyr::spread(scientificName, totalWeight) 
+  pivot_wider(names_from = scientificName, values_from = totalWeight) 
 
 # Add species with zero total weight
 if (!has_name(set.summ.wt, "Engraulis mordax"))      {set.summ.wt$`Engraulis mordax`      <- 0}
@@ -136,8 +134,6 @@ if (!has_name(set.summ.wt, "Atherinopsis californiensis")) {set.summ.wt$`Atherin
 set.summ.wt <- set.summ.wt %>%  
   replace(is.na(.), 0) %>% 
   mutate(AllCPS = rowSums(select(., -(key.set:long)))) %>%
-  # mutate(AllCPS = rowSums(select(., -key.set, -totalCount, -lat, -long))) %>%
-  # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
   rename("Jacksmelt"  = "Atherinopsis californiensis",
          "PacHerring" = "Clupea pallasii",
          "Anchovy"    = "Engraulis mordax",
@@ -150,7 +146,8 @@ set.summ.wt <- set.summ.wt %>%
   summarise_all(list(sum)) %>% 
   ungroup() %>% 
   mutate(AllCPS = rowSums(select(., -cluster, -haul))) %>% 
-  right_join(select(set.clusters, -vessel.name)) %>% 
+  # right_join(set.clusters) %>% 
+  right_join(select(set.clusters, -vessel.name)) %>%
   replace(is.na(.), 0)
 
 set.pie <- set.summ.wt %>% 
