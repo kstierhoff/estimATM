@@ -15,12 +15,18 @@ nasc.sf <- st_as_sf(nasc.nearshore, coords = c("long","lat"), crs = 4326) %>%
   mutate(date_group = date(datetime)) %>% 
   filter(vessel.name == "LBC")
 
+nasc.summ <- nasc.sf %>% 
+  group_by(transect.name) %>% 
+  summarise(date = as.factor(min(date(datetime)))) %>% 
+  st_set_geometry(NULL)
+
 # Convert to lines, by date
 nearshore.lines <- nasc.sf %>% 
   group_by(vessel.name, transect.name) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
-  mutate(distance_nmi = as.numeric(st_length(.)*0.000539957))
+  mutate(distance_nmi = as.numeric(st_length(.)*0.000539957)) %>% 
+  left_join(nasc.summ)
 
 nearshore.lines.date <- nasc.sf %>% 
   group_by(date_group) %>% 
