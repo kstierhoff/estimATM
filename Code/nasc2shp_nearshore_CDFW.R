@@ -12,7 +12,7 @@ load(here::here("Data/Backscatter/nasc_nearshore.Rdata"))
 # load(here::here("C:/KLS/CODE/R_packages/estimATM/2107RL/Data/Backscatter/nasc_nearshore.Rdata"))
 
 nasc.sf <- st_as_sf(nasc.nearshore, coords = c("long","lat"), crs = 4326) %>% 
-  mutate(date_group = date(datetime)) %>% 
+  mutate(date_group = as.factor((date(datetime)))) %>% 
   filter(vessel.name == "LBC")
 
 nasc.summ <- nasc.sf %>% 
