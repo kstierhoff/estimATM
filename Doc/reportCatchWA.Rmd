@@ -55,9 +55,8 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r user-controls}
-get.db     <- F
 get.nav    <- F
-save.figs  <- T
+save.figs  <- F
 resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 do.spatial <- T
 ```
@@ -83,10 +82,10 @@ if (trawl.source == "SQL") {
 }
 
 # Import trawl database tables
-catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
-haul.all       <- tbl(trawl.con,"Haul") %>% collect()
-lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+catch.all	     <- tbl(trawl.con,"Catch") %>% collect() %>% filter(cruise == cruise.name)
+haul.all       <- tbl(trawl.con,"Haul") %>% collect() %>% filter(cruise == cruise.name)
+lengths.all    <- tbl(trawl.con,"Specimen") %>% collect() %>% filter(cruise == cruise.name)
+lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect() %>% filter(cruise == cruise.name)
 spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
 
 # Close database channel
@@ -255,7 +254,7 @@ ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>%
 wa_waters <- wa %>% 
   # Convert to meters for accurate buffer
   st_transform(crs = 3310) %>% 
-  st_buffer(dist = 1852*3) %>% 
+  st_buffer(dist = 1852*12) %>% 
   # Transform back to WGS84 for mapping
   st_transform(4326)
 
@@ -342,7 +341,8 @@ if (trawl.source == "Access") {
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
       TRUE ~ haulBackTime)) %>%
     rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes)
+           collection = Collection, notes = Notes,
+           totalWeight = TotalWtKg, totalNum = TotalNum)
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -364,11 +364,18 @@ if (trawl.source == "Access") {
            sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
            inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
            subSampleNumber = SubSampleNumber)
+  
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
+  
+  # Compute totalWeight and totalNum, which only exist in the Access database
+  catch.all <- catch.all %>% 
+    mutate(
+      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
 }
 
 # Classify hauls by season (spring or summer)
@@ -414,17 +421,17 @@ if (do.spatial) {
     st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
     # Find hauls in the US EEZ
     st_intersection(eez_usa)
-  # 
-  # haul.mpa <- haul.mid %>% 
-  #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  #   st_intersection(ca_mpas) 
   
-  save(haul.wa, file = here("Output/haul_data_reportCatchWa.Rdata"))
+  # Find hauls within 12 nmi
+  haul.wa.12 <- haul.wa %>% 
+    st_intersection(wa_waters)
+
+  save(haul.wa, haul.wa.12, file = here("Output/haul_data_reportCatchWa.Rdata"))
 } else {
   load(here("Output/haul_data_reportCatch.Rdata"))
 }
 
-# Filter hauls in CA waters
+# Filter hauls in WA waters
 haul.out <- haul.mid %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   filter(!haul %in% haul.wa$haul)
@@ -443,41 +450,29 @@ base.map +
 ```{r extract-catch}
 catch.wa <- catch.all %>% 
   filter(haul %in% haul.wa$haul) %>% 
-  # left_join(select(haul.ca, key, date_time)) %>% 
-  left_join(spp.codes)
+  left_join(spp.codes) %>% 
+  filter(!subSampleWtkg == 0) 
+```
 
-catch.table <- catch.wa %>% 
-  left_join(select(haul.all, haul, lat = DecLatitude, long = DecLongitude, 
-                   date_time = equilibriumTime)) %>% 
-  # left_join(select(as.data.frame(haul.mpa), haul, MPA)) %>%
-  mutate(county = NA,
-         utm_e = NA, 
-         utm_n = NA,
-         utm_zone = NA,
-         gps_datum = "WGS84",
-         map_scaling = "10K",
-         num_M = NA,
-         num_F = NA,
-         num_UNK = NA,
-         method = "Nordic trawl",
-         disposition = "S",
-         facility = "SWFSC",
-         totalWt = subSampleWtkg + remainingSubSampleWtkg,
-         meanWt = subSampleWtkg/subSampleCount,
-         totalCt = round(totalWt/meanWt),
-         blank1 = NA,
-         blank2 = NA) %>% 
-  arrange(date_time) %>% 
-  select(commonName, blank1, scientificName, blank2, county, utm_e, utm_n, utm_zone, long, lat, gps_datum,
-         map_scaling, date_time, num_M, num_F, num_UNK, totalCt, method, disposition, facility) %>% 
-  mutate(date_time = format(date_time, "%m/%d/%Y"))
+```{r process-catch}
+# Summarize species catch by weight and number
+catch.summary <- catch.wa %>% 
+  mutate(totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum = totalWeight/(subSampleWtkg/subSampleCount)) %>%
+  group_by("Scientific Name" = scientificName, 
+           "Common Name" = commonName) %>% 
+  summarise("Total weight (kg)" = round(sum(totalWeight), 2),
+            "Total number (n)"  = round(sum(totalNum), 0)) %>% 
+  arrange(desc(`Total weight (kg)`)) 
 
-# Save to CSV
-write_csv(catch.table, here("Output/catch_table_WDFW.csv"), na = "")
+write_csv(catch.summary,
+          here("Output/catch_summary_WDFW.csv"),
+          na = "")
 ```
 
 # Interactive trawl plot
-A map showing all trawl hauls (black points), trawls in WA State waters (red points), and trawls occurring in WA MPAs (blue markers; **need WA MPA shapefiles, if any**). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection.  
+
+A map showing all trawl hauls (white points), trawls in WA State waters (withing the U.S. EEZ; red points), and trawls occurring in WA MPAs (blue markers; **need WA MPA shapefiles, if any**). Hovering over shaded polygons will show MPA names, and over points will show the trawl number, which includes the cruise, ship, haul, and collection.  
 
 ```{r catch-map-leaflet}
 # Configure palette for MPAs
@@ -487,7 +482,7 @@ A map showing all trawl hauls (black points), trawls in WA State waters (red poi
 if (nrow(haul.wa) > 0) {
   leaflet() %>% 
     addProviderTiles(providers$Esri.OceanBasemap) %>%  
-        # Add EEZs
+    # Add EEZs
     addPolylines(data = eez_usa, color = "#000414", weight = 3, 
                  label = "EEZ-U.S.") %>% 
     addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
@@ -512,7 +507,7 @@ if (nrow(haul.wa) > 0) {
 } else {
   leaflet() %>% 
     addProviderTiles(providers$Esri.OceanBasemap) %>%  
-     # Add EEZs
+    # Add EEZs
     addPolylines(data = eez_usa, color = "#000414", weight = 3, 
                  label = "EEZ-U.S.") %>% 
     addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
@@ -538,137 +533,49 @@ if (nrow(haul.wa) > 0) {
 
 ```
 
-```{r extract-ca-net-tows,eval=FALSE}
-if (get.db) {
-  # Define connection to CalCOFI database
-  odbc_channel <- RODBC::odbcConnect("CalCOFI")
-  
-  # SQL query for net tows
-  t_sql <- "select DISTINCT
-       CC.TOWS.T_S_C AS cruise,
-	   CC.TOWS.T_S_SC AS ship,
-	   CC.CRUISETYPES.CT_code cruise_type_code,
-	   cc.CRUISETYPE_CODES.type cruise_type,
-	   CC.TOWS.T_S_OO Order_Occupied,
-	   CC.TOWS.T_TD date,
-      ROUND(t_tbt/100,0,1) hours,CAST((T_TBT) AS INT)%100 minutes, CC.STATIONS.S_L AS line, CC.STATIONS.S_S AS station,
-       
-         CC.STATIONS.S_LATD ++ CC.STATIONS.S_LATM / 60  AS lat, 
-       (-1)*(CC.STATIONS.S_LONGD + CC.STATIONS.S_LONGM / 60) AS long,
-   --   CC.TOWS.t_nl,
-	    CC.TOWS.T_TT_STT tow_type
-       FROM CC.CRUISETYPES  
-	   join 
-	    cc.CRUISETYPE_CODES on CODE=ct_code
-		join
-	   CC.STATIONS  on ct_s_c=s_c and ct_s_sc=s_sc 
-	    JOIN
-             CC.TOWS ON CC.STATIONS.S_C = CC.TOWS.T_S_C AND CC.STATIONS.S_SC = CC.TOWS.T_S_SC AND 
-              CC.STATIONS.S_OO = CC.TOWS.T_S_OO 
-               WHERE --   (CC.TOWS.T_S_C in ('1704')) 
-					 CC.TOWS.T_S_C BETWEEN 1501 AND 1709"
-  
-  # Query CalCOFI database for net tows
-  tows <- sqlQuery(odbc_channel, t_sql) %>% 
-    mutate(
-      date = ymd(date),
-      key = paste(cruise, ship, Order_Occupied)) 
-  
-  # Close ODBC channel  
-  close(odbc_channel)
-  
-  save(tows, file = here("Output/tow_data_SQL.Rdata"))
-} else {
-  load(here("Output/tow_data_SQL.Rdata"))
-}
+# Catch summary
+## By species
 
-# Convert to sf; CRS =4326 (WGS84)
-tows <- st_as_sf(tows, coords = c("long","lat"), crs = 4326) %>% 
-  mutate(long = map_dbl(geometry, ~st_centroid(.x)[[1]]),
-         lat  = map_dbl(geometry, ~st_centroid(.x)[[2]]))
+Catch for all trawl samples in  are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
 
-if (do.spatial) {
-  # Find tows in CA waters
-  tows.ca <- st_intersection(tows, ca_waters) %>% 
-    arrange(date)
-  
-  # Find tows in CA MPAs
-  tows.mpa <- st_intersection(tows, ca_mpas) %>% 
-    arrange(date)
-  
-  save(tows.ca, tows.mpa, file = here("Data/tow_sf.Rdata"))
-} else {
-  load(here("Data/tow_sf.Rdata"))
-}
-
-# Create final table
-tow.table <- as.data.frame(tows.ca) %>%
-  left_join(select(as.data.frame(tows.mpa), key, MPA)) %>% 
-  mutate(
-    method = case_when(
-      tow_type == "CB" ~ "Bongo",
-      tow_type == "MT" ~ "Manta",
-      tow_type == "PV" ~ "Pairovet")) %>% 
-  group_by(key, date, long, lat, MPA, cruise_type, cruise, ship, line, station) %>% 
-  summarise(
-    tows = n(),
-    method = glue::collapse(unique(method),sep = ", ")) %>% 
-  mutate(
-    county         = NA,
-    utm_e          = NA, 
-    utm_n          = NA,
-    utm_zone       = NA,
-    gps_datum      = "WGS84",
-    map_scaling    = "10K",
-    num_M          = NA,
-    num_F          = NA,
-    num_UNK        = NA,
-    disposition    = "S",
-    facility       = "SWFSC",
-    blank1         = NA,
-    blank2         = NA,
-    blank3         = NA,
-    scientificName = "Plankton tows",
-    commonName     = "Misc. plankton") %>% 
-  arrange(cruise_type, date, method) %>% 
-  ungroup() %>% 
-  select(scientificName, commonName, blank1, blank2, county, MPA, utm_e, utm_n, utm_zone, long, lat, gps_datum,
-         map_scaling, date, num_M, num_F, num_UNK, blank3, method, disposition, facility,
-         cruise_type, cruise, ship, line, station) %>% 
-  mutate(date = format(date, "%m/%d/%Y")) 
-
-# Save to CSV
-write_csv(tow.table, here("Output/tow_table_Project9.csv"), na = "")
-```  
-
-<!-- # Interactive plankton tow plot -->
-<!-- A map showing all plankton tows (black points), tows in CA State waters (red points), and tows occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection. -->
-
-```{r tow-leaflet-map,eval=FALSE}
-# Remove tows outside of CA waters
-tows.out <- filter(tows, !key %in% tows.ca$key)
-
-# Create leaflet map
-leaflet() %>% 
-  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-  addProviderTiles(providers$Esri.OceanBasemap, 
-                   group = "Esri.OceanBasemap",
-                   options = tileOptions(useCache = useCachedTile,
-                                         crossOrigin = useCrossOrigin)) %>%
-  addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
-  addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 1,
-              label = ~htmlEscape(MPA)) %>% 
-  addCircleMarkers(data = tows.out, radius = 3, color = "gray50", stroke = FALSE, fillOpacity = 0.75,
-                   label = ~htmlEscape(key)) %>% 
-  addCircleMarkers(data = tows.ca,  radius = 5, color = "red", stroke = FALSE, fillOpacity = 0.75,
-                   label = ~htmlEscape(key)) %>% 
-  addMarkers(data = tows.mpa, popup = ~key, label = ~htmlEscape(key)) %>% 
-  # Add scale bar
-  addScaleBar(position = "bottomright") %>%
-  # Add map coordinates
-  addMouseCoordinates() %>% 
-  # Add measurement tool
-  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
-             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
-             position = "topleft")
+```{r catch-summary}
+catch.summary %>% 
+  replace_na(list(`Total weight (kg)` = "-",
+                  `Total number (n)` = "-")) %>%
+  kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                full_width = FALSE) %>%
+  row_spec(0, align = c("c")) %>% 
+  column_spec(1, italic = T) %>% 
+  scroll_box(height = "500px")
 ```
+
+## By haul
+
+Catch for each trawl sample by species.
+
+```{r catch-hauls}
+catch.all <- catch.wa %>% 
+  select(Haul = haul,
+         "Scientific Name" = scientificName,
+         "Common Name" = commonName,
+         "Total weight (kg)" = totalWeight, 
+         "Total number (n)" = totalNum) %>% 
+  arrange(Haul, desc(`Total weight (kg)`))
+
+catch.all %>% 
+  replace_na(list(`Total weight (kg)` = "-",
+                  `Total number (n)` = "-")) %>%
+  kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                full_width = FALSE) %>%
+  row_spec(0, align = c("c")) %>% 
+  column_spec(2, italic = T) %>% 
+  scroll_box(height = "500px")
+
+write_csv(catch.all,
+          here("Output/catch_table_WDFW.csv"),
+          na = "")
+```
+
+For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).

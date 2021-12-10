@@ -91,11 +91,19 @@ if (trawl.source == "Access") {
       TRUE ~ haulBackTime)) %>%
     rename(cruise = Cruise, ship = Ship, haul = Haul, 
            collection = Collection, notes = Notes)
+  
+  
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
+  
+  # Compute totalWeight and totalNum, which only exist in the Access database
+  catch.all <- catch.all %>% 
+    mutate(
+      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
   
 }
 
@@ -117,8 +125,6 @@ us.hauls <- sort(unique(haul$haul))
 catch <- catch.all %>% 
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
-  rename(totalNum = TotalNum,
-         totalWeight = TotalWtKg) %>% 
   filter(haul %in% us.hauls) %>% 
   filter(!subSampleWtkg == 0) 
 
