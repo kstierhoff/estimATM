@@ -667,7 +667,7 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- "RL"
+cal.vessels        <- c("RL","LBC","LM")
 cal.dir            <- "//swc-storage1.nmfs.local/AST1/SURVEYS/20210702_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
 cal.datetime       <- "1 July"     # Date/time of calibration
 cal.plot.date      <- "2021-07-01" # Date of the calibration, used to plot cal time series
@@ -695,7 +695,9 @@ cal.max.z          <-   10     # enter maximum water depth below transducers
  
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
-cal.noise          <- list(RL = NA)
+cal.noise          <- list(RL = NA,
+                           LM = NA,
+                           LBC = NA)
 
 # Axis options for calibration plots
 cal.scales    <- "free"  # fixed or free
@@ -748,7 +750,7 @@ pairovet.button    <- "Pairovet IN"
 cb.flush.button    <- "CB Flush"
 cb.int.button      <- "CB Interm"
 cb.ext.button      <- "CB Extended"
-gps.lat.hdr        <- "MX512-Lat"
-gps.lon.hdr        <- "MX512-Lon"
-order.occ.hdr      <- "Order_Occ"
+gps.lat.hdr        <- "GP170-Lat"
+gps.lon.hdr        <- "GP170-Lon"
+order.occ.hdr      <- "Order Occ"
 notes.hdr          <- "Notes"
