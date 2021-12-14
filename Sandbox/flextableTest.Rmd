@@ -1,0 +1,66 @@
+---
+title: '{flextable} test'
+author: "Kevin L. Stierhoff"
+date: "10/26/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
+               knitr,maps,geosphere,Hmisc,ggrepel,png,cowplot,forecast,xts,
+               RSQLite,geoR,kableExtra,devtools,scatterpie,marmap,magick,
+               beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
+               leaflet.extras,maptools,mapview,photobiology,fs,plotly,
+               concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,ggnewscale,
+               rworldmap,rworldxtra,data.table,stplanr,ggspatial,htmlwidgets,
+               flextable,ftExtra)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "docx"}
+
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# Output files ------------------------------------------------------------------
+prj.output <- settings.files[str_detect(settings.files, paste0("output_", prj.name, ".R"))]
+source(here("Doc/settings", prj.output))
+```
+
+## Biomass table
+
+```{r pressure, echo=FALSE}
+flextable(be)
+```
+
+## Calibration results
+
+```{r cal-results, results='asis'}
+# Copy calibration results
+cal.results <- all.output %>% 
+  rename(Value = " ")
+
+# create kable object (for Word)
+cal.results %>% 
+  as_flextable() %>%
+  colformat_md(j=c(Value, Units)) %>%
+  flextable::autofit(add_w = 0.2)
+```
