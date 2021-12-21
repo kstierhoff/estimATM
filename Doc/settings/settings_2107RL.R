@@ -317,7 +317,8 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
                                   "SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2107RL",
                             LBC = "C:/SURVEY/2107RL",
-                            LM  = "C:/SURVEY/2107RL")   
+                            LM  = "C:/SURVEY/2107RL",
+                            SD  = "C:/SURVEY/2107RL")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SummerCPS")
 }
@@ -325,7 +326,8 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
 # Backscatter data (within survey.dir, typically; a vector of file paths)
 nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             LM  = "PROCESSED/EV/CSV/LISAMARIE",
-                            LBC = "PROCESSED/EV/CSV/CARNAGE") 
+                            LBC = "PROCESSED/EV/CSV/CARNAGE",
+                            SD  = "PROCESSED/EV/CSV/SAILDRONE") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "CPS.csv",

@@ -58,6 +58,14 @@ if (doc.name == "simulateBiomass.Rmd") {
   #        filename = here("Simulation/Figs/fig_cufes_egg_density_facet.png"),
   #        width = map.width, height = map.height) 
   
+} else if (doc.name == "reportMexico.Rmd") {
+  # Save nasc plot
+  ggsave(cufes.density.all,
+         filename = here("Figs/fig_cufes_egg_density_mx.png"),
+         width = map.width, height = map.height) 
+  
+  # save(cufes.density.all, file = here("Output/fig_cufes_egg_density_mx.png"))  
+  
 } else {
   # Save nasc plot
   ggsave(cufes.density.all,

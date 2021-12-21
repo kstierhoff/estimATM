@@ -35,6 +35,13 @@ if (doc.name == "simulateBiomass.Rmd") {
          width = map.width, height = map.height) 
   
   save(nasc.map.cps, file = here("Simulation/Output/nasc_plot_cps.Rdata"))  
+} else if (doc.name == "reportMexico.Rmd") {
+  # Save nasc plot
+  ggsave(nasc.map.cps,
+         filename = here("Figs/fig_backscatter_cps_mx.png"),
+         width = map.width, height = map.height) 
+  
+  save(nasc.map.cps, file = here("Output/nasc_plot_cps_mx.Rdata"))  
 } else {
   # Save nasc plot
   ggsave(nasc.map.cps,

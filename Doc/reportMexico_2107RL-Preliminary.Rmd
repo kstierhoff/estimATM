@@ -1,12 +1,12 @@
 ---
 output: 
-  bookdown::word_document2:
-    reference_docx: template/report_template_DRAFT_Rmarkdown.docx
   bookdown::pdf_document2:
     number_sections: yes
     toc: no
     includes: 
       in_header: yaml/header.tex
+  bookdown::word_document2:
+    reference_docx: template/report_template_DRAFT_Rmarkdown.docx
 csl: csl/ices-journal-of-marine-science.csl
 bibliography: bib/ast_bib.bib
 ---
@@ -34,7 +34,7 @@ pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
 doc.name <- knitr::current_input()
 if (is.null(doc.type)) {doc.type <- "html"}
-if (is.null(doc.name)) {doc.name <- "reportSurvey.Rmd"}
+if (is.null(doc.name)) {doc.name <- "reportMexico.Rmd"}
 
 # global knitr chunk options
 knitr::opts_chunk$set(echo = F, warning = F, message = F,progress = T,
@@ -920,6 +920,9 @@ ca     <- filter(states, name == "California")
 countries <- ne_countries(scale = "large", returnclass = "sf") %>%
   filter(subregion %in% c("Northern America","Central America"))
 
+eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
+  st_transform(crs.geog)
+
 # Read bathy contours shapefile 
 bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
   st_transform(crs.geog) %>% 
@@ -934,25 +937,20 @@ if (resize.map) {
 } else {
   # Use nav data to resize map to survey progress
   map.bounds <- transects.sf %>%
+    filter(Region ==  "Mexico") %>% 
     st_transform(crs = crs.proj) %>%
     st_bbox()  
 }
 
 # Determine map aspect ratio and set height and width
 map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.height <- 10
+map.height <- 5
 map.width  <- map.height*map.aspect
 
 # Create base map
 base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
-
-# Save the basemap
-ggsave(base.map,file = here("Figs/fig_basemap.png"), 
-       height = map.height, width = map.width)
-
-save(base.map, file = here("Data/Map/basemap.Rdata"))
 ```
 
 ```{r process-scs}
@@ -1020,6 +1018,13 @@ if (process.scs) {
   # load processed SCS data
   load(here("Data/SCS/processed_logs.Rdata"))
 }
+
+bridge.snap <- bridge.snap %>% 
+  st_as_sf(coords = c("Lon", "Lat"), crs = 4326) %>% 
+  st_intersection(select(eez_mex, geometry)) %>% 
+  project_sf(crs = 4326) %>% 
+  rename(Lat = Y, Lon = X)
+  
 ```
 
 ```{r import-trawl-data}
@@ -1104,7 +1109,7 @@ if (trawl.source == "Access") {
 haul.all <- haul.all %>% 
   mutate(season = case_when(
     month(equilibriumTime) < 6 ~ "spring",
-    TRUE ~ "summer"))
+    TRUE ~ "summer")) 
 
 # Filter haul data for current survey
 haul <- haul.all %>% 
@@ -1118,8 +1123,12 @@ haul <- haul.all %>%
   filter(!trawlPerformance %in% trawl.performance) %>% 
   # Assign cluster based on yearday
   mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% 
-  filter(startLatDecimal <= 32.53) %>% 
-  droplevels() # Remove unused factor levels
+  st_as_sf(coords = c("startLongDecimal", "startLatDecimal"), crs = 4326) %>% 
+  st_intersection(select(eez_mex, geometry)) %>% 
+  project_sf(crs = 4326) %>% 
+  rename(startLatDecimal = Y, startLongDecimal = X)
+  # filter(startLatDecimal <= 32.53) %>% 
+  # droplevels() # Remove unused factor levels
 
 # # Get haul starts
 # Find midpoint of each haul as the mean lat/lon
@@ -1159,7 +1168,8 @@ catch <- catch.all %>%
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
   right_join(dplyr::select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
-         totalWeight = subSampleWtkg + remainingSubSampleWtkg)
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg) %>% 
+  filter(haul %in% unique(haul.locs.sf$haul))
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
@@ -1264,7 +1274,7 @@ haul.zero    <- filter(haul.pie, AllCPS == 0)
 cluster.zero <- filter(cluster.pie, AllCPS == 0)
 
 # Calculate pie radius based on latitude range
-pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*pie.scale)
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*0.025)
 
 # Calculate pie radius of each pie, based on All CPS landings
 # Calculate pie radius of each pie, based on All CPS landings
@@ -1333,39 +1343,39 @@ cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
     AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
   rename(lat = StartLatitude, long = StartLongitude) %>% 
   filter(!is.na(lat), !is.na(long)) %>% 
-  filter(lat <= 32.53) %>% 
+  # filter(lat <= 32.53) %>% 
   project_df(to = crs.proj)
 
 # Close connection
 dbDisconnect(cufes.con)
 
-# # save raw cufes table to CSV
-# write.csv(cufes.raw, file = here("Output/cufes_raw.csv"), 
-#           quote = F, row.names = F)
-
 # Process CUFES data
 cufes <- cufes.raw %>% 
   # Convert cufes to long format for plotting
   select(
-    SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
+    SampleNumber, Year, Ship, Cruise, lat, long, Duration, 
     SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
     Comments) %>%
   gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
-         -lat, -long, -X, -Y, -Duration, -Comments) %>% 
+         -lat, -long, -Duration, -Comments) %>% 
   mutate(Density = Counts/Duration/0.64,
          # Create bins for defining point size in NASC plots
          bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
-
-# # Save processed cufes to CSV
-# write.csv(cufes, file = here("Output/cufes_proc.csv"), 
-#           quote = F, row.names = F)
+  left_join(select(cufes.raw, SampleNumber, Start, Stop)) %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>% 
+  st_intersection(select(eez_mex, geometry)) %>% 
+  project_df(to = 3310) 
 
 # Prepare CUFES data for plotting ----------------------------------------------
 # Select CUFES sample with zero density for plotting
 cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
   mutate(bin.level = 1) %>% 
+  st_as_sf(coords = c("X", "Y"), crs = 3310) %>% 
+  st_transform(crs = 4326) %>% 
+  st_intersection(select(eez_mex, geometry)) %>% 
+  project_sf(crs = 3310) %>% 
+  # mutate(lat = Y, long = X) %>% 
   select(X, Y, SampleNumber) 
 
 # Identify bad CUFES samples
@@ -1481,12 +1491,23 @@ if (process.csv) {
   load(here("Output/nasc_cps.Rdata"))
 }
 
-# Filter NASC
-nasc.cps <- nasc.cps %>% 
-  mutate(transect = as.numeric(transect)) %>% 
-  filter(lat <= 32.53,
-         !is.na(transect),
-         !transect %in% as.numeric(tx.rm$RL))
+if (process.csv) {
+  # Filter NASC
+  nasc.cps <- nasc.cps %>% 
+    mutate(transect = as.numeric(transect)) %>% 
+    st_as_sf(coords = c("long", "lat"), crs = 4326) %>% 
+    st_intersection(select(eez_mex, geometry)) %>% 
+    project_sf(crs = 4326) %>% 
+    rename(lat = Y, long = X) %>% 
+    filter(!is.na(transect),
+           !transect %in% as.numeric(tx.rm$RL))
+  
+  # Save subset data; processing takes some time
+  save(nasc.cps, file = here("Output/nasc_cps_mx.Rdata"))
+  
+} else {
+  load(here("Output/nasc_cps_mx.Rdata"))
+}
 
 # Get intervals with bad lat/long values
 bad.nasc.cps <- filter(nasc.cps, lat == 999, long == 999)
@@ -1678,7 +1699,7 @@ if (save.figs) {
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # save survey plan map
-  ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
+  ggsave(here("Figs/fig_survey_plan_mx.png"), survey.plan,
          height = map.height, width = map.width)
   
   # Plot Survey Track, Acoustic Transects, and Trawl Locations #####
@@ -1807,6 +1828,8 @@ The Cooperative Institute for Marine Ecosystems and Climate (CIMEC)
 1156 High St
 Santa Cruz, CA 95064, USA  
 
+# Executive Summary
+
 \newpage
 \pagenumbering{arabic}
 
@@ -1820,9 +1843,15 @@ The survey area was defined primarily by the modeled distribution of potential h
 
 This report provides a preliminary overview of the survey objectives and a summary of the survey equipment, sampling, and preliminary results from data collected in Mexican waters. This report does not include estimates of the animal distributions and biomasses, which are documented separately. The final report will be provided no later than `r ymd("2021-10-04")+years(1)`.  
 
-**This survey was conducted with the approval of the Secretaria de Relaciones Exteriores (SRE, Diplomatic note CTC/1312/2021), the INEGI (Permit: XXX), CONAPESCA (Permit: XXX) and SEMARNAT (Permit: XXX).**  
+**This survey was conducted with the approval of the Secretaria de Relaciones Exteriores (SRE, Diplomatic note CTC/1312/2021), the INEGI (Permit: EG0082021), and CONAPESCA/SAGARPA (Permiso de Pesca de Fomento: PPFE/DGOPA-073/21).**
 
-## Scientific Personnel {#introduction-personnel}
+_1. Georeferenced data of the measurements of meteorological parameters, temperature and salinity profiles of seawater up to 350 meters deep or shallower depths using CTD, oxygen, chlorophyll-a, of currents made with the ADCP profiler_
+
+_2. Results of the sound recordings of marine mammals and those that are obtained from samples of fish, plankton, fish larvae, cephalopods and Euphausiids._ 
+
+_3. Results of the genetic analysis of sardine and anchovy, as well as those of otolith reading of 50 sardines and 25 fish of other species._  
+
+# Scientific Personnel {#introduction-personnel}
 
 The collection and analysis of the survey data were conducted by members of the Fisheries Resources Division at the SWFSC. Asterisks denote Chief Scientists.  
 
@@ -1848,8 +1877,6 @@ The collection and analysis of the survey data were conducted by members of the 
 
 * _Reuben Lasker_
   + J. Renfree and T. Sessions
-* _Long Beach Carnage_
-  + J. Renfree and T. Sessions **[Others?]**
 
 # Methods {#methods}
 ## Survey region and design {#methods-survey-design}
@@ -1871,7 +1898,7 @@ include_graphics(here("Images/img_survey_region.png"))
 (ref:survey-plan) Planned compulsory (solid black lines) and adaptive (dashed red lines) transect lines sampled by _`r survey.vessel`_; adaptive transect lines sampled by unmanned surface vehicles (solid yellow lines); and nearshore transect lines sampled by fishing vessels (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms).
 
 ```{r survey-plan, fig.cap='(ref:survey-plan)', out.height='8in',fig.align='center',fig.pos='H'}
-include_graphics(here("Figs/fig_survey_plan.png"))
+include_graphics(here("Figs/fig_survey_plan_mx.png"))
 ```  
 
 \newpage  
@@ -1879,7 +1906,7 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 ## Acoustic sampling {#methods-acoustic-sampling}
 ### Echosounders {#methods-echosounders}  
 
-On _`r survey.vessel`_, multi-frequency EK80 Wideband Transceivers (18-, 38-, 70-, 120-, 200-, and 333-kHz WBTs; Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise (**Appendix \@ref(appendix-cb-pos)**). Transducer position and motion were measured at 5 Hz using an inertial motion unit (POS-MV, Trimble/Applanix).  
+On _`r survey.vessel`_, multi-frequency EK80 Wideband Transceivers (18-, 38-, 70-, 120-, 200-, and 333-kHz WBTs; Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise. Transducer position and motion were measured at 5 Hz using an inertial motion unit (POS-MV, Trimble/Applanix).  
 
 (ref:cb-config) Transducer locations on the bottom of the centerboard aboard _`r survey.vessel`_.
 
@@ -2035,33 +2062,6 @@ We thank the crew members of NOAA Ship _`r survey.vessel`_, as well as the scien
 
 # (APPENDIX) Appendix {-}
 # Appendix {-} 
-# Centerboard positions {#appendix-cb-pos}
-
-Date, time, and location associated with changes to the position of the centerboard and transducer depth.
-
-```{r cb-pos,results='asis'}
-# get centerboard position records
-cb.pos <- filter(bridge.snap, 
-                 Button %in% c("Retracted (5 m)","Intermediate (7 m)","Extended (9 m)")) %>% 
-  select(datetime, Button, Lat, Lon) %>% 
-  rename(`Date Time` = datetime, `Position (depth)` = Button, 
-         `Latitude` = Lat, `Longitude` = Lon)
-
-if (doc.type == "docx") {
-  # create kable object (for Word)
-  pander(cb.pos)
-
-} else {
-  # print LaTeX table for HTML or PDF
-  kable(cb.pos, align = c("l","l","c","c"), digits = c(0,0,4,4),
-        escape = F, booktabs = T, linesep = "") %>% 
-    kable_styling(position = "center",
-                  latex_options = c("striped", "hold_position"))
-}
-```   
-
-\newpage
-
 # CTD and UCTD sampling locations {#appendix-ctd-sampling}
 
 Times and locations of conductivity and temperature versus depth casts while on station (CTD) and underway (UCTD).  

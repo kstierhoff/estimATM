@@ -45,6 +45,11 @@ if (doc.name == "simulateBiomass.Rmd") {
   ggsave(trawl.pie.haul.wt,
          filename = here("Simulation/Figs/fig_trawl_proportion_haul_wt.png"),
          width = map.width, height = map.height) 
+} else if (doc.name == "reportMexico.Rmd") {
+  # Save nasc plot
+  ggsave(trawl.pie.haul.wt,
+         filename = here("Figs/fig_trawl_proportion_haul_wt_mx.png"),
+         width = map.width, height = map.height) 
 } else {
   # Save nasc plot
   ggsave(trawl.pie.haul.wt,
