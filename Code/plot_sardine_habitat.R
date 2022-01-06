@@ -32,15 +32,26 @@ if (survey.year >= 2021) {
   
   for (ddd in hab.dates) {
     # Generate URLs from dates
+    # habURL <- URLencode(
+    #   paste0("https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.csv0?potential_habitat_mask%5B(",
+    #          ddd,
+    #          ")%5D%5B(27.0):(51.0)%5D%5B(230.0):(247.0)%5D&.draw=surface&.vars=longitude%7Clatitude%7Cpotential_habitat_mask",
+    #          "&.colorBar=%7C%7C%7C%7C%7C&.bgColor=0xffccccff"))  
+    
     habURL <- URLencode(
-      paste0("https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.csv0?potential_habitat_mask%5B(",
+      paste0("https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.csv0?potential_habitat%5B(",
              ddd,
-             ")%5D%5B(27.0):(51.0)%5D%5B(230.0):(247.0)%5D&.draw=surface&.vars=longitude%7Clatitude%7Cpotential_habitat_mask",
-             "&.colorBar=%7C%7C%7C%7C%7C&.bgColor=0xffccccff"))  
+             ")%5D%5B(27.0):1:(51.0)%5D%5B(230.0):1:(247.0)%5D,potential_habitat_mask%5B(",
+             ddd,
+             ")%5D%5B(27.0):1:(51.0)%5D%5B(230.0):1:(247.0)%5D,chlorophyll%5B(",
+             ddd, 
+             ")%5D%5B(27.0):1:(51.0)%5D%5B(230.0):1:(247.0)%5D,sst%5B(",
+             ddd,
+             ")%5D%5B(27.0):1:(51.0)%5D%5B(230.0):1:(247.0)%5D"))
     
     hab.temp <- read_csv(habURL, 
-                         col_names = c("datetime","lat","long","habitat_mask")) %>% 
-      filter(!is.nan(habitat_mask)) %>%  
+                         col_names = c("datetime","lat","long","habitat","habitat_mask","chla","sst")) %>% 
+      # filter(!is.nan(habitat_mask)) %>%  
       mutate(long = long-360,
              date = as.factor(date(datetime))) %>% 
       project_df(to = 3310)
@@ -81,7 +92,8 @@ if (survey.year >= 2021) {
   # Create map
   hab.map <- ggplot() + 
     facet_wrap(~date) +
-    geom_raster(data = hab.data, aes(long, lat, fill = factor(habitat_mask))) +
+    geom_raster(data = filter(hab.data, !is.nan(habitat_mask)), 
+                aes(long, lat, fill = factor(habitat_mask))) +
     geom_sf(data = countries, fill = "black", color = "gray30") +
     geom_sf(data = states, fill = "black", colour = "gray30") +
     scale_fill_manual(name = "Potential habitat",
