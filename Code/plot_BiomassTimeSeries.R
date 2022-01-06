@@ -1,6 +1,3 @@
-# library(odbc)
-# library(tidyverse)
-
 if (get.db) {
   # Configure ODBC connection to AST database ------------------------------------
   ast.con  <- dbConnect(odbc(), 
@@ -46,8 +43,9 @@ biomass.ts <- biomass.ts %>%
          season = case_when(
            month(date_start) < 6 ~ "Spring",
            TRUE ~ "Summer")) %>%
-  filter(season == "Summer", stratum == "All", !region %in% c("Offshore")) %>%
-  select(-season, -region, -stratum, -biomass_sd, -biomass_cv, -date_start, -group, -year) %>%
+  filter(stratum == "All", include_ts == TRUE) %>%
+  # filter(season == "Summer", stratum == "All", include_ts == TRUE) %>%
+  select(-season, -region, -stratum, -biomass_sd, -biomass_cv, -date_start, -group, -year, -include_ts) %>%
   group_by(survey, species, stock) %>% 
   summarise_all(list(sum)) %>% 
   left_join(biomass.ts.var) %>% 
@@ -81,7 +79,7 @@ biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0),
   geom_point() +
   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
   scale_colour_manual(name = 'Species',
-                    labels = c("Clupea pallasii", "Engraulis mordax", "Sardinops sagax",
+                    labels = c("Clupea pallasii", "Engraulis mordax-Central", "Sardinops sagax-Northern",
                                "Scomber japonicus", "Trachurus symmetricus"),
                     values = c(pac.herring.color, anchovy.color,  
                                sardine.color, pac.mack.color, jack.mack.color)) +
