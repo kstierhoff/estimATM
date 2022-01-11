@@ -23,7 +23,7 @@ if (survey.year >= 2021) {
   # work for all of the ATM surveys of CPS, but the code below will recreate the maps
   # as presented in the survey and biomass report Tech Memos from those surveys.
   
-  hab.date.all <- format(hab.date.all, "%Y-%m-%dT12:00:00Z")
+  hab.date.all <- format(ymd(hab.date.all), "%Y-%m-%dT12:00:00Z")
   
   if(exists("hab.data.all")) rm(hab.data.all)
   
@@ -56,11 +56,11 @@ if (survey.year >= 2021) {
   
   # Save habitat data
   dir_create(here("Data/Habitat"))
-  saveRDS(hab.data, file = here("Data/Habitat/habitat_data_all.rds"))
+  saveRDS(hab.data.all, file = here("Data/Habitat/habitat_data_all.rds"))
   
   # Get map bounds for setting map extent
   map.bounds <- nav.sf %>% 
-    st_bbox()
+    sf::st_bbox()
   
   # map.bounds <- hab.data %>% 
   #   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
@@ -76,8 +76,8 @@ if (survey.year >= 2021) {
     filter(subregion %in% c("Northern America","Central America"))
   
   # Read bathy contours shapefile 
-  bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
-    st_transform(4326) %>% 
+  bathy <- sf::st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+    sf::st_transform(4326) %>% 
     rename(Depth = Contour)
   
   # Create map
@@ -87,7 +87,7 @@ if (survey.year >= 2021) {
                 aes(long, lat, fill = factor(habitat_mask))) +
     geom_sf(data = countries, fill = "black", color = "gray30") +
     geom_sf(data = states, fill = "black", colour = "gray30") +
-    scale_fill_manual(name = "Potential habitat",
+    scale_fill_manual(name = bquote(atop('Potential', 'habitat')),
                       # breaks = c(1, 10, 20, 100),
                       values = c("blue","yellow","orange","red"), 
                       labels = c("Unsuitable","Bad","Good","Optimal"),
@@ -115,7 +115,8 @@ if (survey.year >= 2021) {
     geom_sf(data = countries, fill = "black", color = "gray30") +
     geom_sf(data = states, fill = "black", colour = "gray30") +
     cmocean::scale_fill_cmocean(name = "algae",
-                                "Chlorophyll-a (mg/m^3)") +
+                                labels = c(0,10, 20, 30),
+                                bquote(atop('Chorophyll a',~'(mg'~'m'^-3*')'))) +
     # Plot bathymetry contours
     # geom_sf(data = bathy, colour = "gray90") +
     # Format axes and titles
@@ -139,7 +140,7 @@ if (survey.year >= 2021) {
     geom_sf(data = countries, fill = "black", color = "gray30") +
     geom_sf(data = states, fill = "black", colour = "gray30") +
     cmocean::scale_fill_cmocean(name = "thermal",
-                                "SST (C)") +
+                                bquote(atop('SST',~'(C'^'o'~')'))) +
     # scale_fill_manual(name = "Potential habitat",
     #                   # breaks = c(1, 10, 20, 100),
     #                   values = c("blue","yellow","orange","red"), 
@@ -164,15 +165,15 @@ if (survey.year >= 2021) {
   # Save map
   ggsave(hab.map.all, 
          filename = here("Figs/fig_habitat_map_all.png"),
-         width = 8, height = 10)
+         width = 6, height = 6)
   
   ggsave(chl.map.all, 
          filename = here("Figs/fig_chla_map_all.png"),
-         width = 8, height = 10)
+         width = 6, height = 6)
   
   ggsave(sst.map.all, 
          filename = here("Figs/fig_sst_map_all.png"),
-         width = 8, height = 10)
+         width = 6, height = 6)
   
   # Combine all habitat variables
   anch.hab.grid <- plot_grid(hab.map.all, 
@@ -183,43 +184,6 @@ if (survey.year >= 2021) {
   
   # Save combo map
   ggsave(anch.hab.grid, filename = here("Figs/fig_habitat_map_anchovy.png"),
-         width = 24, height = 10)
+         width = 13, height = 6)
   
-} else {
-  # # Prior to 2021, habitat maps were created on the AST site and available for download
-  # # This code generates the URLs for those images based on the survey dates
-  # # downloads the images, and arranges them to create the final figure
-  # 
-  # # Format dates
-  # hab.dates <- format(hab.dates, "%Y%m%d")
-  # 
-  # # Create URLs for downloading downloading sardine potential habitat maps
-  # hab.url.start <- paste0("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
-  #                         hab.dates[1],"_Habitat.png")
-  # hab.url.mid1  <- paste0("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
-  #                         hab.dates[2],"_Habitat.png")
-  # hab.url.mid2  <- paste0("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
-  #                         hab.dates[3],"_Habitat.png")
-  # hab.url.end   <- paste0("http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat/images/",
-  #                         hab.dates[4],"_Habitat.png")
-  # 
-  # # Download sardine potential habitat map files
-  # download.file(hab.url.start, here("Figs/fig_habitat_start.png"), mode = "wb") 
-  # download.file(hab.url.mid1,  here("Figs/fig_habitat_mid1.png"), mode = "wb") 
-  # download.file(hab.url.mid2,  here("Figs/fig_habitat_mid2.png"), mode = "wb") 
-  # download.file(hab.url.end,   here("Figs/fig_habitat_end.png"), mode = "wb") 
-  # 
-  # # Create cowplot objects for map grid
-  # hab.start <- ggdraw() + draw_image(here("Figs/fig_habitat_start.png")) 
-  # hab.mid1  <- ggdraw() + draw_image(here("Figs/fig_habitat_mid1.png"))
-  # hab.mid2  <- ggdraw() + draw_image(here("Figs/fig_habitat_mid2.png"))
-  # hab.end   <- ggdraw() + draw_image(here("Figs/fig_habitat_end.png")) 
-  # 
-  # # Create final figure
-  # hab.map <- plot_grid(hab.start, hab.mid1, hab.mid2, hab.end, 
-  #                      nrow = 2, labels = c("a)","b)","c)","d)"))   
-  # 
-  # # Save final figure
-  # ggsave(hab.map, filename = here("Figs/fig_habitat_map.png"),
-  #        width = 8, height = 8)
-}
+} 

@@ -20,7 +20,7 @@ be.all.nse <- be.nse %>%
 
 # Summarise biomass for all regions included in the final estimates
 be.all.var <- be.all %>% 
-  # bind_rows(be.all.ns) %>% 
+  bind_rows(be.all.ns) %>%
   select(Species, Stock, biomass.sd) %>% 
   group_by(Species, Stock) %>%
   summarise(biomass.sd = sqrt(sum(biomass.sd^2)))
