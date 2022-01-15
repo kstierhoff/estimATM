@@ -105,7 +105,7 @@ if (survey.year >= 2021) {
     theme_bw() +
     theme(panel.spacing = unit(1, "lines"),
           strip.background.x = element_blank(),
-          strip.text.x = element_text(face = "bold"),
+          strip.text.x = element_blank(),
           legend.position="bottom")
   
   chl.map.all <- ggplot() + 
@@ -130,7 +130,7 @@ if (survey.year >= 2021) {
     theme_bw() +
     theme(panel.spacing = unit(1, "lines"),
           strip.background.x = element_blank(),
-          strip.text.x = element_text(face = "bold"),
+          strip.text.x = element_blank(),
           legend.position="bottom")
   
   sst.map.all <- ggplot() + 
@@ -159,7 +159,7 @@ if (survey.year >= 2021) {
     theme_bw() +
     theme(panel.spacing = unit(1, "lines"),
           strip.background.x = element_blank(),
-          strip.text.x = element_text(face = "bold"),
+          strip.text.x = element_blank(),
           legend.position="bottom")
   
   # Save map
@@ -176,9 +176,8 @@ if (survey.year >= 2021) {
          width = 6, height = 6)
   
   # Combine all habitat variables
-  anch.hab.grid <- plot_grid(hab.map.all, 
-                             chl.map.all,
-                             sst.map.all,
+  anch.hab.grid <- plot_grid(hab.map.all, chl.map.all, sst.map.all,
+                             labels = c("a)", "b)","c)"),
                              nrow = 1,
                              align = "hv")
   

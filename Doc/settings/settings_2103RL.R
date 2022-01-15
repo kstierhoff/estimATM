@@ -167,9 +167,9 @@ crs.geog <- 4326 # WGS84
 crs.proj <- 3310 # California Albers Equal Area
 
 # Default map height
-map.height <- 6
+map.height <- 5
 # Map height for specific regions; used in makeTransects
-map.height.region <- 6
+map.height.region <- 5
 
 # Leaflet tile options; set both to T if caching
 useCachedTile  <- F # Use cached tiles
