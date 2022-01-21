@@ -64,8 +64,8 @@ save.figs     <- T # Create new figures
 get.nav       <- T # Download Lasker nav data from ERDDAP
 get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
 get.nav.ns    <- T # Process data from nearshore vessels
-get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
-extract.bathy <- T # Extract bathymetry for each nav point
+get.bathy     <- F # Download ETOPO1 bathymetry data in the survey footprint
+extract.bathy <- F # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
@@ -437,7 +437,7 @@ if (exists("nav.ns")) {
     # Get nav depth and compute photoperiod
     nav.depth.ns <- get.depth(noaa.bathy, nav.ns$long, nav.ns$lat, locator = F, distance = T) %>%
       rename(long = lon) %>%
-      bind_cols(select(nav.ns, time, dist)) %>%
+      bind_cols(select(nav.ns, time, dist, vessel.name)) %>%
       mutate(dist.depth = c(0, diff(dist.km))) %>%
       filter(dist.depth < 100)  %>% # Remove distant points
       mutate(depth_bin = cut(depth, c(min(depth), -200, 0), include.lowest = T, labels = F),
@@ -470,14 +470,14 @@ if (exists("nav.ns")) {
   # Number of pings per km were estimated as ...
   nav.summ.ns <- nav.depth.ns %>% 
     filter(!is.nan(dist), !is.na(day_night)) %>% 
-    group_by(depth_bin, day_night) %>% 
+    group_by(vessel.name, depth_bin, day_night) %>% 
     summarise(
       dist_km  = round(sum(dist)),
       pings_ek = round(sum(pings))) %>% 
     ungroup() %>% 
     mutate(
       dist_nmi = round(dist_km * 0.539957)) %>% 
-    select(depth_bin:dist_km, dist_nmi, everything())
+    select(vessel.name, depth_bin:dist_km, dist_nmi, everything())
   
   # Write results to file
   write_csv(nav.summ.ns, paste0(here("Output"), "/", survey.name, "_LineKilometers_Nearshore", ".csv")) 
@@ -660,7 +660,8 @@ nasc.summ %>%
 if (exists("nav.summ.ns")) {
   nav.summ.ns %>% 
     adorn_totals() %>% 
-    rename(Depth            = depth_bin,
+    rename(Vessel           = vessel.name,
+           Depth            = depth_bin,
            Period           = day_night,
            "Distance (km)"  = dist_km,
            "Distance (nmi)" = dist_nmi,
