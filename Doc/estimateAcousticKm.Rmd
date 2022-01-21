@@ -15,7 +15,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf,
-               mapview,mapdata,photobiology,ggmap,knitr,bookdown,
+               mapview,mapdata,photobiology,ggmap,knitr,bookdown,tcltk,
                rnaturalearth,ggspatial,kableExtra,geosphere,janitor)
 
 # Install and load required packages from Github -------------------------------
@@ -62,9 +62,10 @@ source(here("Doc/settings", prj.settings))
 # Set processing controls -------------------------------------------------
 save.figs     <- T # Create new figures
 get.nav       <- T # Download Lasker nav data from ERDDAP
-get.nav.sd    <- T # Download Saildrone nav data from ERDDAP
-get.bathy     <- F # Download ETOPO1 bathymetry data in the survey footprint
-extract.bathy <- F # Extract bathymetry for each nav point
+get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
+get.nav.ns    <- T # Process data from nearshore vessels
+get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
+extract.bathy <- T # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
@@ -112,6 +113,94 @@ if (resize.map) {
     st_bbox()  
 }
 ```
+
+```{r process-nav-nearshore}
+if (get.nav.ns) {
+  # Get nearshore vessels
+  nav.vessels.ns <- c("LM","LBC")
+  
+  # Load existing nav data
+  if (get.nav) {
+    # Remove existing nav data
+    if (exists("nav.ns")) rm(nav.ns)
+    
+    for (i in nav.vessels.ns) {
+      if (dir_exists(file.path(here("Data/Backscatter", i)))) {
+        # List all CSV files
+        nav.files <- dir_ls(file.path(here("Data/Backscatter", i)),
+                            regexp = nasc.pattern.cps[i],
+                            ignore.case = TRUE)
+        
+        # Remove existing nav.vessel.ns
+        if (exists("nav.vessel.ns")) rm(nav.vessel.ns)
+        
+        # Create or load vessel nasc data
+        if (length(nav.files) > 0) {
+          # Configure progress bar
+          pb <- tkProgressBar("R Progress Bar", "CSV File Processing", 0, 100, 0)
+          
+          # Process all .CSV files
+          for (ii in seq_along(nav.files)) {
+            # Extract vessel nasc
+            nav.vessel.ns.temp <- extract_csv(nav.files[ii]) %>% 
+              mutate(vessel.name = i,
+                     sounder = sounder.type[i],
+                     transect = str_replace(transect, nasc.pattern.cps[i],""),
+                     dist = c(0,diff(dist_m))/1000)
+            
+            # Combine results
+            if (exists("nav.vessel.ns")) {
+              nav.vessel.ns <- bind_rows(nav.vessel.ns, nav.vessel.ns.temp)
+            } else {
+              nav.vessel.ns <- nav.vessel.ns.temp
+            }
+            
+            # Update the progress bar
+            pb.prog <- round(ii/length(nav.files)*100)
+            info <- sprintf("%d%% done", pb.prog)
+            setTkProgressBar(pb, pb.prog, sprintf("CSV processing - %s (%s)", i, info), info)
+          }
+          
+          # Close progress bar
+          close(pb)
+          
+          # Save/load nav.vessel.ns (for debugging)
+          saveRDS(nav.vessel.ns, 
+                  file = here("Data/Nav",  
+                              paste0("nav_vessel_", i, ".rds")))
+          
+          # Remove bad intervals
+          nav.vessel.ns <- nav.vessel.ns %>% 
+            filter(lat != 999, long != 999)
+          
+          # Save original transect name before modifying
+          # Convert date and time to POSIXct
+          nav.vessel.ns <- nav.vessel.ns %>% 
+            mutate(datetime      = ymd_hms(paste(date, time), tz = "UTC"))
+          
+          # Combine results from different vessels
+          if (exists("nav.ns")) {
+            nav.ns <- bind_rows(nav.ns, nav.vessel.ns)
+          } else {
+            nav.ns <- nav.vessel.ns
+          }
+        }
+      }  
+    }
+  }  
+  
+  # Convert saildrone nav to spatial
+  nav.ns.sf <- st_as_sf(nav.ns, coords = c("long","lat"), crs = crs.geog)
+  
+  #Save processed nav data
+  save(nav.ns, nav.ns.sf, file = here("Data/Nav/nav_data_nearshore.Rdata"))
+  
+} else {
+  # Load nav data
+  load(here("Data/Nav/nav_data_nearshore.Rdata"))
+}
+```
+
 
 ```{r process-nav-saildrone}
 if (get.nav.sd) {
@@ -302,11 +391,104 @@ nav.summ <- nav.depth %>%
 write_csv(nav.summ, paste0(here("Output"), "/", survey.name, "_LineKilometers_", survey.vessel, ".csv"))
 ```
 
+```{r summarize-results-ns}
+if (exists("nav.ns")) {
+  # Summarize nav by date and lat/long
+  nav.sun.ns <- nav.ns %>% 
+    mutate(date = date(datetime)) %>% 
+    group_by(date) %>% 
+    summarise(lat = mean(lat),
+              long = mean(long)) %>% 
+    as.data.frame() %>% 
+    filter(!is.na(date))
+  
+  # Get sunrise/sunset for each survey day
+  nav.daynight.ns <- data.frame()
+  
+  for (i in 1:nrow(nav.sun.ns)) {
+    tmp <- day_night(date = nav.sun.ns$date[i], 
+                     geocode = data.frame(lat = nav.sun.ns$lat[i], lon = nav.sun.ns$long[i]),
+                     twilight = survey.twilight)
+    
+    nav.daynight.ns <- bind_rows(nav.daynight.ns, tmp)
+  }
+  
+  # Format the results
+  nav.daynight.ns <- nav.daynight.ns %>% 
+    mutate(sunrise = ymd_hms(paste(day, hms::as_hms(sunrise*3600))) - minutes(survey.twilight.offset),
+           sunset  = sunrise + daylength*3600 + minutes(survey.twilight.offset),
+           sunrise = as.character(sunrise), # convert to character to work with gather()
+           sunset  = as.character(sunset)) %>% 
+    select(day, sunrise, sunset) %>% 
+    gather(period, time, -day) %>% 
+    mutate(time    = ymd_hms(time, tz = "UTC"), # convert back to POSIX
+           sun_key = as.character(time)) %>% 
+    arrange(time) %>% 
+    mutate(id = seq(1, nrow(.)))
+  
+  
+  # Process FSV data from ERDDAP
+  nav.ns <- nav.ns %>%
+    mutate(time = ymd_hms(datetime),
+           date = date(datetime)) %>%  # Distance in km, from speed in
+    filter(between(long, min.long, max.long), between(lat, min.lat, max.lat))
+  
+  if (extract.bathy) {
+    # Get nav depth and compute photoperiod
+    nav.depth.ns <- get.depth(noaa.bathy, nav.ns$long, nav.ns$lat, locator = F, distance = T) %>%
+      rename(long = lon) %>%
+      bind_cols(select(nav.ns, time, dist)) %>%
+      mutate(dist.depth = c(0, diff(dist.km))) %>%
+      filter(dist.depth < 100)  %>% # Remove distant points
+      mutate(depth_bin = cut(depth, c(min(depth), -200, 0), include.lowest = T, labels = F),
+             id = cut(as.numeric(time), as.numeric(nav.daynight.ns$time),
+                      include.lowest = T, labels = F),
+             depth_bin = case_when(
+               depth_bin == 1 ~ "Deep (>200 m)",
+               depth_bin == 2 ~ "Shallow (<200 m)")) %>%
+      filter(!is.na(depth_bin)) %>%
+      left_join(select(nav.daynight.ns, id, period)) %>%
+      mutate(day_night = case_when(
+        period == "sunrise" ~ "Day",
+        period == "sunset"  ~ "Night")) %>%
+      mutate(pings = case_when(
+        abs(depth) < 250              ~ 60*(750/abs(250)),
+        between(abs(depth), 250, 750) ~ 60*(750/abs(depth)),
+        abs(depth) > 750              ~ 60*(750/abs(750)))) %>% # Compute time interval
+      project_df(to = crs.proj) %>% 
+      arrange(desc(day_night), time)
+    
+    # Save results
+    save(nav.depth.ns, file = here("Output/nav_bathy_nearshore.Rdata"))
+    
+  } else {
+    # Load extracted bathymetry
+    load(here("Output/nav_bathy_nearshore.Rdata"))
+  }
+  
+  # Summarise distance by day/night and depth
+  # Number of pings per km were estimated as ...
+  nav.summ.ns <- nav.depth.ns %>% 
+    filter(!is.nan(dist), !is.na(day_night)) %>% 
+    group_by(depth_bin, day_night) %>% 
+    summarise(
+      dist_km  = round(sum(dist)),
+      pings_ek = round(sum(pings))) %>% 
+    ungroup() %>% 
+    mutate(
+      dist_nmi = round(dist_km * 0.539957)) %>% 
+    select(depth_bin:dist_km, dist_nmi, everything())
+  
+  # Write results to file
+  write_csv(nav.summ.ns, paste0(here("Output"), "/", survey.name, "_LineKilometers_Nearshore", ".csv")) 
+}
+```
+
 ```{r summarize-results-sd}
 if (exists("nav.sd")) {
   # Summarize NASC by date and lat/long
   nav.sun.sd <- nav.sd %>% 
-    mutate(date = date(datetime)) %>% 
+    mutate(date = date(time)) %>% 
     group_by(date) %>% 
     summarise(lat = mean(lat),
               long = mean(long)) %>% 
@@ -472,6 +654,28 @@ nasc.summ %>%
   row_spec(0, align = c("c"))
 ```
 
+### Nearshore
+
+```{r effort-summary-nearshore}
+if (exists("nav.summ.ns")) {
+  nav.summ.ns %>% 
+    adorn_totals() %>% 
+    rename(Depth            = depth_bin,
+           Period           = day_night,
+           "Distance (km)"  = dist_km,
+           "Distance (nmi)" = dist_nmi,
+           Pings            = pings_ek) %>%  
+    kable(format = knitr.format, booktabs = TRUE, escape = F,
+          align = c("c"),
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                  full_width = F) %>%
+    row_spec(0, align = c("c")) 
+} else {
+  print("No nearshore data.")
+}
+```
+
 ### Saildrone
 
 ```{r effort-summary-saildrone}
@@ -569,6 +773,52 @@ if (save.figs) {
 include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_", survey.vessel, ".png"))
 ```  
 
+### Nearshore
+
+```{r map-daynight-bathy-nearshore}
+if (save.figs) {
+  # Map Saildrone results by depth bin
+  if (exists("nav.depth.ns")) {
+    # Map Lasker results by depth bin
+    bathy.plot.ns <- base.map + 
+      geom_point(data = nav.depth.ns, aes(X, Y, colour = depth_bin), size = 0.5) +
+      scale_colour_manual(name = "Depth", values = c("#40C270","#1C1C8A")) +
+      theme(legend.position      = c(0,0),
+            legend.justification = c(0,0),
+            legend.background    = element_blank(),
+            legend.key           = element_blank()) +
+      ggtitle("Vessel nav by depth") 
+    
+    # Map results by day/night
+    daynight.plot.ns <- base.map + 
+      geom_point(data = nav.depth.ns, aes(X, Y, colour = day_night), size = 0.5) +
+      scale_colour_manual(name = "Time of day", values = c("#F09F43","#211D1D")) +
+      theme(legend.position      = c(0,0),
+            legend.justification = c(0,0),
+            legend.background    = element_blank(),
+            legend.key           = element_blank()) +
+      ggtitle("Vessel nav by day/night")
+    
+    # Combine plots
+    bathy.photo.plot.ns <- plot_grid(bathy.plot.ns, 
+                                     daynight.plot.ns, 
+                                     nrow = 1, align = "v")
+    
+    # Save combo plot
+    ggsave(bathy.photo.plot.ns, 
+           filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_day_nearshore.png"),
+           height = map.height, width = map.width*2)
+  }
+}
+
+if (file.exists(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_nearshore.png"))) {
+  include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_day_nearshore.png"))
+} else {
+  print("No nearshore data.")
+}
+
+```
+
 ### Saildrone
 
 ```{r map-daynight-bathy-saildrone}
@@ -638,6 +888,36 @@ if (save.figs) {
 }
 
 include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_", survey.vessel, ".png"))
+```
+
+### Nearshore
+
+```{r map-daytime-bathy-nearshore}
+if (exists("nav.depth.ns")) {
+  if (save.figs) {
+    # Map only daytime nav by depth
+    day.plot.ns <- base.map + 
+      geom_point(data = filter(nav.depth.ns, day_night == "Day"), 
+                 aes(X, Y, colour = depth_bin), size = 0.5) +
+      scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
+      theme(legend.position      = c(0,0),
+            legend.justification = c(0,0),
+            legend.background    = element_blank(),
+            legend.key           = element_blank()) +
+      ggtitle("Daytime vessel nav by depth")
+    
+    # Save daytime only plot
+    ggsave(day.plot.ns, 
+           filename = paste0(here("Figs"), "/", survey.name, "_nav_depth_nearshore.png"),
+           height = map.height, width = map.width)
+  }
+}  
+
+if (file.exists(paste0(here("Figs"), "/", survey.name, "_nav_depth_nearshore.png"))) {
+  include_graphics(paste0(here("Figs"), "/", survey.name, "_nav_depth_nearshore.png"))
+} else {
+  print("No nearshore data.")
+}  
 ```
 
 ### Saildrone
