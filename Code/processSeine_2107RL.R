@@ -62,35 +62,33 @@ lm.specimens <- read_csv(here("Data/Seine/lm_catch.csv"), lazy = FALSE) %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
-# lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>% 
-#   left_join(select(lbc.sets, date, set, key.set)) %>% 
-# mutate(
-#   totalLength_mm = case_when(
-#     scientificName == "Clupea pallasii" ~ 
-#       convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
-#     scientificName == "Engraulis mordax" ~ 
-#       convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
-#     scientificName == "Sardinops sagax" ~ 
-#       convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
-#     scientificName == "Scomber japonicus" ~ 
-#       convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
-#     scientificName == "Trachurus symmetricus" ~ 
-#       convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
-#     scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(alternateLength_mm))) %>% 
-# filter(scientificName %in% cps.spp, !is.na(set)) %>% 
-## Estimate missing weights from lengths -------------------------------------------------------
-#   mutate(
-#     weightg = case_when(
-#       is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
-#       TRUE  ~ weightg),
-#     totalLength_mm = case_when(
-#       is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
-#       TRUE ~ totalLength_mm),
-#     K = round((weightg/totalLength_mm*10^3)*100))
+lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
+  left_join(select(lbc.sets, date, set, key.set)) %>%
+  mutate(vessel.name = "LM",
+         label = paste("Date:", date, "Set:", set, "Fish num:", specimen_number),
+         totalLength_mm = case_when(
+           scientificName == "Clupea pallasii" ~
+             convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+           scientificName == "Engraulis mordax" ~
+             convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+           scientificName == "Sardinops sagax" ~
+             convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+           scientificName == "Scomber japonicus" ~
+             convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+           scientificName == "Trachurus symmetricus" ~
+             convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"))) %>%
+  filter(scientificName %in% cps.spp, !is.na(set)) %>%
+  # Estimate missing weights from lengths -------------------------------------------------------
+  mutate(
+    weightg = case_when(
+      is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
+      TRUE  ~ weightg),
+    totalLength_mm = case_when(
+      is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
+      TRUE ~ totalLength_mm),
+    K = round((weightg/totalLength_mm*10^3)*100))
 
-save(lm.specimens, file = here("Output/purse_seine_specimens.Rdata"))
-
-# save(lm.specimens, lbc.specimens, file = here("Output/purse_seine_specimens.Rdata"))
+save(lm.specimens, lbc.specimens, file = here("Output/purse_seine_specimens.Rdata"))
 
 # Summarize specimen data ------------------------------------------------
 lm.spec.summ <- lm.specimens %>%
@@ -101,24 +99,24 @@ lm.spec.summ <- lm.specimens %>%
   left_join(select(lm.sets, key.set, lat, long)) %>% 
   filter(!is.na(lat))
 
-# lbc.spec.summ <- lbc.specimens %>%
-#   group_by(key.set, vessel.name, scientificName) %>% 
-#   summarise(totalWeight = sum(weightg),
-#             totalCount  = n()) %>% 
-#   ungroup() %>% 
-#   left_join(select(lbc.sets, key.set, lat, long)) %>% 
-#   filter(!is.na(lat))
+lbc.spec.summ <- lbc.specimens %>%
+  group_by(key.set, vessel.name, scientificName) %>%
+  summarise(totalWeight = sum(weightg),
+            totalCount  = n()) %>%
+  ungroup() %>%
+  left_join(select(lbc.sets, key.set, lat, long)) %>%
+  filter(!is.na(lat))
 
 # Make specimen summaries spatial -----------------------------------------
 lm.spec.summ.sf <- lm.spec.summ %>% 
-  st_as_sf(coords = c("long","lat"), crs = 4326)
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
-# lbc.spec.summ.sf <- lbc.spec.summ %>% 
-#   st_as_sf(coords = c("long","lat"), crs = 4326)
+lbc.spec.summ.sf <- lbc.spec.summ %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Summarise catch by weight -----------------------------------------------
 set.summ.wt <- lm.spec.summ %>% 
-  # bind_rows(lbc.spec.summ) %>% 
+  bind_rows(lbc.spec.summ) %>%
   filter(vessel.name %in% seine.vessels) %>% 
   pivot_wider(names_from = scientificName, values_from = totalWeight) 
 
@@ -191,13 +189,13 @@ lm.lengths <- lm.specimens %>%
   select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>% 
   mutate(vessel.name = "LM")
 
-# lbc.lengths <- lbc.specimens %>% 
-#   select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>% 
-#   mutate(vessel.name = "LBC")
+lbc.lengths <- lbc.specimens %>%
+  select(key.set, scientificName, standardLength_mm, forkLength_mm, totalLength_mm, weightg) %>%
+  mutate(vessel.name = "LBC")
 
 # Combine data from all platforms and filter unwanted vessels
 lengths.seine <- lm.lengths %>% 
-  # bind_rows(lbc.lengths) %>% 
+  bind_rows(lbc.lengths) %>%
   filter(vessel.name %in% seine.vessels)
 
 # Estimate TS

@@ -2,7 +2,7 @@
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
 process.seine     <- T # Process purse seine data, if present
-process.nearshore <- T # Process near backscatter data
+process.nearshore <- F # Process near backscatter data
 estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed

@@ -363,10 +363,12 @@ if (save.figs) {
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
   nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, trawl.catch.plot.cluster.ns,
-                                        nrow = 1, labels = c("a)", "b)"))
+                                        nrow = 1, labels = c("a)", "b)"),
+                                        align = "hv")
   
   nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, trawl.catch.plot.haul.ns,
-                                     nrow = 1, labels = c("a)", "b)"))
+                                     nrow = 1, labels = c("a)", "b)"),
+                                     align = "hv")
   
   ggsave(nasc.trawl.cluster.wt.ns,
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
