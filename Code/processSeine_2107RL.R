@@ -149,6 +149,7 @@ set.summ.wt <- set.summ.wt %>%
   replace(is.na(.), 0)
 
 set.pie <- set.summ.wt %>% 
+  arrange(cluster) %>% 
   select(cluster, haul, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
   project_df(to = crs.proj) %>% 

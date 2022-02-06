@@ -22,7 +22,7 @@ editor_options:
   chunk_output_type: inline
 ---  
 
-```{r load-libraries-functions, error=FALSE, message=FALSE, warning=FALSE, echo=F}
+```{r load-libraries-functions, error=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
 
@@ -91,9 +91,9 @@ source(here("Doc/settings", prj.settings))
 get.db            <- F # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
-process.csv       <- F # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+copy.files        <- T # Copy data files to local directory 
+process.csv       <- T # Process Echoview files
+save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
@@ -104,8 +104,8 @@ do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- F # Process krill backscatter data
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.krill <- T # Process krill backscatter data
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
@@ -113,7 +113,6 @@ match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
-
 
 ```{r create-dirs}
 dir_create(here(), c("Code","Data", "Doc", "Figs", "Images", "Output", "References", "Simulation"))
@@ -148,7 +147,7 @@ To more easily configure processing for different surveys and distribute updated
 
 Files are copied locally for processing to avoid slow results when working across the network (especially from remote locations or at sea). Controls in the User Settings section (above) determine whether files are copied locally (usually `TRUE` during the first run) and whether files are overwritten. If files are known to have changed, set `overwrite.files <- TRUE` to overwrite files already present, else files already present will be skipped and only new files copied to the local directory. If files have not changed, set `copy.files <- FALSE` to speed processing (`overwrite.files` will be ignored and may be left set to `TRUE`).
 
-```{r copy-files,include=F}
+```{r copy-files,include=FALSE}
 # Copy bibliography and CSL files -------------------------------------------------------
 if (copy.bib) {
   file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
@@ -415,7 +414,7 @@ if (get.nav.sd) {
 }
 ```
 
-```{r configure-base-map,include=F}
+```{r configure-base-map,include=FALSE}
 # Get map data -------------------------------
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
@@ -468,10 +467,19 @@ if (resize.map) {
     st_transform(crs = crs.proj) %>%
     st_bbox() 
 } else {
-  # Use nav data to resize map to survey progress
-  map.bounds <- transects.sf %>%
-    st_transform(crs = crs.proj) %>%
-    st_bbox()  
+  if (survey.name %in% c("2107RL")) {
+    # Use planned transects, except those in Mexico
+    map.bounds <- transects.sf %>%
+      filter(Region != "Mexico") %>% 
+      st_transform(crs = crs.proj) %>%
+      st_bbox()
+  } else {
+    # Use planned transects
+    map.bounds <- transects.sf %>%
+      st_transform(crs = crs.proj) %>%
+      st_bbox()
+  }
+  
 }
 
 # Determine map aspect ratio and set height and width
@@ -568,7 +576,7 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 # Process backscatter data
 ## Read and summarize CSV files from Echoview  
 
-For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else NASC down to 50 m depth (NASC.50) is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned.
+For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else `r nasc.depth.cps`` is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned.
 
 ```{r process-backscatter}
 if (process.csv) {
@@ -702,6 +710,10 @@ if (process.csv) {
       }
       
       # Remove offshore transects data
+      # If proper offshore sampling was conducted, biomass will be estimated
+      # in later steps. If offshore biomass is to be included in the final
+      # estimates, combine.regions == TRUE and "Offshore" should be included in
+      # estimate.regions
       if (rm.offshore[i]) {
         # Filter based on offshore pattern
         nasc.offshore <- nasc.vessel %>% 
@@ -738,6 +750,10 @@ if (process.csv) {
       }
       
       # Remove nearshore transects data
+      # If proper nearshore sampling was conducted, biomass will be estimated
+      # in later steps. If nearshore biomass is to be included in the final
+      # estimates, combine.regions == TRUE and "Nearshore" should be included in
+      # estimate.regions
       if (rm.nearshore[i]) {
         nasc.nearshore <- nasc.vessel %>% 
           filter(str_detect(transect.orig, nasc.pattern.nearshore[i]) |
@@ -760,7 +776,13 @@ if (process.csv) {
         group_by(transect) %>% 
         summarise(L = length(Interval)/10*0.539957) %>%
         arrange(L) %>% 
-        filter(L > min.tx.length[i]) 
+        filter(L > min.tx.length[i])
+      
+      tx.short <- nasc.vessel %>% 
+        group_by(transect) %>% 
+        summarise(L = length(Interval)/10*0.539957) %>%
+        arrange(L) %>% 
+        filter(L <= min.tx.length[i])
       
       # Remove backscatter data from short transects
       nasc.vessel <- nasc.vessel %>% 
@@ -831,7 +853,7 @@ if (process.csv) {
               left_join(select(cps.nasc.temp, time.align, cps.nasc))  
           }
         } else {
-          # Use cps.NASC extractdd using extract_cps_nasc.R
+          # Use cps.NASC extracted using extract_cps_nasc.R
           if ("cps.NASC" %in% colnames(nasc.vessel)) {
             nasc.vessel$cps.nasc <- nasc.vessel$cps.NASC
           } else {
@@ -874,6 +896,14 @@ if (process.csv) {
   
 } else {
   load(here("Data/Backscatter/nasc_all.Rdata"))
+}
+
+# Combine nasc data for all NASC vessels
+if (!is.na(merge.vessels["Core"])) {
+  if (merge.vessels["Core"]) {
+    nasc <- nasc %>% 
+      mutate(vessel.name = survey.vessel.primary)
+  }
 }
 
 # Determine transect order by min latitude/longitude
@@ -967,7 +997,7 @@ save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
 
 ## Compare CPS backscatter (cps.nasc) to NASC.70
 
-For each vessel, plot the backscatter from the CTD.app (`cps.NASC`, or equivalent) to backscatter from the default fixed integration depth (`NASC.70`).
+For each vessel, plot the backscatter from the CTD.app (`cps.nasc`, or equivalent) to backscatter from the default fixed integration depth (`NASC.250`).
 
 ```{r compare-cps-nasc}
 # Compare cps.nasc to NASC.70
@@ -1325,7 +1355,7 @@ include_graphics(here("Figs/fig_nasc_summary_map_tx.png"))
 
 Trawl haul, catch, and length (both individual and binned lengths of CPS) data are imported from either an Access (at sea, generally) or SQL Server database (after the survey). To import from the SQL Server, a machine ODBC connection must be configured to the TRAWL and CUFES databases on the Estrella server (IP address: 161.55.235.187). For help configuring an ODBC connection, contact [Thanh Vu](Thanh.Vu@NOAA.gov) at the SWFSC. To request access to the Trawl database, contact [Yuhong Gu](Yuhong.Gu@NOAA.gov).  
 
-```{r import-trawl-data, include=F}
+```{r import-trawl-data, include=FALSE}
 if (get.db) {
   if (trawl.source == "SQL") {
     # Configure ODBC connection to TRAWL database
@@ -1440,6 +1470,8 @@ haul <- haul.all %>%
          stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
          trawlPerformance, season, notes) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
+  # Manually remove hauls
+  filter(!haul %in% haul.rm) %>% 
   # Calculate haul duration
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins")) %>% 
   # Remove bad trawls
@@ -1584,7 +1616,7 @@ catch <- catch.all %>%
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-  left_join(select(haul, haul, cluster)) %>% 
+  inner_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName))
 
 # Save haul data
@@ -1600,7 +1632,8 @@ if (survey.name %in% c("2107RL")) {
     left_join(spp.codes) %>% 
     mutate(key = paste(haul, scientificName)) %>% 
     # Get specimens with missing weights
-    filter(key %in% unique(catch.weight.missing$key)) %>% 
+    filter(key %in% unique(catch.weight.missing$key),
+           cruise == 202107) %>% 
     # Convert native length to total length, which us used to estimate weight
     mutate(
       totalLength_mm = case_when(
@@ -2230,7 +2263,8 @@ lengths.all <- lengths.all %>%
 lengths <- lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") 
+           scientificName %in% cps.spp & toupper(isRandomSample) == "Y") %>% 
+  filter(!haul %in% haul.rm)
 
 # Save final length data frames
 save(lengths.all, lengths, lw.df,
@@ -2813,7 +2847,7 @@ sigma.plot <- ggplot(lengths, aes(1/sigma.wg,1/sigma.ind*estimated.wg)) +
   ylab("1/sigma.ind*estimated.wg\n") +
   theme_bw() +  
   theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "italic"))
+        strip.text.x       = element_text(face = "italic"))      
 # save TS plot
 ggsave(sigma.plot,
        filename = here("Figs/fig_sigma_plots.png"), 
@@ -3934,7 +3968,7 @@ View results of strata definition algorithm compated to transect spacing, biomas
 # Create data frame with relevant landmarks
 landmarks <- data.frame(
   name = c("Pt. Conception", "Cape Mendocino", "Cape Flattery"),
-  lat.start = c(34.7, 40.430520, 48.490),
+  lat.start = c(stock.break.sar, stock.break.anch, 48.490),
   y = rep(0,3)) %>% 
   filter(lat.start > min(nasc.density$lat),
          lat.start < max(nasc.density$lat))
@@ -7447,9 +7481,13 @@ for (i in unique(strata.final$scientificName)) {
   
   
   # Save plot
+  # ggsave(lf.summ.plot, 
+  #        filename = paste0(here("Figs/fig_cluster_relative_length_frequency_"), i, ".png"),
+  #        height = 10*a.ratio, width = 10) 
+  
   ggsave(lf.summ.plot, 
          filename = paste0(here("Figs/fig_cluster_relative_length_frequency_"), i, ".png"),
-         height = 10*a.ratio, width = 10) 
+         height = 11, width = 8) 
   
   # Add new plot to list
   lf.summ.plots[[i]] <- lf.summ.plot

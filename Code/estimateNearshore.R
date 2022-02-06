@@ -34,12 +34,12 @@ if (process.nearshore) {
   # Combine nasc data for all NASC vessels
   if (merge.vessels["NS"]) {
     nasc.nearshore <- nasc.nearshore %>% 
-      mutate(vessel.name = "RL")
+      mutate(vessel.name = survey.vessel.primary)
   } else {
     nasc.nearshore <- nasc.nearshore %>% 
       mutate(vessel.orig = vessel.name)
   }
-  
+
   # Export data for processing using the CTD app
   write_csv(nasc.nearshore, here("Output/CTDapp/CTDapp_All_Nearshore.csv"))
   save(nasc.nearshore, file = here("Output/CTDapp/CTDapp_All_Nearshore.Rdata"))
@@ -409,7 +409,7 @@ nasc.summ.ns <- nasc.nearshore %>%
 
 save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 
-# Apportion offshore backscatter ------------------------------------------
+# Apportion nearshore backscatter ------------------------------------------
 # If enforcing max cluster distance, set proportions for each species to zero
 # where cluster.distance > max.cluster.dist
 if (limit.cluster.dist["NS"]) {
@@ -654,6 +654,8 @@ for (v in unique(nasc.nearshore$vessel.name)) {
     filter(vessel.name == v) %>%  
     left_join(select(region.wpts, transect, region = Region)) %>% 
     mutate(key = paste(vessel.name, region))
+  
+  # ggplot(nasc.region.temp, aes(long, lat, colour = region)) + geom_point() + coord_map()
   
   # For each region, draw strata polygon using NASC intervals or deepest waypoints
   for (k in unique(nasc.region.temp$key)) {
@@ -1016,7 +1018,8 @@ strata.final.ns <- strata.final.ns %>%
 #   theme_bw()
 
 # Ungroup tx.ends so it joins properly with strata.points.ns  
-tx.ends.ns <- ungroup(tx.ends.ns)
+tx.ends.ns <- ungroup(tx.ends.ns) %>% 
+  arrange(transect.name)
 
 if (stock.break.source == "primary") {
   strata.points.ns <- strata.points.ns %>% 
@@ -1082,15 +1085,27 @@ for (i in unique(nearshore.spp$scientificName)) {
                  TRUE ~ region)) %>% 
         ungroup()
       
-      # ggplot() + 
-      #   geom_line(data = filter(primary.poly.temp, transect == 1), 
-      #             aes(long, lat, group = transect, colour = factor(transect))) +
-      #   geom_text(data = filter(primary.poly.temp, transect == 1), 
-      #             aes(long, lat, group = transect, colour = factor(transect), label = order))
-      
       # Remove vessel name from nearshore region name
       poly.region <- str_replace(unique(primary.poly.temp$region), paste0(j, " "), "")
       
+      # In 2107RL, there was no gap in transect numbering between the various islands
+      # When stratification is done, it selects one transect on either side, which sometimes
+      # results in the addition of a transect from a neighboring island.
+      # In such cases, compute the total transects from each region, and select only the 
+      # info from the region with the most transects (should be the region of interest).
+      if (n_distinct(primary.poly.temp$Region) > 1) {
+        keep.region <- primary.poly.temp %>% 
+          group_by(Region) %>% 
+          tally() %>% 
+          slice(which.max(n)) 
+        
+        # Keep only matching polygons
+        primary.poly.temp <- primary.poly.temp %>% 
+          filter(Region %in% keep.region)
+        
+        poly.region <- poly.region[grep(keep.region$Region, poly.region)]
+      }
+
       # ggplot(primary.poly.temp, aes(long, lat, group = region, colour = region)) + geom_polygon() + coord_map()
       
       if (str_detect(poly.region, "Island")) {
@@ -1239,6 +1254,8 @@ for (i in unique(nearshore.spp$scientificName)) {
         }
       }
       
+      # ggplot(primary.poly.k) + geom_sf()
+      
       # Combine with other polygons ----------------------------------------
       if (exists("strata.nearshore")) {
         strata.nearshore <- rbind(strata.nearshore, primary.poly.k)
@@ -1253,8 +1270,8 @@ for (i in unique(nearshore.spp$scientificName)) {
 #   geom_sf() +
 #   facet_wrap(~scientificName) +
 #   theme_bw()
-# 
-# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum")
+
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + mapview(filter(transects.sf, Type == "Nearshore"))
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
@@ -1303,14 +1320,15 @@ nasc.stock.ns <- nasc.stock.ns %>%
 #   geom_sf() +
 #   facet_wrap(~scientificName) +
 #   theme_bw()
-
-# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum")
+# 
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + 
+#   mapview(filter(transects.sf, Type == "Nearshore"))
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
 
-# Clip primary polygons using the 5 m isobathy polygon -------------------------
+# Clip primary polygons using the 5 m isobath polygon -------------------------
 # Summarize strata transects
 strata.summ.ns <- strata.final.ns %>% 
   left_join(nasc.stock.ns) %>% 

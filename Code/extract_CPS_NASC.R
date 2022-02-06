@@ -14,7 +14,7 @@ source(here::here("Code/estimate_CPS_NASC.R"))
 
 # Configure input and output paths
 path.in  <- here("Data/Backscatter/RL")
-path.out <- path.in
+path.out <- "C:/SURVEY/2107RL/PROCESSED/EV/CSV/LASKER"
 
 # List CSV files (this is just for viewing the files; it's not used in the code)
 list.files(path = path.in, pattern = "CPS-Final 38 kHz CPS.csv", recursive = FALSE)
@@ -26,18 +26,16 @@ estimate.cps.nasc(path.input = path.in,
                   expand.right = F,
                   expand.left = F,
                   expansion = 4, max.range = 350, root = 2,  scaling = 0.5)
-2 # here
-1
-0
+
 # Close both graphics devices
 dev.off()
 dev.off()
-dev.off()
-dev.off()
-dev.off()
-dev.off()
-dev.off()
-dev.off()
-dev.off()
-dev.off()
+# dev.off()
+# dev.off()
+# dev.off()
+# dev.off()
+# dev.off()
+# dev.off()
+# dev.off()
+# dev.off()
 

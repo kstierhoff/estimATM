@@ -2,7 +2,7 @@
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
 process.seine     <- T # Process purse seine data, if present
-process.nearshore <- F # Process near backscatter data
+process.nearshore <- T # Process near backscatter data; typically TRUE
 estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
@@ -271,8 +271,8 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL","LBC","LM") 
-nasc.vessels.offshore  <- NA_character_
+nasc.vessels           <- c("RL","LBC","LM","SD") 
+nasc.vessels.offshore  <- c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
 
@@ -291,7 +291,8 @@ use.seine.data         <- TRUE
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata?
-merge.vessels <- c(OS = FALSE,
+merge.vessels <- c(Core = TRUE,
+                   OS = FALSE,
                    NS = FALSE)
 
 # Combine data from all regions?
@@ -330,33 +331,40 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             SD  = "PROCESSED/EV/CSV/SAILDRONE") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "CPS.csv",
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
-                            LBC = "Final 38 kHz CPS.csv")
+                            LBC = "Final 38 kHz CPS.csv",
+                            SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
                             LM  = "*Krill-Juan Krill Final 120.csv",
-                            LBC = "*Krill-Juan Krill Final 120.csv")
+                            LBC = "*Krill-Juan Krill Final 120.csv",
+                            SD  = "*Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
-                            LBC = "\\d{3}N")
+                            LBC = "\\d{3}N",
+                            SD  = "\\d{3}N")
 # Regex pattern for identifying offshore transects
 nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
                             LM  = "\\d{3}O",
-                            LBC = "\\d{3}O")
+                            LBC = "\\d{3}O",
+                            SD  = "\\d{3}O")
 # Regex pattern for identifying offshore transects
 nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
                             LM  = "\\d{3}I",
-                            LBC = "\\d{3}I")
+                            LBC = "\\d{3}I",
+                            SD  = "\\d{3}I")
 # Regex pattern for identifying transits
 nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LM  = "\\d{3}T",
-                            LBC = "\\d{3}T")
+                            LBC = "\\d{3}T",
+                            SD  = "\\d{3}T")
 # Recursively search NASC directories
-nasc.recurse           <- c(RL  = TRUE,
-                            LM  = TRUE,
-                            LBC = TRUE)
+nasc.recurse           <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            LBC = FALSE,
+                            SD  = TRUE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
@@ -364,6 +372,7 @@ nasc.max               <- NA
 source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
+                            SD  = FALSE,
                             NS  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
@@ -377,57 +386,71 @@ tx.char.pattern        <- c(RL  = "[^0-9]",
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
                             LM  = FALSE,
-                            LBC = FALSE) 
+                            LBC = FALSE,
+                            SD  = TRUE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
 strip.tx.chars         <- c(RL  = FALSE,
                             LM  = FALSE,
-                            LBC = FALSE) 
+                            LBC = FALSE,
+                            SD  = FALSE) 
 
 # If T, removes transects with names including "transit"
 rm.transit             <- c(RL  = FALSE,
                             LM  = FALSE,
-                            LBC = FALSE)  
+                            LBC = FALSE,
+                            SD  = FALSE)  
 
 # If T, removes transects with names including "offshore"
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
-                            LBC = TRUE) 
+                            LBC = TRUE,
+                            SD  = TRUE) 
 
 # If T, removes transects with names including "inshore"
 rm.inshore             <- c(RL  = TRUE,
                             LM  = TRUE,
-                            LBC = TRUE)
+                            LBC = TRUE,
+                            SD  = TRUE)
 
 # If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL  = TRUE,
                             LM  = TRUE,
-                            LBC = TRUE) 
+                            LBC = TRUE,
+                            SD  = TRUE) 
 
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
                             LM  = FALSE,
-                            LBC = FALSE) 
+                            LBC = FALSE,
+                            SD  = FALSE) 
 
 # regex for matching number pattern
 tx.num.pattern         <- c(RL  = "-\\d{1}",
                             LM  = "-\\d{1}",
-                            LBC = "-\\d{1}")
+                            LBC = "-\\d{1}",
+                            SD  = "-\\d{1}")
 
 # Use transect names for transect numbers
 use.tx.number          <- c(RL  = TRUE,
                             LM  = TRUE,
-                            LBC = TRUE)
+                            LBC = TRUE,
+                            SD  = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-tx.rm                  <- list(RL  = c("4142","2627"),
+# Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
+# but will ultimately be included in a joint analysis
+tx.rm                  <- list(RL  = c("4142","2627","018","019","020","021","022","023","024",
+                                       "025","026","027","028","029","030","031"),
                                LM  = NA,
-                               LBC = NA)
+                               LBC = NA,
+                               SD  = c("109"))
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 25,
+min.tx.length          <- c(RL  = 15,
                             LM  = 1,
-                            LBC = 1)
+                            LBC = 1,
+                            SD  = 1)
 
 # Enforce nearest trawl cluster distance limits?
 limit.cluster.dist     <- c(OS  = FALSE,
@@ -437,6 +460,18 @@ limit.cluster.dist     <- c(OS  = FALSE,
 # Uses either haul or cluster data for a given region (NS or OS)
 cluster.source <- c(OS = "cluster",
                     NS = "haul")
+
+# Manually exclude hauls from the analysis
+# List hauls, else NA
+
+# In 2107RL, Lasker returned to the coast of OR to conduct extended transects
+# prior to returning to Mexico. The trawls that were conducted there should
+# not be used to characterize backscatter collected much earlier during Leg 2.
+
+# Furthermore, hauls in Mexico were removed for this analysis, but may be 
+# included in a joint analysis later
+haul.rm <- c(104:109, # Off Oregon
+             110:127) # In Mexico
 
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
@@ -494,14 +529,10 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 5 # 1000 during final
+boot.num <- 500 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
-
-# Estimate biomass in nearshore and offshore strata
-estimate.nearshore <- FALSE
-estimate.offshore  <- FALSE
 
 # Define regions to present in main Results
 estimate.regions   <- c("Core", "Nearshore")
@@ -513,8 +544,8 @@ max.diff <- 3
 nTx.min <- 2
 
 # Stratum pruning settings
-nIndiv.min    <- 10
-nClusters.min <- 3
+nIndiv.min    <- 1
+nClusters.min <- 1
 
 # Use manually defined strata?
 stratify.manually    <- TRUE
@@ -535,35 +566,27 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 3,
-    transect = 69:79),
+    transect = 70:78),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 4,
-    transect = 81:84),
+    transect = 82:88),
   data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 1,
-    transect = 1:13),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 2,
-    transect = 14:26),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 3,
-    transect = 27:40),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 4,
-    transect = 41:51),
-  data.frame(
-    scientificName = "Engraulis mordax", 
+    scientificName = "Clupea pallasii", 
     stratum = 5,
-    transect = 52:59),
+    transect = 94:99),
   data.frame(
     scientificName = "Engraulis mordax", 
-    stratum = 6,
-    transect = 70:79),
+    stratum = 1,
+    transect = 1:51),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 2,
+    transect = 52:58),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 72:88),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
@@ -571,11 +594,11 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 14:26),
+    transect = 14:20),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 27:35),
+    transect = 23:28),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
@@ -583,55 +606,34 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 5,
-    transect = 65:68),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 6,
-    transect = 69:77),
+    transect = 66:84),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 1:13),
+    transect = 1:14),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 14:26),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 3,
     transect = 41:46),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 4,
-    transect = 58:68),
+    stratum = 3,
+    transect = 58:71),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 5,
-    transect = 74:77),
+    stratum = 4,
+    transect = 79:83),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:13),
+    transect = 1:35),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 14:26),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 3,
-    transect = 27:38),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 4,
-    transect = 47:68),
-  data.frame(
-    scientificName = "Trachurus symmetricus", 
-    stratum = 5,
-    transect = 69:83)
-)
+    transect = 41:97))
 
 # Stock boundaries --------------------------------------------------------
-stock.break.anch <- 40.46 # Latitude of Cape Mendocino
+stock.break.anch <- 40.50 # Latitude of Cape Mendocino
 stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
 # Transects used to define stock boundaries (primary or other)
 

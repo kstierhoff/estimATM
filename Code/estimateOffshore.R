@@ -30,7 +30,7 @@ if (process.offshore) {
   # Combine nasc data for all NASC vessels
   if (merge.vessels["OS"]) {
     nasc.offshore <- nasc.offshore %>% 
-      mutate(vessel.name = "RL")
+      mutate(vessel.name = survey.vessel.primary)
   } else {
     nasc.offshore <- nasc.offshore %>% 
       mutate(vessel.orig = vessel.name)
