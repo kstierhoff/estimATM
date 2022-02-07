@@ -1661,7 +1661,10 @@ pe.ns <- point.estimates.ns %>%
   bind_rows(point.estimates.ns) %>%
   mutate(area = area * 2.915533e-07) %>%
   arrange(scientificName, stock, stratum) %>%
-  replace_na(list(stratum = "All", vessel.name = "All")) %>%
+  replace_na(list(vessel.name = "All")) %>%
+  mutate(stratum = case_when(
+    is.na(stratum) ~ "All",
+    TRUE ~  as.character(stratum))) %>% 
   select(Species = scientificName, Stock = stock, Vessel = vessel.name, 
          Stratum = stratum, Area = area, biomass.mean.point = biomass.total)
 
@@ -2042,7 +2045,10 @@ save(be.survey.ns, file = here("Output/biomass_bootstrap_estimates_survey_ns.Rda
 be.ns <- be.stratum.ns %>% 
   bind_rows(be.survey.ns) %>% 
   arrange(Species, Stock, Stratum) %>% 
-  replace_na(list(Stratum = "All", pct.tot.B = 100)) %>%
+  replace_na(list(pct.tot.B = 100)) %>%
+  mutate(Stratum = case_when(
+    is.na(Stratum) ~ "All",
+    TRUE ~  as.character(Stratum))) %>% 
   left_join(select(pe.ns, -Area)) %>%
   rename(Biomass = biomass.mean.point) %>% 
   mutate(biomass.cv = (biomass.sd / Biomass)*100) %>% 

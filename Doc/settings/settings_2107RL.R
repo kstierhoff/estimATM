@@ -334,7 +334,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
-                            SD  = "Final 38 kHz CPS.csv")
+                            SD  = "Final 38 kHz CPS*.*csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
                             LM  = "*Krill-Juan Krill Final 120.csv",
@@ -529,7 +529,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 500 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -633,8 +633,10 @@ strata.manual <- bind_rows(
     transect = 41:97))
 
 # Stock boundaries --------------------------------------------------------
-stock.break.anch <- 40.50 # Latitude of Cape Mendocino
-stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
+stock.break.anch <- 40.50  # Latitude of Cape Mendocino
+stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
+# stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
+
 # Transects used to define stock boundaries (primary or other)
 
 # Used in estimateOffshore, where stock break using offshore transect ends is ambiguous

@@ -1175,7 +1175,9 @@ pe.os <- point.estimates.offshore %>%
   bind_rows(point.estimates.offshore) %>%
   mutate(area = area * 2.915533e-07) %>%
   arrange(scientificName, stock, stratum) %>%
-  replace_na(list(stratum = "All")) %>%
+  mutate(stratum = case_when(
+    is.na(stratum) ~ "All",
+    TRUE ~  as.character(stratum))) %>% 
   select(scientificName, stock, stratum, area, biomass.total) %>%
   rename(
     Species            = scientificName,
@@ -1495,7 +1497,10 @@ save(be.survey.os, file = here("Output/biomass_bootstrap_estimates_survey_os.Rda
 be.os <- be.stratum.os %>% 
   bind_rows(be.survey.os) %>% 
   arrange(Species, Stock, Stratum) %>% 
-  replace_na(list(Stratum = "All", pct.tot.B = 100)) %>%
+  replace_na(list(pct.tot.B = 100)) %>%
+  mutate(Stratum = case_when(
+    is.na(Stratum) ~ "All",
+    TRUE ~  as.character(Stratum))) %>% 
   left_join(select(pe.os, -Area)) %>%
   rename(Biomass = biomass.mean.point) %>% 
   mutate(biomass.cv = (biomass.sd / Biomass)*100) %>% 
