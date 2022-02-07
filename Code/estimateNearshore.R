@@ -1950,6 +1950,7 @@ L.abund.table.ns <- abund.summ.ns %>%
 
 # Save results
 save(L.abund.table.ns, abund.summ.ns, file = here("Output/abundance_table_all_ns.Rdata"))
+write_csv(abund.summ.ns, here("Output/abundance_table_all_ns.csv"))
 
 # Add stock designations to bootstrap estimates
 bootstrap.estimates.ns <- bootstrap.estimates.ns %>% 

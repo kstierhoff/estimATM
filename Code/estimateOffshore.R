@@ -1404,6 +1404,7 @@ L.abund.table.os <- abund.summ.os %>%
 
 # Save results
 save(L.abund.table.os, abund.summ.os, file = here("Output/abundance_table_all_os.Rdata"))
+write_csv(abund.summ.os, here("Output/abundance_table_all_os.csv"))
 
 # Add stock designations to bootstrap estimates
 bootstrap.estimates.os <- bootstrap.estimates.os %>% 
