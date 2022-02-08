@@ -1385,7 +1385,7 @@ abund.summ.os <- abundance.estimates.os %>%
 # CURRENTLY USING ESTIMATED.WG ESTIMATED FROM TOTAL LENGTH
 # MUST UPDATE TO USE ESTIMATED.WG FROM STANDARD LENGTH
 abund.summ.os <- abund.summ.os %>% 
-  mutate(estimated.wg = estimate_ts(Species, TL)$estimated.wg,
+  mutate(estimated.wg = estimate_ts(Species, TL, units = "cm")$estimated.wg,
          biomass      = abundance * estimated.wg,
          Region       = "Offshore")
 
