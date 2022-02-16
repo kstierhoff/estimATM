@@ -34,7 +34,7 @@ renumber.transects <- FALSE # Renumber transects to start at zero if transect ar
 rm.location <- NA # c("mexico")
 
 # Randomize
-do.random <- TRUE
+do.random <- FALSE
 save.csv  <- TRUE
 show.maps <- TRUE
 

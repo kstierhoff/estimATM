@@ -31,6 +31,7 @@ rm.location <- NA # c("mexico")
 # Randomize
 do.random <- FALSE
 save.csv  <- TRUE
+show.maps <- TRUE
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
