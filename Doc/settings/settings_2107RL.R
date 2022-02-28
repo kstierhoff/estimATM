@@ -635,6 +635,13 @@ strata.manual <- bind_rows(
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino
 stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
+
+stock.break.anch.ns <- stock.break.anch # Latitude of Cape Mendocino
+stock.break.sar.ns  <- stock.break.sar # Latitude of San Francisco, based on differences in length dist.
+
+stock.break.anch.os <- stock.break.anch # Latitude of Cape Mendocino
+stock.break.sar.os  <- stock.break.sar # Latitude of San Francisco, based on differences in length dist.
+
 # stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
 
 # Transects used to define stock boundaries (primary or other)
