@@ -65,6 +65,8 @@ if (get.nav) {
   # Save results
   save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
 } else {
-  # Load nav data
-  load(here("Data/Nav/nav_data.Rdata"))
+  if (exists(here("Data/Nav/nav_data.Rdata"))) {
+    # Load nav data
+    load(here("Data/Nav/nav_data.Rdata")) 
+  }
 }

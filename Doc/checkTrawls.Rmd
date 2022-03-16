@@ -52,11 +52,14 @@ settings.files <- dir(here("Doc/settings"))
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
+
+# Create required directories
+dir_create(here(c("Figs", "Output")))
 ```
 
 ```{r user-settings}
 # User-specified settings
-get.nav <- T # Download vessel nav from ERDDAP
+get.nav <- F # Download vessel nav from ERDDAP
 get.db  <- T # Extract data from trawl database (F for testing)
 ```
 
@@ -111,58 +114,31 @@ if (get.db) {
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
-  if (year(haul.all$trawlDate[1]) >= 2021) {
-    haul.all <- haul.all %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-        haulBackTime     = haulbackTime,
-        equilibriumTime  = EquilibriumTime) %>%
-      rename(cruise = Cruise, ship = Ship, haul = Haul, 
-             collection = Collection, notes = Notes)
-    
-  } else {
-    haul.all <- haul.all %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                           format(haul.all$EquilibriumTime,
-                                                  format = "%H:%M:%S"))),
-        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                           format(haul.all$haulbackTime,
-                                                  format = "%H:%M:%S")))) %>%
-      mutate(haulBackTime = case_when(
-        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-        TRUE ~ haulBackTime)) %>%
-      rename(cruise = Cruise, ship = Ship, haul = Haul,
-             collection = Collection, notes = Notes)
-    
-    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-    eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
-    hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-    
-    # Correct equilibriumTime or haulBackTime
-    haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-    haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  }
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>%
+    mutate(haulBackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) 
   
-  # Reformat length frequency data to match SQL
-  lengths.all <- lengths.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, species = Species)
+  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+  
+  # Correct equilibriumTime or haulBackTime
+  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
   
   # Reformat length frequency data to match SQL
   lengthFreq.all <- lengthFreq.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
-           species = Species, length = Length, lengthType = LengthType, 
+    rename(length = Length, lengthType = LengthType, 
            sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
            inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
            subSampleNumber = SubSampleNumber)
+  
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     mutate(
@@ -1448,17 +1424,17 @@ duplicate.ids <- lengths %>%
   pull(individual_ID)
 
 # Print duplicates table  
-  if (length(duplicate.ids) > 0) {
-    lengths %>%
-      filter(individual_ID %in% duplicate.ids) %>% 
-      select(cruise:individual_ID, specimenNumber, scientificName, commonName) %>% 
-      kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-            format.args = list(big.mark = ",")) %>% 
-      kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-      scroll_box(height = "500px")
-  } else {
-    print("Hooray, no duplicated barcodes!")
-  }
+if (length(duplicate.ids) > 0) {
+  lengths %>%
+    filter(individual_ID %in% duplicate.ids) %>% 
+    select(cruise:individual_ID, specimenNumber, scientificName, commonName) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+    scroll_box(height = "500px")
+} else {
+  print("Hooray, no duplicated barcodes!")
+}
 ```
 
 # References
