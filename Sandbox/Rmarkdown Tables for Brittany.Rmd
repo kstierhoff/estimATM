@@ -1,0 +1,115 @@
+---
+title: "R Markdown Tables for Brittany"
+author: "Kevin L. Stierhoff"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+## Document settings
+
+These are user-defined document settings that I often put up front. {pacman} is great for installing and loading packages used by your R Markdown file.
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,flextable,knitr,here,
+               kableExtra)
+
+# set system time zone to UTC
+# Sys.setenv(tz = "UTC")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "latex"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+```
+
+## Load some data
+
+```{r biomass-data}
+# Load biomass data
+be <- readRDS(here("Sandbox/bootstrap_estimates.rds"))
+
+# Configure biomass estimate table
+be.table <- be  %>%
+  rename(Name = Species,
+         Number           = Stratum,
+         Transects        = nTransects,
+         Clusters         = nClusters,
+         Individuals      = nIndiv,
+         "$\\hat{B}$"     = Biomass,
+         SD               = biomass.sd,
+         CV               = biomass.cv,
+         "CI$_{L,95\\%}$" = lower.ci.B,
+         "CI$_{U,95\\%}$" = upper.ci.B) %>% 
+  select(-SD)  
+```
+
+## Add table
+
+Add a table for central stock Northern Anchovy.
+
+```{r biomass-table, echo=TRUE}
+be.table.sub <- be.table %>% 
+  filter(Name == "Engraulis mordax", Stock == "Central") %>% 
+  mutate(Region = "Core") %>% 
+  select(Name, Stock, Region, everything())
+
+if (nrow(be.table.sub) != 0) {
+  if (doc.type == "docx") {
+    regulartable(be.table.sub) %>% 
+      merge_v(j = c("Name")) %>% 
+      italic(j = 1) %>%
+      add_header(Name  = "",
+                 Stock    = "",
+                 Number   = "Stratum", Area = "Stratum", 
+                 Transects = "Stratum", Distance = "Stratum",
+                 Clusters = "Trawl", Individuals = "Trawl",
+                 "$\\hat{B}$" = "Biomass", 
+                 "CI$_{L,95\\%}$" = "Biomass", 
+                 "CI$_{U,95\\%}$" = "Biomass",
+                 CV = "Biomass") %>% 
+      merge_h(part = "header") %>% 
+      align(align = "center",part = "header") %>% 
+      autofit()
+  } else {
+    kable(be.table.sub, format = knitr.format, 
+          booktabs = FALSE, escape = FALSE,
+          align           = c(rep("l", 3), rep("r",ncol(be) - 2)),
+          digits          = c(0),
+          format.args     = list(big.mark = ","),
+          caption = '(ref:biomass-anch-c)') %>% 
+      kable_styling(latex_options = c("hold_position","scale_down"),
+                    position = "center",
+                    font_size = 8) %>% 
+      column_spec(1, italic = T) %>% 
+      collapse_rows(columns = 1:3, valign = "top") %>%
+      add_header_above(c("Species" = 2, "Stratum" = 5, 
+                         "Trawl" = 2, "Biomass" = 4))
+  }
+} else {
+  print("No results for this species/stock.")
+}
+```
+
