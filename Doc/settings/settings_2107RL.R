@@ -9,7 +9,8 @@ estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore 
 combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
-## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
+## This section controls and configures settings used by makeTransects and checkTransects for 
+## generating and checking survey transects
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
