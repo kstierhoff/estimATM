@@ -409,7 +409,7 @@ for (i in unique(transects.ns$loc)) {
 # Calculate transect distances
 transects.final <- transects.final %>% 
   mutate(distance = as.numeric(st_length(.))/1852) %>% # Distance; nmi
-  filter(distance > 8) %>% 
+  filter(distance > 5) %>% 
   mutate(id = rank(id)) %>% 
   rename(transect = id) %>% 
   arrange(transect) 
@@ -420,7 +420,7 @@ transects.final.sd <- transects.final.sd %>%
          type = "Saildrone") %>% # Define type as Saildrone 
   rename(transect = id) %>% 
   arrange(transect) %>% 
-  filter(distance > min.tx.length)
+  filter(distance > min.tx.length["SD"])
 
 # Read Channel Island nearshore transect waypoints
 transects.ns.ci <- read_csv(here("Data/Nav/waypoints_channel_islands.csv")) %>% 
@@ -438,7 +438,8 @@ transects.final.ns <- transects.final.ns %>%
          type = "Nearshore") %>% # Define type as Saildrone 
   rename(transect = id) %>% 
   arrange(transect) %>% 
-  filter(distance > min.tx.length)
+  # filter(distance > min.tx.length["LBC"]) %>% 
+  filter(distance > 1)
 
 # Convert transects to waypoints
 waypoints.final <- transects.final %>% 
@@ -766,7 +767,7 @@ if (save.csv) {
     
     if (nrow(wpts.sub) > 0) {
       write_csv(wpts.sub, here("Output/routes/Compulsory", paste(i, "C.csv", sep = "")),
-          col_names = FALSE)  
+                col_names = FALSE)  
     }
   }
   
@@ -777,7 +778,7 @@ if (save.csv) {
     
     if (nrow(wpts.sub) > 0) {
       write_csv(wpts.sub, here("Output/routes/Adaptive", paste(i, "A.csv", sep = "")),
-          col_names = FALSE)  
+                col_names = FALSE)  
     }
   }
   
@@ -789,7 +790,7 @@ if (save.csv) {
     
     if (nrow(wpts.sub) > 0) {
       write_csv(wpts.sub, here("Output/routes/Saildrone", paste(i, "S.csv", sep = "")),
-          col_names = FALSE)
+                col_names = FALSE)
     }
   }
   
@@ -801,7 +802,7 @@ if (save.csv) {
     
     if (nrow(wpts.sub) > 0) {
       write_csv(wpts.sub, here("Output/routes/Nearshore", paste(i, "N.csv", sep = "")),
-          col_names = FALSE) 
+                col_names = FALSE) 
     }
   }
   
@@ -812,7 +813,7 @@ if (save.csv) {
     select(id, lat, long)
   
   write_csv(uctd.final.csv, here("Output/waypoints/uctd_wpts.csv"),
-          col_names = FALSE)  
+            col_names = FALSE)  
 }
 
 if (do.random) {
@@ -893,14 +894,14 @@ write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
 
 ```{r map-survey-plan,fig.cap='(ref:map-survey-plan)'}
 # Set padding around data  
-  map.bounds <- transects.final %>%
-    st_transform(crs = crs.proj) %>%
-    st_bbox()  
-  
-  # Determine map aspect ratio and set height and width
-  map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-  map.width  <- map.height*map.aspect
-  
+map.bounds <- transects.final %>%
+  st_transform(crs = crs.proj) %>%
+  st_bbox()  
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height*map.aspect
+
 # Create base map
 base.map <- get_basemap(transects.final, states, countries, 
                         landmarks, bathy, map.bounds, crs = crs.proj)
@@ -908,6 +909,8 @@ base.map <- get_basemap(transects.final, states, countries,
 # Map planned transects
 survey.plan <- base.map +    
   geom_sf(data = transects.final, aes(colour = type, linetype = type), 
+          show.legend = "line") +
+  geom_sf(data = transects.final.ns, aes(colour = type, linetype = type), 
           show.legend = "line") +
   scale_colour_manual("Type", 
                       values = c(Adaptive = "red", Compulsory = "black",
