@@ -88,8 +88,8 @@ survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shim
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2107RL"        # SWFSC/AST survey name
-survey.start           <- "5 July"       # Survey start date
-survey.end             <- "15 October"   # Survey end date
+survey.start           <- "5 July"        # Survey start date
+survey.end             <- "15 October"    # Survey end date
 survey.year            <- "2021"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 86              # Days at sea allocated
@@ -169,7 +169,7 @@ model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 # Mapping preferences -----------------------------------------------------
 # Turn off S2 processing in sf
 sf::sf_use_s2(FALSE)
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
+# mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
@@ -316,7 +316,7 @@ sounder.type           <- c(RL  = "EK80")
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
-                                  "SWC-FRD-AST1-D")) {
+                                  "SWC-FRD-AST1-D","SWC-JRENFREE-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2107RL",
                             LBC = "C:/SURVEY/2107RL",
                             LM  = "C:/SURVEY/2107RL",
@@ -497,7 +497,7 @@ cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIO
 cufes.db.sqlite        <- "cufes202107RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 # Trawl data
-trawl.source           <- "SQL" # "SQL" or "Access"
+trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2107RL.accdb"

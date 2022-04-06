@@ -15,9 +15,9 @@ bibliography: bib/ast_bib.bib
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,mapview,rgeos,
+pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,rgeos,
                knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
-               maptools,png,grid,gridExtra,cowplot,flextable,fs,magick,ftExtra,
+               maptools,png,grid,gridExtra,cowplot,flextable,fs,ftExtra,mapview,
                stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
                scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra)
 
@@ -55,8 +55,11 @@ options(knitr.table.format = knitr.format,knitr.kable.NA = '')
 panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
 panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
 
-# Register Google Maps API
-register_google(key = google_map_api)
+# Register Google Maps API; remove 
+if (exists("google_map_api")) register_google(key = google_map_api)
+
+# Create data directories
+dir_create(here(c("Figs","Output")))
 ```
 
 ```{r user-input,include=FALSE}
@@ -77,18 +80,18 @@ theme_set(theme_bw())
 ```{r controls, echo=F, error=F, message=F, warning=F}
 # Processing instructions (T/F)
 copy.files      <- F # copy files from source
-copy.bib        <- F # copy files from source
+copy.bib        <- F # copy files from source; requires VPN
 overwrite.csv   <- T # overwrite CSV files when copying
 overwrite.files <- T # overwrite files when copying
-download.hab    <- F # download habitat map
-save.figs       <- F # draw plots and maps, or use existing
-get.db          <- F # import database data
+download.hab    <- T # download habitat map
+save.figs       <- T # draw plots and maps, or use existing
+get.db          <- T # import database data
 process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- T # download nave data from ERDDAP
-process.csv     <- F # process CSV files from Echoview
+process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal     <- F # process calibration results from previous surveys for time series plots
-process.zmux    <- F # process impedance data
+process.zmux    <- T # process impedance data
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
 calc.raw.size   <- F # computer RAW file size, or use existing
@@ -379,7 +382,7 @@ if ("LBC" %in% cal.vessels) {
   save(all.output.lbc,
        file = here("Output/cal_output_table_LBC.Rdata"))
   
-  write_csv(all.output,
+  write_csv(all.output.lbc,
             file = here("Output/cal_output_table_LBC.csv"))
 }
 ```
@@ -511,7 +514,7 @@ if ("LM" %in% cal.vessels) {
   save(all.output.lm,
        file = here("Output/cal_output_table_LM.Rdata"))
   
-  write_csv(all.output,
+  write_csv(all.output.lm,
             file = here("Output/cal_output_table_LM.csv"))
 }
 ```
@@ -944,7 +947,7 @@ map.height <- 10
 map.width  <- map.height*map.aspect
 
 # Create base map
-base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+base.map <- atm::get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
@@ -1026,13 +1029,13 @@ if (process.scs) {
 if (get.db) {
   if (trawl.source == "SQL") {
     # Configure ODBC connection to TRAWL database
-    trawl.con  <- dbConnect(odbc(), 
+    trawl.con  <- odbc::dbConnect(odbc::odbc(), 
                             Driver = "SQL Server", 
                             Server = "161.55.235.187", 
                             Database = "TRAWL", 
                             Trusted_Connection = "True")
   } else if (trawl.source == "Access") {
-    trawl.con  <- dbConnect(odbc::odbc(), 
+    trawl.con  <- odbc::dbConnect(odbc::odbc(), 
                             Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
                             DBQ = file.path(here("Data/Trawl"), trawl.db.access))
   }
