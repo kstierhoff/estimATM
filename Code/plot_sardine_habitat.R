@@ -18,7 +18,7 @@ hab.dates <- c(date(erddap.survey.start),
                date(erddap.survey.start) + hab.days*2,
                hab.date.end)
 
-load(here("Data/Nav/nav_data.Rdata"))
+# load(here("Data/Nav/nav_data.Rdata"))
 
 if (survey.year >= 2021) {
   # Starting in 2021, sardine habitat data are available for downloaded from ERDDAP

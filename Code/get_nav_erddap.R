@@ -6,10 +6,12 @@ if (get.nav) {
     # Calculate difference between max nav time and now
     nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
     
-    # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time))
+    # Get new ERDDAP start date from max date
+    erddap.survey.start.new <- max(date(nav$time))
   } else {
     nav.lag <- 24
+    # Set new ERDDAP start date equal to original
+    erddap.survey.start.new <- erddap.survey.start
   }
   
   if (nav.lag >= 24) {
@@ -17,7 +19,7 @@ if (get.nav) {
     dataURL <- URLencode(paste(
       "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
       erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
+      "&time>=", erddap.survey.start.new, "&time<=", erddap.survey.end,
       sep = ""))
     
     # Download and parse ERDDAP nav data

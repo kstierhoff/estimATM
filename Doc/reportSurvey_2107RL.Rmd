@@ -133,6 +133,36 @@ if (copy.files) {
 }
 ```
 
+```{r process-nav}
+# Source code to get nav data from ERDDAP
+source(here("Code/get_nav_erddap.R"))
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+
+# Create gps.csv file from nav to replace missing data in Echoview
+nav.gps <- nav %>% 
+  mutate(GPS_date = format(time, format = "%F"),
+         GPS_time = format(time, format = "%T")) %>% 
+  select(GPS_date, GPS_time, latitude = lat, longitude = long)
+
+write_csv(nav.gps, here("Output/nav.gps.csv"))
+
+# Get most recent vessel position for plotting
+nav.now <- tail(nav.sf, 1) %>% 
+  mutate(label = paste("Last position:", time, "UTC"))
+```
+
 ```{r download-habitat-maps}
 if (download.hab) {
   source(here("Code/plot_sardine_habitat.R"))
@@ -877,36 +907,6 @@ ggsave(tsu.scatter.lm, filename = here("Figs/fig_cal_TSu_scatter_LM.png"),
 # Save TS_c plot 
 ggsave(tsc.scatter.lm, filename = here("Figs/fig_cal_TSrel_scatter_LM.png"), 
        width = 9, height = 8)
-```
-
-```{r process-nav}
-# Source code to get nav data from ERDDAP
-source(here("Code/get_nav_erddap.R"))
-
-# Read transect waypoints
-wpts <- read_csv(here("Data/Nav", wpt.filename))
-
-# Convert planned transects to sf; CRS = crs.geog
-wpts.sf <- wpts %>% 
-  filter(Type %in% wpt.types) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
-
-transects.sf <- wpts.sf %>% 
-  group_by(Type, Transect, Region) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
-
-# Create gps.csv file from nav to replace missing data in Echoview
-nav.gps <- nav %>% 
-  mutate(GPS_date = format(time, format = "%F"),
-         GPS_time = format(time, format = "%T")) %>% 
-  select(GPS_date, GPS_time, latitude = lat, longitude = long)
-
-write_csv(nav.gps, here("Output/nav.gps.csv"))
-
-# Get most recent vessel position for plotting
-nav.now <- tail(nav.sf, 1) %>% 
-  mutate(label = paste("Last position:", time, "UTC"))
 ```
 
 ```{r create-basemap,include=F}
