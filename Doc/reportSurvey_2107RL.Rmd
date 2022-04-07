@@ -64,7 +64,7 @@ dir_create(here(c("Figs","Output")))
 
 ```{r user-input,include=FALSE}
 # Get project name from directory
-prj.name <- last(unlist(str_split(here(), "/")))
+prj.name <- dplyr::last(unlist(str_split(here(), "/")))
 
 # Get all settings files
 settings.files <- dir(here("Doc/settings"))
@@ -83,9 +83,9 @@ copy.files      <- F # copy files from source
 copy.bib        <- F # copy files from source; requires VPN
 overwrite.csv   <- T # overwrite CSV files when copying
 overwrite.files <- T # overwrite files when copying
-download.hab    <- T # download habitat map
+download.hab    <- F # download habitat map
 save.figs       <- T # draw plots and maps, or use existing
-get.db          <- T # import database data
+get.db          <- F # import database data
 process.scs     <- T # process SCS logs, or load processed data
 get.nav         <- T # download nave data from ERDDAP
 process.csv     <- T # process CSV files from Echoview
@@ -968,8 +968,8 @@ if (process.scs) {
     bridge.snap <- fs::path(here("Data/SCS")) %>% 
       dir_ls(regexp = scs.pattern) %>% 
       map_df(read_csv) %>% 
-      select(Date, Time, Button, Notes = notes.hdr, 
-             Lat = gps.lat.hdr, Lon = gps.lon.hdr)
+      select(Date, Time, Button, Notes = all_of(notes.hdr), 
+             Lat = all_of(gps.lat.hdr), Lon = all_of(gps.lon.hdr))
     
   } else if (scs.source == "ELG") {
     # Process bridge event data 
@@ -980,8 +980,8 @@ if (process.scs) {
     # read and rbind all files
     for (i in bridge.events) {
       bridge.snap.tmp <- read_csv(i) %>% 
-        select("Date", "Time", "Button", "Notes" = notes.hdr, 
-               "Lat" = gps.lat.hdr, "Lon" = gps.lon.hdr) 
+        select(Date, Time, Button, Notes = all_of(notes.hdr), 
+             Lat = all_of(gps.lat.hdr), Lon = all_of(gps.lon.hdr))
       
       bridge.snap <- bind_rows(bridge.snap, bridge.snap.tmp)
     }
@@ -995,7 +995,7 @@ if (process.scs) {
       moa.tmp <- read_xlsx(bridge.events[b]) %>% 
         mutate(Time = as.character(gsub(".* ", "", Time)),
                datetime = Date + hms(Time)) %>% 
-        select(Date, Time, Button, Notes = notes.hdr, 
+        select(Date, Time, Button, Notes = all_of(notes.hdr), 
                Lat = all_of(gps.lat.hdr), Lon = all_of(gps.lon.hdr), datetime) 
       
       bridge.snap <- bind_rows(bridge.snap, moa.tmp)
@@ -1327,8 +1327,8 @@ trawl.summ <- haul.catch %>%
 ```{r process-cufes}
 # Read CUFES data
 cufes.filename <- list.files(here("Data/CUFES"), pattern = "*.sqlite")
-cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
-cufes.raw <- tbl(cufes.con, "cufessqlite") %>%
+cufes.con      <- odbc::dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
+cufes.raw      <- tbl(cufes.con, "cufessqlite") %>%
   collect() %>% 
   mutate(
     Start = case_when(
@@ -1554,7 +1554,7 @@ processed.cps <- unique(nasc.cps$filename)
 save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 ```
 
-```{r process-csv-krill}
+```{r process-csv-krill,eval=FALSE}
 if (process.csv) {
   if (file.exists(here("Output/processed_krill.Rdata"))) {
     # Load already processed CSV files
@@ -1604,6 +1604,8 @@ if (process.csv) {
 } else {
   load(here("Output/nasc_krill.Rdata"))
 }
+
+# if for no krill data
 
 # Get intervals with bad lat/long values
 bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
