@@ -13,9 +13,15 @@ hab.date.mid1  <- format(ymd(erddap.survey.start) + hab.days, "%Y-%m-%dT12:00:00
 hab.date.mid2  <- format(ymd(erddap.survey.start) + hab.days*2, "%Y-%m-%dT12:00:00Z")
 
 # Combine habitat model dates
-hab.date.all <- "2021-04-01"
-
-load(here("Data/Nav/nav_data.Rdata"))
+if (survey.name %in% c("2103RL")) {
+  hab.dates <- "2021-04-01"
+} else {
+  # Combine habitat model dates
+  hab.dates <- c(date(erddap.survey.start), 
+                 date(erddap.survey.start) + hab.days,
+                 date(erddap.survey.start) + hab.days*2,
+                 hab.date.end)
+}
 
 if (survey.year >= 2021) {
   # Starting in 2021, sardine habitat data are available for downloaded from ERDDAP
@@ -23,11 +29,11 @@ if (survey.year >= 2021) {
   # work for all of the ATM surveys of CPS, but the code below will recreate the maps
   # as presented in the survey and biomass report Tech Memos from those surveys.
   
-  hab.date.all <- format(ymd(hab.date.all), "%Y-%m-%dT12:00:00Z")
+  hab.dates <- format(ymd(hab.dates), "%Y-%m-%dT12:00:00Z")
   
   if(exists("hab.data.all")) rm(hab.data.all)
   
-  for (ddd in hab.date.all) {
+  for (ddd in hab.dates) {
     # Generate URLs from dates
     habURL <- URLencode(
       paste0("https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.csv0?potential_habitat%5B(",
@@ -105,7 +111,7 @@ if (survey.year >= 2021) {
     theme_bw() +
     theme(panel.spacing = unit(1, "lines"),
           strip.background.x = element_blank(),
-          strip.text.x = element_blank(),
+          # strip.text.x = element_blank(),
           legend.position="bottom")
   
   chl.map.all <- ggplot() + 
@@ -130,7 +136,7 @@ if (survey.year >= 2021) {
     theme_bw() +
     theme(panel.spacing = unit(1, "lines"),
           strip.background.x = element_blank(),
-          strip.text.x = element_blank(),
+          # strip.text.x = element_blank(),
           legend.position="bottom")
   
   sst.map.all <- ggplot() + 
@@ -159,7 +165,7 @@ if (survey.year >= 2021) {
     theme_bw() +
     theme(panel.spacing = unit(1, "lines"),
           strip.background.x = element_blank(),
-          strip.text.x = element_blank(),
+          # strip.text.x = element_blank(),
           legend.position="bottom")
   
   # Save map
@@ -184,5 +190,4 @@ if (survey.year >= 2021) {
   # Save combo map
   ggsave(anch.hab.grid, filename = here("Figs/fig_habitat_map_anchovy.png"),
          width = 13, height = 6)
-  
 } 
