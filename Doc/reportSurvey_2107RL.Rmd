@@ -84,10 +84,10 @@ copy.bib        <- F # copy files from source; requires VPN
 overwrite.csv   <- T # overwrite CSV files when copying
 overwrite.files <- T # overwrite files when copying
 download.hab    <- F # download habitat map
-save.figs       <- T # draw plots and maps, or use existing
+save.figs       <- F # draw plots and maps, or use existing
 get.db          <- F # import database data
-process.scs     <- T # process SCS logs, or load processed data
-get.nav         <- T # download nave data from ERDDAP
+process.scs     <- F # process SCS logs, or load processed data
+get.nav         <- T # download nav data from ERDDAP
 process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal     <- F # process calibration results from previous surveys for time series plots
@@ -1555,116 +1555,6 @@ processed.cps <- unique(nasc.cps$filename)
 save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 ```
 
-```{r process-csv-krill,eval=FALSE}
-if (process.csv) {
-  if (file.exists(here("Output/processed_krill.Rdata"))) {
-    # Load already processed CSV files
-    load(here("Output/processed_krill.Rdata"))
-  }
-  
-  # List local CSV files
-  csv.files.krill <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
-                            regexp = nasc.pattern.krill[survey.vessel.primary],
-                            ignore.case = TRUE)
-  
-  if (process.csv.all) {
-    # Create final data frame
-    nasc.krill <- data.frame()
-  } else {
-    # Load already processed files
-    load(here("Output/nasc_krill.Rdata")) 
-    # List only new CSV files
-    csv.files.krill <- csv.files.krill[!csv.files.krill %in% processed.krill]
-  }
-  
-  if (length(csv.files.krill) > 0) {
-    # Configure progress bar
-    pb <- winProgressBar(title = "CSV File Processing Progress - Krill", 
-                         label = "0% done", min = 0, max = 100, initial = 0)
-    
-    # Process all .CSV files
-    for (i in 1:length(csv.files.krill)) {
-      # Process i-th file
-      nasc.krill <- bind_rows(nasc.krill, extract_csv(csv.files.krill[i]))
-      
-      # Update the progress bar
-      info <- sprintf("%d%% done", round((i / length(csv.files.krill)) * 100))
-      setWinProgressBar(pb, round((i / length(csv.files.krill)) * 100), label = info)
-    }
-    close(pb)
-    
-    # Calculate summary interval
-    nasc.krill <- nasc.krill %>%
-      mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                       labels = F, include.lowest = T)) 
-    
-    # Save results
-    save(nasc.krill, file = here("Output/nasc_krill.Rdata"))
-    write.csv(nasc.krill, file = here("Output/nasc_krill.csv"), row.names = F, quote = F)
-  }
-} else {
-  load(here("Output/nasc_krill.Rdata"))
-}
-
-# if for no krill data
-
-# Get intervals with bad lat/long values
-bad.nasc.krill <- filter(nasc.krill, lat == 999, long == 999)
-write_csv(bad.nasc.krill, here("Output/nasc_bad_krill.csv"))
-
-# Average NASC.350 data over new intervals or number of intervals in a 2 km radius
-nasc.summ.krill <- nasc.krill %>%
-  filter(lat != 999, long != 999) %>%
-  group_by(transect, int) %>%
-  summarise(
-    bins    = length(int),
-    bin.mid = as.integer(round(bins / 2)),
-    lat     = lat[1],
-    long    = long[1],
-    NASC    = mean(NASC.350)
-  )
-
-# Average krill.nasc over defined interval
-# Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
-nasc.krill.sf <- nasc.krill %>%
-  filter(lat != 999, long != 999) %>%
-  select(filename, transect, int, dist_m, datetime, lat, long, krill.nasc = NASC.350) %>% 
-  group_by(filename, transect, int) %>% 
-  summarise(
-    lat   = lat[1],
-    long  = long[1],
-    NASC  = mean(krill.nasc),
-    label = paste0('Transect: ', transect[1], "; ",
-                   'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
-    popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
-                   '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
-                   '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
-                   '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
-  # Create bins for defining point size in NASC plots%>% 
-  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = T),
-         bin.level =  as.numeric(bin))  %>% 
-  filter(!is.na(bin)) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
-
-nasc.plot.krill <- project_sf(nasc.krill.sf, crs.proj)
-
-# create acoustic transect labels
-nasc.tx.labels.krill <- nasc.krill %>%
-  group_by(transect) %>%
-  summarise(
-    lat = lat[which.max(long)],
-    long = max(long)
-  )
-
-# List already processed CSV files and save
-processed.krill <- unique(nasc.krill$filename)
-save(processed.krill, file =  here("Output/processed_krill.Rdata"))
-
-# Select plot levels for backscatter data
-nasc.plot.all   <- rbind(nasc.cps.sf, nasc.krill.sf) %>% 
-  filter(NASC >= 200)
-```
-
 ```{r plot-maps, include=F}
 if (save.figs) {
   # Map planned transects
@@ -1747,46 +1637,46 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
          width = map.width*3, height = map.height)
   
-  # Create calibration site maps #####  
-  # Put calibration location lat/lon in a df, for point plot
-  cal.map.df <- data.frame(cal.lat.dd, cal.lon.dd)
-  
-  # get Google map from calibration location
-  cal.map <- ggmap(get_googlemap(c(cal.lon.dd, cal.lat.dd), 
-                                 maptype = "terrain", zoom = 12))
-  
-  # get extent of calibration map for inset
-  cal.map.extent <- cal.map$data
-  
-  # create inset map
-  map.inset <- ggplot(ca) +
-    geom_sf() +
-    geom_path(data = cal.map.extent[c(1, 3, 4, 2, 1),], aes(lon, lat),
-              size = 0.5, colour = 'red') + # plot extent of inset map
-    theme(axis.text.x     = element_blank(), 
-          axis.text.y     = element_blank(), 
-          axis.ticks      = element_blank(),
-          axis.title.x    = element_blank(),
-          axis.title.y    = element_blank(),
-          plot.background = element_blank())
-  
-  # create main map using ggmap
-  map.main <- cal.map + 
-    geom_point(data = cal.map.df, aes(x = cal.lon.dd,y = cal.lat.dd),
-               shape = 23, size = 5, fill = "yellow", colour = "black") + 
-    xlab("\nLongitude (W)") + ylab("Latitude (N)\n") + 
-    theme_bw() + 
-    theme(plot.background = element_blank(),
-          axis.text.y = element_text(angle = 90, hjust = 0.5))
-  
-  # Create final color map
-  cal.map.color <- ggdraw() +
-    draw_plot(map.main,0,0,1,1) +
-    draw_plot(map.inset,0.65,0.65,0.325,0.325)
-  
-  # Save map image
-  ggsave(cal.map.color, filename = here("Figs/fig_cal_map.png"),
-         height = 10, width = 10, units = "in")
+  # # Create calibration site maps #####  
+  # # Put calibration location lat/lon in a df, for point plot
+  # cal.map.df <- data.frame(cal.lat.dd, cal.lon.dd)
+  # 
+  # # get Google map from calibration location
+  # cal.map <- ggmap(get_googlemap(c(cal.lon.dd, cal.lat.dd), 
+  #                                maptype = "terrain", zoom = 12))
+  # 
+  # # get extent of calibration map for inset
+  # cal.map.extent <- cal.map$data
+  # 
+  # # create inset map
+  # map.inset <- ggplot(ca) +
+  #   geom_sf() +
+  #   geom_path(data = cal.map.extent[c(1, 3, 4, 2, 1),], aes(lon, lat),
+  #             size = 0.5, colour = 'red') + # plot extent of inset map
+  #   theme(axis.text.x     = element_blank(), 
+  #         axis.text.y     = element_blank(), 
+  #         axis.ticks      = element_blank(),
+  #         axis.title.x    = element_blank(),
+  #         axis.title.y    = element_blank(),
+  #         plot.background = element_blank())
+  # 
+  # # create main map using ggmap
+  # map.main <- cal.map + 
+  #   geom_point(data = cal.map.df, aes(x = cal.lon.dd,y = cal.lat.dd),
+  #              shape = 23, size = 5, fill = "yellow", colour = "black") + 
+  #   xlab("\nLongitude (W)") + ylab("Latitude (N)\n") + 
+  #   theme_bw() + 
+  #   theme(plot.background = element_blank(),
+  #         axis.text.y = element_text(angle = 90, hjust = 0.5))
+  # 
+  # # Create final color map
+  # cal.map.color <- ggdraw() +
+  #   draw_plot(map.main,0,0,1,1) +
+  #   draw_plot(map.inset,0.65,0.65,0.325,0.325)
+  # 
+  # # Save map image
+  # ggsave(cal.map.color, filename = here("Figs/fig_cal_map.png"),
+  #        height = 10, width = 10, units = "in")
 } 
 ```  
 

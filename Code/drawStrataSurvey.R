@@ -3,7 +3,7 @@
 for (j in unique(nasc$vessel.name)) {
   # Get transect ends, calculate bearing, and add transect spacing
   tx.ends <- filter(nasc, vessel.name == j) %>% 
-                      group_by(transect.name, transect, vessel.name) %>% 
+                      group_by(transect, transect.name, vessel.name) %>% 
                       summarise(
                         lat.i  = lat[which.max(long)],
                         long.i = max(long),

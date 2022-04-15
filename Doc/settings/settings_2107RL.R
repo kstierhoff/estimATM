@@ -103,7 +103,7 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 leg.breaks <- as.numeric(lubridate::ymd(c("2021-07-02", "2021-07-23", 
                                           "2021-08-22", "2021-09-22",
-                                          "2021-10-16")))
+                                          "2021-10-16","2021-11-10")))
 
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
@@ -112,8 +112,8 @@ erddap.survey.end    <- "2021-10-16" # End of survey for ERDDAP vessel data quer
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
-survey.lat           <- c(27,51)
-survey.long          <- c(-130,-113)
+survey.lat           <- c(25.83792,50.7)
+survey.long          <- c(-129.22,-112.9483)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
@@ -212,10 +212,12 @@ jack.mack.color    <- '#0000FF'
 jacksmelt.color    <- '#A020F0'
 pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
+rnd.herring.color  <- '#F0B81D'
 
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
-                        "Scomber japonicus","Trachurus symmetricus")
+                        "Scomber japonicus","Trachurus symmetricus", 
+                        "Etrumeus acuminatus")
 # CUFES
 cufes.start        <- "2021-07-01" # Start of survey for CUFES filtering
 cufes.end          <- "2021-10-16" # End of survey for CUFES filtering
@@ -272,7 +274,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL","LBC","LM","SD","JCF") # JC = Jorge Carranza Fraser
 nasc.vessels.offshore  <- c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
@@ -310,7 +312,8 @@ nasc.interval          <-  100
 nasc.summ.interval     <- 2000/nasc.interval 
 
 # Echosounder type; e.g., EK60, EK80, other
-sounder.type           <- c(RL  = "EK80") 
+sounder.type           <- c(RL  = "EK80",
+                            JCF = "EK80") 
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
@@ -320,7 +323,8 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
   survey.dir           <- c(RL  = "C:/SURVEY/2107RL",
                             LBC = "C:/SURVEY/2107RL",
                             LM  = "C:/SURVEY/2107RL",
-                            SD  = "C:/SURVEY/2107RL")   
+                            SD  = "C:/SURVEY/2107RL",
+                            JCF = "C:/SURVEY/2107RL")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20210702_LASKER_SummerCPS")
 }
@@ -329,43 +333,51 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
 nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             LM  = "PROCESSED/EV/CSV/LISAMARIE",
                             LBC = "PROCESSED/EV/CSV/CARNAGE",
-                            SD  = "PROCESSED/EV/CSV/SAILDRONE") 
+                            SD  = "PROCESSED/EV/CSV/SAILDRONE",
+                            JCF = "PROCESSED/EV/CSV/CARRANZA") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
-                            SD  = "Final 38 kHz CPS*.*csv")
+                            SD  = "Final 38 kHz CPS*.*csv",
+                            JCF  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
                             LM  = "*Krill-Juan Krill Final 120.csv",
                             LBC = "*Krill-Juan Krill Final 120.csv",
-                            SD  = "*Krill-Juan Krill Final 120.csv")
+                            SD  = "*Krill-Juan Krill Final 120.csv",
+                            JCF  = "*.-10-krill.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
                             LBC = "\\d{3}N",
-                            SD  = "\\d{3}N")
+                            SD  = "\\d{3}N",
+                            JCF = "\\d{3}N")
 # Regex pattern for identifying offshore transects
 nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
                             LM  = "\\d{3}O",
                             LBC = "\\d{3}O",
-                            SD  = "\\d{3}O")
+                            SD  = "\\d{3}O",
+                            JCF = "\\d{3}O")
 # Regex pattern for identifying offshore transects
 nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
                             LM  = "\\d{3}I",
                             LBC = "\\d{3}I",
-                            SD  = "\\d{3}I")
+                            SD  = "\\d{3}I",
+                            JCF = "\\d{3}I" )
 # Regex pattern for identifying transits
 nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LM  = "\\d{3}T",
                             LBC = "\\d{3}T",
-                            SD  = "\\d{3}T")
+                            SD  = "\\d{3}T",
+                            JCF = "\\d{3}T")
 # Recursively search NASC directories
 nasc.recurse           <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = TRUE)
+                            SD  = TRUE,
+                            JCF = TRUE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
@@ -374,7 +386,8 @@ source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE,
-                            NS  = FALSE) # in the nearshore strata
+                            NS  = FALSE,
+                            JCF = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv")) # in the nearshore strata 
@@ -382,76 +395,94 @@ data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv"
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
                             LM  = "[^0-9]",
-                            LBC = "[^0-9]") 
+                            LBC = "[^0-9]",
+                            JCF = "[^0-9]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = TRUE) 
+                            SD  = TRUE,
+                            JCF = TRUE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
 strip.tx.chars         <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = FALSE) 
+                            SD  = FALSE,
+                            JCF = FALSE) 
 
 # If T, removes transects with names including "transit"
 rm.transit             <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = FALSE)  
+                            SD  = FALSE,
+                            JCF = FALSE)  
 
 # If T, removes transects with names including "offshore"
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE) 
+                            SD  = TRUE,
+                            JCF = FALSE) 
 
 # If T, removes transects with names including "inshore"
 rm.inshore             <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE)
+                            SD  = TRUE,
+                            JCF = FALSE)
 
 # If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE) 
+                            SD  = TRUE,
+                            JCF = FALSE) 
 
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = FALSE) 
+                            SD  = FALSE,
+                            JCF = FALSE) 
 
 # regex for matching number pattern
 tx.num.pattern         <- c(RL  = "-\\d{1}",
                             LM  = "-\\d{1}",
                             LBC = "-\\d{1}",
-                            SD  = "-\\d{1}")
+                            SD  = "-\\d{1}",
+                            JCF = "-\\d{1}")
 
 # Use transect names for transect numbers
 use.tx.number          <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE)
+                            SD  = TRUE,
+                            JCF = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
-tx.rm                  <- list(RL  = c("4142","2627","018","019","020","021","022","023","024",
-                                       "025","026","027","028","029","030","031"),
+tx.rm                  <- list(RL  = c("4142","2627"),
                                LM  = NA,
                                LBC = NA,
-                               SD  = c("109"))
+                               SD  = c("109"),
+                               JCF = NA)
+
+# tx.rm                  <- list(RL  = c("4142","2627","018","019","020","021","022","023","024",
+#                                        "025","026","027","028","029","030","031"),
+#                                LM  = NA,
+#                                LBC = NA,
+#                                SD  = c("109"),
+#                                JCF = NA)
 
 # Minimum acoustic transect length (nmi)
 min.tx.length          <- c(RL  = 15,
                             LM  = 1,
                             LBC = 1,
-                            SD  = 1)
+                            SD  = 1,
+                            JCF = 1)
 
 # Enforce nearest trawl cluster distance limits?
 limit.cluster.dist     <- c(OS  = FALSE,
@@ -469,10 +500,13 @@ cluster.source <- c(OS = "cluster",
 # prior to returning to Mexico. The trawls that were conducted there should
 # not be used to characterize backscatter collected much earlier during Leg 2.
 
+haul.rm <- c(104:109) # Off Oregon
+
 # Furthermore, hauls in Mexico were removed for this analysis, but may be 
 # included in a joint analysis later
-haul.rm <- c(104:109, # Off Oregon
-             110:127) # In Mexico
+
+# haul.rm <- c(104:109, # Off Oregon
+#              110:127) # In Mexico
 
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
@@ -496,8 +530,10 @@ cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
 cufes.db.sqlite        <- "cufes202107RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
+cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
+cufes.vessels          <- c("RL", "JCF")
 # Trawl data
-trawl.source           <- "Access" # "SQL" or "Access"
+trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir,"DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2107RL.accdb"
