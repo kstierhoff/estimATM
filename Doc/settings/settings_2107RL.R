@@ -377,7 +377,7 @@ nasc.recurse           <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = TRUE,
-                            JCF = TRUE)
+                            JCF = FALSE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
 

@@ -1,5 +1,5 @@
 # Get Carranza nav data from the meteorological station
-nav.jcf <- st_read(here("Data/Nav/JCFINP2110meteorologica00_27.gpkg")) %>% 
+nav.jcf <- st_read(here("Data/Nav/JCF/JCFINP2110meteorologica00_27.gpkg")) %>% 
   mutate(
     time = ymd_hms(paste(date, time)),
     leg = "Leg 5") %>% 
