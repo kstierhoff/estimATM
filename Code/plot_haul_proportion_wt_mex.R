@@ -15,7 +15,7 @@ if (nrow(haul.pos) > 0) {
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "R. Herring", "Sardine"),
+                                 "P. herring", "P. mackerel", "R. herring", "Sardine"),
                       values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                  pac.herring.color, pac.mack.color, rnd.herring.color, 
                                  sardine.color)) +
