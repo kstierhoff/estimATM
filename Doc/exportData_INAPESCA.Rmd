@@ -1,0 +1,513 @@
+---
+title: "Summary of data for DFO Canada"
+author: "Kevin L. Stierhoff"
+date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
+output: html_document
+---
+
+```{r load-libraries-functions, error=FALSE, message=FALSE, warning=FALSE, echo=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,reshape2,lubridate,knitr,maps,rnaturalearth,
+               cowplot,kableExtra,devtools,scatterpie,here,leaflet,
+               maptools,mapview,fs,DT,lwgeom,DBI,odbc,bookdown,sf,
+               data.table,xts,mapproj)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.align = "center", dev = "png", 
+                      dev.args = list(type = "cairo"), dpi = 150)
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+theme_set(theme_bw())
+
+# Restrict data to Mexico?
+restrict.data <- TRUE
+```
+
+```{r project-info,include=FALSE}
+# Get session.info to include in document
+session.info <- session_info()
+
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# Load EEZ boundaries for extracting Canada data
+eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
+  st_transform(crs.geog)
+```
+
+```{r load-trawl-data}
+# Load trawl data
+load(here("Data/Trawl/trawl_data.Rdata"))
+
+# Process haul data ------------------------------------------------------------
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  mutate(
+    equilibriumTime = ymd_hms(equilibriumTime),
+    haulBackTime    = ymd_hms(haulBackTime),
+    season = case_when(
+      month(equilibriumTime) < 6 ~ "spring",
+      TRUE ~ "summer"))
+
+# Filter haul data for current survey
+haul <- haul.all %>% 
+  select(cruise, ship, haul, collection, 
+         startLatDecimal, startLongDecimal, 
+         stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
+         trawlPerformance, season, notes) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
+  # Calculate haul duration
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins")) %>% 
+  # Format trawlPerformance
+  mutate(trawlPerformance = tolower(trimws(trawlPerformance))) %>% 
+  # Remove bad trawls
+  filter(trawlPerformance %in% c("good","ok","poor")) %>% 
+  # Assign cluster based on yearday
+  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
+
+# Get hauls in Canada
+haul.sf.mex <- haul %>% 
+  st_as_sf(coords = c("startLongDecimal","startLatDecimal"), crs = crs.geog) %>% 
+  st_intersection(eez_mex)
+
+# Filter Canadian hauls
+haul <- filter(haul, haul %in% haul.sf.mex$haul)
+
+# Create haul paths from starts and ends
+haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+  group_by(haul) %>%
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1))
+
+# Add trawl distance (nmi) to haul
+haul <- haul %>% 
+  left_join(select(haul.paths, haul, distance))
+
+# Process catch data ------------------------------------------------------------
+catch <- catch.all %>% 
+  left_join(select(spp.codes,species,scientificName,commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship &
+           netSampleType == 'codend') %>% 
+  left_join(select(haul, haul, cluster, 
+                   lat = startLatDecimal, long = startLongDecimal)) %>% 
+  mutate(key = paste(haul, scientificName),   # Create key for merging datasets
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg) %>% # Compute total weight
+  filter(haul %in% haul.sf.mex$haul)
+
+# Process specimen data ------------------------------------------------------------
+# Process binned length data from all surveys
+lengths.expanded.all <- lengthFreq.all %>%
+  left_join(select(spp.codes, species, scientificName, commonName)) %>%
+  # Remove samples from 4meshnet
+  filter(netSampleType == 'codend') %>%    
+  select(cruise, ship, haul, collection, 
+         species, scientificName, length,
+         lengthType, sexUnknown, male, totalFemale) %>% 
+  gather(sex, count, -cruise, -ship, -haul, -collection, -species, 
+         -scientificName, -lengthType, -length) %>%
+  filter(count != 0) %>% 
+  # Expand data frame by counts
+  uncount(weights = count)
+
+# Extract data by length type (SL, FL, and TL) and combine
+lengths.expanded.final <- data.frame()
+
+for (i in unique(lengths.expanded.all$lengthType)) {
+  l.temp <- filter(lengths.expanded.all, lengthType == i)
+  names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
+  lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
+}
+
+# Add missing length columns
+if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
+if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
+if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
+
+# Remove unwanted columns and rename length columns  
+lengths.expanded.final <- lengths.expanded.final %>% 
+  rename(forkLength_mm     = FL,
+         standardLength_mm = SL,
+         totalLength_mm    = TL) %>% 
+  mutate(
+    flaggedData = "N",
+    noteFlaggedData = NA,
+    isRandomSample = "Y",
+    binned = TRUE)
+
+lengths.all <- lengths.all  %>% 
+  mutate(standardLength_mm = as.numeric(standardLength_mm),
+         totalLength_mm    = as.numeric(totalLength_mm),
+         forkLength_mm     = as.numeric(forkLength_mm)) %>% 
+  # Add scientific and common names
+  left_join(select(spp.codes, species, scientificName, commonName)) %>%
+  # Select desired columns
+  select(cruise, ship, haul, collection, 
+         species, individual_ID, 
+         scientificName, commonName, specimenNumber, 
+         standardLength_mm, forkLength_mm, totalLength_mm, 
+         sex, weightg, isRandomSample, flaggedData) %>%
+  # Convert individual IDs to numeric
+  mutate(individual_ID = as.numeric(individual_ID)) %>% 
+  # Standardize sex values
+  mutate(sex    = tolower(trimws(sex)),
+         binned = F) %>% 
+  bind_rows(lengths.expanded.final) %>% 
+  # Create unique key and replace unused sex categories
+  mutate(key = paste(cruise, ship, haul, collection, species, specimenNumber),
+         sex = str_replace(sex,"totalFemale","female"),
+         sex = str_replace(sex,"sexUnknown","unknown")) %>%
+  # Add season from haul
+  left_join(select(haul.all, cruise, ship, haul, season))
+
+# Filter for cruise specific data
+lengths <- lengths.all %>% 
+  filter(cruise %in% cruise.name, ship %in% cruise.ship, toupper(isRandomSample) == "Y") %>% 
+  filter(haul %in% haul.sf.mex$haul)
+```
+
+```{r write-trawl-csv}
+# Create output directory
+dir_create(here("Output/INAPESCA"))
+
+# Write CSV files
+write_csv(catch, here("Output/INAPESCA/catch.csv"))
+write_csv(haul, here("Output/INAPESCA/haul.csv"))
+write_csv(lengths, here("Output/INAPESCA/lengths.csv"))
+```
+
+```{r load-acoustic-data}
+# Load vertically integrated backscatter data
+load(here("Data/Backscatter/nasc_all.Rdata"))
+
+# Add ID to nasc data
+nasc$id <- seq_along(nasc$Interval)
+
+# Convert nasc to spatial
+nasc.sf <- nasc %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(transect.name) %>%
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  st_intersection(eez_mex)
+
+# Extract backscatter data from Canada
+nasc <- filter(nasc, transect.name %in% nasc.sf$transect.name)
+
+# Summarize by file name, not transect, so that renamed (i.e., strip.tx.chars == TRUE) transects get included.
+nasc.plot <- nasc %>%
+  select(filename, vessel.name, transect.name, transect, int, lat, long, cps.nasc) %>% 
+  group_by(filename, vessel.name, transect.name, transect, int) %>% 
+  summarise(
+    lat  = lat[1],
+    long = long[1],
+    NASC = mean(cps.nasc)) %>% 
+  # Create bins for defining point size in NASC plots
+  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
+         bin.level =  as.numeric(bin))
+
+# Convert to sf
+nasc.plot.sf <- nasc.plot %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  filter(transect.name %in% nasc.sf$transect.name)
+
+# Write CSV files
+write_csv(nasc, here("Output/INAPESCA/backscatter_raw.csv"))
+write_csv(nasc.plot, here("Output/INAPESCA/backscatter_summ.csv"))
+```
+
+```{r get-nav-data}
+# Load data
+load(here("Data/Nav/nav_data.Rdata"))
+```
+
+```{r load-uctd-data}
+if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
+  # Load UCTD data
+  load(here("Data/UCTD/uctd_data.Rdata"))
+  
+  # Match UCTD headers to nav data
+  nav.match.uctd <- data.frame()
+  
+  for (i in seq_along(all.uctd.hdr$cast)) {
+    min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], nav$time)))
+    nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
+  }
+  
+  # Combine header and nav data
+  all.uctd.hdr <- all.uctd.hdr %>% 
+    bind_cols(nav.match.uctd) %>% 
+    mutate(lag = difftime(cast.date, time)) %>% 
+    arrange(cast.date)
+  
+  # Summarize UCTD cast results
+  uctd.summ <- all.uctd.casts %>%
+    group_by(cast) %>%
+    summarise(
+      time = round(sum(dt),0),
+      max.depth = round(min(Z),0)) %>%
+    left_join(select(all.uctd.hdr, cast, cast.date, lat, long, SOG)) %>%
+    arrange(cast.date) %>%
+    mutate(cast.num = seq(1, n()))
+  
+  # Summarize uctd casts for water classification
+  uctd.class <-
+    group_by(all.uctd.casts, cast) %>%
+    summarise(
+      min.T = min(T),
+      min.S = min(S),
+      max.T = max(T),
+      max.S = max(S)) %>%
+    # Assign classes based on salinity
+    mutate(class = case_when(
+      min.S <= 31.4 ~ "Type 1",
+      min.S >= 33.4 ~ "Type 2",
+      TRUE ~ "Type 3"))
+  
+  # Add water mass to the summary table and cast data for plotting
+  all.uctd.casts <- all.uctd.casts %>%
+    left_join(select(uctd.class, cast, class))
+  
+  uctd.summ <- uctd.summ %>%
+    left_join(select(uctd.class, cast, class)) %>%
+    select(cast.num, cast, cast.date, lat, long, SOG,
+           time, max.depth, class)
+  
+  # Filter Canadian casts
+  uctd.sf <- all.uctd.hdr %>% 
+    st_as_sf(coords = c("long","lat"), crs  = crs.geog) %>% 
+    st_intersection(eez_mex)
+  
+  uctd.summ <- uctd.summ %>% 
+    filter(cast %in% uctd.sf$cast)
+  
+  all.uctd.casts <- all.uctd.casts %>% 
+    filter(cast %in% uctd.sf$cast)
+  
+  # Write CSV files
+  write_csv(uctd.summ, file = here("Output/INAPESCA/cast_summary_uctd.csv"))
+  
+  write_csv(all.uctd.casts, file = here("Output/INAPESCA/cast_data_uctd.csv"))
+}
+```
+
+```{r load-ctd-data}
+if (file.exists(here("Data/CTD/ctd_data.Rdata"))) {
+  load(here("Data/CTD/ctd_data.Rdata"))
+  
+  # Match UCTD headers to nav data
+  nav.match.ctd <- data.frame()
+  
+  for (i in 1:nrow(all.ctd.hdr)) {
+    min.diff      <- which.min(abs(difftime(all.ctd.hdr$cast.date[i], nav$datetime)))
+    nav.match.ctd <- bind_rows(nav.match.ctd, nav[min.diff, ])
+  }
+  
+  # combine header and nav data
+  all.ctd.hdr <- all.ctd.hdr %>%
+    bind_cols(nav.match.ctd) %>%
+    mutate(
+      cast.num = seq(1, n()),
+      lag = difftime(cast.date, datetime))
+  
+  if (nrow(all.ctd.casts) > 0) {
+    # reorder all.ctd by cast and depth
+    all.ctd.casts <- arrange(all.ctd.casts, cast, desc(Z)) %>%
+      # filter all.ctd to remove bad temperature and salinity
+      filter(between(T, min.T, max.T)) %>%
+      filter(between(S, min.S, max.S))
+    
+    # calculate max depth of each cast
+    ctd.depth <- all.ctd.casts %>%
+      group_by(cast) %>%
+      summarise(max.depth = min(Z))
+    
+    # extract cast number from filename
+    all.ctd.hdr <- all.ctd.hdr %>%
+      left_join(ctd.depth)
+    
+    # summarize uctd casts for water classification
+    ctd.class <- all.ctd.casts %>%
+      group_by(cast) %>%
+      summarise(
+        min.T = min(T),
+        min.S = min(S),
+        max.T = max(T),
+        max.S = max(S)) %>%
+      # assign classes based on salinity
+      mutate(class = case_when(
+        min.S <= 31.4 ~ "Type 1",
+        min.S >= 33.4 ~ "Type 2",
+        TRUE ~ "Type 3"))
+    
+    all.ctd.hdr <- all.ctd.hdr %>%
+      left_join(select(ctd.class, cast, class)) %>%
+      select(cast.num, cast, cast.date, lat, long, max.depth, class)
+    
+    # add water mass to the summary table and cast data for plotting
+    all.ctd.casts <- all.ctd.casts %>%
+      left_join(select(ctd.class, cast, class))
+  }
+  
+  # Filter Canadian casts
+  ctd.sf <- all.ctd.hdr %>% 
+    st_as_sf(coords = c("long","lat"), crs  = crs.geog) %>% 
+    st_intersection(eez_mex)
+  
+  all.ctd.hdr <- all.ctd.hdr %>% 
+    filter(cast %in% ctd.sf$cast)
+  
+  all.ctd.casts <- all.ctd.casts %>% 
+    filter(cast %in% ctd.sf$cast)
+  
+  # write table to CSV
+  write_csv(all.ctd.hdr, file = here("Output/INAPESCA/cast_summary_ctd.csv"))
+  
+  write_csv(all.ctd.casts, file = here("Output/INAPESCA/cast_data_ctd.csv"))
+}
+```
+
+# Plot data
+
+A map showing the distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to 70-m deep); the locations of CTD (green points) and UCTD casts (magenta points), and locations of trawl paths (heavy black lines). The dashed line approximates the Canadian Exclusive Economic Zone (EEZ).  
+
+```{r configure-base-map,include=F}
+# Get map data -------------------------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
+  project_df(to = crs.proj)
+
+# Get land features --------------------------
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Read isoline
+bathy_5m_line <- st_read(here("Data/GIS/bathy_us_wc_5m.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = CONTOUR)
+
+# Read 5m bathymetry points shapefile
+bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
+
+# Read 5m bathymetry polygon
+bathy_5m_poly <- bathy_5m_points %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("POLYGON")
+
+# Create a reduced coastline for nearshore point estimation
+bathy_5m_df <- bathy_5m_points %>%
+  mutate(
+    long = as.data.frame(st_coordinates(.))$X,
+    lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL)
+
+# Set padding around data  
+# Use Canadian EEZ to resize map to survey progress
+map.bounds <- eez_mex %>% 
+  st_transform(crs = crs.proj) %>%
+  st_bbox() 
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj)
+```  
+
+```{r map-acoustic-data}
+# Select plot levels for backscatter data
+nasc.levels.all <- unique(nasc.plot$bin.level)
+nasc.labels.all <- nasc.labels[sort(nasc.levels.all)]
+nasc.sizes.all  <- nasc.sizes[sort(nasc.levels.all)]
+nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
+
+# Map backscatter
+map <- base.map +
+  geom_sf(data = eez_mex, fill = NA, linetype = "dashed") +
+  geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5) + 
+  geom_sf(data = haul.paths, size = 2) +
+  geom_sf(data = nasc.plot.sf, aes(size = bin, fill = bin), 
+          shape = 21, alpha = 0.75) +
+  # Configure size and colour scales
+  scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                    values = nasc.sizes.all, labels = nasc.labels.all) +
+  scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                    values = nasc.colors.all, labels = nasc.labels.all) +
+  # Configure legend guides
+  guides(fill = guide_legend(), size = guide_legend()) +
+  # Plot title
+  ggtitle(paste("Summer", survey.year)) +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+if (exists("ctd.sf")) {
+  map <- map +
+    geom_sf(data = ctd.sf, shape = 21, size = 5,
+            color = "white", fill = "green") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+}
+
+if (exists("uctd.sf")) {
+  map <- map +
+    geom_sf(data = uctd.sf, shape = 21, size = 5,
+            color = "white", fill = "magenta") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+}
+
+# Save nasc plot
+ggsave(map,
+       filename = here("Output/INAPESCA/fig_all_data.png"),
+       width = map.width, height = map.height) 
+
+# Include figure
+include_graphics(here("Output/INAPESCA/fig_all_data.png"))
+```

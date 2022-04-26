@@ -44,7 +44,7 @@ biomass.ts <- biomass.ts %>%
            month(date_start) < 6 ~ "Spring",
            TRUE ~ "Summer")) %>%
   filter(stratum == "All", include_ts == TRUE) %>%
-  # filter(season == "Summer", stratum == "All", include_ts == TRUE) %>%
+  filter(season == "Summer", stratum == "All", include_ts == TRUE) %>%
   select(-season, -region, -stratum, -biomass_sd, -biomass_cv, -date_start, -group, -year, -include_ts) %>%
   group_by(survey, species, stock) %>% 
   summarise_all(list(sum)) %>% 
@@ -79,9 +79,9 @@ biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0),
   geom_point() +
   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
   scale_colour_manual(name = 'Species',
-                    labels = c("Clupea pallasii", "Engraulis mordax-Central", "Sardinops sagax-Northern",
-                               "Scomber japonicus", "Trachurus symmetricus"),
-                    values = c(pac.herring.color, anchovy.color,  
+                    labels = c("Clupea pallasii", "Engraulis mordax-Central", "Etrumeus acuminatus",
+                               "Sardinops sagax-Northern", "Scomber japonicus", "Trachurus symmetricus"),
+                    values = c(pac.herring.color, anchovy.color, rnd.herring.color, 
                                sardine.color, pac.mack.color, jack.mack.color)) +
   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
@@ -118,9 +118,9 @@ biomass.ts.bar <- ggplot(biomass.ts,
                          aes(x = date_start, y = biomass, fill = group)) + 
   geom_bar(colour = "black", position = "stack", stat = "identity") +
   scale_fill_manual(name = 'Species (Stock)',
-                    labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Sardinops sagax (Northern)",
-                               "Scomber japonicus", "Trachurus symmetricus"),
-                    values = c(pac.herring.color, anchovy.color,  
+                    labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Etrumeus acuminatus",
+                               "Sardinops sagax (Northern)", "Scomber japonicus", "Trachurus symmetricus"),
+                    values = c(pac.herring.color, anchovy.color, rnd.herring.color,  
                                sardine.color, pac.mack.color, jack.mack.color)) +
   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
