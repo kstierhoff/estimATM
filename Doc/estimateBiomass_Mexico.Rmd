@@ -97,7 +97,7 @@ save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- T # Generate bootstrap estimates
+do.bootstrap      <- F # Generate bootstrap estimates
 
 ### Sometimes F
 do.imap           <- T # Create interactive Leaflet map
@@ -2387,17 +2387,17 @@ if (survey.name %in% c("2107RL")) {
       key = paste(cruise, ship, collection, consecutiveNumber),
       totalLength_mm = case_when(
         scientificName == "Clupea pallasii" ~ 
-          convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+          convert_length("Clupea pallasii", .$standardLength_mm, "SL", "TL"),
         scientificName == "Engraulis mordax" ~ 
-          convert_length("Engraulis mordax", .$forkLength_mm, "FL", "TL"),
+          convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
         scientificName == "Sardinops sagax" ~ 
-          convert_length("Sardinops sagax", .$forkLength_mm, "FL", "TL"),
+          convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
         scientificName == "Scomber japonicus" ~ 
           convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
         scientificName == "Trachurus symmetricus" ~ 
           convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Etrumeus acuminatus" ~ 
-          convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL")),
+          convert_length("Etrumeus acuminatus", .$standardLength_mm, "SL", "TL")),
       missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
     mutate(
       weightg = estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
@@ -2530,6 +2530,10 @@ if (nrow(lengths.binned) > 0) {
 
 # Save results
 save(length.summ, file = here("Output/length_summary_all.Rdata"))
+
+# Save trawl data-final
+save(catch, haul, lengths,
+     file = here("Data/Trawl/all_trawl_data-final.Rdata") )
 ```  
 
 ## QA/QC of trawl data
@@ -2790,7 +2794,10 @@ if (get.db) {
     cufes.filename <- path_file(dir_ls(here("Data/CUFES"), regexp = "*.sqlite"))
     cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
     # Create the pointer to the CUFES table
-    cufes.all <- tbl(cufes.con, "cufessqlite")
+    cufes.all <- tbl(cufes.con, "cufessqlite") %>% collect()
+    
+    # Close connection
+    dbDisconnect(cufes.con)  
   } else if (cufes.source == "SQL") {
     cufes.con  <- dbConnect(odbc::odbc(), 
                             Driver = "SQL Server", 
@@ -2798,12 +2805,23 @@ if (get.db) {
                             Database = "CUFES", 
                             Trusted_Connection = "True")
     # Create the pointer to the CUFES table
-    cufes.all <- tbl(cufes.con, "CUFES")
+    cufes.all <- tbl(cufes.con, "CUFES") %>% collect()
+    
+    # Close connection
+    dbDisconnect(cufes.con)  
+  } else if (cufes.source == "CSV") {
+    # cufes.source = "CSV"
+    cufes.filename <- file.path(here("Data/CUFES", cufes.db.csv))
+    
+    cufes.all <- read_csv(cufes.filename) %>% 
+      mutate(Cruise = as.character(Cruise))
+    
+    if (is.null(cufes.all$Comments)) cufes.all$Comments <- NA_character_
   }
   
   # Read CUFES data
   cufes.all <- cufes.all %>%
-    collect() %>% 
+    # collect() %>% 
     mutate(
       Start = case_when(
         cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
@@ -2826,9 +2844,6 @@ if (get.db) {
       rename(lat = StartLatitude, long = StartLongitude)%>% 
       project_df(to = crs.proj)
   }
-  
-  # Close connection
-  dbDisconnect(cufes.con)  
   
   # Save imported database data to .Rdata file
   save(cufes.all, file = here("Data/CUFES/cufes_data.Rdata"))

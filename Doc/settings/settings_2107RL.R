@@ -526,9 +526,10 @@ scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # CUFES data
-cufes.source           <- "SQLite" # "SQL" or "SQLite"
+cufes.source           <- "SQLite" # "SQL" or "SQLite" or "CSV"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
 cufes.db.sqlite        <- "cufes202107RL.sqlite" # CUFES SQLite database
+cufes.db.csv           <- "cufes202107RL.csv" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 cufes.date.format      <- "mdy" # mdy (1907RL only) or ymd (most other surveys)
 cufes.vessels          <- c("RL", "JCF")
@@ -555,8 +556,8 @@ length.min <- 1 # Minimum length bin for length frequencies
 # (max. anchovy = 20 cm, sardine & herring = 30 cm, Pac. mack = 40, and jack mack. = 60)
 length.max <- data.frame("species" = c("Clupea pallasii","Engraulis mordax",
                                        "Sardinops sagax", "Scomber japonicus",
-                                       "Trachurus symmetricus"),
-                         "sl" = c(30,20,30,40,60))
+                                       "Trachurus symmetricus","Etrumeus acuminatus"),
+                         "sl" = c(30,20,30,40,60,30))
 
 # Species to generate point estimates
 point.est.spp          <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
@@ -590,84 +591,200 @@ stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
 # Manually define sampling strata for each species
-# Create a new data frame with each species, stratum, and vector containing transects
+# Create a new data frame with each species, stratum, and vector containing transectsv
 strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 46:53),
+    transect = 86:93),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 2,
-    transect = 55:66),
+    transect = 95:106),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 3,
-    transect = 70:78),
+    transect = 110:118),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 4,
-    transect = 82:88),
+    transect = 122:128),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 5,
-    transect = 94:99),
+    transect = 134:139),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:51),
+    transect = 12:26),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 52:58),
+    transect = 27:40),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 3,
-    transect = 72:88),
+    transect = 41:91),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 4,
+    transect = 92:99),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 5,
+    transect = 111:127),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 1:13),
+    transect = 1:26),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 14:20),
+    transect = 27:40),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 23:28),
+    transect = 41:53),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 47:60),
+    transect = 54:69),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 5,
-    transect = 66:84),
+    transect = 87:100),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 6,
+    transect = 106:123),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 1:14),
+    transect = 4:26),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 41:46),
+    transect = 27:40),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 3,
-    transect = 58:71),
+    transect = 41:54),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 4,
-    transect = 79:83),
+    transect = 81:86),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 5,
+    transect = 98:110),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 6,
+    transect = 118:123),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:35),
+    transect = 4:26),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 41:97))
+    transect = 27:40),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 3,
+    transect = 41:86),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 4,
+    transect = 87:136),
+  data.frame(
+    scientificName = "Etrumeus acuminatus", 
+    stratum = 1,
+    transect = 1:26)
+)
+
+# strata.manual <- bind_rows(
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 1,
+#     transect = 46:53),
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 2,
+#     transect = 55:66),
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 3,
+#     transect = 70:78),
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 4,
+#     transect = 82:88),
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 5,
+#     transect = 94:99),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 1,
+#     transect = 1:51),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 2,
+#     transect = 52:58),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 3,
+#     transect = 72:88),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 1,
+#     transect = 1:69),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 2,
+#     transect = 87:100),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 3,
+#     transect = 106:123),
+#   # data.frame(
+#   #   scientificName = "Sardinops sagax", 
+#   #   stratum = 4,
+#   #   transect = 47:60),
+#   # data.frame(
+#   #   scientificName = "Sardinops sagax", 
+#   #   stratum = 5,
+#   #   transect = 66:84),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 1,
+#     transect = 4:54),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 2,
+#     transect = 81:86),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 3,
+#     transect = 98:110),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 4,
+#     transect = 118:123),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 1,
+#     transect = 4:86),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 2,
+#     transect = 87:136),
+#   data.frame(
+#     scientificName = "Etrumeus acuminatus", 
+#     stratum = 1,
+#     transect = 1:26)
+#   )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino

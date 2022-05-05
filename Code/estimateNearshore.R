@@ -1564,16 +1564,17 @@ if (save.figs) {
   load(here("Output/biomass_dens_ns_map_all.Rdata"))
 }
 
-# Create blank plots for missing species
-for (i in cps.spp) {
-  if (is.null(biomass.dens.figs.ns[[i]])) {
-    df <- data.frame()
-    biomass.dens.temp <- ggplot(df) + geom_point() + 
-      xlim(0,10) + ylim(0,10) + 
-      annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
-      theme_bw()  
-    ggsave(biomass.dens.temp, 
-           filename = paste(here("Figs/fig_biomass_dens_ns_"), i, ".png", sep = ""))
+# Create blank plots for missing species/stocks
+for (i in unique(strata.primary$scientificName)) {
+  for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
+    if (is.null(biomass.dens.figs.ns[[i]][[j]])) {
+      biomass.dens.temp <- base.map + 
+        annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
+        theme_bw()  
+      ggsave(biomass.dens.temp, 
+             filename = paste0(here("Figs/fig_biomass_dens_ns_"), i, "-", j, ".png"),
+             height = map.height, width = map.width)
+    }
   }
 }
 
@@ -2143,15 +2144,18 @@ for (i in unique(abund.summ.ns$Species)) {
 }
 
 # Create blank plots for missing species
-for (i in cps.spp) {
-  if (is.null(L.disagg.plots.ns[[i]])) {
-    df <- data.frame()
-    L.disagg.temp.ns <- ggplot(df) + geom_point() + 
-      xlim(0,10) + ylim(0,10) + 
-      annotate('text',5,5,label = 'No Data', size = 6, fontface = 'bold') +
-      theme_bw() + ggtitle(i)  
-    ggsave(L.disagg.temp.ns, 
-           filename = paste0(here("Figs/fig_L_disagg_os_"), i, ".png"))
+for (i in unique(strata.primary$scientificName)) {
+  for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
+    if (is.null(L.disagg.plots.ns[[i]])) {
+      df <- data.frame()
+      L.disagg.temp.ns <- ggplot(df) + geom_point() + 
+        xlim(0,10) + ylim(0,10) + 
+        annotate('text',5,5,label = 'No Data', size = 6, fontface = 'bold') +
+        theme_bw() + ggtitle(i)  
+      ggsave(L.disagg.temp.ns, 
+             filename = paste0(here("Figs/fig_L_disagg_os_"), i, ".png"),
+             height = 6, width = 6)
+    }
   }
 }
 
