@@ -211,10 +211,12 @@ jack.mack.color    <- '#0000FF'
 jacksmelt.color    <- '#A020F0'
 pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
+rnd.herring.color  <- '#F0B81D'
 
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
-                        "Scomber japonicus","Trachurus symmetricus")
+                        "Scomber japonicus","Trachurus symmetricus", 
+                        "Etrumeus acuminatus")
 # CUFES
 cufes.start        <- "2022-06-27" # Start of survey for CUFES filtering
 cufes.end          <- "2022-09-24" # End of survey for CUFES filtering
