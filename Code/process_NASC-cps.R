@@ -1,24 +1,26 @@
 if (process.csv) {
   if (!process.csv.all) {
     # Load already processed CSV files 
-    if (file.exists(here("Output/processed_csv.Rdata"))) {
-      load(here("Output/processed_csv.Rdata"))
+    if (file.exists(here("Output/processed_csv-cps.Rdata"))) {
+      load(here("Output/processed_csv-cps.Rdata"))
     }
     
     # Load already processed backscatter data
-    load(here("Data/Backscatter/nasc_all.Rdata"))
+    if (file.exists(here("Data/Backscatter/nasc_all-cps.Rdata"))) {
+      load(here("Data/Backscatter/nasc_all-cps.Rdata"))
+    }
   }
   
   # Process CSV files for each vessel
   for (i in nasc.vessels) {
     # List all CSV files
     nasc.files <- dir_ls(file.path(here("Data/Backscatter", i)),
-                         regepx = nasc.pattern.cps[i],
+                         regexp = nasc.pattern.cps[i],
                          ignore.case = TRUE)
     
     if (!process.csv.all) {
       # List only new CSV files
-      nasc.files <- nasc.files[!fs::path_file(nasc.files) %in% processed.csv]
+      nasc.files <- nasc.files[!fs::path_file(nasc.files) %in% processed.cps]
       
       # Load already processed vessel NASC data
       if (file.exists(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))) {
@@ -63,7 +65,7 @@ if (process.csv) {
               file = here("Data/Backscatter", i, 
                           paste0("nasc_vessel_", i, "_RAW.rds")))
       
-      processed.csv.vessel <- unique(fs::path_file(nasc.vessel$filename))
+      processed.cps.vessel <- unique(fs::path_file(nasc.vessel$filename))
       
       # Get intervals with bad lat/long values
       bad.nasc <- filter(nasc.vessel, lat == 999, long == 999) %>% 
@@ -258,21 +260,17 @@ if (process.csv) {
               left_join(select(cps.nasc.temp, time.align, cps.nasc))  
           }
         } else {
-          # Use fixed integration depth (NASC.70), with or without surface noise removal
-          if (rm.surface[i]) {
-            # Remove surface noise, often from Saildrone backscatter
-            if ("cps.NASC" %in% colnames(nasc.vessel)) {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.NASC - NASC.5)
-            } else {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70 - NASC.5)
-            }
+          # Use cps.NASC extracted using extract_cps_nasc.R
+          if ("cps.NASC" %in% colnames(nasc.vessel)) {
+            nasc.vessel$cps.nasc <- nasc.vessel$cps.NASC
           } else {
-            # Keep surface backscatter
-            if ("cps.NASC" %in% colnames(nasc.vessel)) {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.NASC)
-            } else {
-              nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
-            }
+            # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
+            nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
+          }
+          
+          # Remove surface noise, often from Saildrone backscatter
+          if (rm.surface[i]) {
+            nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.nasc - NASC.5)
           }
         }
         
@@ -281,28 +279,28 @@ if (process.csv) {
                                          paste0("nasc_vessel_", i, ".rds")))
         
         # Combine results from different vessels
-        if (exists("nasc")) {
-          nasc <- bind_rows(nasc, nasc.vessel)
+        if (exists("nasc.cps")) {
+          nasc.cps <- bind_rows(nasc.csv, nasc.vessel)
         } else {
-          nasc <- nasc.vessel
+          nasc.cps <- nasc.vessel
         }
       }
       
-      # Combine processed.csv.vessel
-      if (exists("processed.csv")) {
-        processed.csv <- unique(sort(c(processed.csv, processed.csv.vessel)))
+      # Combine processed.cps.vessel
+      if (exists("processed.cps")) {
+        processed.cps <- unique(sort(c(processed.cps, processed.cps.vessel)))
       } else {
-        processed.csv <- processed.csv.vessel
+        processed.cps <- processed.cps.vessel
       }
     }
   }  
   
   # Save processed NASC file import
-  save(nasc, file = here("Data/Backscatter/nasc_all.Rdata"))
+  save(nasc.cps, file = here("Data/Backscatter/nasc_all-cps.Rdata"))
   
   # Save processed CSV file names
-  save(processed.csv, file =  here("Output/processed_csv.Rdata"))
+  save(processed.cps, file =  here("Output/processed_csv.Rdata"))
   
 } else {
-  load(here("Data/Backscatter/nasc_all.Rdata"))
+  load(here("Data/Backscatter/nasc_all-cps.Rdata"))
 }
