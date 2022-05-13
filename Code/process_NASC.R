@@ -1,14 +1,12 @@
 if (process.csv) {
   if (!process.csv.all) {
     # Load already processed CSV files 
-    if (file.exists(here("Output/processed_csv-cps.Rdata"))) {
-      load(here("Output/processed_csv-cps.Rdata"))
+    if (file.exists(here("Output/processed_csv.Rdata"))) {
+      load(here("Output/processed_csv.Rdata"))
     }
     
     # Load already processed backscatter data
-    if (file.exists(here("Data/Backscatter/nasc_all-cps.Rdata"))) {
-      load(here("Data/Backscatter/nasc_all-cps.Rdata"))
-    }
+    load(here("Data/Backscatter/nasc_all.Rdata"))
   }
   
   # Process CSV files for each vessel
@@ -20,7 +18,7 @@ if (process.csv) {
     
     if (!process.csv.all) {
       # List only new CSV files
-      nasc.files <- nasc.files[!fs::path_file(nasc.files) %in% processed.cps]
+      nasc.files <- nasc.files[!fs::path_file(nasc.files) %in% processed.csv]
       
       # Load already processed vessel NASC data
       if (file.exists(here("Data/Backscatter", i, paste0("nasc_vessel_", i, "_RAW.rds")))) {
@@ -65,7 +63,7 @@ if (process.csv) {
               file = here("Data/Backscatter", i, 
                           paste0("nasc_vessel_", i, "_RAW.rds")))
       
-      processed.cps.vessel <- unique(fs::path_file(nasc.vessel$filename))
+      processed.csv.vessel <- unique(fs::path_file(nasc.vessel$filename))
       
       # Get intervals with bad lat/long values
       bad.nasc <- filter(nasc.vessel, lat == 999, long == 999) %>% 
@@ -131,6 +129,10 @@ if (process.csv) {
       }
       
       # Remove offshore transects data
+      # If proper offshore sampling was conducted, biomass will be estimated
+      # in later steps. If offshore biomass is to be included in the final
+      # estimates, combine.regions == TRUE and "Offshore" should be included in
+      # estimate.regions
       if (rm.offshore[i]) {
         # Filter based on offshore pattern
         nasc.offshore <- nasc.vessel %>% 
@@ -167,6 +169,10 @@ if (process.csv) {
       }
       
       # Remove nearshore transects data
+      # If proper nearshore sampling was conducted, biomass will be estimated
+      # in later steps. If nearshore biomass is to be included in the final
+      # estimates, combine.regions == TRUE and "Nearshore" should be included in
+      # estimate.regions
       if (rm.nearshore[i]) {
         nasc.nearshore <- nasc.vessel %>% 
           filter(str_detect(transect.orig, nasc.pattern.nearshore[i]) |
@@ -189,7 +195,13 @@ if (process.csv) {
         group_by(transect) %>% 
         summarise(L = length(Interval)/10*0.539957) %>%
         arrange(L) %>% 
-        filter(L > min.tx.length[i]) 
+        filter(L > min.tx.length[i])
+      
+      tx.short <- nasc.vessel %>% 
+        group_by(transect) %>% 
+        summarise(L = length(Interval)/10*0.539957) %>%
+        arrange(L) %>% 
+        filter(L <= min.tx.length[i])
       
       # Remove backscatter data from short transects
       nasc.vessel <- nasc.vessel %>% 
@@ -279,28 +291,28 @@ if (process.csv) {
                                          paste0("nasc_vessel_", i, ".rds")))
         
         # Combine results from different vessels
-        if (exists("nasc.cps")) {
-          nasc.cps <- bind_rows(nasc.csv, nasc.vessel)
+        if (exists("nasc")) {
+          nasc <- bind_rows(nasc, nasc.vessel)
         } else {
-          nasc.cps <- nasc.vessel
+          nasc <- nasc.vessel
         }
       }
       
-      # Combine processed.cps.vessel
-      if (exists("processed.cps")) {
-        processed.cps <- unique(sort(c(processed.cps, processed.cps.vessel)))
+      # Combine processed.csv.vessel
+      if (exists("processed.csv")) {
+        processed.csv <- unique(sort(c(processed.csv, processed.csv.vessel)))
       } else {
-        processed.cps <- processed.cps.vessel
+        processed.csv <- processed.csv.vessel
       }
     }
   }  
   
   # Save processed NASC file import
-  save(nasc.cps, file = here("Data/Backscatter/nasc_all-cps.Rdata"))
+  save(nasc, file = here("Data/Backscatter/nasc_all.Rdata"))
   
   # Save processed CSV file names
-  save(processed.cps, file =  here("Output/processed_csv-cps.Rdata"))
+  save(processed.csv, file =  here("Output/processed_csv.Rdata"))
   
 } else {
-  load(here("Data/Backscatter/nasc_all-cps.Rdata"))
+  load(here("Data/Backscatter/nasc_all.Rdata"))
 }
