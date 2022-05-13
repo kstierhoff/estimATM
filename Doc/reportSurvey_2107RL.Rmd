@@ -19,7 +19,7 @@ pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,rgeos,
                knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
                maptools,png,grid,gridExtra,cowplot,flextable,fs,ftExtra,mapview,
                stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
-               scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra)
+               scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra,tcltk)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -83,7 +83,7 @@ copy.bib        <- F # copy files from source; requires VPN
 overwrite.csv   <- T # overwrite CSV files when copying
 overwrite.files <- T # overwrite files when copying
 download.hab    <- F # download habitat map
-save.figs       <- F # draw plots and maps, or use existing
+save.figs       <- T # draw plots and maps, or use existing
 get.db          <- F # import database data
 process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- F # download nav data from ERDDAP
@@ -132,9 +132,13 @@ if (copy.files) {
 }
 ```
 
-```{r process-nav}
+```{r process-nav, include=FALSE}
 # Source code to get nav data from ERDDAP
 source(here("Code/get_nav_erddap.R"))
+
+if (survey.name == "2107RL") {
+  source(here("Code/get_nav_carranza.R"))
+}
 
 # Read transect waypoints
 wpts <- read_csv(here("Data/Nav", wpt.filename))
@@ -179,7 +183,7 @@ if (process.cal) {
 if (save.figs) {
   source(here("Code/plot_CalTimeSeries.R"))
 }
-```  
+```
 
 ```{r plot-cal-fm}
 if (process.cal) {
@@ -428,9 +432,9 @@ if ("LM" %in% cal.vessels) {
   
   # Get calibration files
   cal.files.lm <- sort(c(list.files(dir.lm,pattern = ".txt", 
-                                     full.names = TRUE),
-                          list.files(dir.lm,pattern = ".xml", 
-                                     full.names = TRUE)))
+                                    full.names = TRUE),
+                         list.files(dir.lm,pattern = ".xml", 
+                                    full.names = TRUE)))
   
   # set survey info
   survey.vessel.temp   <- "LM"
@@ -491,29 +495,29 @@ if ("LM" %in% cal.vessels) {
   
   # create names for cal parameters and beam model results
   names(cal.params.lm) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
-                             "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
-                             "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
-                             "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
-                             "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
-                             "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
-                             "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
-                             "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
-                             "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                             "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                             "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
-                             "Theoretical TS ($TS_\\mathrm{theory}$)",
-                             "Ambient Noise")
+                            "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                            "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                            "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                            "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                            "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                            "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                            "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                            "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                            "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                            "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                            "Theoretical TS ($TS_\\mathrm{theory}$)",
+                            "Ambient Noise")
   
   names(bm.res.lm) <- c("Frequency","On-axis Gain ($G_0$)",
-                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
-                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                         "Angle Offset Along. ($\\alpha_{0}$)",
-                         "Angle Offset Athw. ($\\beta_{0}$)")
+                        "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                        "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                        "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                        "Angle Offset Along. ($\\alpha_{0}$)",
+                        "Angle Offset Athw. ($\\beta_{0}$)")
   
   names(echo.settings.lm) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
-                                "Bandwidth (Hz)","Transmit Power (W)",
-                                "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+                               "Bandwidth (Hz)","Transmit Power (W)",
+                               "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
   
   # cast output by frequency and transducer model number
   param.output.lm  <- suppressMessages(dcast(melt(cal.params.lm, id.vars = "Frequency"), variable~Frequency))
@@ -521,8 +525,8 @@ if ("LM" %in% cal.vessels) {
   
   # add a column with parameter units
   param.units.lm <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
-                                          "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
-                                          "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+                                         "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                                         "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
   
   # add a column with beam model units
   bm.units.lm <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
@@ -546,6 +550,138 @@ if ("LM" %in% cal.vessels) {
   
   write_csv(all.output.lm,
             file = here("Output/cal_output_table_LM.csv"))
+}
+```
+
+```{r process-cal-carranza}
+if ("JCF" %in% cal.vessels) {
+  
+  # Create output directory ------------------------------------------------------
+  dir_create(here("Output/Calibration/JCF"))
+  
+  # Calibration directory -----------------------------------------------
+  dir.jcf <- here("Data/Calibration/JCF")
+  
+  # Get calibration files
+  cal.files.jcf <- sort(c(list.files(dir.jcf,pattern = ".txt", 
+                                     full.names = TRUE),
+                          list.files(dir.jcf,pattern = ".xml", 
+                                     full.names = TRUE)))
+  
+  # set survey info
+  survey.vessel.temp   <- "JCF"
+  survey.name.temp     <- survey.name
+  cal.group.temp       <- "INAPESCA"
+  
+  # Create data frames for storing results
+  cal.res.jcf   <- data.frame()
+  cal.info.jcf  <- data.frame()
+  cal.pings.jcf <- data.frame()
+  
+  # process all calibration results in CALIBRATION directory
+  for (i in cal.files.jcf) {
+    # Extract calibration results, information, and pings
+    cal <- extract_cal(i, survey.vessel.temp, survey.name.temp, cal.group.temp)
+    
+    # combine all results
+    cal.res.jcf   <- bind_rows(cal.res.jcf,   cal$cal.res)
+    cal.info.jcf  <- bind_rows(cal.info.jcf,  cal$cal.info)
+    cal.pings.jcf <- bind_rows(cal.pings.jcf, cal$cal.pings)
+  }
+  
+  # Format results
+  cal.res.jcf   <- arrange(cal.res.jcf, mdy(cal_date), txdr_freq)
+  cal.info.jcf  <- arrange(cal.info.jcf, mdy_hms(date_time))
+  cal.pings.jcf <- arrange(cal.pings.jcf, date_time)
+  
+  # write all results to file
+  save(cal.res.jcf, cal.info.jcf, cal.pings.jcf, cal.files,
+       file = here("Data/Calibration/LBC/cal_results_jcf.Rdata"))
+  
+  # Get results from current survey ---------------------------------------------
+  
+  # create data frame for calibration parameters
+  cal.params.jcf <- cal.res.jcf %>% 
+    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
+           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
+           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
+           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
+           txdr_alon_oa,txdr_athw_oa,target_ts) 
+  
+  # add noise estimates
+  # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
+  if (is.na(cal.noise["JCF"])) { 
+    cal.params.jcf$noise <- rep("N/A", length(cal.files.jcf))
+  } else {
+    cal.params.jcf$noise <- unlist(cal.noise[cal.vessels])
+  }
+  
+  # create data frame for beam model results
+  bm.res.jcf <- cal.res.jcf %>% 
+    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
+           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
+  
+  # create a data frame for echosounder settings
+  echo.settings.jcf <- cal.res.jcf %>% 
+    select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
+  
+  # create names for cal parameters and beam model results
+  names(cal.params.jcf) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
+                             "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                             "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                             "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                             "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                             "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                             "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                             "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                             "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                             "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                             "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                             "Theoretical TS ($TS_\\mathrm{theory}$)",
+                             "Ambient Noise")
+  
+  names(bm.res.jcf) <- c("Frequency","On-axis Gain ($G_0$)",
+                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                         "Angle Offset Along. ($\\alpha_{0}$)",
+                         "Angle Offset Athw. ($\\beta_{0}$)")
+  
+  names(echo.settings.jcf) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
+                                "Bandwidth (Hz)","Transmit Power (W)",
+                                "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+  
+  # cast output by frequency and transducer model number
+  param.output.jcf  <- suppressMessages(dcast(melt(cal.params.jcf, id.vars = "Frequency"), variable~Frequency))
+  bm.output.jcf     <- suppressMessages(dcast(melt(bm.res.jcf, id.vars = "Frequency"), variable~Frequency))
+  
+  # add a column with parameter units
+  param.units.jcf <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+                                          "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                                          "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+  
+  # add a column with beam model units
+  bm.units.jcf <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  
+  # add units to output and arrange columns
+  param.output.jcf <- bind_cols(param.output.jcf, param.units.jcf) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  bm.output.jcf <- bind_cols(bm.output.jcf, bm.units.jcf) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  # combine results data frames
+  all.output.jcf <- rbind(param.output.jcf, bm.output.jcf) %>% 
+    rename(" " = "Frequency ($f$, kHz)")
+  
+  # save output to .Rdata and CSV
+  save(all.output.jcf,
+       file = here("Output/cal_output_table_JCF.Rdata"))
+  
+  write_csv(all.output.lbc,
+            file = here("Output/cal_output_table_JCF.csv"))
 }
 ```
 
@@ -670,243 +806,369 @@ ggsave(here("Figs/fig_cal_TSrel_scatter.png"), tsc.scatter,
 ```
 
 ```{r plot-cal-pings-lbc}
-# Get ping data from current survey and format for plotting
-cal.pings.lbc <- cal.pings.lbc %>% 
-  mutate(cal_date = date(date_time)) %>% 
-  # filter(between(cal_date,
-  #                ymd(cal.plot.date) - days(cal.window),
-  #                ymd(cal.plot.date) + days(cal.window))) %>% 
-  arrange(txdr_freq, ping_num)
-
-# Set axis limits based on range of ping angles
-cal.lim.tmp <- round(max(max(cal.pings.lbc$along), max(cal.pings.lbc$athw))) 
-
-if (cal.lim.tmp %% 2) {
-  # If range is odd, add 1 to make axis ticks look nice
-  cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
-} else {
-  cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+if ("LBC" %in% cal.vessels) {
+  # Get ping data from current survey and format for plotting
+  cal.pings.lbc <- cal.pings.lbc %>% 
+    mutate(cal_date = date(date_time)) %>% 
+    # filter(between(cal_date,
+    #                ymd(cal.plot.date) - days(cal.window),
+    #                ymd(cal.plot.date) + days(cal.window))) %>% 
+    arrange(txdr_freq, ping_num)
+  
+  # Set axis limits based on range of ping angles
+  cal.lim.tmp <- round(max(max(cal.pings.lbc$along), max(cal.pings.lbc$athw))) 
+  
+  if (cal.lim.tmp %% 2) {
+    # If range is odd, add 1 to make axis ticks look nice
+    cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
+  } else {
+    cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+  }
+  
+  # subset only outlier points
+  outliers <- filter(cal.pings.lbc, outlier == 1)
+  
+  cal.pings.lbc <- cal.pings.lbc %>% 
+    left_join(select(cal.res.lbc,txdr_freq,txdr_type,target_ts,
+                     txdr_gain,bm_txdr_gain,
+                     bm_alon_ba,bm_athw_ba,
+                     bm_alon_oa,bm_athw_oa)) %>% 
+    mutate(
+      txdr_type      = fct_reorder(txdr_type, txdr_freq),
+      TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
+      alpha          = along - bm_alon_oa,
+      beta           = athw - bm_athw_oa,
+      x              = (2*alpha) / bm_alon_ba,
+      y              = (2*beta) / bm_athw_ba,
+      B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
+      TS_c_new       = TS_u_new + B,
+      relTS_c        = TS_c_new - target_ts,
+      relTS_c_scaled = case_when(
+        relTS_c >= 1 ~ 1,
+        relTS_c <= -1 ~-1,
+        between(relTS_c,-1,1) ~ relTS_c))
+  
+  if (cal.scales == "fixed") {
+    # Plot beam-uncompensated target strength data #####
+    tsu.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
+      geom_point(aes(colour = TS_u)) + 
+      geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along), 
+                 shape = "+", size = 1, alpha = 0.7) +
+      facet_wrap(~txdr_type, scales = cal.scales) +
+      scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                           option = "magma") +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      guides(size =  "none") + theme_bw() + 
+      theme(panel.spacing    = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x     = element_text(face = "bold")) + 
+      coord_equal()
+    
+    # Plot beam-compensated target strength data #####
+    tsc.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
+      geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
+      geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along),
+                 shape = "+", size = 4) +
+      facet_wrap(~txdr_type, scales = cal.scales) + 
+      scale_fill_distiller(name = expression(italic(TS)[rel]),
+                           type = "div", palette = "RdBu", limits = c(-1,1)) +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      theme_bw() + 
+      theme(panel.spacing = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x = element_text(face = "bold")) +
+      coord_equal()
+    
+  } else {
+    # Plot beam-uncompensated target strength data #####
+    tsu.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
+      geom_point(aes(colour = TS_u)) + 
+      geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along), 
+                 shape = "+", size = 1, alpha = 0.7) +
+      facet_wrap(~txdr_type, scales = cal.scales) +
+      scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                           option = "magma") +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+      scale_y_continuous('Alongship Beam Angle (deg)\n') +
+      guides(size =  "none") + theme_bw() + 
+      theme(panel.spacing    = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x     = element_text(face = "bold")) 
+    
+    # Plot beam-compensated target strength data #####
+    tsc.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
+      geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
+      geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along),
+                 shape = "+", size = 4) +
+      facet_wrap(~txdr_type, scales = cal.scales) + 
+      scale_fill_distiller(name = expression(italic(TS)[rel]),
+                           type = "div", palette = "RdBu", limits = c(-1,1)) +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+      scale_y_continuous('Alongship Beam Angle (deg)\n') +
+      theme_bw() + 
+      theme(panel.spacing = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x = element_text(face = "bold")) 
+  }
+  
+  # Save TS_u plot 
+  ggsave(tsu.scatter.lbc, filename = here("Figs/fig_cal_TSu_scatter_LBC.png"),  
+         width = 9, height = 8)
+  
+  # Save TS_c plot 
+  ggsave(tsc.scatter.lbc, filename = here("Figs/fig_cal_TSrel_scatter_LBC.png"), 
+         width = 9, height = 8)
 }
-
-# subset only outlier points
-outliers <- filter(cal.pings.lbc, outlier == 1)
-
-cal.pings.lbc <- cal.pings.lbc %>% 
-  left_join(select(cal.res.lbc,txdr_freq,txdr_type,target_ts,
-                   txdr_gain,bm_txdr_gain,
-                   bm_alon_ba,bm_athw_ba,
-                   bm_alon_oa,bm_athw_oa)) %>% 
-  mutate(
-    txdr_type      = fct_reorder(txdr_type, txdr_freq),
-    TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
-    alpha          = along - bm_alon_oa,
-    beta           = athw - bm_athw_oa,
-    x              = (2*alpha) / bm_alon_ba,
-    y              = (2*beta) / bm_athw_ba,
-    B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
-    TS_c_new       = TS_u_new + B,
-    relTS_c        = TS_c_new - target_ts,
-    relTS_c_scaled = case_when(
-      relTS_c >= 1 ~ 1,
-      relTS_c <= -1 ~-1,
-      between(relTS_c,-1,1) ~ relTS_c))
-
-if (cal.scales == "fixed") {
-  # Plot beam-uncompensated target strength data #####
-  tsu.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
-    geom_point(aes(colour = TS_u)) + 
-    geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along), 
-               shape = "+", size = 1, alpha = 0.7) +
-    facet_wrap(~txdr_type, scales = cal.scales) +
-    scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                         option = "magma") +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    guides(size =  "none") + theme_bw() + 
-    theme(panel.spacing    = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x     = element_text(face = "bold")) + 
-    coord_equal()
-  
-  # Plot beam-compensated target strength data #####
-  tsc.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
-    geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
-    geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along),
-               shape = "+", size = 4) +
-    facet_wrap(~txdr_type, scales = cal.scales) + 
-    scale_fill_distiller(name = expression(italic(TS)[rel]),
-                         type = "div", palette = "RdBu", limits = c(-1,1)) +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    theme_bw() + 
-    theme(panel.spacing = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x = element_text(face = "bold")) +
-    coord_equal()
-  
-} else {
-  # Plot beam-uncompensated target strength data #####
-  tsu.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
-    geom_point(aes(colour = TS_u)) + 
-    geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along), 
-               shape = "+", size = 1, alpha = 0.7) +
-    facet_wrap(~txdr_type, scales = cal.scales) +
-    scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                         option = "magma") +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-    scale_y_continuous('Alongship Beam Angle (deg)\n') +
-    guides(size =  "none") + theme_bw() + 
-    theme(panel.spacing    = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x     = element_text(face = "bold")) 
-  
-  # Plot beam-compensated target strength data #####
-  tsc.scatter.lbc <- ggplot(filter(cal.pings.lbc, outlier == 0), aes(athw, along)) +
-    geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
-    geom_point(data = filter(cal.pings.lbc, outlier == 1), aes(athw, along),
-               shape = "+", size = 4) +
-    facet_wrap(~txdr_type, scales = cal.scales) + 
-    scale_fill_distiller(name = expression(italic(TS)[rel]),
-                         type = "div", palette = "RdBu", limits = c(-1,1)) +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-    scale_y_continuous('Alongship Beam Angle (deg)\n') +
-    theme_bw() + 
-    theme(panel.spacing = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x = element_text(face = "bold")) 
-}
-
-# Save TS_u plot 
-ggsave(tsu.scatter.lbc, filename = here("Figs/fig_cal_TSu_scatter_LBC.png"),  
-       width = 9, height = 8)
-
-# Save TS_c plot 
-ggsave(tsc.scatter.lbc, filename = here("Figs/fig_cal_TSrel_scatter_LBC.png"), 
-       width = 9, height = 8)
 ```
 
 ```{r plot-cal-pings-lm}
-# Get ping data from current survey and format for plotting
-cal.pings.lm <- cal.pings.lm %>% 
-  mutate(cal_date = date(date_time)) %>% 
-  # filter(between(cal_date,
-  #                ymd(cal.plot.date) - days(cal.window),
-  #                ymd(cal.plot.date) + days(cal.window))) %>% 
-  arrange(txdr_freq, ping_num)
-
-# Set axis limits based on range of ping angles
-cal.lim.tmp <- round(max(max(cal.pings.lm$along), max(cal.pings.lm$athw))) 
-
-if (cal.lim.tmp %% 2) {
-  # If range is odd, add 1 to make axis ticks look nice
-  cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
-} else {
-  cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+if ("LM" %in% cal.vessels) {
+  # Get ping data from current survey and format for plotting
+  cal.pings.lm <- cal.pings.lm %>% 
+    mutate(cal_date = date(date_time)) %>% 
+    # filter(between(cal_date,
+    #                ymd(cal.plot.date) - days(cal.window),
+    #                ymd(cal.plot.date) + days(cal.window))) %>% 
+    arrange(txdr_freq, ping_num)
+  
+  # Set axis limits based on range of ping angles
+  cal.lim.tmp <- round(max(max(cal.pings.lm$along), max(cal.pings.lm$athw))) 
+  
+  if (cal.lim.tmp %% 2) {
+    # If range is odd, add 1 to make axis ticks look nice
+    cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
+  } else {
+    cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+  }
+  
+  # subset only outlier points
+  outliers <- filter(cal.pings.lm, outlier == 1)
+  
+  cal.pings.lm <- cal.pings.lm %>% 
+    left_join(select(cal.res.lm,txdr_freq,txdr_type,target_ts,
+                     txdr_gain,bm_txdr_gain,
+                     bm_alon_ba,bm_athw_ba,
+                     bm_alon_oa,bm_athw_oa)) %>% 
+    mutate(
+      txdr_type      = fct_reorder(txdr_type, txdr_freq),
+      TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
+      alpha          = along - bm_alon_oa,
+      beta           = athw - bm_athw_oa,
+      x              = (2*alpha) / bm_alon_ba,
+      y              = (2*beta) / bm_athw_ba,
+      B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
+      TS_c_new       = TS_u_new + B,
+      relTS_c        = TS_c_new - target_ts,
+      relTS_c_scaled = case_when(
+        relTS_c >= 1 ~ 1,
+        relTS_c <= -1 ~-1,
+        between(relTS_c,-1,1) ~ relTS_c))
+  
+  if (cal.scales == "fixed") {
+    # Plot beam-uncompensated target strength data #####
+    tsu.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
+      geom_point(aes(colour = TS_u)) + 
+      geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along), 
+                 shape = "+", size = 1, alpha = 0.7) +
+      facet_wrap(~txdr_type, scales = cal.scales) +
+      scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                           option = "magma") +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      guides(size =  "none") + theme_bw() + 
+      theme(panel.spacing    = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x     = element_text(face = "bold")) + 
+      coord_equal()
+    
+    # Plot beam-compensated target strength data #####
+    tsc.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
+      geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
+      geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along),
+                 shape = "+", size = 4) +
+      facet_wrap(~txdr_type, scales = cal.scales) + 
+      scale_fill_distiller(name = expression(italic(TS)[rel]),
+                           type = "div", palette = "RdBu", limits = c(-1,1)) +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      theme_bw() + 
+      theme(panel.spacing = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x = element_text(face = "bold")) +
+      coord_equal()
+    
+  } else {
+    # Plot beam-uncompensated target strength data #####
+    tsu.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
+      geom_point(aes(colour = TS_u)) + 
+      geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along), 
+                 shape = "+", size = 1, alpha = 0.7) +
+      facet_wrap(~txdr_type, scales = cal.scales) +
+      scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                           option = "magma") +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+      scale_y_continuous('Alongship Beam Angle (deg)\n') +
+      guides(size =  "none") + theme_bw() + 
+      theme(panel.spacing    = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x     = element_text(face = "bold")) 
+    
+    # Plot beam-compensated target strength data #####
+    tsc.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
+      geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
+      geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along),
+                 shape = "+", size = 4) +
+      facet_wrap(~txdr_type, scales = cal.scales) + 
+      scale_fill_distiller(name = expression(italic(TS)[rel]),
+                           type = "div", palette = "RdBu", limits = c(-1,1)) +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+      scale_y_continuous('Alongship Beam Angle (deg)\n') +
+      theme_bw() + 
+      theme(panel.spacing = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x = element_text(face = "bold")) 
+  }
+  
+  # Save TS_u plot 
+  ggsave(tsu.scatter.lm, filename = here("Figs/fig_cal_TSu_scatter_LM.png"),  
+         width = 9, height = 8)
+  
+  # Save TS_c plot 
+  ggsave(tsc.scatter.lm, filename = here("Figs/fig_cal_TSrel_scatter_LM.png"), 
+         width = 9, height = 8)
 }
+```
 
-# subset only outlier points
-outliers <- filter(cal.pings.lm, outlier == 1)
-
-cal.pings.lm <- cal.pings.lm %>% 
-  left_join(select(cal.res.lm,txdr_freq,txdr_type,target_ts,
-                   txdr_gain,bm_txdr_gain,
-                   bm_alon_ba,bm_athw_ba,
-                   bm_alon_oa,bm_athw_oa)) %>% 
-  mutate(
-    txdr_type      = fct_reorder(txdr_type, txdr_freq),
-    TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
-    alpha          = along - bm_alon_oa,
-    beta           = athw - bm_athw_oa,
-    x              = (2*alpha) / bm_alon_ba,
-    y              = (2*beta) / bm_athw_ba,
-    B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
-    TS_c_new       = TS_u_new + B,
-    relTS_c        = TS_c_new - target_ts,
-    relTS_c_scaled = case_when(
-      relTS_c >= 1 ~ 1,
-      relTS_c <= -1 ~-1,
-      between(relTS_c,-1,1) ~ relTS_c))
-
-if (cal.scales == "fixed") {
-  # Plot beam-uncompensated target strength data #####
-  tsu.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
-    geom_point(aes(colour = TS_u)) + 
-    geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along), 
-               shape = "+", size = 1, alpha = 0.7) +
-    facet_wrap(~txdr_type, scales = cal.scales) +
-    scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                         option = "magma") +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    guides(size =  "none") + theme_bw() + 
-    theme(panel.spacing    = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x     = element_text(face = "bold")) + 
-    coord_equal()
+```{r plot-cal-pings-jcf}
+if ("JCF" %in% cal.vessels) {
+  # Get ping data from current survey and format for plotting
+  cal.pings.jcf <- cal.pings.jcf %>% 
+    mutate(cal_date = date(date_time)) %>% 
+    # filter(between(cal_date,
+    #                ymd(cal.plot.date) - days(cal.window),
+    #                ymd(cal.plot.date) + days(cal.window))) %>% 
+    arrange(txdr_freq, ping_num)
   
-  # Plot beam-compensated target strength data #####
-  tsc.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
-    geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
-    geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along),
-               shape = "+", size = 4) +
-    facet_wrap(~txdr_type, scales = cal.scales) + 
-    scale_fill_distiller(name = expression(italic(TS)[rel]),
-                         type = "div", palette = "RdBu", limits = c(-1,1)) +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                       breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-    theme_bw() + 
-    theme(panel.spacing = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x = element_text(face = "bold")) +
-    coord_equal()
+  # Set axis limits based on range of ping angles
+  cal.lim.tmp <- round(max(max(cal.pings.jcf$along), max(cal.pings.jcf$athw))) 
   
-} else {
-  # Plot beam-uncompensated target strength data #####
-  tsu.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
-    geom_point(aes(colour = TS_u)) + 
-    geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along), 
-               shape = "+", size = 1, alpha = 0.7) +
-    facet_wrap(~txdr_type, scales = cal.scales) +
-    scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                         option = "magma") +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-    scale_y_continuous('Alongship Beam Angle (deg)\n') +
-    guides(size =  "none") + theme_bw() + 
-    theme(panel.spacing    = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x     = element_text(face = "bold")) 
+  if (cal.lim.tmp %% 2) {
+    # If range is odd, add 1 to make axis ticks look nice
+    cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
+  } else {
+    cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+  }
   
-  # Plot beam-compensated target strength data #####
-  tsc.scatter.lm <- ggplot(filter(cal.pings.lm, outlier == 0), aes(athw, along)) +
-    geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
-    geom_point(data = filter(cal.pings.lm, outlier == 1), aes(athw, along),
-               shape = "+", size = 4) +
-    facet_wrap(~txdr_type, scales = cal.scales) + 
-    scale_fill_distiller(name = expression(italic(TS)[rel]),
-                         type = "div", palette = "RdBu", limits = c(-1,1)) +
-    scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-    scale_y_continuous('Alongship Beam Angle (deg)\n') +
-    theme_bw() + 
-    theme(panel.spacing = unit(1, "lines"),
-          strip.background = element_rect(fill = "white"),
-          strip.text.x = element_text(face = "bold")) 
+  # subset only outlier points
+  outliers <- filter(cal.pings.jcf, outlier == 1)
+  
+  cal.pings.jcf <- cal.pings.jcf %>% 
+    left_join(select(cal.res.jcf,txdr_freq,txdr_type,target_ts,
+                     txdr_gain,bm_txdr_gain,
+                     bm_alon_ba,bm_athw_ba,
+                     bm_alon_oa,bm_athw_oa)) %>% 
+    mutate(
+      txdr_type      = fct_reorder(txdr_type, txdr_freq),
+      TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
+      alpha          = along - bm_alon_oa,
+      beta           = athw - bm_athw_oa,
+      x              = (2*alpha) / bm_alon_ba,
+      y              = (2*beta) / bm_athw_ba,
+      B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
+      TS_c_new       = TS_u_new + B,
+      relTS_c        = TS_c_new - target_ts,
+      relTS_c_scaled = case_when(
+        relTS_c >= 1 ~ 1,
+        relTS_c <= -1 ~-1,
+        between(relTS_c,-1,1) ~ relTS_c))
+  
+  if (cal.scales == "fixed") {
+    # Plot beam-uncompensated target strength data #####
+    tsu.scatter.jcf <- ggplot(filter(cal.pings.jcf, outlier == 0), aes(athw, along)) +
+      geom_point(aes(colour = TS_u)) + 
+      geom_point(data = filter(cal.pings.jcf, outlier == 1), aes(athw, along), 
+                 shape = "+", size = 1, alpha = 0.7) +
+      facet_wrap(~txdr_type, scales = cal.scales) +
+      scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                           option = "magma") +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      guides(size =  "none") + theme_bw() + 
+      theme(panel.spacing    = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x     = element_text(face = "bold")) + 
+      coord_equal()
+    
+    # Plot beam-compensated target strength data #####
+    tsc.scatter.jcf <- ggplot(filter(cal.pings.jcf, outlier == 0), aes(athw, along)) +
+      geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
+      geom_point(data = filter(cal.pings.jcf, outlier == 1), aes(athw, along),
+                 shape = "+", size = 4) +
+      facet_wrap(~txdr_type, scales = cal.scales) + 
+      scale_fill_distiller(name = expression(italic(TS)[rel]),
+                           type = "div", palette = "RdBu", limits = c(-1,1)) +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                         breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+      theme_bw() + 
+      theme(panel.spacing = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x = element_text(face = "bold")) +
+      coord_equal()
+    
+  } else {
+    # Plot beam-uncompensated target strength data #####
+    tsu.scatter.jcf <- ggplot(filter(cal.pings.jcf, outlier == 0), aes(athw, along)) +
+      geom_point(aes(colour = TS_u)) + 
+      geom_point(data = filter(cal.pings.jcf, outlier == 1), aes(athw, along), 
+                 shape = "+", size = 1, alpha = 0.7) +
+      facet_wrap(~txdr_type, scales = cal.scales) +
+      scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                           option = "magma") +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+      scale_y_continuous('Alongship Beam Angle (deg)\n') +
+      guides(size =  "none") + theme_bw() + 
+      theme(panel.spacing    = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x     = element_text(face = "bold")) 
+    
+    # Plot beam-compensated target strength data #####
+    tsc.scatter.jcf <- ggplot(filter(cal.pings.jcf, outlier == 0), aes(athw, along)) +
+      geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
+      geom_point(data = filter(cal.pings.jcf, outlier == 1), aes(athw, along),
+                 shape = "+", size = 4) +
+      facet_wrap(~txdr_type, scales = cal.scales) + 
+      scale_fill_distiller(name = expression(italic(TS)[rel]),
+                           type = "div", palette = "RdBu", limits = c(-1,1)) +
+      scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+      scale_y_continuous('Alongship Beam Angle (deg)\n') +
+      theme_bw() + 
+      theme(panel.spacing = unit(1, "lines"),
+            strip.background = element_rect(fill = "white"),
+            strip.text.x = element_text(face = "bold")) 
+  }
+  
+  # Save TS_u plot 
+  ggsave(tsu.scatter.jcf, filename = here("Figs/fig_cal_TSu_scatter_JCF.png"),  
+         width = 9, height = 8)
+  
+  # Save TS_c plot 
+  ggsave(tsc.scatter.jcf, filename = here("Figs/fig_cal_TSrel_scatter_JCF.png"), 
+         width = 9, height = 8)
 }
-
-# Save TS_u plot 
-ggsave(tsu.scatter.lm, filename = here("Figs/fig_cal_TSu_scatter_LM.png"),  
-       width = 9, height = 8)
-
-# Save TS_c plot 
-ggsave(tsc.scatter.lm, filename = here("Figs/fig_cal_TSrel_scatter_LM.png"), 
-       width = 9, height = 8)
 ```
 
 ```{r create-basemap,include=F}
@@ -931,14 +1193,23 @@ bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>%
 # Set padding around data  
 if (resize.map) {
   # Use nav data to resize map to survey progress
-  map.bounds <- nav.paths.sf %>% 
+  map.bounds <- nav.sf %>% 
     st_transform(crs = crs.proj) %>%
-    st_bbox()  
+    st_bbox() 
 } else {
-  # Use nav data to resize map to survey progress
-  map.bounds <- transects.sf %>%
-    st_transform(crs = crs.proj) %>%
-    st_bbox()  
+  if (survey.name %in% c("2107RL")) {
+    # Use combined planned transects
+    map.bounds <- transects.jcf %>% 
+      select(Type) %>% 
+      bind_rows(transects.sf) %>% 
+      st_transform(crs = crs.proj) %>%
+      st_bbox()
+  } else {
+    # Use planned transects
+    map.bounds <- transects.sf %>%
+      st_transform(crs = crs.proj) %>%
+      st_bbox()
+  }
 }
 
 # Determine map aspect ratio and set height and width
@@ -981,7 +1252,7 @@ if (process.scs) {
     for (i in bridge.events) {
       bridge.snap.tmp <- read_csv(i) %>% 
         select(Date, Time, Button, Notes = all_of(notes.hdr), 
-             Lat = all_of(gps.lat.hdr), Lon = all_of(gps.lon.hdr))
+               Lat = all_of(gps.lat.hdr), Lon = all_of(gps.lon.hdr))
       
       bridge.snap <- bind_rows(bridge.snap, bridge.snap.tmp)
     }
@@ -1030,18 +1301,18 @@ if (get.db) {
   # An installation of Microsoft Access Database Engine Redistributable is required
   # for the Access version. It may be downloaded here: 
   # https://www.microsoft.com/en-us/download/details.aspx?id=54920
- 
+  
   if (trawl.source == "SQL") {
     # Configure ODBC connection to TRAWL database
     trawl.con  <- odbc::dbConnect(odbc::odbc(), 
-                            Driver = "SQL Server", 
-                            Server = "161.55.235.187", 
-                            Database = "TRAWL", 
-                            Trusted_Connection = "True")
+                                  Driver = "SQL Server", 
+                                  Server = "161.55.235.187", 
+                                  Database = "TRAWL", 
+                                  Trusted_Connection = "True")
   } else if (trawl.source == "Access") {
     trawl.con  <- odbc::dbConnect(odbc::odbc(), 
-                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                            DBQ = file.path(here("Data/Trawl"), trawl.db.access))
+                                  Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                                  DBQ = file.path(here("Data/Trawl"), trawl.db.access))
   }
   
   # Import trawl database tables
@@ -1127,6 +1398,42 @@ haul <- haul.all %>%
   mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% 
   droplevels() # Remove unused factor levels
 
+if (survey.name %in% c("2107RL")) {
+  # Get max haul and cluster for Lasker to increment Carranza data
+  max.cluster.rl <- max(haul$cluster)
+  max.haul.rl <- max(haul$haul)
+  
+  # Get Carranza data during 
+  haul.jcf <- read_csv(here("Data/Trawl/JCFINP2110_haul_bitacore.csv")) %>% 
+    mutate(cruise = as.character(cruise.name),
+           ship = "JCF",
+           equilibriumTime = with_tz(dmy_hm(startDateLocalTime, tz = "America/Los_Angeles"), 
+                                     tzone = "UTC"),
+           haulBackTime = with_tz(dmy_hm(stopDateLocalTime, tz = "America/Los_Angeles"), 
+                                  tzone = "UTC"),
+           collection = haul,
+           trawl.performance = NA,
+           season = case_when(
+             month(equilibriumTime) < 6 ~ "spring",
+             TRUE ~ "summer"), 
+           notes = NA,
+           duration = difftime(haulBackTime, equilibriumTime, units = "mins"),
+           cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% 
+    mutate(haul = haul + max.haul.rl,
+           cluster = cluster + max.cluster.rl)  %>% 
+    select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal,
+           stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime,
+           trawl.performance:cluster) 
+  
+  # ggplot(haul.jcf, aes(startLongDecimal, startLatDecimal)) + geom_point() + coord_map()
+  
+  haul <- bind_rows(haul, haul.jcf)
+  
+  # ggplot(haul, aes(startLongDecimal, startLatDecimal, colour = ship)) + 
+  #   geom_point() + 
+  #   coord_map()  
+}
+
 # # Get haul starts
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
@@ -1170,6 +1477,23 @@ catch <- catch.all %>%
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg)
 
+if (survey.name %in% c("2107RL")) {
+  # Read and process catch data from Carranza
+  catch.jcf <- read_csv(here("Data/Trawl/JCFINP2110_catch.csv")) %>% 
+    mutate(
+      cruise      = as.character(cruise.name),
+      collection  = haul,
+      haul        = haul + max.haul.rl,
+      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight,
+      key         = paste(haul, scientificName)) %>% 
+    left_join(select(spp.codes, scientificName, commonName, species)) %>% 
+    left_join(select(haul, haul, cluster))
+  
+  # Combine catch data from each vessel
+  catch <- bind_rows(catch, catch.jcf)
+}
+
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
   haul.summ.wt <- catch %>% 
@@ -1183,6 +1507,7 @@ if (nrow(catch) > 0) {
   if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
   if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
   if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (!has_name(haul.summ.wt, "Etrumeus acuminatus"))   {haul.summ.wt$`Etrumeus acuminatus` <- 0}
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>%  
@@ -1194,7 +1519,8 @@ if (nrow(catch) > 0) {
            "Anchovy"    = "Engraulis mordax",
            "Sardine"    = "Sardinops sagax",
            "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") 
+           "JackMack"   = "Trachurus symmetricus",
+           "RndHerring" = "Etrumeus acuminatus") 
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
@@ -1220,6 +1546,7 @@ if (nrow(catch) > 0) {
                               "Sardine"    = rep(0, nrow(haul)),
                               "PacMack"    = rep(0, nrow(haul)),
                               "JackMack"   = rep(0, nrow(haul)),
+                              "RndHerring" = rep(0, nrow(haul)),
                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
     right_join(haul.mid)
   
@@ -1236,7 +1563,7 @@ if (nrow(catch) > 0) {
 # Prepare catch data for plotting ----------------------------------------------
 # Select and rename trawl data for pie charts
 haul.pie <- haul.summ.wt %>% 
-  select(haul, long, lat, Anchovy, JackMack, 
+  select(haul, long, lat, Anchovy, JackMack, RndHerring,
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
@@ -1249,10 +1576,11 @@ haul.pie <- haul.summ.wt %>%
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 cluster.pie <- cluster.summ.wt %>% 
-  select(cluster, long, lat, Anchovy, JackMack, 
+  select(cluster, long, lat, Anchovy, JackMack, RndHerring,
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
@@ -1265,7 +1593,11 @@ cluster.pie <- cluster.summ.wt %>%
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
+
+# Filter for empty trawls
+haul.zero    <- filter(haul.pie, AllCPS == 0)
 
 # Filter for empty trawls
 haul.zero    <- filter(haul.pie, AllCPS == 0)
@@ -1311,8 +1643,10 @@ haul.Sardine.kg    <- sum(haul.catch$Sardine, na.rm = T)
 haul.PacMack.kg    <- sum(haul.catch$PacMack, na.rm = T)
 haul.JackMack.kg   <- sum(haul.catch$JackMack, na.rm = T)
 haul.PacHerring.kg <- sum(haul.catch$PacHerring, na.rm = T)
+haul.RndHerring.kg <- sum(haul.catch$RndHerring, na.rm = T)
 haul.CPS.kg        <- sum(haul.Anchovy.kg, haul.Sardine.kg, haul.PacMack.kg,
-                          haul.JackMack.kg, haul.PacHerring.kg, na.rm = T)
+                          haul.JackMack.kg, haul.PacHerring.kg, haul.RndHerring.kg, 
+                          na.rm = T)
 
 # summarize trawl haul data
 trawl.summ <- haul.catch %>% 
@@ -1320,6 +1654,7 @@ trawl.summ <- haul.catch %>%
                    Longitude = startLongDecimal)) %>% 
   select(Haul = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
          "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
+         "R. Herring" = RndHerring, 
          Jacksmelt, "All CPS" = AllCPS) %>% 
   mutate(Date = format(Date, "%m/%d/%Y %H:%M"))
 ```
@@ -1328,7 +1663,7 @@ trawl.summ <- haul.catch %>%
 # Read CUFES data
 cufes.filename <- list.files(here("Data/CUFES"), pattern = "*.sqlite")
 cufes.con      <- odbc::dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.db.sqlite))
-cufes.raw      <- tbl(cufes.con, "cufessqlite") %>%
+cufes.all      <- tbl(cufes.con, "cufessqlite") %>%
   collect() %>% 
   mutate(
     Start = case_when(
@@ -1348,11 +1683,11 @@ cufes.raw      <- tbl(cufes.con, "cufessqlite") %>%
 dbDisconnect(cufes.con)
 
 # save raw cufes table to CSV
-write.csv(cufes.raw, file = here("Output/cufes_raw.csv"), 
+write.csv(cufes.all, file = here("Output/cufes_raw.csv"), 
           quote = F, row.names = F)
 
 # Process CUFES data
-cufes <- cufes.raw %>% 
+cufes <- cufes.all %>% 
   # Convert cufes to long format for plotting
   select(
     SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
@@ -1364,7 +1699,43 @@ cufes <- cufes.raw %>%
          # Create bins for defining point size in NASC plots
          bin = cut(Density, cufes.breaks, include.lowest = T),
          bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
+  left_join(select(cufes.all, SampleNumber, Start, Stop)) 
+
+
+if (survey.name %in% c("2107RL")) {
+  # Import and format CUFES data from Carranza
+  cufes.jcf.all <- read_csv(here("Data/CUFES/cufes_jcfinp2110_rev.csv")) %>% 
+    mutate(Start = with_tz(dmy_hms(paste(date, startLocalTime), tz = "America/Los_Angeles"), tzone = "UTC"),
+           Stop  = with_tz(dmy_hms(paste(date, stopLocalTime), tz = "America/Los_Angeles"), tzone = "UTC"),
+           Ship  = "JCF",
+           Cruise = as.character(cruise.name),
+           Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+           Year = year(Start),
+           AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+    rename(lat = startLatDecimal,
+           long = startLongDecimal) %>% 
+    project_df(to = crs.proj) 
+  
+  # Convert to long form
+  cufes.jcf <- cufes.jcf.all %>% 
+    select(
+      SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
+      SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+      Comments) %>% 
+    gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
+           -lat, -long, -X, -Y, -Duration, -Comments) %>% 
+    mutate(Density = Counts/Duration/0.64,
+           # Create bins for defining point size in NASC plots
+           bin = cut(Density, cufes.breaks, include.lowest = T),
+           bin.level = as.numeric(bin)) %>% 
+    left_join(select(cufes.jcf.all, SampleNumber, Start, Stop))
+  
+  # Combine with CUFES data from Lasker
+  cufes     <- bind_rows(cufes, cufes.jcf)
+  cufes.all <- bind_rows(cufes.all, cufes.jcf.all)
+  
+  # ggplot(cufes, aes(long, lat, colour = Ship)) + geom_point() + coord_map()
+}
 
 # Save processed cufes to CSV
 write.csv(cufes, file = here("Output/cufes_proc.csv"), 
@@ -1372,12 +1743,12 @@ write.csv(cufes, file = here("Output/cufes_proc.csv"),
 
 # Prepare CUFES data for plotting ----------------------------------------------
 # Select CUFES sample with zero density for plotting
-cufes.neg <- filter(cufes.raw, AllEggs == 0) %>% 
+cufes.neg <- filter(cufes.all, AllEggs == 0) %>% 
   mutate(bin.level = 1) %>% 
   select(X, Y, SampleNumber)
 
 # Identify bad CUFES samples
-cufes.bad <- filter(cufes.raw, Duration <= 0)
+cufes.bad <- filter(cufes.all, Duration <= 0)
 
 save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
 
@@ -1435,86 +1806,40 @@ all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
 ```  
 
 ```{r process-csv-cps}
-if (process.csv) {
-  if (file.exists(here("Output/processed_cps.Rdata"))) {
-    # Load already processed CSV files
-    load(here("Output/processed_cps.Rdata"))
-  }
-  
-  # List local CSV files
-  csv.files.cps <- dir_ls(here("Data/Backscatter", survey.vessel.primary), 
-                          regexp = nasc.pattern.cps[survey.vessel.primary],
-                          ignore.case = TRUE)
-  
-  if (process.csv.all) {
-    # Create final data frame
-    nasc.cps <- data.frame()
-  } else {
-    # Load already processed files
-    load(here("Output/nasc_cps.Rdata")) 
-    # List only new CSV files
-    csv.files.cps <- csv.files.cps[!csv.files.cps %in% processed.cps]
-  }
-  
-  if (length(csv.files.cps) > 0) {
-    # Configure progress bar
-    pb <- winProgressBar(title = "CSV File Processing Progress - CPS", 
-                         label = "0% done", min = 0, max = 100, initial = 0)
-    
-    # Process all .CSV files
-    for (i in 1:length(csv.files.cps)) {
-      # Process i-th file
-      nasc.cps <- bind_rows(nasc.cps, extract_csv(csv.files.cps[i]))
-      
-      # Update the progress bar
-      info <- sprintf("%d%% done", round((i / length(csv.files.cps)) * 100))
-      setWinProgressBar(pb, round((i / length(csv.files.cps)) * 100), label = info)
-    }
-    close(pb)
-    
-    # Calculate summary interval
-    nasc.cps <- nasc.cps %>%
-      mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                       labels = F, include.lowest = T))
-    
-    # Save results
-    save(nasc.cps, file = here("Output/nasc_cps.Rdata"))
-    write.csv(nasc.cps, file = here("Output/nasc_cps.csv"), row.names = F, quote = F)
-  }
-} else {
-  load(here("Output/nasc_cps.Rdata"))
-}
+# Process backscatter data (CSV files) for CPS
+source(here("Code/process_NASC.R"))
 
 # Get intervals with bad lat/long values
-bad.nasc.cps <- filter(nasc.cps, lat == 999, long == 999)
-write_csv(bad.nasc.cps, here("Output/nasc_bad_cps.csv"))
+bad.nasc <- filter(nasc, lat == 999, long == 999)
+write_csv(bad.nasc, here("Output/nasc_bad_cps.csv"))
 
 # Summarize nasc for reporting effort
-nasc.summ <- nasc.cps %>% 
-  group_by(transect) %>% 
+nasc.summ <- nasc %>% 
+  group_by(transect.name, transect) %>% 
   summarise(
     distance = length(Interval)*100/1852,
     lat = lat[which.min(long)],
     lon = long[which.min(long)])
 
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
-nasc.summ.cps <- nasc.cps %>%
+nasc.summ.cps <- nasc %>%
   filter(lat != 999, long != 999) %>% 
-  group_by(transect, int) %>%
+  group_by(transect.name, transect, int) %>%
   summarise(
     bins    = length(int),
     bin.mid = as.integer(round(bins / 2)),
     lat     = lat[1],
     long    = long[1],
-    NASC    = mean(NASC.70)
+    NASC    = mean(cps.nasc)
   )
 
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
-nasc.cps.sf <- nasc.cps %>%
+nasc.sf <- nasc %>%
   filter(lat != 999, long != 999) %>%
-  select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
-  group_by(filename, transect, int) %>% 
+  # arrange(filename, datetime) %>% 
+  select(filename, transect.name, transect, int, dist_m, datetime, lat, long, cps.nasc) %>% 
+  group_by(filename, transect.name, transect, int) %>% 
   summarise(
     lat   = lat[1],
     long  = long[1],
@@ -1531,26 +1856,26 @@ nasc.cps.sf <- nasc.cps %>%
   filter(!is.na(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
-nasc.plot.cps <- project_sf(nasc.cps.sf, crs.proj)
+nasc.plot.cps <- project_sf(nasc.sf, crs.proj)
 
 # Convert acoustic transects to sf
-nasc.tx.sf <- st_as_sf(nasc.cps.sf, coords = c("long","lat"), crs = crs.geog) %>% 
-  select(transect) %>% 
-  group_by(transect) %>% 
+nasc.tx.sf <- st_as_sf(nasc.sf, coords = c("long","lat"), crs = crs.geog) %>% 
+  select(transect.name, transect) %>% 
+  group_by(transect.name, transect) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   filter(!transect %in% tx.rm)
 
 # create acoustic transect labels
-nasc.tx.labels.cps <- nasc.cps %>%
-  group_by(transect) %>%
+nasc.tx.labels.cps <- nasc %>%
+  group_by(transect.name, transect) %>%
   summarise(
     lat = lat[which.max(long)],
     long = max(long)
   )
 
 # List already processed CSV files and save
-processed.cps <- unique(nasc.cps$filename)
+processed.cps <- unique(nasc$filename)
 save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 ```
 
@@ -1570,6 +1895,28 @@ if (save.figs) {
   ggsave(here("Figs/fig_survey_plan.png"), survey.plan,
          height = map.height, width = map.width)
   
+  if (survey.name %in% c("2107RL")) {
+    # Map planned transects
+    survey.plan.mx <- base.map +    
+      geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
+              show.legend = "line") +
+      geom_sf(data = transects.jcf, aes(colour = Type, linetype = Type), 
+              show.legend = "line") +
+      # geom_sf(data = nav.paths.sf, colour = "gray50", size = 1, alpha = 0.5) +
+      # geom_sf(data = nav.paths.jcf.sf, colour = "gray50", size = 1, alpha = 0.5) +
+      scale_colour_manual("Type", 
+                          values = wpt.colors) +
+      scale_linetype_manual("Type", 
+                            values = wpt.linetypes) +
+      coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+               xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+               ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+    
+    # save survey plan map
+    ggsave(here("Figs/fig_survey_plan_mx.png"), survey.plan.mx,
+           height = map.height, width = map.width)
+  }
+
   # Plot Survey Track, Acoustic Transects, and Trawl Locations #####
   survey.track.map <- base.map +
     # Plot transects data
@@ -1608,11 +1955,11 @@ if (save.figs) {
     geom_point(data = haul.catch, aes(X, Y),
                shape = 21, colour = "black", fill = "white", size = 3) +
     geom_sf(data = bongo.sta, 
-            shape = 24, size = 3, fill = "orange", colour = "black") +
+            shape = 24, size = 2, fill = "orange", colour = "black") +
     geom_sf(data = ctd.sta, 
-            shape = 21, size = 3, fill = "red", colour = "black") +
+            shape = 21, size = 2, fill = "red", colour = "black") +
     geom_sf(data = uctd.sta, 
-            shape = 21, size = 3, fill = "red", colour = "black") +
+            shape = 21, size = 2, fill = "red", colour = "black") +
     coord_sf(crs = crs.proj,
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -1635,47 +1982,13 @@ if (save.figs) {
   ggsave(nasc.cufes.trawl.plot, 
          filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
          width = map.width*3, height = map.height)
-  
-  # # Create calibration site maps #####  
-  # # Put calibration location lat/lon in a df, for point plot
-  # cal.map.df <- data.frame(cal.lat.dd, cal.lon.dd)
-  # 
-  # # get Google map from calibration location
-  # cal.map <- ggmap(get_googlemap(c(cal.lon.dd, cal.lat.dd), 
-  #                                maptype = "terrain", zoom = 12))
-  # 
-  # # get extent of calibration map for inset
-  # cal.map.extent <- cal.map$data
-  # 
-  # # create inset map
-  # map.inset <- ggplot(ca) +
-  #   geom_sf() +
-  #   geom_path(data = cal.map.extent[c(1, 3, 4, 2, 1),], aes(lon, lat),
-  #             size = 0.5, colour = 'red') + # plot extent of inset map
-  #   theme(axis.text.x     = element_blank(), 
-  #         axis.text.y     = element_blank(), 
-  #         axis.ticks      = element_blank(),
-  #         axis.title.x    = element_blank(),
-  #         axis.title.y    = element_blank(),
-  #         plot.background = element_blank())
-  # 
-  # # create main map using ggmap
-  # map.main <- cal.map + 
-  #   geom_point(data = cal.map.df, aes(x = cal.lon.dd,y = cal.lat.dd),
-  #              shape = 23, size = 5, fill = "yellow", colour = "black") + 
-  #   xlab("\nLongitude (W)") + ylab("Latitude (N)\n") + 
-  #   theme_bw() + 
-  #   theme(plot.background = element_blank(),
-  #         axis.text.y = element_text(angle = 90, hjust = 0.5))
-  # 
-  # # Create final color map
-  # cal.map.color <- ggdraw() +
-  #   draw_plot(map.main,0,0,1,1) +
-  #   draw_plot(map.inset,0.65,0.65,0.325,0.325)
-  # 
-  # # Save map image
-  # ggsave(cal.map.color, filename = here("Figs/fig_cal_map.png"),
-  #        height = 10, width = 10, units = "in")
+}
+
+if (save.figs) {
+  if (exists("google_map_api")) {
+    # If the Google Map API key is present, map the calibration location
+    source(here("Code/map_calibration_location.R"))
+  }
 } 
 ```  
 
@@ -1759,9 +2072,9 @@ The collection and analysis of the survey data were conducted by members of the 
 **Echosounder Calibrations:**  
 
 * _Reuben Lasker_
-  + J. Renfree and T. Sessions
++ J. Renfree and T. Sessions
 * _Long Beach Carnage_
-  + J. Renfree and T. Sessions **[Others?]**
++ J. Renfree and T. Sessions **[Others?]**
 
 \newpage
 
@@ -1935,7 +2248,7 @@ For _`r survey.vessel`_, the EK80s were calibrated on `r cal.datetime` while the
 
 ```{r cal-results,results='asis'}
 if (doc.type == "docx") {
-    # create kable object (for Word)
+  # create kable object (for Word)
   pander(all.output)
   # # create flextable object (for Word)
   # all.output %>% 
@@ -1994,6 +2307,8 @@ if (doc.type == "docx") {
 }
 ```  
 
+\newpage
+
 For _Lisa Marie_, the echosounders were calibrated using the standard sphere technique with a WC38.1 **in a tank at the SWFSC**. Beam model results were entered into the GPT-control software and are presented in **Table \@ref(tab:cal-results-lm)**.  
 
 (ref:cal-results-lm) General purpose transceiver (EK60 GPT, Simrad) beam model results estimated from an in situ calibration of echosounders aboard _Lisa Marie_ using a WC38.1. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
@@ -2015,6 +2330,32 @@ if (doc.type == "docx") {
     add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.lm) - 2))
 }
 ```  
+
+\newpage
+
+For _Carranza_, the echosounders were calibrated using the standard sphere technique **[update calibration location]** by INAPESCA. Beam model results were entered into the GPT-control software and are presented in **Table \@ref(tab:cal-results-jcf)**.  
+
+(ref:cal-results-jcf) General purpose transceiver (EK60 GPT, Simrad) beam model results estimated from a dockside calibration of echosounders aboard _Carranza_ using a WC38.1. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
+
+```{r cal-results-jcf,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output.jcf)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output.jcf, format = knitr.format, 
+        align = c("l","l", rep("c",ncol(all.output.jcf) - 2)),
+        booktabs = TRUE, escape = FALSE, linesep = "",
+        caption = '(ref:cal-results-jcf)') %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("hold_position"),
+                  font_size = 8) %>%  
+    row_spec(18, hline_after = TRUE) %>% 
+    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.jcf) - 2))
+}
+```  
+
+\newpage
 
 ## Data collection {#results-data-collection}
 ### Acoustic and net sampling {#results-acoustic-trawl-sampling}  
@@ -2047,7 +2388,7 @@ During Legs I and II, _`r survey.vessel`_ coordinated with _Long Beach Carnage_,
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
 
-A total of `r nrow(ctd.sta)` CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted, and `r prettyNum(nrow(cufes.raw), digits = 1, big.mark = ",")` CUFES samples were collected underway. The locations of CTD and UCTD stations are presented in **Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**.  
+A total of `r nrow(ctd.sta)` CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted, and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were collected underway. The locations of CTD and UCTD stations are presented in **Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**.  
 
 ## Distribution of CPS {#results-cps-distribution}
 ### Core region  
@@ -2056,7 +2397,7 @@ Acoustic backscatter sampled by  _`r survey.vessel`_ and ascribed to CPS (**Fig.
 
 Northern Anchovy eggs were observed throughout the survey region south of Monterey Bay, but were most abundant in CUFES samples along the offshore portions of transects in the Southern CA Bight, coincident with backscatter ascribed to CPS (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Few Pacific Sardine eggs were observed, mostly around the southeast coast of Santa Catalina Island (**Fig. \@ref(fig:nasc-cufes-trawl)b**). No Jack Mackerel eggs were observed.  
 
-Northern Anchovy catches were predominant, by weight, in trawl samples collected throughout the survey area (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Jack Mackerel were present in several trawls offshore in the SCB, and one near Long Beach (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were caught in nine trawls; however, catches were small and not visible except in one trawl haul offshore of the northern Channel Islands (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Mackerel were caught in two hauls in the SCB but also not visible at this scale (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Overall, the `r nrow(trawl.summ)` trawls captured a combined `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, and `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel; **Appendix \@ref(appendix-trawl-sampling)**).  
+Northern Anchovy catches were predominant, by weight, in trawl samples collected throughout the survey area (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Jack Mackerel were present in several trawls offshore in the SCB, and one near Long Beach (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were caught in nine trawls; however, catches were small and not visible except in one trawl haul offshore of the northern Channel Islands (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Mackerel were caught in two hauls in the SCB but also not visible at this scale (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Overall, the `r nrow(trawl.summ)` trawls captured a combined `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel, and `r prettyNum(haul.RndHerring.kg, digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-trawl-sampling)**).  
 
 ### Nearshore region  
 
@@ -2158,7 +2499,7 @@ cb.pos <- filter(bridge.snap,
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(cb.pos)
-
+  
 } else {
   # print LaTeX table for HTML or PDF
   kable(cb.pos, align = c("l","l","c","c"), digits = c(0,0,4,4),

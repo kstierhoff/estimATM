@@ -10,14 +10,15 @@ if (nrow(haul.pos) > 0) {
     # Plot trawl pies
     geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = r),
                     cols = c("Anchovy", "JackMack", "Jacksmelt",
-                             "PacHerring", "PacMack", "Sardine"),
+                             "PacHerring", "PacMack", "RndHerring", "Sardine"),
                     color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
+                                 "P. herring", "P. mackerel", "R. herring", "Sardine"),
                       values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
+                                 pac.herring.color, pac.mack.color, rnd.herring.color, 
+                                 sardine.color)) +
     # Plot empty cluster locations
     geom_point(data = haul.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
