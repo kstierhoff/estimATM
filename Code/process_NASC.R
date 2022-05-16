@@ -14,6 +14,7 @@ if (process.csv) {
     # List all CSV files
     nasc.files <- dir_ls(file.path(here("Data/Backscatter", i)),
                          regexp = nasc.pattern.cps[i],
+                         recurse = nasc.recurse[i],
                          ignore.case = TRUE)
     
     if (!process.csv.all) {
