@@ -871,12 +871,32 @@ if (process.csv) {
             left_join(select(cps.nasc.temp, datetime, cps.nasc))
           
         } else {
-          # Use fixed integration depth (NASC.50), with or without surface noise removal
-          if (rm.surface[i]) {
-            # Remove surface noise, often from Saildrone backscatter
-            nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70 - NASC.5)
+          # Use cps.nasc extracted using extract_cps_nasc.R
+          if ("cps.nasc" %in% colnames(nasc.vessel)) {
+            nasc.vessel$cps.nasc.source <- "cps.nasc"
           } else {
-            nasc.vessel <- mutate(nasc.vessel, cps.nasc = NASC.70)
+            # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
+            # nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
+            nasc.vessel <- nasc.vessel %>% 
+              mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
+                     cps.nasc.source = nasc.depth.cps)
+          }
+          
+          # If files are not passed through extract_CPS_NASC.R, then cps.nasc = NA
+          nasc.vessel <- nasc.vessel %>% 
+            # Create variable containing the source of cps.nasc data, either 
+            # cps.nasc (from extract_CPS_NASC.R) or the value of nasc.depth.cps
+            mutate(cps.nasc.source = case_when(
+              is.na(cps.nasc) ~ nasc.depth.cps,
+              TRUE ~ cps.nasc.source)) %>% 
+            # Replace missing cps.nasc values with backscatter down to nasc.depth.cps
+            mutate(cps.nasc = case_when(
+              is.na(cps.nasc) ~ purrr::pluck(., nasc.depth.cps),
+              TRUE ~ cps.nasc))
+          
+          # Remove surface noise, often from Saildrone backscatter
+          if (rm.surface[i]) {
+            nasc.vessel <- mutate(nasc.vessel, cps.nasc = cps.nasc - NASC.5)
           }
         }
         

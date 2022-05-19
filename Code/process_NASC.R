@@ -273,13 +273,28 @@ if (process.csv) {
               left_join(select(cps.nasc.temp, time.align, cps.nasc))  
           }
         } else {
-          # Use cps.NASC extracted using extract_cps_nasc.R
+          # Use cps.nasc extracted using extract_cps_nasc.R
           if ("cps.nasc" %in% colnames(nasc.vessel)) {
-            nasc.vessel$cps.nasc <- nasc.vessel$cps.nasc
+            nasc.vessel$cps.nasc.source <- "cps.nasc"
           } else {
             # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
-            nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
+            # nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
+            nasc.vessel <- nasc.vessel %>% 
+              mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
+                     cps.nasc.source = nasc.depth.cps)
           }
+          
+          # If files are not passed through extract_CPS_NASC.R, then cps.nasc = NA
+          nasc.vessel <- nasc.vessel %>% 
+            # Create variable containing the source of cps.nasc data, either 
+            # cps.nasc (from extract_CPS_NASC.R) or the value of nasc.depth.cps
+            mutate(cps.nasc.source = case_when(
+              is.na(cps.nasc) ~ nasc.depth.cps,
+              TRUE ~ cps.nasc.source)) %>% 
+            # Replace missing cps.nasc values with backscatter down to nasc.depth.cps
+            mutate(cps.nasc = case_when(
+              is.na(cps.nasc) ~ purrr::pluck(., nasc.depth.cps),
+              TRUE ~ cps.nasc))
           
           # Remove surface noise, often from Saildrone backscatter
           if (rm.surface[i]) {
@@ -290,6 +305,38 @@ if (process.csv) {
         # Save processed CSV data from each survey vessel
         saveRDS(nasc.vessel, file = here("Data/Backscatter", i, 
                                          paste0("nasc_vessel_", i, ".rds")))
+        
+        nasc.vessel.comp <- project_df(nasc.vessel, to = crs.proj)
+        
+        # Map a comparison of cps.nasc to nasc.depth.cps and
+        # indicating the source of the backscatter data
+        compare.cps.nasc.map <- base.map + 
+          geom_point(data = nasc.vessel.comp, aes(X, Y, size = NASC.250)) +
+          geom_point(data = nasc.vessel.comp, 
+                     aes(X, Y, size = cps.nasc, colour = cps.nasc.source),
+                     shape = 21, fill = NA) +
+          coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+                   xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+                   ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+        
+        # Save figure
+        ggsave(compare.cps.nasc.map, 
+               filename = here("Data/Backscatter", i, paste0("nasc_vessel_map_", i, ".png")), 
+               height = map.height, width = map.width)
+        
+        # Scatter plot comparing cps.nasc to nasc.depth.cps and
+        # indicating the source of the backscatter data
+        compare.cps.nasc.scatter <- ggplot() + 
+          geom_point(data = nasc.vessel.comp, 
+                     aes(cps.nasc, NASC.250, colour = cps.nasc.source)) + 
+          geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+          facet_wrap(~cps.nasc.source) +
+          coord_equal() + 
+          theme_bw()
+        
+        # Save figure
+        ggsave(compare.cps.nasc.scatter, 
+               filename = here("Data/Backscatter", i, paste0("nasc_vessel_scatter_", i, ".png")))
         
         # Combine results from different vessels
         if (exists("nasc")) {
