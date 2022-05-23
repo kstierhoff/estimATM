@@ -51,9 +51,10 @@ estimate.cps.nasc <- function(path.input, pattern, path.output, max.range = 200,
   
   print(paste("Expansion =", exponent))
   
-  temporary <- read.csv(paste(path.input, "\\", acoustic.file.list[test.1], sep = ""))
-  # plot
+  temporary <- read.csv(paste(path.input, "\\", acoustic.file.list[test.1], sep = ""), 
+                        fileEncoding = "UTF-8-BOM")
   
+  # plot
   if (jpeg == T) {
     jpeg(paste(path.output, "\\", substr(acoustic.file.list[test.1], 1, nchar(acoustic.file.list[test.1]) - 4), "_original", ".jpeg", sep = ""), width = 35, height = 25, units = "cm", res = 200)
     
