@@ -494,7 +494,7 @@ cluster.source <- c(OS = "cluster",
                     NS = "haul")
 
 # Manually exclude hauls from the analysis
-# List hauls, else NA
+# List hauls (e.g., c(1, 2...n)), else NA
 
 # In 2107RL, Lasker returned to the coast of OR to conduct extended transects
 # prior to returning to Mexico. The trawls that were conducted there should

@@ -463,16 +463,8 @@ cluster.source <- c(OS = "cluster",
                     NS = "haul")
 
 # Manually exclude hauls from the analysis
-# List hauls, else NA
-
-# In 2107RL, Lasker returned to the coast of OR to conduct extended transects
-# prior to returning to Mexico. The trawls that were conducted there should
-# not be used to characterize backscatter collected much earlier during Leg 2.
-
-# Furthermore, hauls in Mexico were removed for this analysis, but may be 
-# included in a joint analysis later
-haul.rm <- NA # c(104:109, # Off Oregon
-              # 110:127) # In Mexico
+# List hauls (e.g., c(1, 2...n)), else NA
+haul.rm <- NA
 
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance

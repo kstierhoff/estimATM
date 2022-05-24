@@ -406,6 +406,10 @@ limit.cluster.dist     <- c(OS  = FALSE,
 cluster.source <- c(OS = "cluster",
                     NS = "haul")
 
+# Manually exclude hauls from the analysis
+# List hauls (e.g., c(1, 2...n)), else NA
+haul.rm <- NA
+
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 
