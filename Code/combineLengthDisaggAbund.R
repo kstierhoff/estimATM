@@ -142,7 +142,7 @@ if (L.disagg.scales == "fixed") {
 }
 
 # Create blank plots for missing species
-for (i in cps.spp) {
+for (i in names(L.disagg.plots.all)) {
   if (is.null(L.disagg.plots.all[[i]])) {
     df <- data.frame()
     L.disagg.temp.all <- ggplot(df) + geom_point() + 
@@ -150,6 +150,6 @@ for (i in cps.spp) {
       annotate('text',5,5,label = 'No Data', size = 6, fontface = 'bold') +
       theme_bw() + ggtitle(i)  
     ggsave(L.disagg.temp.all, 
-           filename = paste0(here("Figs/fig_L_disagg_os_"), i, ".png"))
+           filename = paste0(here("Figs/fig_L_disagg_combo_"), i, ".png"))
   }
 }

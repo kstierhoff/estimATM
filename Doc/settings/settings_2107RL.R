@@ -553,7 +553,7 @@ uctd.cast.pattern      <- ".*_processed.asc"
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
 length.min <- 1 # Minimum length bin for length frequencies
-# (max. anchovy = 20 cm, sardine & herring = 30 cm, Pac. mack = 40, and jack mack. = 60)
+# (max. anchovy = 20 cm, sardine & herrings = 30 cm, Pac. mack = 40, and jack mack. = 60)
 length.max <- data.frame("species" = c("Clupea pallasii","Engraulis mordax",
                                        "Sardinops sagax", "Scomber japonicus",
                                        "Trachurus symmetricus","Etrumeus acuminatus"),

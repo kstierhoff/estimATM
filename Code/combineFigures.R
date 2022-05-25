@@ -1,10 +1,10 @@
 # Combine plots from core and nearshore survey areas
-for (ss in cps.spp) {
+for (ss in names(biomass.dens.figs)) {
   # List core figures
   biomass.path.core <- fs::dir_ls(here("Figs"), regexp = paste0("fig_biomass_dens_", ss))
   # List nearshore figures
   biomass.path.ns   <- fs::dir_ls(here("Figs"), regexp = paste0("fig_biomass_dens_ns_", ss))
-  # Extract stocks from filenames
+  # Extract stocks from file names
   biomass.stocks <- str_split(biomass.path.core, "_") %>% 
     unlist() %>% 
     str_subset(ss) %>% 

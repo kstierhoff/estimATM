@@ -453,11 +453,11 @@ uctd.cast.pattern      <- ".*_processed.asc"
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
 length.min <- 1 # Minimum length bin for length frequencies
-# (max. anchovy = 20 cm, sardine & herring = 30 cm, Pac. mack = 40, and jack mack. = 60)
+# (max. anchovy = 20 cm, sardine & herrings = 30 cm, Pac. mack = 40, and jack mack. = 60)
 length.max <- data.frame("species" = c("Clupea pallasii","Engraulis mordax",
                                        "Sardinops sagax", "Scomber japonicus",
-                                       "Trachurus symmetricus"),
-                         "sl" = c(30,20,30,40,60))
+                                       "Trachurus symmetricus","Etrumeus acuminatus"),
+                         "sl" = c(30,20,30,40,60,30))
 
 # Species to generate point estimates
 point.est.spp          <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
@@ -508,7 +508,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 4:14),
+    transect = 4:16),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
@@ -545,7 +545,7 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.430520 # Latitude of Cape Mendocino
-stock.break.sar  <- 32.000000 # Latitude of US-Mexico Border (or change based on SST)
+stock.break.sar  <- 37.674 # Latitude of US-Mexico Border (or change based on SST)
 
 stock.break.anch.ns <- stock.break.anch # Latitude of Cape Mendocino
 stock.break.sar.ns  <- 37.674 # Latitude of San Francisco, based on nearshore habitat model.

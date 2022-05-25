@@ -470,12 +470,13 @@ nasc.nearshore <- nasc.nearshore %>%
     her.dens  = cps.nasc*prop.her  / (4*pi*sigmawg.her)  / 1000,
     jack.dens = cps.nasc*prop.jack / (4*pi*sigmawg.jack) / 1000,
     mack.dens = cps.nasc*prop.mack / (4*pi*sigmawg.mack) / 1000,
-    sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000)
+    sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000,
+    rher.dens = cps.nasc*prop.rher / (4*pi*sigmawg.rher) / 1000)
 
 # Format for plotting
 nasc.density.ns <- nasc.nearshore %>%
   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
-         sar.dens, transect, transect.name, int, cluster) %>% 
+         sar.dens, rher.dens, transect, transect.name, int, cluster) %>% 
   group_by(transect, transect.name, int, cluster) %>% 
   summarise(
     lat = lat[1],
@@ -484,7 +485,8 @@ nasc.density.ns <- nasc.nearshore %>%
     `Clupea pallasii`       = mean(her.dens),
     `Trachurus symmetricus` = mean(jack.dens),
     `Scomber japonicus`     = mean(mack.dens),
-    `Sardinops sagax`       = mean(sar.dens)) %>% 
+    `Sardinops sagax`       = mean(sar.dens),
+    `Etrumeus acuminatus`   = mean(rher.dens)) %>% 
   gather(scientificName, density, -transect, -transect.name, -int, -lat, -long, -cluster) %>% 
   mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
@@ -1564,16 +1566,15 @@ if (save.figs) {
   load(here("Output/biomass_dens_ns_map_all.Rdata"))
 }
 
-# Create blank plots for missing species/stocks
-for (i in unique(strata.primary$scientificName)) {
-  for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
+# Create blank plots for missing species
+for (i in unique(strata.nearshore$scientificName)) {
+  for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
     if (is.null(biomass.dens.figs.ns[[i]][[j]])) {
       biomass.dens.temp <- base.map + 
         annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
         theme_bw()  
       ggsave(biomass.dens.temp, 
-             filename = paste0(here("Figs/fig_biomass_dens_ns_"), i, "-", j, ".png"),
-             height = map.height, width = map.width)
+             filename = paste0(here("Figs/fig_biomass_dens_ns_"), i, "-", j, ".png"))
     }
   }
 }
@@ -1684,7 +1685,8 @@ if (use.seine.data) {
       scientificName == "Engraulis mordax" & lat <  stock.break.anch ~ "Central",
       scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
       scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
-      scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"))  
+      scientificName %in% c("Clupea pallasii","Scomber japonicus",
+                            "Trachurus symmetricus","Etrumeus acuminatus") ~ "All"))  
 } else {
   pos.clusters.ns <- pos.clusters
 }
@@ -2217,7 +2219,7 @@ if (save.figs) {
   acoustic.prop.indiv.ns <- clf %>%
     filter(cluster %in% unique(nasc.nearshore$cluster)) %>% 
     select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-           prop.mack, prop.sar) %>% 
+           prop.mack, prop.sar, prop.rher) %>% 
     replace(. == 0, 0.0000001) %>% 
     # replace(is.na(.), 0) %>% 
     project_df(to = crs.proj)
@@ -2269,7 +2271,7 @@ if (save.figs) {
     geom_scatterpie(data = acoustic.prop.indiv.ns, 
                     aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("prop.anch","prop.jack","prop.her",
-                             "prop.mack","prop.sar"),
+                             "prop.mack","prop.rher","prop.sar"),
                     color = 'black', alpha = 0.8) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero.ns, aes(X, Y),
@@ -2277,9 +2279,9 @@ if (save.figs) {
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "J. mackerel", "P. herring",
-                                 "P. mackerel", "Sardine"),
+                                 "P. mackerel", "R. herring", "Sardine"),
                       values = c(anchovy.color, jack.mack.color, pac.herring.color,   
-                                 pac.mack.color, sardine.color)) +
+                                 pac.mack.color, rnd.herring.color, sardine.color)) +
     # Configure legend guides
     guides(fill = guide_legend(), size = guide_legend()) +
     coord_sf(crs = crs.proj, 
