@@ -88,13 +88,13 @@ survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shim
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2107RL"        # SWFSC/AST survey name
-survey.start           <- "5 July"        # Survey start date
+survey.start           <- "6 July"        # Survey start date
 survey.end             <- "15 October"    # Survey end date
 survey.year            <- "2021"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 86              # Days at sea allocated
 survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
-survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
+survey.landmark.s      <- "Punta Abreojos, MX" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -806,13 +806,13 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2107RL_EK80"
-raw.size      <-  50   # file size in megabytes (MB)
+raw.size      <-  1   # file size in megabytes (GB)
 raw.log.range <- 350  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
-ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v11.XX" # Echoview version
+ek80.version  <- "v2.0.0" # EK80 version
+ev.version    <- "v12" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <- 1000  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
@@ -836,14 +836,14 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 # # Calibration information ------------------------------------------------
 cal.vessels        <- c("RL","LBC","LM","JCF")
 cal.dir            <- "//swc-storage1.nmfs.local/AST1/SURVEYS/20210702_LASKER_SummerCPS/DATA/EK60/CALIBRATION/RESULTS"
-cal.datetime       <- "1 July"     # Date/time of calibration
-cal.plot.date      <- "2021-07-01" # Date of the calibration, used to plot cal time series
+cal.datetime       <- "17 June"     # Date/time of calibration
+cal.plot.date      <- "2021-06-17" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "J. Renfree, D. Demer"        # Calibration participants
 cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
-cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
-cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
+cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865Â°N @ Pier 30-32
+cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844Â°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
 cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1; _Lasker_ sphere #1)" # Cal sphere info
@@ -856,10 +856,10 @@ cal.notes          <- "UPDATE CAL LOCATION. Lasker calibration sphere #1"
 # Physical conditions during calibration
 cal.temp           <-   21.1   # enter water temperature
 cal.sal            <-   34.0   # enter salinity
-cal.c              <- 1524.9   # enter sound speed (m/s)
-cal.min.z          <-    5     # enter minimum water depth below transducers
-cal.max.z          <-   10     # enter maximum water depth below transducers
- 
+cal.c              <- 1523.5  # enter sound speed (m/s)
+cal.min.z          <-    7.6     # enter minimum water depth below transducers
+cal.max.z          <-   8.1     # enter maximum water depth below transducers
+
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
 cal.noise          <- list(RL = NA,
