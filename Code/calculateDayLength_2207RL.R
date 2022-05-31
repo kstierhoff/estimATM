@@ -1,9 +1,9 @@
 library(tidyverse)
 library(photobiology)
 
-df <- data.frame(date = lubridate::ymd(c("2022-06-27","2022-08-01","202209-11","2022-09-30")),
-                 lat = c(48.5, 40, 33.7, 32),
-                 long = c(-124.5, -123.6, -119.9, -117))
+df <- data.frame(date = lubridate::ymd(c("2022-7-05","2022-08-01","202209-11","2022-09-30")),
+                 lat = c(44.2, 40, 33.7, 32),
+                 long = c(-124.011, -123.6, -119.9, -117))
 
 day_length(
   date = df$date[1],
