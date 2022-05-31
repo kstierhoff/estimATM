@@ -4,10 +4,12 @@ dir_create(here("Output/tables"))
 dir_create(here("Figs"))
 
 # Read GPX file
-route <- readGPX(here("Data/Nav", gpx.file))
+route <- read_GPX(here("Data/Nav", gpx.file))
 
 # Create data frame of waypoints
-wpts <- route$waypoints 
+wpts <- route$waypoints %>% 
+  project_sf(crs = crs.geog) %>% 
+  select(lon = X, lat = Y, name)
 
 write_csv(wpts, here("Output/waypoints/all_waypoints.csv"))
 
@@ -306,10 +308,10 @@ transects <- transects %>%
 # Extract bathymetry ------------------------------------------------------
 # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
 if (get.bathy) {
-  noaa.bathy <- getNOAA.bathy(lon1 = min(transects$Longitude - 1), 
-                              lon2 = max(transects$Longitude + 1),
-                              lat1 = max(transects$Latitude) + 1, 
-                              lat2 = min(transects$Latitude) - 1, 
+  noaa.bathy <- getNOAA.bathy(lon1 = min(wpts$lon - 1), 
+                              lon2 = max(wpts$lon + 1),
+                              lat1 = max(wpts$lat) + 1, 
+                              lat2 = min(wpts$lat) - 1, 
                               resolution = 1)
   # Save bathy results
   save(noaa.bathy, file = paste(here("Data/GIS"), "/bathy_data_",
@@ -373,14 +375,6 @@ tx.start.labels <- tx.labels.tmp %>%
   rbind(tx.end.labels)
 
 tx.labels <- project_df(tx.start.labels, to = crs.proj)
-
-# # Convert uctds to sf
-# uctds.sf <- uctds %>% 
-#   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
-# 
-# # Convert Pairovets to sf
-# pairovets.sf <- pairovets %>% 
-#   st_as_sf(coords = c("lon","lat"), crs = crs.geog)
 
 # export tables to csv
 wpt.export <- select(transects, Transect, name, everything(), -group, -Leg, -Waypoint) %>% 

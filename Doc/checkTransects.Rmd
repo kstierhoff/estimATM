@@ -15,14 +15,18 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,sf,mapview,lubridate,here,knitr,DT,bookdown,
-               plotKML,rnaturalearth,swfscMisc,fs,photobiology,ggspatial,
+               rnaturalearth,swfscMisc,fs,photobiology,ggspatial,
                leaflet,leaflet.extras,leafem,htmltools,marmap,mapproj,gt,
-               beepr,shadowtext)
+               beepr,shadowtext,stplanr,tmaptools)
 
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("rstudio/distill")
 pacman::p_load_gh("kstierhoff/surveyR")
 pacman::p_load_gh("kstierhoff/atm")
+
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 
 # Configure knitr chunk options
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
@@ -35,7 +39,7 @@ theme_set(theme_bw())
 ```{r user-input}
 # User input --------------------------------------------------------------
 copy.gpx           <- F # Copy GPX file from AST server
-process.transects  <- T # Process GPX file using processTransects.R
+process.transects  <- T # Usually T; Process GPX file using processTransects.R
 update.routes      <- T # Re-write route files after processing
 get.bathy          <- F # Get NOAA bathymetry (used to extract bathymetry)
 extract.bathy      <- T # Extract bathymetry profile along each transect
@@ -334,13 +338,13 @@ if (leaflet.checkTransects.simple) {
                         "Bathymetry Contours", "Planned Transects", 
                         "UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
-    hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
+    # hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2])
   
 } else {
   # Create leaflet map
-  i.map <- eaflet() %>% 
+  i.map <- leaflet() %>% 
     # Enable tile caching
     enableTileCaching() %>% 
     # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
@@ -458,7 +462,7 @@ if (leaflet.checkTransects.simple) {
                         "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
                         "Planned Transects (Transits)", "UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
-    hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
+    # hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2]) 
 }
@@ -887,5 +891,5 @@ if (file.exists(here("Figs/fig_transect_depth_ecdf.png"))) {
 ```
 
 ```{r work-complete}
-beep(4)
+# beep(4)
 ```
