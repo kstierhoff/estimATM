@@ -85,7 +85,7 @@ overwrite.files <- T # overwrite files when copying
 download.hab    <- F # download habitat map
 save.figs       <- T # draw plots and maps, or use existing
 get.db          <- F # import database data
-process.scs     <- T # process SCS logs, or load processed data
+process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- F # download nav data from ERDDAP
 process.csv     <- F # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
@@ -1824,6 +1824,24 @@ events_sf <- st_as_sf(bridge.snap, coords = c("Lon","Lat"), crs = crs.geog)
 ctd.sta         <- filter(events_sf, Button == ctd.button)
 uctd.sta        <- filter(events_sf, Button == uctd.button)
 
+# Append CTD cast locations from other survey vessels
+if (survey.name %in% c("2107RL")) {
+  
+  # Read Carranza stations
+  ctd.jcf <- read_csv(here("Data/CTD/ctd_stations_jcf.csv")) %>% 
+    mutate(Button = "CTD") 
+  
+  ctd.jcf.sf <- ctd.jcf %>% 
+    st_as_sf(coords = c("long", "lat"), crs = crs.proj)
+  
+  # Combine with Lasker casts
+  ctd.sta <- bind_rows(ctd.sta, ctd.jcf.sf)
+  
+  # # Create datetime column
+  # ctd.jcf <- ctd.jcf %>%
+  #   mutate(datetime = format(mdy_hms(paste(Date, Time)), format = "%m/%d/%Y %H:%M"))
+}
+
 # Extract bongo locations
 bongo.sta       <- filter(events_sf, Button == bongo.button)
 
@@ -1839,6 +1857,12 @@ all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
     Button == ctd.button ~ "CTD Cast",
     Button == uctd.button ~ "UCTD Cast", 
     TRUE ~ Button))
+
+# Append CTD info from other survey vessels
+if (survey.name %in% c("2107RL")) {
+  all.ctds <- all.ctds %>% 
+    bind_rows(select(ctd.jcf, Date = datetime, Button = Button, Latitude = lat, Longitude = long))
+}
 ```  
 
 ```{r process-csv-cps}
@@ -2037,7 +2061,7 @@ source(here("Code/plot_purseSeine_2107RL.R"))
 
 **Report on the `r survey.name.long` (`r survey.name`), `r survey.start` to `r survey.end` `r survey.year`, conducted aboard NOAA Ship _`r survey.vessel.long`_, Mexican research vessel _Dr. Jorge Carranza Fraser_, fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and unmanned surface vehicles**  
 
-Josiah S. Renfree^1^, Noelle Bowlin^1^, David A. Demer^1^, Brad Erisman^1^, Gabriel E. Johnson^1,2^, Scott A. Mau^1^, David W. Murfin^1^, Brittany Schwartzkopf^1^, Thomas S. Sessions^1^, Kevin L. Stierhoff^1^, Lanora Vasquez^1^, William Watson^1^, and Juan P. Zwolinski^1,3^
+Josiah S. Renfree^1^, Noelle M. Bowlin^1^, David A. Demer^1^, Brad E. Erisman^1^, Gabriel E. Johnson^1,2^, Scott A. Mau^1^, David W. Murfin^1^, Brittany D. Schwartzkopf^1^, Thomas S. Sessions^1^, Kevin L. Stierhoff^1^, Lanora Vasquez^1^, William Watson^1^, and Juan P. Zwolinski^1,3^
 
 ^1^Fisheries Resources Division  
 Southwest Fisheries Science Center (SWFSC)  
@@ -2100,7 +2124,7 @@ The collection and analysis of the survey data were conducted by 1-members of th
   + Leg IV:  K. Stierhoff^1\*^, S. Sessions^1^, and J. Zarate^2^
 
 * _Carranza_
-  + M. Vásquez-Ortiz^2^
+  + M. Vásquez-Ortiz^2^ and L. López^2^
   
 **Trawl Sampling:**
 
@@ -2111,7 +2135,7 @@ The collection and analysis of the survey data were conducted by 1-members of th
   + Leg IV:  K. James^1^, K. Koch^1^, K. Lane^1^, D. Lowry^1^, and J. Soto^4^
 
 * _Carranza_
-  +
+  + D. Cruz^2^, L. Campos^2^, A. Rodríguez^2^, and S. Galindo^2^
 
 **CUFES Sampling:**
 
@@ -2122,7 +2146,7 @@ The collection and analysis of the survey data were conducted by 1-members of th
   + Leg IV:  L. Vasquez^1^ and V. Magana^2^
 
 * _Carranza_
-  +
+  + S. Gutiérrez^2^
 
 **Purse-seine Sampling:**  
 
@@ -2142,8 +2166,7 @@ The collection and analysis of the survey data were conducted by 1-members of th
 * _Saildrone_
   + Saildrone, Inc. and J. Renfree^1^
 * _Carranza_
-  + M. Vásquez-Ortiz^2^
-  + S. Galindo^2^
+  + M. Vásquez-Ortiz^2^ and S. Galindo^2^
 
 \newpage
 
@@ -2291,7 +2314,7 @@ Up to three nighttime (i.e., 60 min after sunset to 30 min before sunrise) surfa
 
 Trawls were towed at ~4 kn for 45 min. The total catch from each trawl was weighed and sorted by species or groups. From the catches with CPS, specimens were selected randomly for each of the target species (up to 75 for Pacific Sardine and Northern Anchovy and up to 50 for Pacific Mackerel, Jack Mackerel, and Pacific Herring). Those were weighed and measured to either their standard length ($L_S$; mm) for Pacific Sardine and Northern Anchovy, or fork length ($L_F$; mm) for Jack Mackerel, Pacific Mackerel, and Pacific Herring. In addition, sex and maturity were recorded for up to 75 specimens from Pacific Sardine and Northern Anchovy and up to 25 for Pacific and Jack Mackerels. Ovaries were preserved for up to 10 specimens of each CPS species except Pacific Herring. For Northern Anchovy, whole ovaries were preserved for up to 10 immature specimens (maturity code 1), up to 10 mature specimens (maturity codes 2-4), and up to 10 specimens with hydrated ovaries. Fin clips were removed from 50 Pacific Sardine and Northern Anchovy specimens each from five different geographic zones (designated by J. Hyde and M. Craig, SWFSC) and preserved in ethanol for genetic analysis. Otoliths were removed from up to 50 Pacific Sardine in the subsample; for other CPS species (except Pacific Herring), 25 otoliths were removed "as equally as possible" from the range of sizes present. The combined catches in up to three trawls per night (i.e., trawl cluster) were used to estimate the proportions of species contributing to the nearest samples of acoustic backscatter.  
 
-On _Carranza_, up to three trawls were conducted each night. The net, a midwater Mesh Wing Trawl 25/25 (252MWT04i; NET Systems), has equal top and bottom footrope lengths of 48.17 m. The mesh size decreases from 1600 to 50 mm, and is constructed of multifilament nylon cloth and ultra-high molecular weight polyethylene. The cod-end is a 17-mm Raschel nylon cloth netting. Trawls were towed at 3.5 to 4 knots for 45 minutes. A sample volume of approximately 15 kg was obtained from each haul. When the biological sample of the target species was less than this volume, the entire sample was processed. Subsequently, the CPS were identified and processed, first by measuring the standard length of each individual in the sample. Then, a proportion of each size interval was obtained with respect to the total number of organisms analyzed, to obtain a subsample for biological sampling that reflects the size distribution observed in the overall sample. The subsample was then processed to obtain specimen length, weight, sex, sexual maturity, fat content, stomach content, and gonadal weight. Otoliths were extracted for future age analysis.
+On _Carranza_, up to three trawls were conducted each night. The net, a midwater Mesh Wing Trawl 25/25 (252MWT04i; NET Systems), has equal top and bottom footrope lengths of 48.17 m. The mesh size decreases from 1600 to 50 mm, and is constructed of multifilament nylon cloth and ultra-high molecular weight polyethylene [@Carranza2021]. The cod-end is a 17-mm Raschel nylon cloth netting. Trawls were towed at 3.5 to 4 knots for 45 minutes. A sample volume of approximately 15 kg was obtained from each haul. When the biological sample of the target species was less than this volume, the entire sample was processed. Subsequently, the CPS were identified and processed, first by measuring the standard length of each individual in the sample. Then, a proportion of each size interval was obtained with respect to the total number of organisms analyzed, to obtain a subsample for biological sampling that reflects the size distribution observed in the overall sample. The subsample was then processed to obtain specimen length, weight, sex, sexual maturity, fat content, stomach content, and gonadal weight. Otoliths were extracted for future age analysis.
 
 (ref:trawl-diagrams) Schematic drawings of the Nordic 264 rope trawl a) net and b) cod-end.
 
@@ -2310,13 +2333,13 @@ On _Long Beach Carnage_, as many as three purse seine sets were planned each day
 ## Ichthyoplankton and oceanographic sampling {#methods-other-sampling}
 ### Egg and larva sampling {#methods-egg-sampling}  
 
-On _`r survey.vessel`_, fish eggs were collected during the day using a CUFES [@Checkley1997], which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. The particles in the sampled water were sieved by a 505-$\mu$m mesh. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs". Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the durations of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish.  
+On _`r survey.vessel`_ and _Carranza_, fish eggs were collected during the day using a CUFES [@Checkley1997], which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. For each vessel, the particles in the sampled water were sieved by a 505- and 500-$\mu$m mesh, respectively. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs". Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn for _`r survey.vessel`_, and 4 nmi at a speed of 8 kn for _Carranza_. Because the durations of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish.
 
-A CalCOFI bongo oblique net [a bridleless pair of 71-cm diameter nets with 505-$\mu$m mesh, @Smith1977] was used opportunistically to sample ichthyoplankton and krill after sunset, to contribute to the CalCOFI ichthyoplankton time series. Where there was adequate depth, 300 m of wire was deployed at a rate of 50 m min^-1^ and then retrieved at 20 m min^-1^, at a nominal wire angle of 45$^\circ$. Bongo samples were stored in 5% buffered formalin.  
+On _`r survey.vessel`_, a CalCOFI bongo oblique net [a bridleless pair of 71-cm diameter nets with 505-$\mu$m mesh, @Smith1977] was used opportunistically to sample ichthyoplankton and krill after sunset, to contribute to the CalCOFI ichthyoplankton time series. Where there was adequate depth, 300 m of wire was deployed at a rate of 50 m min^-1^ and then retrieved at 20 m min^-1^, at a nominal wire angle of 45$^\circ$. Bongo samples were stored in 5% buffered formalin.  
 
 ### Conductivity and temperature versus depth (CTD) sampling {#methods-ctd-sampling}  
 
-On _`r survey.vessel`_, conductivity and temperature were measured versus depth to `r ctd.depth` m using calibrated sensors on a CTD rosette or underway probe (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data were used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005]. These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth during acoustic data processing.  
+On _`r survey.vessel`_ and _Carranza_, conductivity and temperature were measured versus depth to `r ctd.depth` and 500 m, respectively, using calibrated sensors on a CTD rosette or underway probe (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth during acoustic data processing. For _`r survey.vessel`_, these data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005]. For _Carranza_, the conductivity and temperature from the echosounder calibrations were used for the Echoview processing.
 
 \newpage
 
@@ -2607,7 +2630,7 @@ All raw EK80, ME70, MS70, SX90, and EC150-3C data are archived on the SWFSC data
 
 # Acknowledgements {#acknowledgements}  
 
-We thank the crew members of the NOAA ship _`r survey.vessel`_ and INAPESCA ship _Carranza_, and all scientists who participated in the sampling operations at sea. We thank Roberto Zarate and the team from INASPECA for the processing and dissemination of acoustic and biological sampling data from _Carranza_.  We thank Capts. Rick Blair (_Lisa Marie_) and Rich Ashley and Tom Brinton (_Long Beach Carnage_), along with the all the F/V crew members, for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey. We thank Kristen Hinton and Patrick Biondo from WDFW for biological sampling at sea aboard _Lisa Marie_; and Kelly Kloos, T. Nguyen, Joel van Noord, and Trevor Stocking for sampling aboard _Long Beach Carnage_. Critical reviews by **[List of Reviewers]** improved this report.  
+We thank the crew members of the NOAA ship _`r survey.vessel`_ and INAPESCA ship _Carranza_, and all scientists who participated in the sampling operations at sea. We thank Roberto Zarate and the team from INASPECA for the processing and dissemination of acoustic and biological sampling data from _Carranza_.  We thank Capts. Rick Blair (_Lisa Marie_) and Rich Ashley and Tom Brinton (_Long Beach Carnage_), along with the all the F/V crew members, for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey. We thank Dianna Porzio from CDFW for coordinating the biological sampling and for organizing, validating, and disseminating the resulting data. We thank Kristen Hinton and Patrick Biondo from WDFW for biological sampling at sea aboard _Lisa Marie_; and Kelly Kloos, T. Nguyen, Joel van Noord, and Trevor Stocking for sampling aboard _Long Beach Carnage_. Critical reviews by **[List of Reviewers]** improved this report.  
 
 # References {-}  
 
