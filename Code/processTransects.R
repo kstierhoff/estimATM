@@ -461,11 +461,25 @@ survey.map <- base.map +
           aes(linetype = Type, colour = Type), show.legend = "line") +
   scale_linetype_manual(name = "Type", values = wpt.linetypes) +
   scale_colour_manual(name = "Type", values = wpt.colors) +
-  geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
-  geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-          xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-          ylim = c(map.bounds["ymin"], map.bounds["ymax"])) 
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+
+if (nrow(uctds.sf) > 0) {
+  survey.map <- survey.map +
+    geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))  
+}
+
+if (nrow(pairovets.sf) > 0) {
+  survey.map <- survey.map +
+    geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+}
 
 # Save the map
 ggsave(survey.map, filename = here("Figs/fig_survey_map.png"), 
