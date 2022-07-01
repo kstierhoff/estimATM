@@ -13,8 +13,10 @@ pacman::p_load_gh("kstierhoff/atm")
 source(here::here("Code/estimate_CPS_NASC.R"))
 
 # Configure input and output paths
-path.in  <- here("Data/Backscatter/RL")
-path.out <- "C:/SURVEY/2107RL/PROCESSED/EV/CSV/LASKER"
+# path.in  <- here("Data/Backscatter/SD")
+# path.out <- here("Data/Backscatter/SD")
+path.in  <- "C:/SURVEY/2107RL/PROCESSED/EV/CSV/SAILDRONE/SD1059"
+path.out <- "C:/SURVEY/2107RL/PROCESSED/EV/CSV/SAILDRONE/SD1059"
 
 # List CSV files (this is just for viewing the files; it's not used in the code)
 list.files(path = path.in, pattern = "CPS-Final 38 kHz CPS.csv", recursive = FALSE)
@@ -30,12 +32,3 @@ estimate.cps.nasc(path.input = path.in,
 # Close both graphics devices
 dev.off()
 dev.off()
-# dev.off()
-# dev.off()
-# dev.off()
-# dev.off()
-# dev.off()
-# dev.off()
-# dev.off()
-# dev.off()
-

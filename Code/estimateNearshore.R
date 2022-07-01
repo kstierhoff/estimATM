@@ -463,7 +463,7 @@ if (save.figs) {
   load(here("Output/acoustic_proportion_maps_ns.Rdata"))
 }
 
-# Calculate offshore acoustic biomass density -----------------------------
+# Calculate nearshore acoustic biomass density -----------------------------
 nasc.nearshore <- nasc.nearshore %>% 
   mutate( 
     anch.dens = cps.nasc*prop.anch / (4*pi*sigmawg.anch) / 1000,
@@ -1375,9 +1375,10 @@ nasc.density.ns.sf <- nasc.density.ns %>%
                    '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>')
   )
 
-# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax")) +
-# mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"),zcol = "stock") +
-# mapview(filter(nasc.density.ns.sf, scientificName == "Engraulis mordax"), cex = "bin.level", zcol = "bin.level")
+# ns.spp <- "Clupea pallasii"
+# mapview(filter(strata.nearshore, scientificName == ns.spp)) +
+# mapview(filter(strata.nearshore, scientificName == ns.spp), zcol = "stock") +
+# mapview(filter(nasc.density.ns.sf, scientificName == ns.spp), cex = "bin.level", zcol = "bin.level")
 
 # mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "vessel.name")
 # mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "vessel.name")

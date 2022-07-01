@@ -340,7 +340,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
-                            SD  = "Final 38 kHz CPS*.*csv",
+                            SD  = "Final 38 kHz CPS_nasc_cps.csv",
                             JCF  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
@@ -567,7 +567,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 10 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE

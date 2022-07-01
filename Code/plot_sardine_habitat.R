@@ -68,12 +68,13 @@ if (survey.year >= 2021) {
   saveRDS(hab.data, file = here("Data/Habitat/habitat_data.rds"))
   
   # Get map bounds for setting map extent
-  map.bounds <- nav.sf %>% 
-    st_bbox()
-  
-  # map.bounds <- hab.data %>% 
-  #   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
+  # map.bounds <- nav.sf %>% 
   #   st_bbox()
+  
+  # Get map bounds for setting map extent  
+  map.bounds <- hab.data %>%
+    st_as_sf(coords = c("long","lat"), crs = 4326) %>%
+    st_bbox()
   
   # Get map features --------------------------
   # Get state data
