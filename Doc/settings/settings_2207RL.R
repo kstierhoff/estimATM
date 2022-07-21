@@ -61,7 +61,7 @@ transects.rm <- NA # Numbered transects to remove
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
 leg.ends <- c(ymd("2022-06-27"), ymd("2022-07-15"),
-              ymd("2022-07-19"), ymd("2022-08-06"),
+              ymd("2022-07-21"), ymd("2022-08-06"),
               ymd("2022-08-12"), ymd("2022-08-30"),
               ymd("2022-09-06"), ymd("2022-09-23"))
 
@@ -88,7 +88,7 @@ survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2207RL"        # SWFSC/AST survey name
 survey.start           <- "27 June"       # Survey start date
-survey.end             <- "23 September"   # Survey end date
+survey.end             <- "23 September"  # Survey end date
 survey.year            <- "2022"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 77              # Days at sea allocated
@@ -100,7 +100,7 @@ survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
-leg.breaks <- as.numeric(lubridate::ymd(c("2022-06-27", "2022-07-19", 
+leg.breaks <- as.numeric(lubridate::ymd(c("2022-06-27", "2022-07-21", 
                                           "2022-08-12", "2022-09-06",
                                           "2022-09-24")))
 
