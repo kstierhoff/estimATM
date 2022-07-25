@@ -486,7 +486,7 @@ scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes202207RL.sqlite" # CUFES SQLite database
+cufes.db.sqlite        <- "cufes202206RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 cufes.vessels          <- c("RL", "JCF")
 # Trawl data
