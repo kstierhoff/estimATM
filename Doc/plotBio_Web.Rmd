@@ -74,7 +74,7 @@ get.db             <- T # Import trawl database
 # Are we sampling? If no, F. Skips data processing steps.
 sampling.acoustics <- T 
 sampling.cufes     <- T 
-sampling.trawl     <- F 
+sampling.trawl     <- T 
 
 # Control script behavior (often F)
 resize.map         <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -292,17 +292,13 @@ if (sampling.trawl) {
 if (sampling.trawl) {
   # Create startLatitudeDecimal and startLongitudeDecimal for Access data
   if (trawl.source == "Access") {
-    if (year(haul.all$trawlDate[1]) >= 2021) {
+    if (year(haul.all$netInWaterTime[1]) >= 2021) {
       haul <- haul.all %>% 
         mutate(
           startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
           startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
           stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-          stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-          haulBackTime     = haulbackTime,
-          equilibriumTime  = EquilibriumTime) %>%
-        rename(cruise = Cruise, ship = Ship, haul = Haul, 
-               collection = Collection, notes = Notes)
+          stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
       
     } else {
       haul <- haul.all %>% 
@@ -412,6 +408,7 @@ if (sampling.trawl) {
     if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
     if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
     if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+    if (!has_name(haul.summ.wt, "Etrumeus acuminatus")) {haul.summ.wt$`Etrumeus acuminatus` <- 0}
     
     # Calculate total weight of all CPS species
     haul.summ.wt <- haul.summ.wt %>%  
@@ -423,7 +420,8 @@ if (sampling.trawl) {
              "Anchovy"    = "Engraulis mordax",
              "Sardine"    = "Sardinops sagax",
              "PacMack"    = "Scomber japonicus",
-             "JackMack"   = "Trachurus symmetricus") 
+             "JackMack"   = "Trachurus symmetricus",
+             "RndHerring" = "Etrumeus acuminatus") 
     
     # Summarise catch by cluster
     cluster.summ.wt <- haul.summ.wt %>% 
@@ -449,6 +447,7 @@ if (sampling.trawl) {
                                 "Sardine"    = rep(0, nrow(haul)),
                                 "PacMack"    = rep(0, nrow(haul)),
                                 "JackMack"   = rep(0, nrow(haul)),
+                                "RndHerring" = rep(0, nrow(haul)),
                                 "AllCPS"     = rep(0, nrow(haul)))) %>% 
       right_join(haul.mid)
     
@@ -466,7 +465,7 @@ if (sampling.trawl) {
   # Select and rename trawl data for pie charts
   haul.pie <- haul.summ.wt %>% 
     select(haul, long, lat, Anchovy, JackMack, 
-           Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>%
+           Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>%
     # Create bins for defining point size in NASC plots
     mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin)) %>% 
@@ -474,7 +473,7 @@ if (sampling.trawl) {
   
   cluster.pie <- cluster.summ.wt %>% 
     select(cluster, long, lat, Anchovy, JackMack, 
-           Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+           Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
     # Create bins for defining point size in NASC plots
     mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
            bin.level =  as.numeric(bin)) %>% 

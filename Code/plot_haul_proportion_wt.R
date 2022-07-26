@@ -35,7 +35,7 @@ if (nrow(haul.pos) > 0) {
             alpha = 0.75, linetype = "dashed") +
     # Plot empty trawl locations
     geom_point(data = haul.zero, aes(X, Y), 
-               size = 3, shape = 21, fill = 'black', colour = 'white') ++
+               size = 3, shape = 21, fill = 'black', colour = 'white') +
     coord_sf(crs = crs.proj, 
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
@@ -56,4 +56,4 @@ if (doc.name == "simulateBiomass.Rmd") {
   ggsave(trawl.pie.haul.wt,
          filename = here("Figs/fig_trawl_proportion_haul_wt.png"),
          width = map.width, height = map.height) 
-  }
+}
