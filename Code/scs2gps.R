@@ -1,5 +1,6 @@
 # Create gps.csv file for Echoview processing from SCS data
 
+# Load libraries
 pacman::p_load(tidyverse, here, lubridate)
 pacman::p_load_gh("kstierhoff/surveyR")
 
@@ -8,6 +9,7 @@ start_date <- ymd("2022-07-25")
 end_date <- ymd("2022-07-30")
 # end_date <- ymd(Sys.Date())
 
+# Read and format SCS data; filter for start and end date.
 nav.csv <- read_csv(here("Data/SCS/2207RL_GPS.csv")) %>% 
   select(GPS_date = Date, GPS_time = Time, latitude = "GP170-Lat",longitude = "GP170-Lon") %>% 
   mutate(latitude = scs2dd(latitude),
