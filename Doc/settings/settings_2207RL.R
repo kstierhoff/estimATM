@@ -141,9 +141,9 @@ survey.start.sd  <- NA_character_ # Start of Saildrone survey
 survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
-erddap.url.sd <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2021"
-erddap.survey.start.sd <- "2021-07-07T00%3A00%3A00Z"
-erddap.survey.end.sd   <- "2021-10-15T23%3A59%3A00Z"
+erddap.url.sd <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2022"
+erddap.survey.start.sd <- "2022-07-09T00%3A00%3A00Z"
+erddap.survey.end.sd   <- "2022-10-15T23%3A59%3A00Z"
 # Configure columns and classes
 erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
 erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
