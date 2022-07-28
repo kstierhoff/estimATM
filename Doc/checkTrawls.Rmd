@@ -59,7 +59,7 @@ dir_create(here(c("Figs", "Output")))
 
 ```{r user-settings}
 # User-specified settings
-get.nav <- F # Download vessel nav from ERDDAP
+get.nav <- T # Download vessel nav from ERDDAP
 get.db  <- T # Extract data from trawl database (F for testing)
 ```
 
@@ -201,6 +201,7 @@ if (nrow(catch) > 0) {
   if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
   if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
   if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (is.null(haul.summ.wt$`Etrumeus acuminatus`)) {haul.summ.wt$`Etrumeus acuminatus` <- 0}
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>% 
@@ -218,7 +219,8 @@ if (nrow(catch) > 0) {
            "Anchovy"    = "Engraulis mordax",
            "Sardine"    = "Sardinops sagax",
            "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
+           "JackMack"   = "Trachurus symmetricus",
+           "RndHerring" = "Etrumeus acuminatus") %>% 
     replace(is.na(.), 0)
   
   # Add lat/long to haul summary for plotting
@@ -229,7 +231,8 @@ if (nrow(catch) > 0) {
            "Anchovy"    = "Engraulis mordax",
            "Sardine"    = "Sardinops sagax",
            "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") %>% 
+           "JackMack"   = "Trachurus symmetricus",
+           "RndHerring" = "Etrumeus acuminatus") %>% 
     replace(is.na(.), 0)
   
 } else {
@@ -242,6 +245,7 @@ if (nrow(catch) > 0) {
                               "Sardine"    = rep(0, nrow(haul)),
                               "PacMack"    = rep(0, nrow(haul)),
                               "JackMack"   = rep(0, nrow(haul)),
+                              "RndHerring" = rep(0, nrow(haul)),
                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
     right_join(haul.mid)
   
@@ -258,7 +262,7 @@ if (nrow(catch) > 0) {
 # Select and rename trawl data for pie charts
 catch.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Project pie data
@@ -290,6 +294,7 @@ haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal)
                      'Jack mackerel:', JackMack, 'kg<br/>',
                      'P. herring:', PacHerring, 'kg<br/>',
                      'P. mackerel:', PacMack, 'kg<br/>',
+                     'R. herring:', RndHerring, 'kg<br/>',
                      'All CPS:', AllCPS, 'kg')) 
 
 # Add coordinates if using the Access database (columns do not exist in SQL database)
@@ -331,6 +336,7 @@ cluster.catch.sf <- catch.pie %>%
                   'Jack mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 saveRDS(haul.paths, file = here("Output/haul_paths.rds"))
@@ -400,7 +406,7 @@ lengths.all <- lengths.all %>%
     missing.length = case_when(
       is.na(standardLength_mm) & scientificName %in% c("Sardinops sagax", "Engraulis mordax") ~
         TRUE,
-      is.na(forkLength_mm) & scientificName %in% c("Scomber japonicus", "Trachurus symmetricus", "Clupea pallasii") ~
+      is.na(forkLength_mm) & scientificName %in% c("Scomber japonicus", "Trachurus symmetricus", "Clupea pallasii", "Etrumeus acuminatus") ~
         TRUE,
       is.na(mantleLength_mm) & scientificName %in% c("Doryteuthis (Loligo) opalescens") ~
         TRUE,
@@ -411,7 +417,8 @@ lengths.all <- lengths.all %>%
   # Calculate native lengths for each species, for plotting later
   mutate(nativeLength_mm = case_when(
     scientificName %in% c("Sardinops sagax", "Engraulis mordax") ~ standardLength_mm,
-    scientificName %in% c("Scomber japonicus", "Trachurus symmetricus", "Clupea pallasii") ~ forkLength_mm,
+    scientificName %in% c("Scomber japonicus", "Trachurus symmetricus", 
+                          "Clupea pallasii", "Etrumeus acuminatus") ~ forkLength_mm,
     scientificName == "Doryteuthis (Loligo) opalescens" ~ mantleLength_mm,
     TRUE ~ NA_integer_))
 
@@ -445,7 +452,9 @@ lengths.all  <- lengths.all %>%
       scientificName == "Scomber japonicus" ~ 
         convert_length("Scomber japonicus", .$nativeLength_mm, "FL", "TL"),
       scientificName == "Trachurus symmetricus" ~ 
-        convert_length("Trachurus symmetricus", .$nativeLength_mm, "FL", "TL"),
+        convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
+      scientificName == "Etrumeus acuminatus" ~ 
+        convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm))) %>% 
   mutate(totalLength_mm = round(totalLength_mm),
          mantleLength_mm = round(mantleLength_mm)) 
@@ -605,6 +614,7 @@ lengths %>%
 ```
 
 # Length-frequencies
+
 Length frequency by cruise leg. Length measurements are "native lengths", which are _SL_ for sardine and anchovies, and _FL_ for mackerels and herring.
 
 ```{r length-freq-leg}
