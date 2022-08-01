@@ -498,8 +498,8 @@ trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl 
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
-ctd.hdr.pattern        <- "dCTD*.*hdr"
-ctd.cast.pattern       <- "dCTD*.*asc"
+ctd.hdr.pattern        <- "RL2203*.*hdr"
+ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
