@@ -10,7 +10,8 @@ nav.path <- here("Data/SCS") # Shore side
 
 # Specify path to save gps.csv file
 dir_create("C:/SURVEY/2207RL/PROCESSED/EV/GPS")
-gps.path <- "C:/SURVEY/2207RL/PROCESSED/EV/GPS/120A.gps.csv"
+gps.path <- "C:/SURVEY/2207RL/PROCESSED/EV/GPS"
+tx.name  <- "120A"
 
 # Set start and end date to reduce file size (makes matching faster, I think)
 start_date <- ymd_hms("2022-07-28 12:12:01")
@@ -34,7 +35,12 @@ nav.gps <- nav.csv %>%
   select(GPS_date, GPS_time, latitude, longitude)
 
 # Write file
-write_csv(nav.gps, gps.path)
+write_csv(nav.gps, file.path(gps.path, paste0(tx.name, ".gps.csv")))
 
 # Plot results
 ggplot(nav.csv, aes(longitude, latitude)) + geom_path()
+
+# Save plot
+ggsave(file.path(gps.path, paste0(tx.name, ".png")))
+
+       
