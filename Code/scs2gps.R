@@ -11,9 +11,9 @@ nav.path <- here("Data/SCS") # Shore side
 # Specify path to save gps.csv file
 dir_create("C:/SURVEY/2207RL/PROCESSED/EV/GPS")
 gps.path <- "C:/SURVEY/2207RL/PROCESSED/EV/GPS"
-tx.name  <- "120A"
 
 # Set start and end date to reduce file size (makes matching faster, I think)
+tx.name  <- "120A"
 start_date <- ymd_hms("2022-07-28 12:12:01")
 end_date   <- ymd_hms("2022-07-30 00:00:01")
 # end_date <- ymd(Sys.Date())
