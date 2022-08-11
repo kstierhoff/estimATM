@@ -18,7 +18,8 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,leaflet,
-               here,bookdown,odbc,DBI,knitr,DT,fs,sf,reshape2,leafem)
+               here,bookdown,odbc,DBI,knitr,DT,fs,sf,reshape2,leafem,
+               cowplot)
 
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("kstierhoff/surveyR")
@@ -397,7 +398,7 @@ lengths.all <- lengths.all %>%
   select(cruise, ship, haul, collection, species, individual_ID, 
          scientificName, commonName, specimenNumber, 
          standardLength_mm, forkLength_mm, totalLength_mm, mantleLength_mm,
-         sex, weightg, isRandomSample, flaggedData) %>%
+         sex, weightg, otolithNumber, isRandomSample, flaggedData) %>%
   # Standardize sex values
   mutate(sex = tolower(trimws(sex)),
          binned = FALSE) %>% 
@@ -1446,6 +1447,74 @@ if (length(duplicate.ids) > 0) {
   print("Hooray, no duplicated barcodes!")
 }
 ```
+
+## Otolith samples
+
+```{r summarize-otolith-samples}
+# Plot lengths for specimens with collected otoliths
+
+# Filter for CPS species only
+otoliths <- lengths %>% 
+  filter(scientificName %in% cps.spp) 
+
+# Plot species with standard length measurements
+otoliths.sl <- ggplot() + 
+  geom_histogram(data = filter(otoliths,
+                               scientificName %in% c("Engraulis mordax","Sardinops sagax")),
+                 aes(standardLength_mm),
+                 colour = "black", fill = "gray50",
+                 binwidth = 10, breaks = seq(0, 200, 10)) +
+  geom_histogram(data = filter(otoliths, 
+                               scientificName %in% c("Engraulis mordax","Sardinops sagax"),
+                               !is.na(otolithNumber)),
+                 aes(standardLength_mm, fill = scientificName),
+                 colour = "black",
+                 binwidth = 10, breaks = seq(0, 200, 10),
+                 show.legend = FALSE) +
+  geom_hline(yintercept = 50, linetype = "dashed") +
+  facet_wrap(~scientificName, scales = "free") + 
+  scale_fill_manual(values = c("Sardinops sagax" = sardine.color, 
+                               "Engraulis mordax" = anchovy.color)) +
+  labs(x = "Standard length (mm)", y = "Count") +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold.italic")) 
+
+# Plot species with fork length measurements
+otoliths.fl <- ggplot() + 
+  geom_histogram(data = filter(otoliths,
+                               scientificName %in% c("Scomber japonicus","Trachurus symmetricus")),
+                 aes(forkLength_mm),
+                 colour = "black", fill = "gray50",
+                 binwidth = 50, breaks = seq(0, 600, 50)) +
+  geom_histogram(data = filter(otoliths, 
+                               scientificName %in% c("Scomber japonicus","Trachurus symmetricus"),
+                               !is.na(otolithNumber)),
+                 aes(forkLength_mm, fill = scientificName),
+                 colour = "black",
+                 binwidth = 50, breaks = seq(0, 600, 50),
+                 show.legend = FALSE) +
+  geom_hline(yintercept = 50, linetype = "dashed") +
+  facet_wrap(~scientificName, scales = "free") + 
+  scale_fill_manual(values = c("Scomber japonicus" = pac.mack.color, 
+                               "Trachurus symmetricus" = jack.mack.color)) +
+  labs(x = "Fork length (mm)", y = "Count") +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold.italic")) 
+
+# Combine plots
+otoliths.all <- plot_grid(otoliths.sl,
+          otoliths.fl,
+          nrow = 2)
+
+# Save plot
+ggsave(otoliths.all,
+       filename = here("Figs/fig_otolith_sample_distribution.png"), 
+       height=9, width=11)
+
+# Print plot
+include_graphics(here("Figs/fig_otolith_sample_distribution.png"))
+```
+
 
 # References
 
