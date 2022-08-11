@@ -497,12 +497,12 @@ trawl.db.access        <- "TrawlDataEntry2207RL.accdb"
 trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 # CTD data
-ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
+ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD/PROCESSED")
 ctd.hdr.pattern        <- "RL2203*.*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 # UCTD data   
-uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
+uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
 uctd.hdr.pattern       <- ".*UCTD_\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
