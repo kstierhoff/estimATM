@@ -503,7 +503,7 @@ ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
-uctd.hdr.pattern       <- ".*UCTD\\d{3}.*asc"
+uctd.hdr.pattern       <- ".*UCTD_\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
 # Biomass estimation settings ------------------------------------------
