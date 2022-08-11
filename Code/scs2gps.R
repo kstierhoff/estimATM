@@ -5,17 +5,17 @@ pacman::p_load(tidyverse, here, lubridate, fs)
 pacman::p_load_gh("kstierhoff/surveyR")
 
 # Specify nav file source
-# nav.path <- "//10.48.23.223/log40/EventData/AST CONTINUOUS" # At sea
-nav.path <- here("Data/SCS") # Shore side
+nav.path <- "//10.48.23.223/log40/EventData/AST CONTINUOUS" # At sea
+#nav.path <- here("Data/SCS") # Shore side
 
 # Specify path to save gps.csv file
 dir_create("C:/SURVEY/2207RL/PROCESSED/EV/GPS")
 gps.path <- "C:/SURVEY/2207RL/PROCESSED/EV/GPS"
 
 # Set start and end date to reduce file size (makes matching faster, I think)
-tx.name  <- "120A"
-start_date <- ymd_hms("2022-07-28 12:12:01")
-end_date   <- ymd_hms("2022-07-30 00:00:01")
+tx.name  <- "103C"
+start_date <- ymd_hms("2022-08-03 12:12:01")
+end_date   <- ymd_hms("2022-08-06 00:00:01")
 # end_date <- ymd(Sys.Date())
 
 # Read and format SCS data; filter for start and end date
