@@ -9,25 +9,31 @@ library(readr)    # For reading and writing plain text files
 # User Settings -----------------------------------------------------------
 
 # Directory of CTD files to process
-dir.CTD <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\CTD_to_Process\\'
+dir.CTD <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\CTD_to_Process\\'
+# dir.CTD <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\PROCESSED\\'
+dir.output <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\PROCESSED\\'
+# dir.output <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
-dir.PSA <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\PSA\\'
+dir.PSA <- 'C:\\SURVEY\\2207RL\\DATA\\UCTD\\PSA\\'
+# dir.PSA <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\PSA\\'
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\test.XMLCON'
+file.con <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\test.XMLCON'
+# file.con <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\test.XMLCON'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\_2107RL_Template.ecs'
+ECS.template <- 'C:\\SURVEY\\2207RL\\PROCESSED\\EV\\ECS\\_2207RL_Template.ecs'
+# ECS.template <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\_2107RL_Template.ecs'
 
 # ECS output directory
-dir.ECS <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\'
+dir.ECS <- 'C:\\SURVEY\\2207RL\\PROCESSED\\EV\\ECS\\'
+# dir.ECS <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
 pause <- 0.5
