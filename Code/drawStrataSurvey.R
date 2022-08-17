@@ -67,5 +67,5 @@ for (j in unique(nasc$vessel.name)) {
 survey.polygons <- st_make_valid(survey.polygons)
 
 # Export to shapefile
-st_write(survey.polygons, "Output/survey_footprint.shp",
+st_write(survey.polygons, here("Output/survey_footprint.shp"),
          delete_layer = TRUE)

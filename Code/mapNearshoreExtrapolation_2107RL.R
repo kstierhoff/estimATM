@@ -563,15 +563,17 @@ ns.lims <- strata.primary.spp %>%
 nasc.density.sub <- nasc.density %>% 
   filter(scientificName == i,
          density != 0,
-         transect %in% unique(strata.sub$transect)) 
+         transect %in% unique(strata.sub$transect)) %>% 
+  droplevels()
 
 nasc.density.nse.sub <- nasc.density.nse %>% 
   filter(scientificName == i,
          density != 0,
-         transect %in% unique(strata.sub$transect)) 
+         transect %in% unique(strata.sub$transect)) %>% 
+  droplevels()
 
 # Select legend objects 
-dens.levels.ns <- sort(unique(nasc.density.sub$bin.level))
+dens.levels.ns <- sort(unique(nasc.density.nse.sub$bin.level))
 dens.labels.ns <- dens.labels[dens.levels.ns]
 dens.sizes.ns  <- dens.sizes[dens.levels.ns]
 dens.colors.ns <- dens.colors[dens.levels.ns]

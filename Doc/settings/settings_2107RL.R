@@ -274,7 +274,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL","LBC","LM","SD","JCF") # JC = Jorge Carranza Fraser
+nasc.vessels           <- c("RL","LBC","LM","SD","JCF") # JCF = Jorge Carranza Fraser
 nasc.vessels.offshore  <- c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
@@ -596,23 +596,23 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 86:93),
+    transect = 88:95),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 2,
-    transect = 95:106),
+    transect = 97:108),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 3,
-    transect = 110:118),
+    transect = 111:120),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 4,
-    transect = 122:128),
+    transect = 124:130),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 5,
-    transect = 134:139),
+    transect = 136:141),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
@@ -624,15 +624,15 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 3,
-    transect = 41:91),
+    transect = 41:93),
   data.frame(
-    scientificName = "Engraulis mordax", 
+    scientificName = "Engraulis mordax",
     stratum = 4,
-    transect = 92:99),
+    transect = 94:101),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 5,
-    transect = 111:127),
+    transect = 113:130),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
@@ -648,15 +648,15 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 54:69),
+    transect = 54:71),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 5,
-    transect = 87:100),
+    transect = 89:102),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 6,
-    transect = 106:123),
+    transect = 108:126),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
@@ -672,15 +672,15 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 4,
-    transect = 81:86),
+    transect = 83:87),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 5,
-    transect = 98:110),
+    transect = 100:112),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 6,
-    transect = 118:123),
+    transect = 121:126),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
@@ -692,11 +692,11 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 3,
-    transect = 41:86),
+    transect = 41:87),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 4,
-    transect = 87:136),
+    transect = 89:139),
   data.frame(
     scientificName = "Etrumeus acuminatus", 
     stratum = 1,
