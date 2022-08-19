@@ -51,11 +51,12 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate,knitr,here,
                png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
-               odbc,cowplot,mapview,fs,beepr)
+               odbc,cowplot,mapview,fs,beepr,reshape2)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
 pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
 
 # set system time zone to UTC
 Sys.setenv(tz = "UTC")
@@ -134,13 +135,15 @@ The estimated biomass of the northern stock of Pacific Sardine was `r prettyNum(
 
 The estimated biomass of the southern stock of Pacific Sardine was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"] / (be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"] + be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"]))*100,big.mark=",",digits=2)`% of the total biomass. Within the survey area, the southern stock ranged from approximately Monterey Bay to Punta Eugenia. $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Southern"]` to `r length.summ$L.max[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Southern"]` cm with a modes at approximately 9-10 cm and 15 cm in both the core and nearshore regions.
 
-The estimated biomass of Pacific Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%). A negligible amount of biomass was observed in the core survey area, and `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%) were observed in the nearshore region. Pacific Mackerel ranged from approximately Del Mar, CA to San Diego. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Scomber japonicus']` to `r length.summ$L.max[length.summ$scientificName == 'Scomber japonicus']` cm.  
+The estimated biomass of Pacific Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%). In the core region biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'] + be.all$Biomass[be.all$Species == 'Scomber japonicus']))*100,big.mark=",",digits=2)`% of the total biomass. Pacific Mackerel ranged from approximately Astoria to Punta Eugenia. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Scomber japonicus']` to `r length.summ$L.max[length.summ$scientificName == 'Scomber japonicus']` cm with a mode between 20 and 24 cm and at 34 cm in the core region, and modes at 14 and 20 cm in the nearshore region.  
 
-The estimated biomass of Jack Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] + be.all$Biomass[be.all$Species == 'Trachurus symmetricus']))*100,big.mark=",",digits=2)`% of the total biomass. Jack Mackerel ranged from approximately Pt. Conception to San Diego. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Trachurus symmetricus']` to `r length.summ$L.max[length.summ$scientificName == 'Trachurus symmetricus']` cm with a prominent mode at 13 cm.
+**[RESUME HERE]**
 
-The estimated biomass of Pacific Herring was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] / (be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] + be.all$Biomass[be.all$Species == 'Clupea pallasii']))*100,big.mark=",",digits=2)`% of the total biomass. Pacific Herring ranged from approximately **Pt. Conception to San Diego**. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Clupea pallasii']` to `r length.summ$L.max[length.summ$scientificName == 'Clupea pallasii']` cm with a prominent mode at **13 cm**.  
+The estimated biomass of Jack Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] + be.all$Biomass[be.all$Species == 'Trachurus symmetricus']))*100,big.mark=",",digits=2)`% of the total biomass. Jack Mackerel were present throughout the survey area from Cape Flattery to Punta Eugenia. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Trachurus symmetricus']` to `r length.summ$L.max[length.summ$scientificName == 'Trachurus symmetricus']` cm with modes at approximately 14, 28, 39, and 50 cm.
 
-The estimated biomass of Round Herring was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=1)`%), all observed in the core region. Round Herring ranged from approximately **Pt. Conception to San Diego**. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Etrumeus acuminatus']` to `r length.summ$L.max[length.summ$scientificName == 'Etrumeus acuminatus']` cm with a prominent mode at **13 cm**.
+The estimated biomass of Pacific Herring was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%), and in the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] / (be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] + be.all$Biomass[be.all$Species == 'Clupea pallasii']))*100,big.mark=",",digits=2)`% of the total biomass. Pacific Herring ranged from approximately Cape Flattery to Fort Bragg. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Clupea pallasii']` to `r length.summ$L.max[length.summ$scientificName == 'Clupea pallasii']` cm with a prominent mode at 21 in the core region and at 15 cm in the nearshore region.  
+
+The estimated biomass of Round Herring was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=1)`%), all observed in the core region. Round Herring ranged from approximately El Rosario to Punta Abreojos off Baja CA. Fork length ($L_F$) ranged from `r length.summ$L.min[length.summ$scientificName == 'Etrumeus acuminatus']` to `r length.summ$L.max[length.summ$scientificName == 'Etrumeus acuminatus']` cm with modes at 17 and 25 cm.
 
 \newpage
 
@@ -152,7 +155,7 @@ During summer and fall, the northern stock of Pacific Sardine typically migrates
 
 Acoustic-trawl method (ATM) surveys, which combine information collected with echosounders and nets, were introduced to the CCE more than 45 years ago to survey CPS off the west coast of the U.S. [@Mais1974;@Mais1977;@Smith1978]. Following a two-decade hiatus, the ATM was reintroduced in the CCE in spring 2006 to sample the then abundant Pacific Sardine population [@Cutter2008]. Since then, this sampling effort has continued and expanded through annual or semi-annual surveys [@Zwolinski2014]. Beginning in 2011, the ATM estimates of Pacific Sardine abundance, age structure, and distribution have been incorporated in the annual assessments of the northern stock [@Hill2017]. Additionally, ATM survey results are applied to estimate the abundances, demographies, and distributions of epipelagic and semi-demersal fishes [e.g., @Swartzman1997;@Williams2013;@Zwolinski2014] and plankton [@Hewitt2000].  
 
-This document, and references herein, describes in detail the ATM as presently used by NOAA's Southwest Fisheries Science Center (SWFSC) to survey the distributions and abundances of CPS and their oceanographic environments [e.g., @Cutter2008;@Demer2012;@Zwolinski2014]. In general terms, the contemporary ATM combines information from satellite-sensed oceanographic conditions, calibrated multifrequency echosounders, probe-sampled oceanographic conditions, pumped samples of fish eggs, and trawl-net catches of juvenile and adult CPS. The survey area is initially defined with consideration to the potential habitat of a priority stock or stock assemblage, e.g., that for the northern stock of Pacific Sardine (**Fig. \@ref(fig:sardine-distribution)**) or the central or northern stock of Northern Anchovy. The survey area is further expanded to encompass as much of the potential habitat as possible for other CPS present off the West Coast of the U.S., as time permits.  
+This document, and references herein, describes in detail the ATM as presently used by NOAA's Southwest Fisheries Science Center (SWFSC) to survey the distributions and abundances of CPS and their oceanographic environments [e.g., @Cutter2008;@Demer2012;@Zwolinski2014]. In general terms, the contemporary ATM combines information from satellite-sensed oceanographic conditions, calibrated multifrequency echosounders, probe-sampled oceanographic conditions, pumped samples of fish eggs, and trawl-net catches of juvenile and adult CPS. The survey area is initially defined with consideration to the potential habitat of a priority stock or stock assemblage, e.g., that for the northern stock of Pacific Sardine (**Fig. \@ref(fig:sardine-distribution)**) or the  northern or central stock of Northern Anchovy. The survey area is further expanded to encompass as much of the potential habitat as possible for other CPS present off the West Coast of the U.S., as time permits.  
 
 Along transects in the survey area, multi-frequency split-beam echosounders transmit sound pulses downward beneath the ship and receive echoes from animals and the seabed in the path of the sound waves. Measurements of sound speed and absorption from conductivity-temperature-depth (CTD) probes allow accurate compensation of these echoes for propagation losses. The calibrated echo intensities, normalized to the range-dependent observational volume, provide indications of the target type and behavior [e.g., @Demer2009].  
 
@@ -172,19 +175,23 @@ Animal densities are estimated by dividing the summed intensities attributed to 
 
 The primary objectives of the SWFSC’s ATM surveys are to survey the distributions and abundances of CPS, krill, and their abiotic environments in the CCE. Typically, spring surveys are conducted during 25-40 days-at-sea (DAS) between March and May, and summer surveys are conducted during 50-80 DAS between June and October. In spring, the ATM surveys focus primarily on the northern stock of Pacific Sardine and the central stock of Northern Anchovy. In summer, the ATM surveys also focus on the northern stock of Northern Anchovy. During spring and summer, the biomasses of other CPS (e.g., Pacific Mackerel, Jack Mackerel, and Pacific Herring) present in the survey area are estimated.  
 
-In `r tolower(survey.season)` `r survey.year`, the ATM survey performed aboard _`r survey.vessel`_ was augmented with coordinated sampling by a fishing vessel F/V _Long Beach Carnage_ to estimate the biomasses of CPS in offshore and nearshore regions where sampling by _`r survey.vessel`_ was not possible or safe.  
+In `r tolower(survey.season)` `r survey.year`, the ATM survey performed aboard _`r survey.vessel`_ was augmented with coordinated sampling by the fishing vessels F/V _Lisa Marie_ and F/V _Long Beach Carnage_ to estimate the biomasses of CPS in nearshore regions where sampling by _`r survey.vessel`_ was not possible or safe. In addition, three wind-powered uncrewed surface vessels (USVs; Saildrone, Inc.) conducted acoustic sampling along adaptive transects not sampled by _`r survey.vessel`_. Finally, acoustic and trawl sampling was coordinated with the Mexican research vessel _Dr. Jorge Carranza Fraser_ (hereafter, _Carranza_) off Baja CA, between El Rosario and Punta Abreojos.  
 
-Presented here are 1) a detailed description of the ATM used to survey CPS in the CCE off the west coast of North America; and 2) estimates of the abundance, biomass, size structure, and distribution of CPS, specifically the northern stock of Pacific Sardine; the central stock of Northern Anchovy; Pacific Mackerel; and Jack Mackerel for the core and nearshore survey regions. Additional details about the survey may be found in the survey report **[Stierhoff2021a]**.  
+Presented here are 1) a detailed description of the ATM used to survey CPS in the CCE off the west coast of North America; and 2) estimates of the abundance, biomass, size structure, and distribution of CPS, specifically the northern stock of Pacific Sardine; the central and northern stocks of Northern Anchovy; Pacific Mackerel; Jack Mackerel; and Pacific Herring for the core and nearshore survey regions. Additional details about the survey may be found in the survey report [@Renfree2022].  
+
+This survey was conducted with the approval of the Secretaria de Relaciones Exteriores (SRE, Diplomatic note CTC/1312/2021), the Instituto Nacional de Estadística y Geografía (INEGI; Permit: EG0082021), and the Comisión Nacional de Acuacultura y Pesca (CONAPESCA; Permit: PPFE/DGOPA-073/21).  
 
 # Methods {#methods}
 ## Data collection {#methods-data-collection}
 ### Survey design {#methods-survey-design}  
 
-The `r tolower(survey.season)` `r survey.year` survey was conducted principally using _`r survey.vessel`_. The sampling domain, between `r survey.landmark.n` and `r survey.landmark.s`, was defined by the modeled distribution of potential habitat for the northern stock of Pacific Sardine at the beginning of the survey (**Fig. \@ref(fig:sardine-potential-habitat)a**), and information recently gathered from other research projects [e.g., California Cooperative Oceanic Fisheries Investigations (CalCOFI) samples] or the fishing industry (e.g., catch and bycatch data). This area encompassed the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S. and Canada from approximately San Diego, CA to Cape Scott, BC, but also spanned portions of the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, and Pacific Herring (**Fig. \@ref(fig:sardine-potential-habitat)b-d**). East to west, the sampling domain extends from the coast to at least the 1,000 fathom (~1830 m) isobath (**Fig. \@ref(fig:survey-plan)**). Considering the expected distribution of the target species, the acceptable uncertainty in biomass estimates, and the available ship time (`r survey.das` days at sea, DAS), the principal survey objectives were the estimations of biomass for the northern stock of Pacific Sardine and the central stock of Northern Anchovy in the survey region. Additionally, biomass estimates were sought for Pacific Mackerel and Jack Mackerel in the survey region.  
+The `r tolower(survey.season)` `r survey.year` survey was conducted principally using _`r survey.vessel`_ and _Carranza_. The sampling domain, between `r survey.landmark.n` and `r survey.landmark.s`, was defined by the modeled distribution of potential habitat for the northern stock of Pacific Sardine at the beginning of the survey (**Fig. \@ref(fig:sardine-potential-habitat)a**), and information recently gathered from other research projects [e.g., California Cooperative Oceanic Fisheries Investigations (CalCOFI) samples] or the fishing industry (e.g., catch and bycatch data). This area encompassed the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S. and Canada from approximately San Diego, CA to Cape Scott, BC, but also spanned portions of the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, Pacific Herring, and Round Herring (**Fig. \@ref(fig:sardine-potential-habitat)b-d**). East to west, the sampling domain extends from the coast to at least the 1,000 fathom (~1830 m) isobath (**Fig. \@ref(fig:survey-plan)**). Considering the expected distribution of the target species, the acceptable uncertainty in biomass estimates, and the available ship time (`r survey.das` days at sea, DAS), the principal survey objectives were the estimations of biomass for the northern stock of Pacific Sardine and the central stock of Northern Anchovy in the survey region. Additionally, biomass estimates were sought for the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, Pacific Herring, and Round Herring in the survey region.  
 
-Additional sampling was conducted nearshore along 5-nmi-long transects spaced 5 nmi apart between San Francisco and San Diego using F/V _Long Beach Carnage_ equipped with multi-frequency (**MTA4**) echosounders (magenta lines, **Fig. \@ref(fig:survey-plan)**). The goal of the nearshore sampling was to estimate the abundance and biomass of the central stock of Northern Anchovy and northern stock of Pacific Sardine close to shore, in shallow water, or both, where _`r survey.vessel`_ could not safely navigate or trawl.  
+The transects are perpendicular to the coast, extending from the shallowest navigable depth (~25 m) to either a distance of 35 nmi or to the 1,000 fathom isobath, whichever is farthest (**Fig. \@ref(fig:survey-plan)**). When CPS are observed within the westernmost 3 nmi of a transect, that transect and the next one to the south are extended in 5-nmi increments until no CPS are observed in the last 3 nmi of the extension.  
 
-The transects are perpendicular to the coast, extending from the shallowest navigable depth (~30 m) to either a distance of 35 nmi or to the 1,000 fathom isobath, whichever is farthest (**Fig. \@ref(fig:survey-plan)**). When CPS are observed within the westernmost 3 nmi of a transect, that transect and the next one to the south are extended in 5-nmi increments until no CPS are observed in the last 3 nmi of the extension.  
+To increase the spatial sampling resolution, acoustic sampling was conducted by USVs interstitial to _`r survey.vessel`_ transects from Cape Flattery, WA to Crescent City, CA and from Point Arena to Point Conception, CA (SD-1036, SD-1055, and SD-1059; yellow lines, **Fig. \@ref(fig:survey-plan)**). USVs (SD-1036 and SD-1059) were additionally used to sample the offshore extents of _`r survey.vessel`_ transects in the Southern California Bight. 
+
+To estimate the abundance and biomass of CPS close to shore, in shallow water, or both, where _`r survey.vessel`_ could not safely navigate or trawl, acoustic and purse seine sampling was conducted nearshore between Cape Flattery and San Diego using two fishing vessels equipped with multi-frequency echosounders (magenta lines, **Fig. \@ref(fig:survey-plan)**). F/V _Lisa Marie_ sampled 5-nmi-long transects spaced 5 nmi apart between Cape Flattery and Bodega Bay. F/V _Long Beach Carnage_ sampled 5-nmi-long transects spaced 5 nmi apart between Bodega Bay and San Diego, and 2.5-nmi-long transects spaced 2.5 nmi apart around Santa Cruz and Santa Catalina Islands in the SCB.  
 
 (ref:sardine-potential-habitat) Distribution of potential habitat for the northern stock of Pacific Sardine (a) before, (b, c) during, and (d) at the end of the `r tolower(survey.season)` `r survey.year` survey.
 
@@ -194,7 +201,7 @@ include_graphics(here("Figs/fig_habitat_map.png"))
 
 \newpage  
 
-(ref:survey-plan) Planned compulsory (solid black lines) transect lines sampled by _`r survey.vessel`_ and nearshore transect lines sampled by F/V _Long Beach Carnage_ (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms). _`r survey.vessel`_'s actual daytime and nighttime movements are overlaid (heavy gray line).
+(ref:survey-plan) Planned compulsory (solid black lines) and adaptive (dashed red lines) transect lines sampled by _`r survey.vessel`_ and _Carranza_; interstitial (yellow lines) and offshore (dashed orange lines) transect lines sampled by USVs; nearshore transect lines sampled by F/V _Lisa Marie_ and F/V _Long Beach Carnage_ (solid magenta lines). Isobaths (light gray lines) are placed at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 fathoms).
 
 ```{r survey-plan,fig.cap='(ref:survey-plan)',out.height='8in',fig.pos='H'}
 include_graphics(here("Figs/fig_survey_plan.png"))  
@@ -207,7 +214,13 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 
 On _`r survey.vessel`_, multi-frequency Wideband Transceivers (18-, 38-, 70-, 120-, 200-, and 333-kHz EK80 WBTs; Simrad) were configured with split-beam transducers (`r echo.models`, respectively; Simrad). The transducers were mounted on the bottom of a retractable keel or "centerboard" (**Fig. \@ref(fig:cb-config)**). The keel was retracted (transducers ~`r cb.retracted`-m depth) during calibration, and extended to the intermediate position (transducers ~`r cb.intermediate`-m depth) during the survey. Exceptions were made during shallow water operations, when the keel was retracted; or during times of heavy weather, when the keel was extended (transducers ~`r cb.extended`-m depth) to provide extra stability and reduce the effect of weather-generated noise. In addition, acoustic data were also collected using a multibeam echosounder (ME70, Simrad), multibeam sonar (MS70, Simrad), and scanning sonar (SX90, Simrad). Transducer position and motion were measured at 5 Hz using an inertial motion unit (POS-MV, Trimble/Applanix).  
 
-On _Long Beach Carnage_, the SWFSC's multi-frequency echosounders (38-, 70-, 120-, and 200-kHz EK60 GPTs; Simrad) were configured with the SWFSC's multi-frequency transducer array (MTA4) with split-beam transducers (ES38-12, ES70-7C, ES120-7C and ES200-7C; Simrad) mounted on the bottom of a pole.  
+On _Carranza_, multi-frequency General Purpose Transceivers (18-, 38-, 70-, 120-, and 200-kHz Simrad EK60 GPTs) were configured with split-beam transducers (Simrad ES18, ES38B, ES70-7C, ES120-7C, and ES200-7C) mounted on the bottom of a retractable keel, placing them approximately 4 m beneath the water surface.  
+
+On _Lisa Marie_, the SWFSC's General Purpose Transceiver (38-kHz Simrad EK60 GPT) was connected to the vessel's hull-mounted split-beam transducer (Simrad ES38B, not shown).
+
+On _Long Beach Carnage_, the SWFSC's multi-frequency General Purpose Transceivers (38-, 70-, 120-, and 200-kHz Simrad EK60 GPTs) were configured with the SWFSC's split-beam transducers (Simrad ES38-12, ES70-7C, ES120-7C and ES200-7C) mounted in a multi-frequency transducer array (MTA4) on the bottom of a pole (**Fig. \@ref(fig:cb-config-lbc)**).  
+
+On the three USVs (SD-1036, SD-1055, and SD-1059), miniature Wideband Transceivers (Simrad WBT Mini) were configured with gimbaled, keel-mounted, dual-frequency transducers (Simrad ES38-18|200-18C) containing a split-beam 38-kHz transducer and single-beam 200-kHz transducer with nominally 18$^\circ$ beamwidths.  
 
 (ref:cb-config) Echosounder transducers mounted on the bottom of the retractable centerboard on _`r survey.vessel`_. During the survey, the centerboard was extended, typically positioning the transducers at ~2 m below the keel at a water depth of ~7 m.
 
@@ -219,14 +232,24 @@ if (survey.vessel.primary == "RL") {
 }
 ```  
 
+\newpage
+
+(ref:cb-config-lbc) Transducer locations on the bottom of the pole-mounted multi-transducer array (MTA4) installed on the F/V _Long Beach Carnage_.
+
+```{r cb-config-lbc,fig.cap='(ref:cb-config-lbc)',out.height = '3in',fig.align='center',fig.pos='H'}
+include_graphics(here("Images/img_MTA4_config.png"))
+```
+
 #### Echosounder calibrations {#methods-echosounder-calibration}  
 ##### _`r survey.vessel`_  
 
-First, the transducer integrities were verified through transducer-impedance measurements in water and air using an inductance-capacitance-resistance (LCR) meter (Agilent E4980A) and custom software (Matlab, MathWorks). The impedance magnitude ($|Z|$, $\Omega$), phase ($\theta$, $^\circ$), conductance ($G$, $S$), susceptance ($B$, $S$), resistance ($R$, $\Omega$), and reactance ($X$, $\Omega$) were measured over broadband frequency ranges for each transducer quadrants connected in parallel. Impedance measurements are presented in the survey report [@Stierhoff2020a].  
+The echosounder systems aboard _`r survey.vessel`_ were calibrated on `r cal.datetime` while the vessel was docked at `r cal.loc` (`r cal.lat.dd` $^{\circ}\textrm{N}$, `r cal.lon.dd` $^{\circ}\textrm{W}$) using the standard sphere technique [@Foote1987; @Demer2015]. Each WBT was calibrated in both CW (i.e., continuous wave or chirp mode) and FM mode (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere`; for FM mode, additional calibrations were conducted for the 120, 200, and 333-kHz echosounders using a smaller 25-mm WC sphere. Temperature and salinity were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) to estimate sound speeds at the transducer and sphere depths, and the time-averaged sound speed and absorption coefficients for the range between them. The theoretical target strength ($TS$; dB re 1 m^2^) of the sphere was calculated using the Standard Sphere Target Strength Calculator^[http://swfscdata.nmfs.noaa.gov/AST/SphereTS/] and values for the sphere, sound-pulse, and seawater properties. The sphere was positioned throughout the main lobe of each of the transducer beams using three motorized downriggers, two on one side of the vessel and one on the other. The WBTs were configured using the calibration results via the control software (EK80 `r ek80.version`, Simrad; **Table \@ref(tab:cal-results)**). Calibration results for WBTs in FM mode are presented in the survey report [@Renfree2022] and are available upon request.  
 
-The echosounder systems aboard _`r survey.vessel`_ were calibrated on `r cal.datetime` while the vessel was docked at `r cal.loc` (`r cal.lat.dd` $^{\circ}\textrm{N}$, `r cal.lon.dd` $^{\circ}\textrm{W}$) using the standard sphere technique [@Foote1987; @Demer2015]. Each WBT was calibrated in both CW (i.e., continuous wave or chirp mode) and FM mode (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere`; calibrations of WBTs in FM mode used both the WC38.1 and a smaller 25 mm WC sphere. A CTD was cast to measure temperature and salinity versus depth, to estimate sound speeds at the transducer and sphere depths, and the time-averaged sound speed and absorption coefficients for the range between them. The theoretical target strength ($TS$; dB re 1 m^2^) of the sphere was calculated using the Standard Sphere Target Strength Calculator^[http://swfscdata.nmfs.noaa.gov/AST/SphereTS/] and values for the sphere, sound-pulse, and seawater properties. The sphere was positioned throughout the main lobe of each of the transducer beams using three motorized downriggers, two on one side of the vessel and one on the other. The GPTs and WBTs were configured using the calibration results via the control software (EK80 `r ek80.version`, Simrad; **Table \@ref(tab:cal-results)**). Calibration results for WBTs in FM mode are presented in the survey report [@Stierhoff2020a] and are available upon request.  
+##### _Carranza_  
 
-(ref:cal-results) EK60 general purpose transceiver (GPT, Simrad) information, pre-calibration settings, and beam model results following calibration (below the horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into ER60.
+For _Carranza_, the 18, 38, and 70-kHz GPTs were calibrated on 29 and 30 January, 2022, using the standard sphere technique. Calibrations were unsuccessful for the 120 and 200-kHz GPTs, and therefore results from the most recent calibration, conducted in September 2020, were used. Beam model results were entered into the EK80 software and are presented in **Table \@ref(tab:cal-results-jcf)**.  
+
+(ref:cal-results) EK80 wide-band transceiver (WBT, Simrad) information, pre-calibration settings, and beam model results following calibration (below the horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into EK60.
 
 ```{r cal-results, results='asis'}
 # Copy calibration results
@@ -249,35 +272,485 @@ if (doc.type == "docx") {
     add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
     row_spec(18, hline_after = T)
 }
-```
-\newpage
+```  
 
-##### F/V _Long Beach Carnage_  
-
-The echosounders were calibrated using the standard sphere technique with a WC38.1 in a tank at the SWFSC. Beam model results were entered into the GPT-control software and are presented in **Table \@ref(tab:cal-results-lbc)**.  
-
-(ref:cal-results-lbc) General purpose transceiver (EK60 GPT, Simrad) beam model results estimated from a tank calibration of echosounders aboard _Long Beach Carnage_ using a WC38.1. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
-
-```{r cal-results-lbc,results='asis'}
-if (file.exists(here("Output/cal_output_table_LBC.Rdata"))) {
-  load(here("Output/cal_output_table_LBC.Rdata"))   
+```{r process-cal-carnage}
+if ("LBC" %in% cal.vessels) {
   
-  if (doc.type == "docx") {
-    # create kable object (for Word)
-    pander(all.output.lbc)
-  } else {
-    # print LaTeX table for HTML or PDF
-    kable(all.output.lbc, format = knitr.format, 
-          align = c("l","l", rep("c",ncol(all.output.lbc) - 2)),
-          booktabs = TRUE, escape = FALSE, linesep = "",
-          caption = '(ref:cal-results-lbc)') %>% 
-      kable_styling(position = "center", 
-                    latex_options = c("hold_position"),
-                    font_size = 8) %>%  
-      add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.lbc) - 2))
+  # Create output directory ------------------------------------------------------
+  dir_create(here("Output/Calibration/LBC"))
+  
+  # Calibration directory -----------------------------------------------
+  dir.lbc <- here("Data/Calibration/LBC")
+  
+  # Get calibration files
+  cal.files.lbc <- sort(c(list.files(dir.lbc,pattern = ".txt", 
+                                     full.names = TRUE),
+                          list.files(dir.lbc,pattern = ".xml", 
+                                     full.names = TRUE)))
+  
+  # set survey info
+  survey.vessel.temp   <- "LBC"
+  survey.name.temp     <- survey.name
+  cal.group.temp       <- cal.group
+  
+  # Create data frames for storing results
+  cal.res.lbc   <- data.frame()
+  cal.info.lbc  <- data.frame()
+  cal.pings.lbc <- data.frame()
+  
+  # process all calibration results in CALIBRATION directory
+  for (i in cal.files.lbc) {
+    # Extract calibration results, information, and pings
+    cal <- extract_cal(i, survey.vessel.temp, survey.name.temp, cal.group.temp)
+    
+    # combine all results
+    cal.res.lbc   <- bind_rows(cal.res.lbc,   cal$cal.res)
+    cal.info.lbc  <- bind_rows(cal.info.lbc,  cal$cal.info)
+    cal.pings.lbc <- bind_rows(cal.pings.lbc, cal$cal.pings)
   }
+  
+  # Format results
+  cal.res.lbc   <- arrange(cal.res.lbc, mdy(cal_date), txdr_freq)
+  cal.info.lbc  <- arrange(cal.info.lbc, mdy_hms(date_time))
+  cal.pings.lbc <- arrange(cal.pings.lbc, date_time)
+  
+  # write all results to file
+  save(cal.res.lbc, cal.info.lbc, cal.pings.lbc, cal.files.lbc,
+       file = here("Data/Calibration/LBC/cal_results_lbc.Rdata"))
+  
+  # Get results from current survey ---------------------------------------------
+  
+  # create data frame for calibration parameters
+  cal.params.lbc <- cal.res.lbc %>% 
+    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
+           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
+           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
+           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
+           txdr_alon_oa,txdr_athw_oa,target_ts) 
+  
+  # add noise estimates
+  # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
+  if (is.na(cal.noise["LBC"])) { 
+    cal.params.lbc$noise <- rep("N/A", length(cal.files.lbc))
+  } else {
+    cal.params.lbc$noise <- unlist(cal.noise[cal.vessels])
+  }
+  
+  # create data frame for beam model results
+  bm.res.lbc <- cal.res.lbc %>% 
+    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
+           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
+  
+  # create a data frame for echosounder settings
+  echo.settings.lbc <- cal.res.lbc %>% 
+    select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
+  
+  # create names for cal parameters and beam model results
+  names(cal.params.lbc) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
+                             "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                             "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                             "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                             "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                             "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                             "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                             "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                             "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                             "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                             "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                             "Theoretical TS ($TS_\\mathrm{theory}$)",
+                             "Ambient Noise")
+  
+  names(bm.res.lbc) <- c("Frequency","On-axis Gain ($G_0$)",
+                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                         "Angle Offset Along. ($\\alpha_{0}$)",
+                         "Angle Offset Athw. ($\\beta_{0}$)")
+  
+  names(echo.settings.lbc) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
+                                "Bandwidth (Hz)","Transmit Power (W)",
+                                "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+  
+  # cast output by frequency and transducer model number
+  param.output.lbc  <- suppressMessages(dcast(melt(cal.params.lbc, id.vars = "Frequency"), variable~Frequency))
+  bm.output.lbc     <- suppressMessages(dcast(melt(bm.res.lbc, id.vars = "Frequency"), variable~Frequency))
+  
+  # add a column with parameter units
+  param.units.lbc <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+                                          "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                                          "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+  
+  # add a column with beam model units
+  bm.units.lbc <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  
+  # add units to output and arrange columns
+  param.output.lbc <- bind_cols(param.output.lbc, param.units.lbc) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  bm.output.lbc <- bind_cols(bm.output.lbc, bm.units.lbc) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  # combine results data frames
+  all.output.lbc <- rbind(param.output.lbc, bm.output.lbc) %>% 
+    rename(" " = "Frequency ($f$, kHz)")
+  
+  # save output to .Rdata and CSV
+  save(all.output.lbc,
+       file = here("Output/cal_output_table_LBC.Rdata"))
+  
+  write_csv(all.output.lbc,
+            file = here("Output/cal_output_table_LBC.csv"))
+}
+```
+
+```{r process-cal-lisa-marie}
+if ("LM" %in% cal.vessels) {
+  
+  # Create output directory ------------------------------------------------------
+  dir_create(here("Output/Calibration/LM"))
+  
+  # Calibration directory -----------------------------------------------
+  dir.lm <- here("Data/Calibration/LM")
+  
+  # Get calibration files
+  cal.files.lm <- sort(c(list.files(dir.lm,pattern = ".txt", 
+                                    full.names = TRUE),
+                         list.files(dir.lm,pattern = ".xml", 
+                                    full.names = TRUE)))
+  
+  # set survey info
+  survey.vessel.temp   <- "LM"
+  survey.name.temp     <- survey.name
+  cal.group.temp       <- cal.group
+  
+  # Create data frames for storing results
+  cal.res.lm   <- data.frame()
+  cal.info.lm  <- data.frame()
+  cal.pings.lm <- data.frame()
+  
+  # process all calibration results in CALIBRATION directory
+  for (i in cal.files.lm) {
+    # Extract calibration results, information, and pings
+    cal <- extract_cal(i, survey.vessel.temp, survey.name.temp, cal.group.temp)
+    
+    # combine all results
+    cal.res.lm   <- bind_rows(cal.res.lm,   cal$cal.res)
+    cal.info.lm  <- bind_rows(cal.info.lm,  cal$cal.info)
+    cal.pings.lm <- bind_rows(cal.pings.lm, cal$cal.pings)
+  }
+  
+  # Format results
+  cal.res.lm   <- arrange(cal.res.lm, mdy(cal_date), txdr_freq)
+  cal.info.lm  <- arrange(cal.info.lm, mdy_hms(date_time))
+  cal.pings.lm <- arrange(cal.pings.lm, date_time)
+  
+  # write all results to file
+  save(cal.res.lm, cal.info.lm, cal.pings.lm, cal.files.lm,
+       file = here("Data/Calibration/LBC/cal_results_lm.Rdata"))
+  
+  # Get results from current survey ---------------------------------------------
+  
+  # create data frame for calibration parameters
+  cal.params.lm <- cal.res.lm %>% 
+    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
+           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
+           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
+           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
+           txdr_alon_oa,txdr_athw_oa,target_ts) 
+  
+  # add noise estimates
+  # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
+  if (is.na(cal.noise["LM"])) { 
+    cal.params.lm$noise <- rep("N/A", length(cal.files.lm))
+  } else {
+    cal.params.lm$noise <- unlist(cal.noise[cal.vessels])
+  }
+  
+  # create data frame for beam model results
+  bm.res.lm <- cal.res.lm %>% 
+    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
+           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
+  
+  # create a data frame for echosounder settings
+  echo.settings.lm <- cal.res.lm %>% 
+    select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
+  
+  # create names for cal parameters and beam model results
+  names(cal.params.lm) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
+                            "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                            "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                            "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                            "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                            "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                            "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                            "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                            "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                            "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                            "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                            "Theoretical TS ($TS_\\mathrm{theory}$)",
+                            "Ambient Noise")
+  
+  names(bm.res.lm) <- c("Frequency","On-axis Gain ($G_0$)",
+                        "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                        "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                        "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                        "Angle Offset Along. ($\\alpha_{0}$)",
+                        "Angle Offset Athw. ($\\beta_{0}$)")
+  
+  names(echo.settings.lm) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
+                               "Bandwidth (Hz)","Transmit Power (W)",
+                               "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+  
+  # cast output by frequency and transducer model number
+  param.output.lm  <- suppressMessages(dcast(melt(cal.params.lm, id.vars = "Frequency"), variable~Frequency))
+  bm.output.lm     <- suppressMessages(dcast(melt(bm.res.lm, id.vars = "Frequency"), variable~Frequency))
+  
+  # add a column with parameter units
+  param.units.lm <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+                                         "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                                         "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+  
+  # add a column with beam model units
+  bm.units.lm <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  
+  # add units to output and arrange columns
+  param.output.lm <- bind_cols(param.output.lm, param.units.lm) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  bm.output.lm <- bind_cols(bm.output.lm, bm.units.lm) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  # combine results data frames
+  all.output.lm <- rbind(param.output.lm, bm.output.lm) %>% 
+    rename(" " = "Frequency ($f$, kHz)")
+  
+  # save output to .Rdata and CSV
+  save(all.output.lm,
+       file = here("Output/cal_output_table_LM.Rdata"))
+  
+  write_csv(all.output.lm,
+            file = here("Output/cal_output_table_LM.csv"))
+}
+```
+
+```{r process-cal-carranza}
+if ("JCF" %in% cal.vessels) {
+  
+  # Create output directory ------------------------------------------------------
+  dir_create(here("Output/Calibration/JCF"))
+  
+  # Calibration directory -----------------------------------------------
+  dir.jcf <- here("Data/Calibration/JCF")
+  
+  # Get calibration files
+  cal.files.jcf <- sort(c(list.files(dir.jcf,pattern = ".txt", 
+                                     full.names = TRUE),
+                          list.files(dir.jcf,pattern = ".xml", 
+                                     full.names = TRUE)))
+  
+  # set survey info
+  survey.vessel.temp   <- "JCF"
+  survey.name.temp     <- survey.name
+  cal.group.temp       <- "INAPESCA"
+  
+  # Create data frames for storing results
+  cal.res.jcf   <- data.frame()
+  cal.info.jcf  <- data.frame()
+  cal.pings.jcf <- data.frame()
+  
+  # process all calibration results in CALIBRATION directory
+  for (i in cal.files.jcf) {
+    # Extract calibration results, information, and pings
+    cal <- extract_cal(i, survey.vessel.temp, survey.name.temp, cal.group.temp)
+    
+    # combine all results
+    cal.res.jcf   <- bind_rows(cal.res.jcf,   cal$cal.res)
+    cal.info.jcf  <- bind_rows(cal.info.jcf,  cal$cal.info)
+    cal.pings.jcf <- bind_rows(cal.pings.jcf, cal$cal.pings)
+  }
+  
+  # Format results
+  cal.res.jcf   <- arrange(cal.res.jcf, mdy(cal_date), txdr_freq)
+  cal.info.jcf  <- arrange(cal.info.jcf, mdy_hms(date_time))
+  cal.pings.jcf <- arrange(cal.pings.jcf, date_time)
+  
+  # write all results to file
+  save(cal.res.jcf, cal.info.jcf, cal.pings.jcf, cal.files.jcf,
+       file = here("Data/Calibration/LBC/cal_results_jcf.Rdata"))
+  
+  # Get results from current survey ---------------------------------------------
+  
+  # create data frame for calibration parameters
+  cal.params.jcf <- cal.res.jcf %>% 
+    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
+           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
+           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
+           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
+           txdr_alon_oa,txdr_athw_oa,target_ts) 
+  
+  # add noise estimates
+  # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
+  if (is.na(cal.noise["JCF"])) { 
+    cal.params.jcf$noise <- rep("N/A", length(cal.files.jcf))
+  } else {
+    cal.params.jcf$noise <- unlist(cal.noise[cal.vessels])
+  }
+  
+  # create data frame for beam model results
+  bm.res.jcf <- cal.res.jcf %>% 
+    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
+           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
+  
+  # create a data frame for echosounder settings
+  echo.settings.jcf <- cal.res.jcf %>% 
+    select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
+  
+  # create names for cal parameters and beam model results
+  names(cal.params.jcf) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
+                             "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                             "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                             "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                             "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                             "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                             "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                             "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                             "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                             "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                             "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                             "Theoretical TS ($TS_\\mathrm{theory}$)",
+                             "Ambient Noise")
+  
+  names(bm.res.jcf) <- c("Frequency","On-axis Gain ($G_0$)",
+                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                         "Angle Offset Along. ($\\alpha_{0}$)",
+                         "Angle Offset Athw. ($\\beta_{0}$)")
+  
+  names(echo.settings.jcf) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
+                                "Bandwidth (Hz)","Transmit Power (W)",
+                                "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+  
+  # cast output by frequency and transducer model number
+  param.output.jcf  <- suppressMessages(dcast(melt(cal.params.jcf, id.vars = "Frequency"), variable~Frequency))
+  bm.output.jcf     <- suppressMessages(dcast(melt(bm.res.jcf, id.vars = "Frequency"), variable~Frequency))
+  
+  # add a column with parameter units
+  param.units.jcf <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+                                          "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                                          "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+  
+  # add a column with beam model units
+  bm.units.jcf <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  
+  # add units to output and arrange columns
+  param.output.jcf <- bind_cols(param.output.jcf, param.units.jcf) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  bm.output.jcf <- bind_cols(bm.output.jcf, bm.units.jcf) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  # combine results data frames
+  all.output.jcf <- rbind(param.output.jcf, bm.output.jcf) %>% 
+    rename(" " = "Frequency ($f$, kHz)")
+  
+  # save output to .Rdata and CSV
+  save(all.output.jcf,
+       file = here("Output/cal_output_table_JCF.Rdata"))
+  
+  write_csv(all.output.lbc,
+            file = here("Output/cal_output_table_JCF.csv"))
 }
 ```  
+
+\newpage
+
+(ref:cal-results-jcf) General Purpose Transceiver (Simrad EK60 GPT) calibrated beam model results estimated from calibrations of the echosounders aboard _Carranza_ using either a Cu63 (for 18 kHz) or WC38.1 (for 38, 70, 120, and 200 kHz). Results for the 120 and 200-kHz GPTs are from a calibration conducted in September 2020. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
+
+```{r cal-results-jcf,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output.jcf)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output.jcf, format = knitr.format, 
+        align = c("l","l", rep("c",ncol(all.output.jcf) - 2)),
+        booktabs = TRUE, escape = FALSE, linesep = "",
+        caption = '(ref:cal-results-jcf)') %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("hold_position"),
+                  font_size = 8) %>%  
+    row_spec(18, hline_after = TRUE) %>% 
+    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.jcf) - 2))
+}
+```  
+
+\newpage
+
+##### _Lisa Marie_  
+
+For _Lisa Marie_, the 38-kHz GPT was calibrated on 5 June, 2021 using the standard sphere technique with a WC38.1 while the vessel was anchored in Yaquina Bay near Newport, OR (44.6249, -124.0370). Calibration results for _Lisa Marie_ are presented in **Table \@ref(tab:cal-results-lm)**.  
+
+(ref:cal-results-lm) General Purpose Transceiver (Simrad EK60 GPT) beam model results estimated from an in situ calibration of echosounders aboard _Lisa Marie_ using a WC38.1. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
+
+```{r cal-results-lm,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output.lm)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output.lm, format = knitr.format, 
+        align = c("l","l", rep("c",ncol(all.output.lm) - 2)),
+        booktabs = TRUE, escape = FALSE, linesep = "",
+        caption = '(ref:cal-results-lm)') %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("hold_position"),
+                  font_size = 8) %>%  
+    row_spec(18, hline_after = TRUE) %>% 
+    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.lm) - 2))
+}
+```  
+
+\newpage
+
+##### _Long Beach Carnage_
+
+For _Long Beach Carnage_, the echosounders were calibrated using the standard sphere technique with a WC38.1 on 13 October, 2021 in a tank at the SWFSC. Calibration results for _Long Beach Carnage_ are presented in **Table \@ref(tab:cal-results-lbc)**.  
+
+(ref:cal-results-lbc) General Purpose Transceiver (Simrad EK60 GPT) beam model results estimated from a tank calibration of echosounders aboard _Long Beach Carnage_ using a WC38.1. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (EK80, Simrad).
+
+```{r cal-results-lbc,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output.lbc)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output.lbc, format = knitr.format, 
+        align = c("l","l", rep("c",ncol(all.output.lbc) - 2)),
+        booktabs = TRUE, escape = FALSE, linesep = "",
+        caption = '(ref:cal-results-lbc)') %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("hold_position"),
+                  font_size = 8) %>%  
+    row_spec(18, hline_after = TRUE) %>% 
+    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.lbc) - 2))
+}
+```  
+
+\newpage  
+
+##### Saildrone USVs
+
+**[Add calibration results for Saildrones]**
+
+\newpage  
 
 #### Data collection {#methods-acoustic-data-collection}
 
@@ -688,7 +1161,7 @@ if (exists("nasc.summ.os")) {
 }
 ```
 
-The `r tolower(survey.season)` `r survey.year` survey took place between San Francisco and San Diego during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. In the core survey area, acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=0)` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. In the nearshore survey area, acoustic sampling was conducted along `r nrow(nasc.summ.ns)` daytime east-west transects by _Long Beach Carnage_ in that totaled `r prettyNum(sum(nasc.summ.ns$distance),big.mark=",",digits=0)` nmi. As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.  
+The `r tolower(survey.season)` `r survey.year` survey took place between San Francisco and San Diego during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. In the core survey area, acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=3)` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. In the nearshore survey area, acoustic sampling was conducted along `r nrow(nasc.summ.ns)` daytime east-west transects by _Long Beach Carnage_ in that totaled `r prettyNum(sum(nasc.summ.ns$distance),big.mark=",",digits=3)` nmi. As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.  
 
 **[Leg summaries have not been provided for this survey, and I don't have the green book; please update]**
 
