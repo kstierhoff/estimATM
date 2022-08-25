@@ -340,7 +340,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
-                            SD  = "Final 38 kHz CPS.csv",
+                            SD  = "Final 38 kHz CPS_nasc_cps.csv",
                             JCF  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
@@ -376,7 +376,7 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T",
 nasc.recurse           <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = FALSE,
+                            SD  = TRUE,
                             JCF = FALSE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
@@ -423,7 +423,7 @@ rm.transit             <- c(RL  = FALSE,
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE,
+                            SD  = FALSE,
                             JCF = FALSE) 
 
 # If T, removes transects with names including "inshore"
