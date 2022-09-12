@@ -489,22 +489,32 @@ cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIO
 cufes.db.sqlite        <- "cufes202207RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 cufes.vessels          <- c("RL", "JCF")
+
 # Trawl data
 trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2207RL.accdb"
-trawl.performance      <- c("Aborted", "Bad", "Poor") # Character vector; trawl performance to exclude
+trawl.performance      <- c("Aborted", "Bad") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
+
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD/PROCESSED")
 ctd.hdr.pattern        <- "RL2203*.*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
+
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
 uctd.hdr.pattern       <- ".*UCTD_\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
+
+# TDR data
+tdr.dir.kite           <- here("Data/TDR/Kite")
+tdr.dir.foot           <- here("Data/TDR/Footrope")
+tdr.pattern            <- "2207RL*.*rsk"
+tdr.recurse            <- TRUE # Recursively search TDR directory
+tdr.offset             <- 1    # Time offset in hours
 
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 

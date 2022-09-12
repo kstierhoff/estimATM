@@ -1,0 +1,286 @@
+---
+title: "TDR Data Explorer"
+author: "Kevin Stierhoff"
+date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+css: css/ast.css
+bibliography: bib/ast_bib.bib
+csl: csl/ices-journal-of-marine-science.csl
+---
+
+```{r set-up,echo=F,message=F,warning=F,error=F,include=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,
+               knitr,DT,fs,cowplot,oce,sf,mapview)
+
+# Install and load required packages from Github -------------------------------
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+
+theme_set(theme_bw())
+```
+
+```{r project-settings, include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+
+# Create required directories
+dir_create(here(c("Figs", "Output")))
+```
+
+```{r user-settings}
+# User-specified settings
+get.nav <- F # Download vessel nav from ERDDAP
+get.db  <- F # Extract data from trawl database (F for testing)
+```
+
+```{r get-nav}
+# Source code to get nav data from ERDDAP
+source(here("Code/get_nav_erddap.R"))
+```
+
+```{r get-trawl-data}
+if (get.db) {
+  if (trawl.source == "SQL") {
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "SQL Server", 
+                            Server = "161.55.235.187", 
+                            Database = "Trawl", 
+                            Trusted_Connection = "True")
+  } else if (trawl.source == "Access") {
+    # Copy trawl Access database
+    haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                      regexp = trawl.db.access)
+    
+    file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+    
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                            DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+  }
+  # Import trawl database tables
+  haul.all       <- tbl(trawl.con,"Haul") %>% collect()
+  
+  # Close database channel
+  dbDisconnect(trawl.con)
+  
+  # Save trawl data
+  saveRDS(haul.all,
+          file = here("Data/Trawl/haul_data_tdr.rds"))
+  
+} else {
+  # Load trawl data
+  haul.all <- readRDS(here("Data/Trawl/haul_data_tdr.rds"))
+  
+}
+```
+
+```{r modify-data}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  # Reformat haul data to match SQL
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>%
+    mutate(haulBackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) 
+  
+  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+  
+  # Correct equilibriumTime or haulBackTime
+  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    mutate(
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime))
+}
+
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  mutate(season = case_when(
+    month(equilibriumTime) < 6 ~ "spring",
+    TRUE ~ "summer"))
+
+# Get only hauls from current survey
+haul <- filter(haul.all, cruise %in% cruise.name) %>% 
+  arrange(haul) %>% 
+  mutate(
+    netInWaterTime  = ymd_hms(netInWaterTime,  tz = "America/Los_Angeles"),
+    equilibriumTime = ymd_hms(equilibriumTime, tz = "America/Los_Angeles"),
+    haulBackTime    = ymd_hms(haulBackTime,    tz = "America/Los_Angeles"),
+    netOnDeckTime   = ymd_hms(netOnDeckTime,   tz = "America/Los_Angeles"),
+    duration        = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+    cluster   = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+```
+
+```{r read-rsk}
+# Process RSK files
+## Kite
+rsk.files.kite <- dir_ls(tdr.dir.kite, 
+                         recurse = tdr.recurse, regexp = tdr.pattern)
+
+# Create tibble for storing results
+tbl.kite <- tibble()
+
+for (i in rsk.files.kite) {
+  rsk.kite <- read.rsk(i)
+  
+  # Convert to tibble
+  tbl.kite.tmp <- as_tibble(rsk.kite@data) %>% 
+    mutate(filename = path_file(rsk.kite@metadata$filename),
+           cruise = str_extract(filename, "^\\d{4}\\w{2}"),
+           haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
+           depth = -pressure,
+           loc   = "Kite",
+           time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+  
+  tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
+}
+
+## Kite
+rsk.files.foot <- dir_ls(tdr.dir.foot, 
+                         recurse = tdr.recurse, regexp = tdr.pattern)
+
+# Create tibble for storing results
+tbl.foot <- tibble()
+
+for (i in rsk.files.foot) {
+  rsk.foot <- read.rsk(i)
+  
+  # Convert to tibble
+  tbl.foot.tmp <- as_tibble(rsk.foot@data) %>% 
+    mutate(filename = path_file(rsk.foot@metadata$filename),
+           cruise = str_extract(filename, "^\\d{4}\\w{2}"),
+           haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
+           depth = -pressure,
+           loc   = "Foot",
+           time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+  
+  tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
+}
+
+# Combine data for plotting
+tbl.all <- bind_rows(tbl.kite, tbl.foot)
+```
+
+```{r plot-results}
+# Plot and save all deployments
+for (k in unique(tbl.all$haul)) {
+  # Get TDR data from haul k
+  tdr.plot <- filter(tbl.all, haul == k)
+  
+  # Get haul info from haul k
+  trawl.window <- haul %>% 
+    filter(haul == k)
+  
+  # Extract nav data for 30 min before and after haul
+  trawl.nav <- nav %>% 
+    filter(between(time, 
+                   min(tdr.plot$time) - minutes(30), 
+                   max(tdr.plot$time) + minutes(30)))
+  
+  # Plot results
+  plot.tdr <- ggplot() + 
+    geom_rect(data = trawl.window,
+              aes(xmin = equilibriumTime + hours(tdr.offset), 
+                  xmax = haulBackTime + hours(tdr.offset), 
+                  ymin = min(-tdr.plot$pressure), 
+                  ymax = 10),
+              fill = 'gray70', alpha = 0.5) +
+    geom_rect(data = trawl.window,
+              aes(xmin = netInWaterTime + hours(tdr.offset), 
+                  xmax = netOnDeckTime + hours(tdr.offset), 
+                  ymin = min(-tdr.plot$pressure), 
+                  ymax = 10), fill = NA,
+              colour = 'black', linetype = "dashed") +
+    geom_line(data = tdr.plot,
+              aes(time, -pressure + 10, colour = loc)) + 
+    scale_colour_manual(name = "Location", values = c(Foot = "blue", Kite = "red")) +
+    geom_line(data = trawl.nav,
+              aes(time, SOG), 
+              colour = "magenta") +
+    geom_hline(yintercept = 0, colour = "black") +
+    ylim(min(-tdr.plot$pressure), 15) +
+    labs(x = "Time (PDT)",
+         y = "Pressure (dbar)",
+         title = unique(tdr.plot$filename))
+  
+  # Save plot
+  ggsave(plot.tdr, 
+         filename = here("Figs/TDR",
+                         paste0(survey.name, "_TDR_", sprintf("%03d", k), ".png")),
+         height = 5, width = 10)
+}
+```
+
+```{r eval=FALSE}
+# # Plot results
+# plot.tdr2 <-
+#   ggplot() + 
+#   geom_rect(data = trawl.window,
+#             aes(xmin = equilibriumTime + hours(haul.offset), 
+#                 xmax = haulBackTime + hours(haul.offset), 
+#                 ymin = min(-tdr.plot$pressure), 
+#                 ymax = 10),
+#                 fill = 'gray70', alpha = 0.5) +
+#   geom_ribbon(data = tdr.plot,
+#             aes(x = time, 
+#                 ymin = foot, 
+#                 ymax = 10), fill = NA,
+#                 colour = 'black', linetype = "dashed") +
+#   geom_line(data = tdr.plot,
+#             aes(time, -pressure + 10, colour = loc)) + 
+#   scale_colour_manual(name = "Location", values = c(Foot = "blue", Kite = "red")) +
+#   geom_line(data = trawl.nav,
+#             aes(time, SOG), 
+#             colour = "magenta") +
+#   geom_hline(yintercept = 0, colour = "black") +
+#   ylim(min(-tdr.plot$pressure), 10) +
+#   labs(x = "Time (PDT)",
+#        y = "Pressure (dbar)",
+#        title = unique(tdr.plot$filename))
+```
+
+
+
+
+
