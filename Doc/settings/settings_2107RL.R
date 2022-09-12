@@ -4,8 +4,8 @@
 process.seine     <- T # Process purse seine data, if present
 process.nearshore <- T # Process near backscatter data; typically TRUE
 estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
-process.offshore  <- F # Process offshore backscatter data
-estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
+process.offshore  <- T # Process offshore backscatter data
+estimate.os       <- T # Estimate biomass in the offshore strata; T if offshore surveyed
 combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
@@ -28,7 +28,7 @@ uctd.spacing   <- 15
 
 ### Transect removal and renumbering
 rm.n.transects     <- 0 # Number of transects to remove from the start (if near Mexico)
-rm.i.transects <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
+rm.i.transects     <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 renumber.transects <- FALSE # Renumber transects to start at zero if transect are removed
 
 # Locations to remove from planning (e.g., north, central, south, and mexico)
@@ -303,7 +303,7 @@ merge.vessels <- c(Core = TRUE,
 # However, for LBC in 1907RL, Islands are stratified separately from mainland transects,
 # so regions for that vessel are not merged
 # Used in estimateNearshore.R
-merge.regions <- NA_character_
+merge.regions <- c("SD", "LM")
 
 # Interval length (m); from Echoview
 nasc.interval          <-  100    
@@ -387,7 +387,9 @@ source.cps.nasc        <- c(RL  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE,
                             NS  = FALSE,
-                            JCF = FALSE) # in the nearshore strata
+                            JCF = FALSE,
+                            NS  = FALSE, # in the nearshore strata
+                            OS  = FALSE) # in the offshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2107RL.csv")) # in the nearshore strata 
@@ -423,7 +425,7 @@ rm.transit             <- c(RL  = FALSE,
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = FALSE,
+                            SD  = TRUE,
                             JCF = FALSE) 
 
 # If T, removes transects with names including "inshore"
@@ -587,11 +589,12 @@ nClusters.min <- 1
 
 # Use manually defined strata?
 stratify.manually    <- TRUE
-stratify.manually.os <- FALSE
+stratify.manually.os <- TRUE
 stratify.manually.ns <- FALSE
 
 # Manually define sampling strata for each species
-# Create a new data frame with each species, stratum, and vector containing transectsv
+# Create a new data frame with each species, stratum, and vector containing transects
+# Core strata
 strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
@@ -702,89 +705,6 @@ strata.manual <- bind_rows(
     stratum = 1,
     transect = 1:26)
 )
-
-# strata.manual <- bind_rows(
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 1,
-#     transect = 46:53),
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 2,
-#     transect = 55:66),
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 3,
-#     transect = 70:78),
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 4,
-#     transect = 82:88),
-#   data.frame(
-#     scientificName = "Clupea pallasii", 
-#     stratum = 5,
-#     transect = 94:99),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 1,
-#     transect = 1:51),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 2,
-#     transect = 52:58),
-#   data.frame(
-#     scientificName = "Engraulis mordax", 
-#     stratum = 3,
-#     transect = 72:88),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 1,
-#     transect = 1:69),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 2,
-#     transect = 87:100),
-#   data.frame(
-#     scientificName = "Sardinops sagax", 
-#     stratum = 3,
-#     transect = 106:123),
-#   # data.frame(
-#   #   scientificName = "Sardinops sagax", 
-#   #   stratum = 4,
-#   #   transect = 47:60),
-#   # data.frame(
-#   #   scientificName = "Sardinops sagax", 
-#   #   stratum = 5,
-#   #   transect = 66:84),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 1,
-#     transect = 4:54),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 2,
-#     transect = 81:86),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 3,
-#     transect = 98:110),
-#   data.frame(
-#     scientificName = "Scomber japonicus", 
-#     stratum = 4,
-#     transect = 118:123),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 1,
-#     transect = 4:86),
-#   data.frame(
-#     scientificName = "Trachurus symmetricus", 
-#     stratum = 2,
-#     transect = 87:136),
-#   data.frame(
-#     scientificName = "Etrumeus acuminatus", 
-#     stratum = 1,
-#     transect = 1:26)
-#   )
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino

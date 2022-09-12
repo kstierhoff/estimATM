@@ -1040,7 +1040,7 @@ nearshore.spp <- nasc.prop.spp.ns %>%
 
 # Create final strata and calculate area
 if (exists("strata.nearshore")) rm(strata.nearshore)
-# if (exists("nasc.stock.ns"))    rm(nasc.stock.ns)
+if (exists("nasc.stock.ns"))    rm(nasc.stock.ns)
 
 for (i in unique(nearshore.spp$scientificName)) {
   for (j in unique(strata.final.ns$vessel.name)) {
@@ -1109,8 +1109,8 @@ for (i in unique(nearshore.spp$scientificName)) {
       }
 
       # ggplot(primary.poly.temp, aes(long, lat, group = region, colour = region)) + geom_polygon() + coord_map()
-      
-      if (str_detect(poly.region, "Island")) {
+      if (length(grep("Island", poly.region)) > 0) {
+      # if (str_detect(poly.region, "Island")) {
         # If an Island strata
         # Get latitude range for backscatter data
         nasc.nearshore.summ <- nasc.nearshore %>% 

@@ -81,9 +81,60 @@ if (process.offshore) {
       left_join(select(cps.nasc.temp, time.align, cps.nasc))
     
   } else {
-    nasc.offshore <- nasc.offshore %>%
-      mutate(cps.nasc = NASC.50)
+    # Use cps.nasc extracted using extract_cps_nasc.R
+    if ("cps.nasc" %in% colnames(nasc.offshore)) {
+      nasc.offshore$cps.nasc.source <- "cps.nasc"
+    } else {
+      # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
+      nasc.offshore <- nasc.offshore %>% 
+        mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
+               cps.nasc.source = nasc.depth.cps)
+    }
+    
+    # If files are not passed through extract_CPS_NASC.R, then cps.nasc = NA
+    nasc.offshore <- nasc.offshore %>% 
+      # Create variable containing the source of cps.nasc data, either 
+      # cps.nasc (from extract_CPS_NASC.R) or the value of nasc.depth.cps
+      mutate(cps.nasc.source = case_when(
+        is.na(cps.nasc) ~ nasc.depth.cps,
+        TRUE ~ cps.nasc.source)) %>% 
+      # Replace missing cps.nasc values with backscatter down to nasc.depth.cps
+      mutate(cps.nasc = case_when(
+        is.na(cps.nasc) ~ purrr::pluck(., nasc.depth.cps),
+        TRUE ~ cps.nasc))
   }
+  
+  # Scatter plot comparing cps.nasc to nasc.depth.cps and
+  # indicating the source of the backscatter data in the offshore region
+  nasc.vessel.comp.os <- project_df(nasc.offshore, to = crs.proj)
+  
+  compare.cps.nasc.scatter.os <- ggplot() + 
+    geom_point(data = nasc.vessel.comp.os, 
+               aes(cps.nasc, NASC.250, colour = cps.nasc.source)) + 
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+    facet_wrap(~cps.nasc.source) +
+    coord_equal() + 
+    theme_bw()
+  
+  # Save figure
+  ggsave(compare.cps.nasc.scatter.os, 
+         filename = here("Data/Backscatter", paste0("nasc_vessel_scatter_os.png")))
+  
+  # Map a comparison of cps.nasc to nasc.depth.cps and
+  # indicating the source of the backscatter data
+  compare.cps.nasc.map <- base.map + 
+    geom_point(data = nasc.vessel.comp.os, aes(X, Y, size = NASC.250)) +
+    geom_point(data = nasc.vessel.comp.os, 
+               aes(X, Y, size = cps.nasc, colour = cps.nasc.source),
+               shape = 21, fill = NA) +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+  
+  # Save figure
+  ggsave(compare.cps.nasc.map, 
+         filename = here("Data/Backscatter", paste0("nasc_vessel_map_os.png")), 
+         height = map.height, width = map.width)
   
   # Identify intervals that fall outside the primary survey area
   nasc.offshore.diff <- nasc.offshore %>% 
@@ -240,14 +291,15 @@ if (save.figs) {
     geom_point(data = cluster.zero.os, aes(X, Y), 
                size = 2, shape = 21, fill = 'black', colour = 'white') +
     # Plot panel label
-    ggtitle("CPS Species Proportions in Trawls") +
+    # ggtitle("CPS Species Proportions in Trawls") +
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
   nasc.trawl.cluster.wt.os <- plot_grid(nasc.cluster.plot.os, trawl.catch.plot.os,
-                               nrow = 1, labels = c("a)", "b)"))
+                               nrow = 1, labels = c("a)", "b)"),
+                               align = "hv")
   
   ggsave(nasc.trawl.cluster.wt.os,
          filename = here("Figs/fig_nasc_trawl_cluster_wt_os.png"),
@@ -394,6 +446,17 @@ if (limit.cluster.dist["OS"]) {
     mutate(bin       = cut(density,dens.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin))
 }
+
+# Get list of species present in offshore strata
+offshore.spp <- nasc.density.os %>% 
+  group_by(scientificName) %>% 
+  summarise(density = mean(density)) %>% 
+  filter(density > 0) %>% 
+  pull(scientificName)
+
+# Remove species with no catch data
+nasc.density.os <- nasc.density.os %>% 
+  filter(scientificName %in% offshore.spp)
 
 # nasc.density.os <- nasc.offshore %>%
 #   select(lat, long, anch.dens, her.dens, jack.dens, mack.dens, 
@@ -606,7 +669,7 @@ strata.super.polygons.os <- strata.points.os.sf %>%
   summarise(do_union = F) %>% 
   st_cast("POLYGON") %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_20m_final)) %>% 
+  st_difference(st_union(bathy_20m_poly)) %>% 
   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
   mutate(area = st_area(.))
 
@@ -700,7 +763,8 @@ strata.manual.os <- bind_rows(
 if (stratify.manually.os) {
   # Use manually defined strata
   strata.final.os <- strata.manual.os %>%
-    mutate(stratum.orig = stratum)
+    mutate(stratum.orig = stratum) %>% 
+    filter(scientificName %in% offshore.spp)
   
 } else {
   # Define strata automatically
@@ -911,7 +975,7 @@ strata.summ.os <- strata.final.os %>%
 
 strata.offshore <- strata.offshore %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_20m_final)) %>% 
+  st_difference(st_union(bathy_20m_poly)) %>% 
   st_difference(filter(strata.super.polygons, vessel.name == "RL")) %>% 
   ungroup() %>% 
   mutate(area = st_area(.)) 
@@ -1011,63 +1075,48 @@ if (save.figs) {
                cluster %in% nasc.os.clusters) %>% 
         ungroup() 
       
-      # Map biomass density, strata polygons, and positive trawl clusters
-      biomass.dens.os <- base.map +
-        geom_sf(data = filter(strata.offshore, scientificName == i, stock == j),
-                aes(colour = factor(stratum)), fill = NA, size = 1) +
-        scale_colour_discrete('Stratum') + 
-        # Plot vessel track
-        geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
-        # Plot zero nasc data
-        geom_point(data = filter(nasc.offshore, cps.nasc == 0), aes(X, Y),
-                   colour = 'gray50', size = 0.15, alpha = 0.5) +
-        # Plot NASC data
-        geom_point(data = nasc.density.plot.os, aes(X, Y, size = bin, fill = bin),
-                   shape = 21, alpha = 0.75) +
-        # Configure size and colour scales
-        scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-                          values = dens.sizes.all, labels = dens.labels.all) +
-        scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-                          values = dens.colors.all, labels = dens.labels.all) +
-        # Plot positive cluster midpoints
-        geom_shadowtext(data = pos.cluster.txt,
-                        aes(X, Y, label = cluster), 
-                        colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
-        # geom_shadowtext(data = cluster.pie.os,
-        #                 aes(X, Y, label = cluster), 
-        #                 colour = "red", bg.colour = "white", size = 2) +
-        # Configure legend guides
-        guides(colour = guide_legend(order = 1),
-               fill   = guide_legend(order = 2), 
-               size   = guide_legend(order = 2)) +
-        coord_sf(crs = crs.proj, 
-                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-      
-      # Check plot
-      # ggplot() +
-      #   # Plot zero nasc data
-      #   geom_point(data = filter(nasc.offshore, cps.nasc == 0), aes(X, Y),
-      #              colour = 'gray50', size = 0.15, alpha = 0.5) +
-      #   # Plot NASC data
-      #   geom_point(data = nasc.density.plot.os, aes(X, Y, size = bin, fill = bin),
-      #              shape = 21, alpha = 0.75) +
-      #   # Configure size and colour scales
-      #   scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-      #                     values = dens.sizes.all, labels = dens.labels.all) +
-      #   scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-      #                     values = dens.colors.all, labels = dens.labels.all) +
-      #   coord_sf(crs = crs.proj, 
-      #            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-      #            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-      
-      # Save figures
-      ggsave(biomass.dens.os, 
-             filename = paste(here("Figs/fig_biomass_dens_os_"), i, "-", j, ".png",sep = ""),
-             width  = map.width,height = map.height)
-      
-      # Save plot to list
-      biomass.dens.figs.os[[i]][[j]] <- biomass.dens.os
+      if(nrow(nasc.density.plot.os) > 0) {
+        # Map biomass density, strata polygons, and positive trawl clusters
+        biomass.dens.os <- base.map +
+          geom_sf(data = filter(strata.offshore, scientificName == i, stock == j),
+                  aes(colour = factor(stratum)), fill = NA, size = 1) +
+          scale_colour_discrete('Stratum') + 
+          # Plot vessel track
+          geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
+          # Plot zero nasc data
+          geom_point(data = filter(nasc.offshore, cps.nasc == 0), aes(X, Y),
+                     colour = 'gray50', size = 0.15, alpha = 0.5) +
+          # Plot NASC data
+          geom_point(data = nasc.density.plot.os, aes(X, Y, size = bin, fill = bin),
+                     shape = 21, alpha = 0.75) +
+          # Configure size and colour scales
+          scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
+                            values = dens.sizes.all, labels = dens.labels.all) +
+          scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
+                            values = dens.colors.all, labels = dens.labels.all) +
+          # Plot positive cluster midpoints
+          geom_shadowtext(data = pos.cluster.txt,
+                          aes(X, Y, label = cluster), 
+                          colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
+          # geom_shadowtext(data = cluster.pie.os,
+          #                 aes(X, Y, label = cluster), 
+          #                 colour = "red", bg.colour = "white", size = 2) +
+          # Configure legend guides
+          guides(colour = guide_legend(order = 1),
+                 fill   = guide_legend(order = 2), 
+                 size   = guide_legend(order = 2)) +
+          coord_sf(crs = crs.proj, 
+                   xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+                   ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+
+        # Save figures
+        ggsave(biomass.dens.os, 
+               filename = paste(here("Figs/fig_biomass_dens_os_"), i, "-", j, ".png",sep = ""),
+               width  = map.width,height = map.height)
+        
+        # Save plot to list
+        biomass.dens.figs.os[[i]][[j]] <- biomass.dens.os 
+      }
     }
   }
   
@@ -1081,11 +1130,10 @@ if (save.figs) {
 # Create blank plots for missing species
 for (i in cps.spp) {
   if (is.null(biomass.dens.figs.os[[i]])) {
-    df <- data.frame()
-    biomass.dens.temp <- ggplot(df) + geom_point() + 
-      xlim(0,10) + ylim(0,10) + 
+    biomass.dens.temp <- base.map + 
       annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
       theme_bw()  
+
     ggsave(biomass.dens.temp, 
            filename = paste(here("Figs/fig_biomass_dens_os_"), i, ".png", sep = ""))
   }
@@ -1164,7 +1212,8 @@ save(point.estimates.offshore,
 write_csv(nasc.summ.strata.os, here("Output/nasc_strata_summary_os.csv"))
 
 # Add stock designations to point estimates
-point.estimates.offshore <- left_join(point.estimates.offshore, strata.summ.offshore)
+point.estimates.offshore <- left_join(point.estimates.offshore, strata.summ.offshore) %>% 
+  filter(biomass.total > 0)
 
 # Summarize point estimates (by stocks)
 pe.os <- point.estimates.offshore %>%
@@ -1549,7 +1598,7 @@ ggsave(biomass.histogram.survey.os,
 # Create list for storing plots
 L.disagg.plots.os <- list()
 
-# Plot length-disaggrated abundance and biomass by length class for each species
+# Plot length-disaggregated abundance and biomass by length class for each species
 for (i in unique(abund.summ.os$Species)) {
   for (j in unique(abund.summ.os$Stock[abund.summ.os$Species == i])) {
     # Get y-axis limits for abundance and biomass plots
