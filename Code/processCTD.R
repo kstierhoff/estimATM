@@ -206,4 +206,7 @@ for (i in files.CTD) {
                sprintf('Krill/CPS sound speed ratio = %.6f', avgSoundSpeed.Krill/avgSoundSpeed.CPS),
                sep = '')
   write_file(tmp, paste(dir.output, file.name, '_SoundSpeedRatio.txt', sep = ''))
+  
+  # Copy CTD file to the PROCESSED directory
+  file.copy(file.path(dir.CTD, i), dir.output)
 }
