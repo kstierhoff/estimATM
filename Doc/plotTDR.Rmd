@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,
-               knitr,DT,fs,cowplot,oce,sf,mapview)
+               knitr,DT,fs,cowplot,oce,sf,mapview,shadowtext)
 
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("kstierhoff/surveyR")
@@ -214,7 +214,7 @@ for (i in rsk.files.foot) {
            cruise = str_extract(filename, "^\\d{4}\\w{2}"),
            haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
            depth = -pressure,
-           loc   = "Foot",
+           loc   = "Footrope",
            time  = ymd_hms(time, tz = "America/Los_Angeles")) 
   
   tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
@@ -233,6 +233,12 @@ for (k in unique(tbl.all$haul)) {
   # Get haul info from haul k
   trawl.window <- haul %>% 
     filter(haul == k)
+  
+  # Format data for text labels
+  trawl.text <- trawl.window %>% 
+    select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
+    pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") %>% 
+    mutate(time = time + hours(tdr.offset))
   
   # Extract nav data for 30 min before and after haul
   trawl.nav <- nav %>% 
@@ -254,9 +260,13 @@ for (k in unique(tbl.all$haul)) {
                   ymin = min(-tdr.plot$pressure), 
                   ymax = 10), fill = NA,
               colour = 'black', linetype = "dashed") +
+    geom_shadowtext(data = trawl.text,
+              aes(time, min(-tdr.plot$pressure), label = event),
+              bgcolor = "white", size = 3,
+              angle = 90, hjust = 0, vjust = 0.5, nudge_y = 1) +
     geom_line(data = tdr.plot,
               aes(time, -pressure + 10, colour = loc)) + 
-    scale_colour_manual(name = "Location", values = c(Foot = "blue", Kite = "red")) +
+    scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
     geom_line(data = trawl.nav,
               aes(time, SOG), 
               colour = "magenta") +
