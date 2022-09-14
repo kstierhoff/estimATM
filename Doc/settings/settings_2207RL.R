@@ -483,6 +483,12 @@ tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculatin
 scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
+# SCS data info for extracting NAV data
+scs.nav.path           <- "C:/SURVEY/2207RL/DATA/SCS" # Local
+scs.nav.dir            <- "SAMOS"
+scs.nav.pattern        <- "SAMOS-OBS.*.elg"
+scs.nav.recurse        <- TRUE
+
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
@@ -495,7 +501,7 @@ trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2207RL.accdb"
-trawl.performance      <- c("Aborted", "Bad") # Character vector; trawl performance to exclude
+trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
 # CTD data
@@ -760,7 +766,11 @@ pairovet.button    <- "Pairovet IN"
 cb.flush.button    <- "CB Flush"
 cb.int.button      <- "CB Interm"
 cb.ext.button      <- "CB Extended"
-gps.lat.hdr        <- "GP170-Lat"
-gps.lon.hdr        <- "GP170-Lon"
+gps.lat.hdr        <- "SAMOS-Lat-VALUE"
+gps.lon.hdr        <- "SAMOS-Lon-VALUE"
+sst.hdr            <- "SAMOS-TSGT-VALUE"
+sog.hdr            <- "SAMOS-SOG-VALUE"
+wind.dir.hdr       <- "SAMOS-TrueWind-Dir-VALUE"
+wind.speed.hdr     <- "SAMOS-TrueWind-Spd-VALUE"
 order.occ.hdr      <- "Order Occ"
 notes.hdr          <- "Notes"

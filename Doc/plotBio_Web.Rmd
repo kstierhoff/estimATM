@@ -61,9 +61,10 @@ nasc.plot.min    <- 1
 
 ```{r processing-controls}
 # Control script behavior (usually T)
+get.nav            <- T # Download NOAA Ship nav data
+nav.source         <- "SCS" # Navigation data source: ERDDAP or SCS
 save.figs          <- T # Save figures
-get.nav            <- T # Download NOAA Ship nav data from ERDDAP
-get.nav.sd         <- T # Download Saildrone nav data from ERDDAP
+get.nav.sd         <- F # Download Saildrone nav data from ERDDAP
 copy.files         <- T # Copy data files from data to plotBio directory
 overwrite.files    <- T # Overwrite existing files when copying (not CSV, see below)
 process.csv        <- T # Process acoustic backscatter files
@@ -120,8 +121,12 @@ if (copy.files) {
 ```
 
 ```{r process-nav}
-# Source code to get nav data from ERDDAP
-source(here("Code/get_nav_erddap.R"))
+# Source code to get nav data from ERDDAP or SCS
+if (nav.source == "ERDDAP") {
+  source(here("Code/get_nav_erddap.R"))
+} else if (nav.source == "SCS") {
+  source(here("Code/get_nav_scs.R"))
+}
 
 # Read transect waypoints
 wpts <- read_csv(here("Data/Nav", wpt.filename))
@@ -365,7 +370,7 @@ if (sampling.trawl) {
     mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
            cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1)  
   
-  # Find midpoint of each haul as the mean lat/lon
+  # Find midpoint of each haul as the mean lat/long
   haul.mid <- haul %>% 
     group_by(cluster, haul) %>% 
     summarise(

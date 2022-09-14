@@ -44,13 +44,35 @@ dir_create(here(c("Figs", "Output")))
 
 ```{r user-settings}
 # User-specified settings
-get.nav <- F # Download vessel nav from ERDDAP
-get.db  <- F # Extract data from trawl database (F for testing)
+copy.files <- T # Copy TDR files
+get.db     <- T # Extract data from trawl database (F for testing)
+get.nav    <- T # Download NOAA Ship nav data
+nav.source <- "SCS" # Navigation data source: ERDDAP or SCS
+```
+
+```{r copy-files}
+if (copy.files) {
+  # Create directory for TDR files
+  dir_create(here("Data/TDR", c("Kite","Footrope")))
+  
+  # Copy trawl Access database
+  tdr.files.kite <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/TDR/Kite"),
+                           regexp = tdr.pattern)
+  file_copy(tdr.files.kite, here("Data/TDR/Kite"), overwrite = TRUE)
+  
+  tdr.files.foot <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/TDR/Footrope"),
+                           regexp = tdr.pattern)
+  file_copy(tdr.files.foot, here("Data/TDR/Footrope"), overwrite = TRUE)
+}
 ```
 
 ```{r get-nav}
-# Source code to get nav data from ERDDAP
-source(here("Code/get_nav_erddap.R"))
+# Source code to get nav data from ERDDAP or SCS
+if (nav.source == "ERDDAP") {
+  source(here("Code/get_nav_erddap.R"))
+} else if (nav.source == "SCS") {
+  source(here("Code/get_nav_scs.R"))
+}
 ```
 
 ```{r get-trawl-data}
