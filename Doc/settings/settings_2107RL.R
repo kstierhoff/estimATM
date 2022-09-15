@@ -425,7 +425,7 @@ rm.transit             <- c(RL  = FALSE,
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE,
+                            SD  = FALSE,
                             JCF = FALSE) 
 
 # If T, removes transects with names including "inshore"
