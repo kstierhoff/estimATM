@@ -4,8 +4,8 @@ author: "Kevin Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
   bookdown::html_document2:
-    toc: yes
-    toc_float: yes
+    toc: no
+    toc_float: no
     number_sections: yes
 css: css/ast.css
 bibliography: bib/ast_bib.bib
@@ -23,6 +23,10 @@ pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("kstierhoff/surveyR")
 pacman::p_load_gh("kstierhoff/atm")
+
+# Knitr options
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      out.width = "90%")
 
 theme_set(theme_bw())
 ```
@@ -44,10 +48,12 @@ dir_create(here(c("Figs", "Output")))
 
 ```{r user-settings}
 # User-specified settings
-copy.files <- T # Copy TDR files
-get.db     <- T # Extract data from trawl database (F for testing)
-get.nav    <- T # Download NOAA Ship nav data
-nav.source <- "SCS" # Navigation data source: ERDDAP or SCS
+copy.files      <- T # Copy TDR files
+process.tdr     <- T # Process TDR files
+process.tdr.all <- F # Process all TDR files
+get.db          <- T # Extract data from trawl database (F for testing)
+get.nav         <- T # Download NOAA Ship nav data
+nav.source      <- "SCS" # Navigation data source: ERDDAP or SCS
 ```
 
 ```{r copy-files}
@@ -175,111 +181,217 @@ cluster.mid <- haul.mid %>%
 ```
 
 ```{r read-rsk}
-# Process RSK files
-## Kite
-rsk.files.kite <- dir_ls(tdr.dir.kite, 
-                         recurse = tdr.recurse, regexp = tdr.pattern)
+# Calculate mean latitude for computing depth from pressure
+# Could be improved (marginally) by extracting the latitude for each haul
+mean.lat <- mean(haul$startLatDecimal)
 
-# Create tibble for storing results
-tbl.kite <- tibble()
+# Process Kite files ----------------------------------------------------------------------
+# Get fileSnapshot at the beginning of the knit, to compare with the end of the last knit
+tdr.snapshot.start.k <- fileSnapshot(here("Data/TDR/Kite"), full.names = FALSE)
+tdr.snapshot.start.f <- fileSnapshot(here("Data/TDR/Footrope"), full.names = FALSE)
 
-for (i in rsk.files.kite) {
-  rsk.kite <- read.rsk(i)
-  
-  # Convert to tibble
-  tbl.kite.tmp <- as_tibble(rsk.kite@data) %>% 
-    mutate(filename = path_file(rsk.kite@metadata$filename),
-           cruise = str_extract(filename, "^\\d{4}\\w{2}"),
-           haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
-           depth = -pressure,
-           loc   = "Kite",
-           time  = ymd_hms(time, tz = "America/Los_Angeles")) 
-  
-  tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
+# Load fileSnapshot from last knit, or make equal to the start
+if (file.exists(here("Output/tdr_snapshot_end_k.rds"))){
+  tdr.snapshot.end.k <- readRDS(here("Output/tdr_snapshot_end_k.rds"))
+} else {
+  tdr.snapshot.end.k <- tdr.snapshot.start.k
 }
 
-## Kite
-rsk.files.foot <- dir_ls(tdr.dir.foot, 
-                         recurse = tdr.recurse, regexp = tdr.pattern)
-
-# Create tibble for storing results
-tbl.foot <- tibble()
-
-for (i in rsk.files.foot) {
-  rsk.foot <- read.rsk(i)
-  
-  # Convert to tibble
-  tbl.foot.tmp <- as_tibble(rsk.foot@data) %>% 
-    mutate(filename = path_file(rsk.foot@metadata$filename),
-           cruise = str_extract(filename, "^\\d{4}\\w{2}"),
-           haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
-           depth = -pressure,
-           loc   = "Footrope",
-           time  = ymd_hms(time, tz = "America/Los_Angeles")) 
-  
-  tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
+# Load fileSnapshot from last knit, or make equal to the start
+if (file.exists(here("Output/tdr_snapshot_end_f.rds"))){
+  tdr.snapshot.end.f <- readRDS(here("Output/tdr_snapshot_end_f.rds"))
+} else {
+  tdr.snapshot.end.f <- tdr.snapshot.start.f
 }
 
-# Combine data for plotting
-tbl.all <- bind_rows(tbl.kite, tbl.foot)
+# Identify new and changed files
+tdr.changed.k    <- changedFiles(tdr.snapshot.end.k, tdr.snapshot.start.k) 
+tdr.changed.f    <- changedFiles(tdr.snapshot.end.f, tdr.snapshot.start.f) 
+# List files that need to be processed
+tdr.to.process.k <- c(tdr.changed.k$changed, tdr.changed.k$added)
+tdr.to.process.f <- c(tdr.changed.f$changed, tdr.changed.f$added)
+
+if (process.tdr) {
+  # List all kite files
+  rsk.files.kite <- dir_ls(tdr.dir.kite, 
+                           recurse = tdr.recurse, regexp = tdr.pattern)
+  # List all footrope files
+  rsk.files.foot <- dir_ls(tdr.dir.foot, 
+                           recurse = tdr.recurse, regexp = tdr.pattern)
+  
+  if (process.tdr.all) {
+    # If processing all files, create empty tibbles for TDR data
+    tbl.all <- tibble()
+    
+  } else  {
+    if (file.exists(here("Output/tdr_data_all.Rdata"))) {
+      # Load data frame with already processed TDR data
+      load(here("Output/tdr_data_all.Rdata")) 
+      
+      # If files have changed, remove those data from the already processed data
+      if (length(tdr.changed.k$changed) > 0) {
+        tbl.all <- tbl.all %>% 
+          filter(!path_file(filename) %in% path_file(fs_path(tdr.changed.k$changed)))
+      }
+      
+      if (length(tdr.changed.f$changed) > 0) {
+        tbl.all <- tbl.all %>% 
+          filter(!path_file(filename) %in% path_file(fs_path(tdr.changed.k$changed))) 
+      }
+      
+    } else {
+      # Create an empty data frame
+      tbl.all <- tibble()
+    }
+    
+    if (length(tdr.to.process.k) > 0) {
+      # List only new TDR files
+      rsk.files.kite <- rsk.files.kite[fs::path_file(rsk.files.kite) %in% 
+                                         path_file(fs_path(tdr.to.process.k))]  
+    } else {
+      # Set length of csv.files.cps to zero
+      rsk.files.kite <- character(0)
+    }
+    
+    if (length(tdr.to.process.f) > 0) {
+      # List only new TDR files
+      rsk.files.foot <- rsk.files.foot[fs::path_file(rsk.files.foot) %in% 
+                                         path_file(fs_path(tdr.to.process.f))]  
+    } else {
+      # Set length of csv.files.cps to zero
+      rsk.files.foot <- character(0)
+    }
+  }
+  
+  # Save snapshot
+  saveRDS(tdr.snapshot.start.k, here("Output/tdr_snapshot_end_k.rds"))
+  saveRDS(tdr.snapshot.start.f, here("Output/tdr_snapshot_end_f.rds"))
+  
+  # Process Kite files ----------------------------------------------------------------------
+  ## Create tibble for storing results
+  tbl.kite <- tibble()
+  
+  if (length(rsk.files.kite) > 0) {
+    for (i in rsk.files.kite) {
+      rsk.kite <- read.rsk(i)
+      
+      # Convert to tibble
+      tbl.kite.tmp <- as_tibble(rsk.kite@data) %>% 
+        mutate(filename = path_file(rsk.kite@metadata$filename),
+               cruise = str_extract(filename, "^\\d{4}\\w{2}"),
+               haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
+               depth = surveyR::calc_depth(mean.lat, pressure*100),
+               loc   = "Kite",
+               time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+      
+      
+      tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
+    }
+  }
+  
+  # Process Footrope files ----------------------------------------------------------------------
+  ## Create tibble for storing results
+  tbl.foot <- tibble()
+  
+  if (length(rsk.files.foot) > 0) {
+    for (i in rsk.files.foot) {
+      rsk.foot <- read.rsk(i)
+      
+      # Convert to tibble
+      tbl.foot.tmp <- as_tibble(rsk.foot@data) %>% 
+        mutate(filename = path_file(rsk.foot@metadata$filename),
+               cruise = str_extract(filename, "^\\d{4}\\w{2}"),
+               haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
+               depth = surveyR::calc_depth(mean.lat, pressure*100),
+               loc   = "Footrope",
+               time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+      
+      
+      tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
+    }
+  }
+  
+  # Combine new data
+  tbl.all.new <- bind_rows(tbl.kite, tbl.foot)
+  
+  # Combine new and existing data
+  tbl.all <- bind_rows(tbl.all, tbl.all.new)
+  
+  # Save processed TDR data
+  save(tbl.all, file = here("Output/tdr_data_all.Rdata"))
+} else {
+  # Load already processed TDR data
+  load(here("Output/tdr_data_all.Rdata"))
+}
 ```
 
 ```{r plot-results}
-# Plot and save all deployments
-for (k in unique(tbl.all$haul)) {
-  # Get TDR data from haul k
-  tdr.plot <- filter(tbl.all, haul == k)
-  
-  # Get haul info from haul k
-  trawl.window <- haul %>% 
-    filter(haul == k)
-  
-  # Format data for text labels
-  trawl.text <- trawl.window %>% 
-    select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
-    pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") %>% 
-    mutate(time = time + hours(tdr.offset))
-  
-  # Extract nav data for 30 min before and after haul
-  trawl.nav <- nav %>% 
-    filter(between(time, 
-                   min(tdr.plot$time) - minutes(30), 
-                   max(tdr.plot$time) + minutes(30)))
-  
-  # Plot results
-  plot.tdr <- ggplot() + 
-    geom_rect(data = trawl.window,
-              aes(xmin = equilibriumTime + hours(tdr.offset), 
-                  xmax = haulBackTime + hours(tdr.offset), 
-                  ymin = min(-tdr.plot$pressure), 
-                  ymax = 10),
-              fill = 'gray70', alpha = 0.5) +
-    geom_rect(data = trawl.window,
-              aes(xmin = netInWaterTime + hours(tdr.offset), 
-                  xmax = netOnDeckTime + hours(tdr.offset), 
-                  ymin = min(-tdr.plot$pressure), 
-                  ymax = 10), fill = NA,
-              colour = 'black', linetype = "dashed") +
-    geom_shadowtext(data = trawl.text,
-              aes(time, min(-tdr.plot$pressure), label = event),
-              bgcolor = "white", size = 3,
-              angle = 90, hjust = 0, vjust = 0.5, nudge_y = 1) +
-    geom_line(data = tdr.plot,
-              aes(time, -pressure + 10, colour = loc)) + 
-    scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
-    geom_line(data = trawl.nav,
-              aes(time, SOG), 
-              colour = "magenta") +
-    geom_hline(yintercept = 0, colour = "black") +
-    ylim(min(-tdr.plot$pressure), 15) +
-    labs(x = "Time (PDT)",
-         y = "Pressure (dbar)",
-         title = unique(tdr.plot$filename))
-  
-  # Save plot
-  ggsave(plot.tdr, 
-         filename = here("Figs/TDR",
-                         paste0(survey.name, "_TDR_", sprintf("%03d", k), ".png")),
-         height = 5, width = 10)
+# Plot and save all new deployments
+if(nrow(tbl.all.new) > 0) {
+  for (k in unique(tbl.all.new$haul)) {
+    # Get TDR data from haul k
+    tdr.plot <- filter(tbl.all.new, haul == k)
+    
+    # Get haul info from haul k
+    trawl.window <- haul %>% 
+      filter(haul == k)
+    
+    # Format data for text labels
+    trawl.text <- trawl.window %>% 
+      select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
+      pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") %>% 
+      mutate(time = time + hours(tdr.offset))
+    
+    # Extract nav data for 30 min before and after haul
+    trawl.nav <- nav %>% 
+      filter(between(time, 
+                     min(tdr.plot$time) - minutes(30), 
+                     max(tdr.plot$time) + minutes(30)))
+    
+    # Plot results
+    plot.tdr <- ggplot() + 
+      geom_rect(data = trawl.window,
+                aes(xmin = equilibriumTime + hours(tdr.offset), 
+                    xmax = haulBackTime + hours(tdr.offset), 
+                    ymin = min(tdr.plot$depth), 
+                    ymax = 10),
+                fill = 'gray70', alpha = 0.5) +
+      geom_rect(data = trawl.window,
+                aes(xmin = netInWaterTime + hours(tdr.offset), 
+                    xmax = netOnDeckTime + hours(tdr.offset), 
+                    ymin = min(tdr.plot$depth), 
+                    ymax = 10), fill = NA,
+                colour = 'gray50', linetype = "dashed", alpha = 0.5) +
+      geom_text(data = trawl.text,
+                aes(time, min(tdr.plot$depth), label = event),
+                size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) +
+      geom_text(data = trawl.text,
+                aes(time, min(tdr.plot$depth), label = event),
+                size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) +
+      geom_line(data = tdr.plot,
+                aes(time, depth + 10, colour = loc)) + 
+      annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)", 
+               colour = "magenta", hjust = 0, size = 3) +
+      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
+      geom_line(data = trawl.nav,
+                aes(time, SOG), 
+                colour = "magenta") +
+      geom_hline(yintercept = 0, colour = "gray50") +
+      ylim(min(tdr.plot$depth), 20) +
+      labs(x = "Time (PDT)",
+           y = "Depth (m)",
+           title = paste("Cruise:", unique(tdr.plot$cruise), 
+                         "; Haul:", unique(tdr.plot$haul),
+                         "; Date:", date(tdr.plot$time[1])))
+    
+    # Save plot
+    ggsave(plot.tdr, 
+           filename = here("Figs/TDR",
+                           paste0(survey.name, "_TDR_", sprintf("%03d", k), ".png")),
+           height = 5, width = 10)
+  }
+} else {
+  cat("No new TDR data to plot.")
 }
 ```
+
