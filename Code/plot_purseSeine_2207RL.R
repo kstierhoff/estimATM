@@ -21,22 +21,55 @@ source(here("Doc/settings", prj.settings))
 # Source following the section entitled estimateNearshore in estimateBiomass.
 
 # Import set data ----------------------------------------------------
+# LM
 lm.sets <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>% 
   mutate(date = mdy(date),
          vessel_name = "Lisa Marie",
          vessel.name = "LM",
          key.set = paste(vessel.name, date, set))
 
-# lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
-#   mutate(date = date(mdy_hm(datetime)),
-#          vessel_name = "Long Beach Carnage",
-#          vessel.name = "LBC",
-#          key.set = paste(vessel_name, date, set))
+# LBC
+lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
+  mutate(date = mdy(date),
+         vessel_name = "Long Beach Carnage",
+         vessel.name = "LBC",
+         key.set = paste(vessel.name, date, set))
 
-# save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
+save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
+
+# Import catch data -------------------------------------------------------
+# LM
+lm.catch <- read_csv(here("Data/Seine/lm_catch.csv")) %>% 
+  mutate(date = mdy(date),
+         vessel.name = "Lisa Marie",
+         vessel.name = "LM",
+         key.set = paste(vessel.name, date, set),
+         scientificName = case_when(
+           species_name == "Pacific Herring" ~ "Clupea pallasii",
+           species_name == "Pacific Sardine" ~ "Sardinops sagax",
+           species_name == "Chub Mackerel" ~ "Scomber japonicus",
+           species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
+           species_name == "Northern Anchovy" ~ "Engraulis mordax",
+           species_name == "Jacksmelt" ~ "Atherinopsis californiensis",
+           species_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
+           TRUE ~ NA_character_)) %>% 
+  filter(!is.na(scientificName)) %>% 
+  group_by(key.set, vessel.name, scientificName) %>% 
+  summarise(totalWeight = sum(weightkg))
+
+# LBC
+lbc.catch <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
+  left_join(select(lbc.sets, set, date)) %>% 
+  mutate(vessel_name = "Long Beach Carnage",
+         vessel.name = "LBC",
+         key.set = paste(vessel.name, date, set)) %>% 
+  pivot_longer(cols = 3:6, names_to = "scientificName", values_to = "weightkg") %>% 
+  replace_na(list(weightkg = 0)) %>% 
+  group_by(key.set, vessel.name, scientificName) %>% 
+  summarise(totalWeight = sum(weightkg))
 
 # Import specimen data ----------------------------------------------------
-lm.specimens <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>% 
+lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>% 
   mutate(date = mdy(date),
          vessel.name = "Lisa Marie",
          vessel.name = "LM",
@@ -82,7 +115,7 @@ lm.specimens <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
-# lbc.specimens <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
+# lbc.lengths <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
 #   left_join(select(lbc.sets, date, set, key.set)) %>%
 #   mutate(vessel.name = "LM",
 #          label = paste("Date:", date, "Set:", set, "Fish num:", specimen_number),
@@ -108,34 +141,42 @@ lm.specimens <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
 #     TRUE ~ totalLength_mm),
 #   K = round((weightg/totalLength_mm*10^3)*100))
 
-# save(lm.specimens, lbc.specimens, file = here("Output/purse_seine_specimens.Rdata"))
+# save(lm.lengths, lbc.lengths, file = here("Output/purse_seine_specimens.Rdata"))
 
 # Summarize specimen data ------------------------------------------------
-lm.spec.summ <- lm.specimens %>%
-  group_by(key.set, scientificName) %>% 
-  summarise(totalWeight = sum(weightg, na.rm = TRUE),
-            totalCount  = n()) %>% 
-  left_join(select(lm.sets, key.set, lat, long)) %>% 
-  filter(!is.na(lat)) 
+lm.catch.summ <- lm.catch %>%
+  select(key.set, scientificName, totalWeight) %>% 
+  tidyr::spread(scientificName, totalWeight) %>% 
+  right_join(select(lm.sets, key.set, vessel.name, lat, long)) %>% # Add all sets, incl. empty hauls
+  arrange(key.set) 
 
-# lbc.spec.summ <- lbc.specimens %>%
+# Summarize catch from all species
+lbc.catch.summ <- lbc.catch %>% 
+  select(key.set, scientificName, totalWeight) %>% 
+  tidyr::spread(scientificName, totalWeight) %>% 
+  right_join(select(lbc.sets, key.set, vessel.name, lat, long)) %>% # Add all sets, incl. empty hauls
+  arrange(key.set)
+
+# lm.spec.summ <- lm.lengths %>%
 #   group_by(key.set, scientificName) %>% 
-#   summarise(totalWeight = sum(weightg, na.rm = TRUE),
-#             totalCount  = n()) %>% 
-#   left_join(select(lbc.sets, key.set, lat, long)) %>% 
-#   filter(!is.na(lat)) 
+#   summarise(totalWeight = sum(weightg, na.rm = TRUE)) %>% 
+#   tidyr::spread(scientificName, totalWeight) %>% 
+#   right_join(select(lm.sets, key.set, vessel.name, lat, long)) %>% # Add all sets, incl. empty hauls
+#   arrange(key.set) %>% 
+#   ungroup()
 
 # Make specimen summaries spatial -----------------------------------------
-lm.spec.summ.sf <- lm.spec.summ %>% 
+lm.catch.summ.sf <- lm.catch.summ %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
-# lbc.spec.summ.sf <- lbc.spec.summ %>% 
-#   st_as_sf(coords = c("long","lat"), crs = 4326)
+lbc.catch.summ.sf <- lbc.catch.summ %>%
+  st_as_sf(coords = c("long","lat"), crs = 4326)
 
 # Summarise catch by weight -----------------------------------------------
-set.summ.wt <- lm.spec.summ %>% 
-  # bind_rows(lbc.spec.summ) %>% 
-  tidyr::spread(scientificName, totalWeight) 
+# So far, LM catch is from the specimen data (no bucket sample info, yet)
+# LBC catch is from bucket samples (no specimen info, yet)
+set.summ.wt <- lm.catch.summ %>% 
+  bind_rows(lbc.catch.summ) 
 
 # Add species with zero total weight
 if (!has_name(set.summ.wt, "Engraulis mordax"))      {set.summ.wt$`Engraulis mordax`      <- 0}
@@ -143,12 +184,14 @@ if (!has_name(set.summ.wt, "Sardinops sagax"))       {set.summ.wt$`Sardinops sag
 if (!has_name(set.summ.wt, "Scomber japonicus"))     {set.summ.wt$`Scomber japonicus`     <- 0}
 if (!has_name(set.summ.wt, "Trachurus symmetricus")) {set.summ.wt$`Trachurus symmetricus` <- 0}
 if (!has_name(set.summ.wt, "Clupea pallasii"))       {set.summ.wt$`Clupea pallasii`       <- 0}
+if (!has_name(set.summ.wt, "Etrumeus acuminatus"))   {set.summ.wt$`Etrumeus acuminatus`   <- 0}
 if (!has_name(set.summ.wt, "Atherinopsis californiensis")) {set.summ.wt$`Atherinopsis californiensis` <- 0}
 
 # Calculate total weight of all CPS species
 set.summ.wt <- set.summ.wt %>%  
   replace(is.na(.), 0) %>% 
   ungroup() %>% 
+  select(key.set, vessel.name, lat, long, everything()) %>% 
   mutate(AllCPS = rowSums(select(., -(key.set:long)))) %>%
   # mutate(AllCPS = rowSums(select(., -key.set, -totalCount, -lat, -long))) %>%
   # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
@@ -157,11 +200,12 @@ set.summ.wt <- set.summ.wt %>%
          "Anchovy"    = "Engraulis mordax",
          "Sardine"    = "Sardinops sagax",
          "PacMack"    = "Scomber japonicus",
+         "RndHerring" = "Etrumeus acuminatus",
          "JackMack"   = "Trachurus symmetricus") 
 
 set.pie <- set.summ.wt %>% 
-  select(key.set, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  select(key.set, vessel.name, long, lat, Anchovy, JackMack, 
+         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   atm::project_df(to = 3310) %>% 
   mutate(
     label = paste("Set", key.set),
@@ -170,6 +214,7 @@ set.pie <- set.summ.wt %>%
                   'Sardine:', Sardine, 'kg<br/>',
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
@@ -178,41 +223,41 @@ set.pie <- set.summ.wt %>%
 
 # Summarize transects -----------------------------------------------------
 # Summarize nasc data
-nasc.summ.ns <- nasc.nearshore %>% 
-  group_by(vessel.name, transect.name, transect) %>% 
-  summarise(
-    start     = min(datetime),
-    end       = max(datetime),
-    duration  = difftime(end, start, units = "hours"),
-    n_int     = length(Interval),
-    distance  = length(Interval)*nasc.interval/1852,
-    lat       = lat[which.min(long)],
-    long      = long[which.min(long)],
-    mean_nasc = mean(cps.nasc)) %>% 
-  arrange(vessel.name, start)
-
-save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
-
-# Summarize nasc for plotting
-nasc.plot.ns <- nasc.nearshore %>%
-  select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
-  group_by(filename, transect, transect.name, int) %>%
-  summarise(
-    lat  = lat[1],
-    long = long[1],
-    NASC = mean(cps.nasc)) %>%
-  # Create bins for defining point size in NASC plots%>%
-  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
-         bin.level =  as.numeric(bin)) %>%
-  ungroup() %>%
-  project_df(to = crs.proj)
-
-nasc.paths.ns <- nasc.plot.ns %>%
-  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-  group_by(transect.name) %>%
-  summarise(do_union = F) %>%
-  st_cast("LINESTRING") %>%
-  ungroup()
+# nasc.summ.ns <- nasc.nearshore %>% 
+#   group_by(vessel.name, transect.name, transect) %>% 
+#   summarise(
+#     start     = min(datetime),
+#     end       = max(datetime),
+#     duration  = difftime(end, start, units = "hours"),
+#     n_int     = length(Interval),
+#     distance  = length(Interval)*nasc.interval/1852,
+#     lat       = lat[which.min(long)],
+#     long      = long[which.min(long)],
+#     mean_nasc = mean(cps.nasc)) %>% 
+#   arrange(vessel.name, start)
+# 
+# save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
+# 
+# # Summarize nasc for plotting
+# nasc.plot.ns <- nasc.nearshore %>%
+#   select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
+#   group_by(filename, transect, transect.name, int) %>%
+#   summarise(
+#     lat  = lat[1],
+#     long = long[1],
+#     NASC = mean(cps.nasc)) %>%
+#   # Create bins for defining point size in NASC plots%>%
+#   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
+#          bin.level =  as.numeric(bin)) %>%
+#   ungroup() %>%
+#   project_df(to = crs.proj)
+# 
+# nasc.paths.ns <- nasc.plot.ns %>%
+#   st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+#   group_by(transect.name) %>%
+#   summarise(do_union = F) %>%
+#   st_cast("LINESTRING") %>%
+#   ungroup()
 
 
 # Read GPX file
@@ -239,11 +284,25 @@ load("C:/KLS/CODE/Github/estimATM/2207RL/Data/Nav/nav_data.Rdata")
 
 # Plot Lisa Marie data ----------------------------------------------------
 # Use nav data to resize map to survey progress
-map.bounds.ns <- nav.paths.sf %>%
-    st_transform(crs = 3310) %>%
-  bind_rows(lm.path) %>% 
+wpts.sf <- read_csv(here("Data/Nav/waypoints_2207RL.csv")) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = 4326) 
 
+map.bounds.ns <- wpts.sf %>%
+  st_transform(crs = 3310) %>%
   st_bbox()
+
+map.bounds.lm <- lm.catch.summ.sf %>%
+  st_transform(crs = 3310) %>%
+  st_bbox()
+
+map.bounds.lbc <- lbc.catch.summ.sf %>%
+  st_transform(crs = 3310) %>%
+  st_bbox()
+
+# map.bounds.ns <- nav.paths.sf %>%
+#   st_transform(crs = 3310) %>%
+#   bind_rows(lm.path) %>% 
+#   st_bbox()
 
 # map.bounds.ns <- nasc.paths.ns %>%
 #   filter(str_detect(transect.name, "LM")) %>% 
@@ -251,7 +310,9 @@ map.bounds.ns <- nav.paths.sf %>%
 #   st_bbox()
 
 # Calculate pie radius based on latitude range
-pie.radius.ns <- as.numeric(abs(map.bounds.ns$ymin - map.bounds.ns$ymax)*pie.scale)
+pie.radius.ns  <- as.numeric(abs(map.bounds.ns$ymin - map.bounds.ns$ymax)*pie.scale)
+pie.radius.lm  <- as.numeric(abs(map.bounds.lm$ymin - map.bounds.lm$ymax)*pie.scale)
+pie.radius.lbc <- as.numeric(abs(map.bounds.lbc$ymin - map.bounds.lbc$ymax)*pie.scale)
 
 # Calculate pie radius of each pie, based on All CPS landings
 if (scale.pies) {
@@ -284,77 +345,83 @@ load("C:/KLS/CODE/Github/estimATM/2207RL/Data/Map/basemap.Rdata")
 
 load(here("Output/trawl_pie_plotBio.Rdata"))
 
-set.pies <- base.map + 
+set.pies.lm <- base.map + 
   # Plot NASC data
   geom_path(data = lm.points, aes(X, Y)) +
-  geom_point(data = project_df(lm.sets, to = crs.proj), 
-             aes(X, Y),
-             shape = 21, fill = "black", colour = "white", size = 3) +
-  # geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
-  # geom_sf(data = lm.path) %>%
   # Plot purse seine pies
   scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM")), 
-                              aes(X, Y, group = key.set, r = r*1.5),
+                              aes(X, Y, group = key.set, r = pie.radius.ns),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
+                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
                               color = 'black', alpha = 0.8) +
-  # # Plot haul pies
-  # scatterpie::geom_scatterpie(data = haul.pos, 
-  #                             aes(X, Y, group = haul, r = r),
-  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
-  #                                      "PacHerring", "PacMack", "Sardine"),
-  #                             color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
+                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
-  geom_point(data = set.zero, aes(X, Y)) +
-  # ggtitle("CPS Proportions in Purse Seines") +
+                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+  geom_point(data = filter(set.zero, vessel.name == "LM"), aes(X, Y)) +
+  ggtitle("Lisa Marie") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
-           ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
+           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
+           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]))
 
-ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LisaMarie.png"),
+ggsave(set.pies.lm, filename = here("Figs/fig_seine_proportion_set_wt_LisaMarie.png"),
+       height = 10, width = 6)
+
+set.pies.lbc <- base.map + 
+  # Plot NASC data
+  # geom_path(data = lbc.points, aes(X, Y)) +
+  # Plot purse seine pies
+  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
+                              aes(X, Y, group = key.set, r = pie.radius.ns),
+                              cols = c("Anchovy", "JackMack", "Jacksmelt",
+                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                              color = 'black', alpha = 0.8) +
+  # Configure trawl scale
+  scale_fill_manual(name = 'Species',
+                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+  geom_point(data = filter(set.zero, vessel.name == "LBC"), aes(X, Y)) +
+  ggtitle("Long Beach Carnage") +
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
+           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"])) 
+
+ggsave(set.pies.lbc, filename = here("Figs/fig_seine_proportion_set_wt_Carnage.png"),
        height = 10, width = 6)
 
 haul.pies <- base.map + 
   # # Plot NASC data
   geom_path(data = project_df(nav, to = crs.proj), aes(X, Y)) +
-  # geom_point(data = project_df(lm.sets, to = crs.proj), 
-  #            aes(X, Y),
-  #            shape = 21, fill = "black", colour = "white", size = 3) +
-  # geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
-  # geom_sf(data = st_transform(nav.paths.sf, crs.proj)) %>%
-  # Plot purse seine pies
-  # scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM")), 
-  #                             aes(X, Y, group = key.set, r = r*1.5),
-  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
-  #                                      "PacHerring", "PacMack", "Sardine"),
-  #                             color = 'black', alpha = 0.8) +
   # Plot haul pies
   scatterpie::geom_scatterpie(data = haul.pos, 
-                              aes(X, Y, group = haul, r = r),
+                              aes(X, Y, group = haul, r = pie.radius.ns),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
+                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
                               color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
+                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
+                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = haul.zero, aes(X, Y)) +
-  # ggtitle("CPS Proportions in Purse Seines") +
+  ggtitle("Reuben Lasker") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.ns["xmin"]*1.4, map.bounds.ns["xmax"]*0.8), 
-           ylim = c(map.bounds.ns["ymin"]*0.9, map.bounds.ns["ymax"]))
+           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
+           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]))
 
-set.haul.combo <- cowplot::plot_grid(set.pies, haul.pies, align = "hv")
+ggsave(haul.pies, filename = here("Figs/fig_seine_proportion_set_wt_Carnage.png"),
+       height = 10, width = 6)
 
-ggsave(set.haul.combo, filename = here("Figs/fig_seine_proportion_set_wt_LM-RL.png"),
-       height = 10, width = 10)
+set.haul.combo <- cowplot::plot_grid(set.pies.lm, set.pies.lbc, haul.pies, 
+                                     nrow = 1, align = "hv")
+
+ggsave(set.haul.combo, filename = here("Figs/fig_seine_proportion_set_wt_LM-LBC-RL.png"),
+       height = 10, width = 6*3)
 
 # Map backscatter
 nasc.map.ns.lm <- base.map +
@@ -623,8 +690,8 @@ ggsave(nasc.ns.combo, filename = here("Figs/fig_backscatter_cps_AllNearshore.png
        height = 10, width = 20)
 
 # Get max TL for plotting L/W models
-L.max <- select(lm.specimens, scientificName, totalLength_mm) %>%
-  bind_rows(select(lbc.specimens, scientificName, totalLength_mm)) %>% 
+L.max <- select(lm.lengths, scientificName, totalLength_mm) %>%
+  bind_rows(select(lbc.lengths, scientificName, totalLength_mm)) %>% 
   group_by(scientificName) %>% 
   summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
 
@@ -645,7 +712,7 @@ for (i in unique(L.max$scientificName)) {
 
 # Estimate missing weights from lengths -------------------------------------------------------
 # Add a and b to length data frame and calculate missing lengths/weights
-lm.specimens <- lm.specimens %>% 
+lm.lengths <- lm.lengths %>% 
   mutate(
     weightg = case_when(
       is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
@@ -655,7 +722,7 @@ lm.specimens <- lm.specimens %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
-lbc.specimens <- lbc.specimens %>% 
+lbc.lengths <- lbc.lengths %>% 
   mutate(
     weightg = case_when(
       is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
@@ -670,11 +737,11 @@ lbc.specimens <- lbc.specimens %>%
 lw.plot.lm <- ggplot() + 
   # Plot seasonal length models for each species
   geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
-  geom_point(data = lm.specimens, aes(forkLength_mm, weightg, label = label), 
+  geom_point(data = lm.lengths, aes(forkLength_mm, weightg, label = label), 
              colour = "blue") + 
-  geom_point(data = lm.specimens, aes(standardLength_mm, weightg, label = label), 
+  geom_point(data = lm.lengths, aes(standardLength_mm, weightg, label = label), 
              colour = "red") + 
-  geom_point(data = lm.specimens, aes(totalLength_mm, weightg, label = label), 
+  geom_point(data = lm.lengths, aes(totalLength_mm, weightg, label = label), 
              colour = "green") + 
   facet_wrap(~scientificName, scales = "free") +
   xlab("Length (mm)") +
@@ -692,11 +759,11 @@ ggsave(lw.plot.lm, filename = here("Figs/fig_LW_plots_LisaMarie.png"),
 lw.plot.lbc <- ggplot() + 
   # Plot seasonal length models for each species
   geom_line(data = lw.df, aes(L, W), linetype = 'dashed') +
-  geom_point(data = lbc.specimens, aes(forkLength_mm, weightg, label = label), 
+  geom_point(data = lbc.lengths, aes(forkLength_mm, weightg, label = label), 
              colour = "blue") + 
-  geom_point(data = lbc.specimens, aes(standardLength_mm, weightg, label = label), 
+  geom_point(data = lbc.lengths, aes(standardLength_mm, weightg, label = label), 
              colour = "red") + 
-  geom_point(data = lbc.specimens, aes(totalLength_mm, weightg, label = label), 
+  geom_point(data = lbc.lengths, aes(totalLength_mm, weightg, label = label), 
              colour = "green") + 
   facet_wrap(~scientificName, scales = "free") +
   xlab("Length (mm)") +
