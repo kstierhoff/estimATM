@@ -121,6 +121,7 @@ if (get.db) {
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
   haul.all <- haul.all %>% 
+    arrange(haul) %>% 
     mutate(
       startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
       startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
@@ -1170,6 +1171,25 @@ haul.paths %>%
     distance, knitr.format, color = "black",
     background = ifelse(distance <= 5, "white", "orange"))) %>%
   select(haul, distance) %>%
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+        align = c("c")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = FALSE) %>%
+  row_spec(0, align = c("c")) %>% 
+  scroll_box(height = "500px")
+```
+
+## Hauls durations
+
+Trawl durations are examined to look for data entry errors. Trawls longer than 50 min are highlighted orange.
+
+```{r check-trawl-duration}
+haul %>%
+  arrange(haul) %>% 
+  mutate(Duration = cell_spec(
+    Duration, knitr.format, color = "black",
+    background = ifelse(Duration >= 50, "orange", "white"))) %>%
+  select(haul, cluster, equilibriumTime, haulBackTime, Duration) %>%
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("c")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
