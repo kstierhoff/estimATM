@@ -92,14 +92,15 @@ survey.end             <- "23 September"  # Survey end date
 survey.year            <- "2022"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 77              # Days at sea allocated
-survey.landmark.n      <- "Cape Scott, British Columbia" # Landmark - N extent of survey
-survey.landmark.s      <- "Punta Eugenia, Baja California" # Landmark - S extent of survey
+survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
+survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
 daynight.filter        <- c("Day","Night")# A character string including "Day", "Night", or both
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
+# Use start dates of each leg + end date of last leg
 leg.breaks <- as.numeric(lubridate::ymd(c("2022-06-27", "2022-07-19", 
                                           "2022-08-12", "2022-09-06",
                                           "2022-09-30")))
@@ -107,7 +108,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2022-06-27", "2022-07-19",
 # Define ERDDAP data variables
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2022-06-27" # Start of survey for ERDDAP vessel data query
-erddap.survey.end    <- "2022-09-24" # End of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2022-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
