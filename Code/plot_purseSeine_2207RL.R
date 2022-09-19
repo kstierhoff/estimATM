@@ -1,13 +1,18 @@
-library(tidyverse)
-library(readr)
-library(lubridate)
-library(here)
-library(plotly)
-library(sf)
-library(mapview)
-library(atm)
-library(surveyR)
+# This script imports and processes purse seine data from fishing vessels -------
+# Source following the section entitled estimateNearshore in estimateBiomass ----
 
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,readr, lubridate, here, plotly, sf, mapview)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+
+# Get project settings----------------------------------------------------------
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(),"/")))
 
@@ -18,17 +23,16 @@ settings.files <- dir(here("Doc/settings"))
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
 
-# Source following the section entitled estimateNearshore in estimateBiomass.
-
-# Import set data ----------------------------------------------------
-# LM
+# Import data ------------------------------------------------------------------
+## Import set data 
+### LM
 lm.sets <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>% 
   mutate(date = mdy(date),
          vessel_name = "Lisa Marie",
          vessel.name = "LM",
          key.set = paste(vessel.name, date, set))
 
-# LBC
+### LBC
 lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
   mutate(date = mdy(date),
          vessel_name = "Long Beach Carnage",
@@ -37,8 +41,8 @@ lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
 
 save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
 
-# Import catch data -------------------------------------------------------
-# LM
+## Import catch data -----------------------------------------------------------
+### LM
 lm.catch <- read_csv(here("Data/Seine/lm_catch.csv")) %>% 
   mutate(date = mdy(date),
          vessel.name = "Lisa Marie",
@@ -57,7 +61,7 @@ lm.catch <- read_csv(here("Data/Seine/lm_catch.csv")) %>%
   group_by(key.set, vessel.name, scientificName) %>% 
   summarise(totalWeight = sum(weightkg))
 
-# LBC
+## LBC
 lbc.catch <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
   left_join(select(lbc.sets, set, date)) %>% 
   mutate(vessel_name = "Long Beach Carnage",
@@ -68,7 +72,8 @@ lbc.catch <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
   group_by(key.set, vessel.name, scientificName) %>% 
   summarise(totalWeight = sum(weightkg))
 
-# Import specimen data ----------------------------------------------------
+## Import specimen data ----------------------------------------------------
+### LM
 lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>% 
   mutate(date = mdy(date),
          vessel.name = "Lisa Marie",
@@ -115,6 +120,7 @@ lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
+### LM
 # lbc.lengths <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
 #   left_join(select(lbc.sets, date, set, key.set)) %>%
 #   mutate(vessel.name = "LM",
@@ -142,6 +148,72 @@ lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
 #   K = round((weightg/totalLength_mm*10^3)*100))
 
 # save(lm.lengths, lbc.lengths, file = here("Output/purse_seine_specimens.Rdata"))
+
+# Combine nearshore lengths from LM and LBC
+lengths.ns <- lm.lengths
+
+# Get max TL for plotting L/W models
+L.max.ns <- lengths.ns %>% 
+  # Add LBC data
+  filter(scientificName %in%  cps.spp) %>%
+  group_by(scientificName) %>% 
+  summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
+
+# Plot LW data from specimens --------------------------------------------------
+# Data frame for storing results
+lw.df.ns <- data.frame()
+
+# Generate length/weight curves
+for (i in unique(L.max.ns$scientificName)) {
+  # Create a length vector for each species
+  totalLength_mm <- seq(0, L.max.ns$max.TL[L.max.ns$scientificName == i])
+  
+  # Calculate weights from lengths
+  weightg <- estimate_weight(i, totalLength_mm, season = tolower(survey.season))
+  
+  # Combine results
+  lw.df.ns <- bind_rows(lw.df.ns, data.frame(scientificName = i, weightg, totalLength_mm))
+}
+
+# Convert lengths for plotting
+lw.df.ns <- lw.df.ns %>% 
+  mutate(
+    forkLength_mm     = convert_length(scientificName, totalLength_mm, "TL", "FL"),
+    standardLength_mm = convert_length(scientificName, totalLength_mm, "TL", "SL")
+  )
+
+# Plot L/W data
+# Examine length differences by leg
+lw.plot.ns <- ggplot() +
+  # Plot L/W data for current survey
+  geom_point(data = lengths.ns,
+             aes(totalLength_mm, weightg, group = sex_name, colour = sex_name), alpha = 0.75) +
+  # Plot individuals with missing lengths and weights
+  geom_point(data = filter(lengths.ns, missing.length == TRUE),
+             aes(totalLength_mm, weightg),
+             shape = 21, fill = 'red',  size = 2.5) +
+  geom_point(data = filter(lengths.ns, missing.weight == TRUE),
+             aes(totalLength_mm, weightg),
+             shape = 21, fill = 'blue', size = 2.5) +
+  # Plot seasonal length models for each species
+  geom_line(data = lw.df.ns, aes(totalLength_mm, weightg), 
+            alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+  # Facet by species
+  facet_wrap(~scientificName, scales = "free") +
+  scale_colour_manual(name = "Sex", values = c("Female" = "pink", "Male" = "lightblue",
+                                             "Unknown" = "#FFC926", "Not Sexed" = "purple")) +
+  # Format plot
+  xlab("Total length (mm)") + ylab("Mass (g)") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
+
+ggplotly(lw.plot.ns)
+
+# Save length/weight plot
+ggsave(lw.plot.ns, filename = here("Figs/fig_LW_plots_ns.png"),
+       width = 10, height = 7) 
+
 
 # Summarize specimen data ------------------------------------------------
 lm.catch.summ <- lm.catch %>%
@@ -421,7 +493,7 @@ set.haul.combo <- cowplot::plot_grid(set.pies.lm, set.pies.lbc, haul.pies,
                                      nrow = 1, align = "hv")
 
 ggsave(set.haul.combo, filename = here("Figs/fig_seine_proportion_set_wt_LM-LBC-RL.png"),
-       height = 10, width = 6*3)
+       height = 10, width = 12)
 
 # Map backscatter
 nasc.map.ns.lm <- base.map +
