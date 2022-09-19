@@ -1021,6 +1021,9 @@ ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>%
 or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>% 
   st_transform(crs.geog) 
 
+wc_mpas <- st_read(here("Data/GIS/wc_mpas.shp")) %>% 
+  st_transform(crs.geog) 
+
 # Read CA MPAs shapefile
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
   st_transform(crs.geog)
@@ -1144,15 +1147,21 @@ if (sampling.cufes) {
 imap.bounds <- map_bounds(nav$lat, nav$long, 0.1) 
 
 # Create color palette for MPAs
+## CA and OR MPAs
 all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
                              unique(as.character(or_mpas$Label))))
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
 
+## All West Coast MPAs
+mpaPalWC <- colorFactor(topo.colors(10), unique(wc_mpas$Design))
+
 # Create color pallette for CUFES
 cufesPal <- colorFactor(cufes.colors, cufes.plot.spp)
+
 # Create color palette for seep types
 seepPal <- colorFactor(c("red","blue"), c("Seep","Uncertain"))
+
 # Create color pallette for planned transects
 txPal    <- colorFactor(wpt.colors, wpt.types)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
@@ -1199,12 +1208,15 @@ i.map <- leaflet() %>%
               opacity = 0.75,
               label = ~htmlEscape("CA State Waters"),
               group = "State Waters") %>%
-  # Add CA MPAs
-  addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
-              fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
-  # Add OR MPAs
-  addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
-              fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+  # # Add CA MPAs
+  # addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
+  #             fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+  # # Add OR MPAs
+  # addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
+  #             fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+  # Add West Coast MPAs
+  addPolygons(data = wc_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalWC(Design),
+              fillOpacity = 0.3, label = ~htmlEscape(Site_Nm), group = "MPAs") %>%
   # Add core planned transects
   addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,
