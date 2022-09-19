@@ -152,8 +152,14 @@ lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
 # Combine nearshore lengths from LM and LBC
 lengths.ns <- lm.lengths
 
+saveRDS(lengths.ns, here("output/lw_data_nearshore.rds"))
+
+### RL
+lengths.rl <- readRDS(here("Output/lw_data_checkTrawls.rds"))
+
 # Get max TL for plotting L/W models
-L.max.ns <- lengths.ns %>% 
+L.max.ns <- select(lengths.ns, scientificName, totalLength_mm) %>%
+  bind_rows(select(lengths.rl, scientificName, totalLength_mm)) %>% 
   # Add LBC data
   filter(scientificName %in%  cps.spp) %>%
   group_by(scientificName) %>% 
@@ -213,6 +219,26 @@ ggplotly(lw.plot.ns)
 # Save length/weight plot
 ggsave(lw.plot.ns, filename = here("Figs/fig_LW_plots_ns.png"),
        width = 10, height = 7) 
+
+# Compare lengths and weights between LM/LBC/RL
+lw.plot.comp <- ggplot() +
+  # Plot L/W data for current survey
+  geom_point(data = lengths.rl,
+             aes(totalLength_mm, weightg), colour = "gray50", alpha = 0.75) +
+  geom_point(data = lengths.ns,
+             aes(totalLength_mm, weightg), colour = "blue", alpha = 0.75) +
+  # Plot seasonal length models for each species
+  geom_line(data = lw.df.ns, aes(totalLength_mm, weightg), 
+            alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+  # Facet by species
+  facet_wrap(~scientificName, scales = "free") +
+  # scale_colour_manual(name = "Sex", values = c("Female" = "pink", "Male" = "lightblue",
+  #                                              "Unknown" = "#FFC926", "Not Sexed" = "purple")) +
+  # Format plot
+  xlab("Total length (mm)") + ylab("Mass (g)") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
 
 
 # Summarize specimen data ------------------------------------------------

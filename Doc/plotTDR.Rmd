@@ -17,7 +17,7 @@ csl: csl/ices-journal-of-marine-science.csl
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,
+pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,glue,
                knitr,DT,fs,cowplot,oce,sf,mapview,shadowtext)
 
 # Install and load required packages from Github -------------------------------
@@ -348,34 +348,11 @@ if(nrow(tbl.all.new) > 0) {
                      min(tdr.plot$time) - minutes(30), 
                      max(tdr.plot$time) + minutes(30)))
     
-    # Plot results
+    # Plot TDR data
     plot.tdr <- ggplot() + 
-      geom_rect(data = trawl.window,
-                aes(xmin = equilibriumTime + hours(tdr.offset), 
-                    xmax = haulBackTime + hours(tdr.offset), 
-                    ymin = min(tdr.plot$depth), 
-                    ymax = 10),
-                fill = 'gray70', alpha = 0.5) +
-      geom_rect(data = trawl.window,
-                aes(xmin = netInWaterTime + hours(tdr.offset), 
-                    xmax = netOnDeckTime + hours(tdr.offset), 
-                    ymin = min(tdr.plot$depth), 
-                    ymax = 10), fill = NA,
-                colour = 'gray50', linetype = "dashed", alpha = 0.5) +
-      geom_text(data = trawl.text,
-                aes(time, min(tdr.plot$depth), label = event),
-                size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) +
-      geom_text(data = trawl.text,
-                aes(time, min(tdr.plot$depth), label = event),
-                size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) +
       geom_line(data = tdr.plot,
                 aes(time, depth + 10, colour = loc)) + 
-      annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)", 
-               colour = "magenta", hjust = 0, size = 3) +
       scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
-      geom_line(data = trawl.nav,
-                aes(time, SOG), 
-                colour = "magenta") +
       geom_hline(yintercept = 0, colour = "gray50") +
       ylim(min(tdr.plot$depth), 20) +
       labs(x = "Time (PDT)",
@@ -384,14 +361,68 @@ if(nrow(tbl.all.new) > 0) {
                          "; Haul:", unique(tdr.plot$haul),
                          "; Date:", date(tdr.plot$time[1])))
     
+    # Add trawl window, if present
+    if (nrow(trawl.window) > 0) {
+      plot.tdr <- plot.tdr + 
+        geom_rect(data = trawl.window,
+                  aes(xmin = equilibriumTime + hours(tdr.offset),
+                      xmax = haulBackTime + hours(tdr.offset),
+                      ymin = min(tdr.plot$depth),
+                      ymax = 10),
+                  fill = 'gray70', alpha = 0.5) +
+        geom_rect(data = trawl.window,
+                  aes(xmin = netInWaterTime + hours(tdr.offset),
+                      xmax = netOnDeckTime + hours(tdr.offset),
+                      ymin = min(tdr.plot$depth),
+                      ymax = 10), fill = NA,
+                  colour = 'gray50', linetype = "dashed", alpha = 0.5) +
+        geom_text(data = trawl.text,
+                  aes(time, min(tdr.plot$depth), label = event),
+                  size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) 
+    }
+    
+    # Add SOG if present
+    if (nrow(trawl.nav) > 0) {
+      plot.tdr <- plot.tdr + 
+        annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)",
+                 colour = "magenta", hjust = 0, size = 3) +
+        geom_line(data = trawl.nav,
+                  aes(time, SOG),
+                  colour = "magenta")
+    }
+    
     # Save plot
     ggsave(plot.tdr, 
            filename = here("Figs/TDR",
                            paste0(survey.name, "_TDR_", sprintf("%03d", k), ".png")),
            height = 5, width = 10)
   }
+  # Print processed TDR hauls.
+  cat(paste0("Processed TDR data from haul(s) ", glue_collapse(unique(tdr.plot$haul), sep = ",", last = " and "), "."))
+  
 } else {
-  cat("No new TDR data to plot.")
+  cat("No new TDR data have been processed.")
+  
 }
 ```
+
+Display TDR data for the last three trawl hauls.
+
+```{r list-plots}
+tdr.figs <- tail(dir_ls(here("Figs/TDR")), 3)
+```
+
+```{r plot-1}
+include_graphics(tdr.figs[1])
+```
+
+```{r plot-2}
+include_graphics(tdr.figs[2])
+```
+
+```{r plot-31}
+include_graphics(tdr.figs[3])
+```
+
+
 
