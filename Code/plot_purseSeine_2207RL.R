@@ -240,6 +240,50 @@ lw.plot.comp <- ggplot() +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold.italic"))
 
+lw.plot.comp.lm <- ggplot() +
+  # Plot L/W data for current survey
+  # geom_point(data = lengths.rl,
+  #            aes(totalLength_mm, weightg), colour = "gray50", alpha = 0.75) +
+  geom_point(data = lengths.ns,
+             aes(totalLength_mm, weightg), colour = "gray50", alpha = 0.75) +
+  # Plot seasonal length models for each species
+  geom_line(data = lw.df.ns, aes(totalLength_mm, weightg), 
+            alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+  # Facet by species
+  facet_wrap(~scientificName, scales = "free", nrow = 1) +
+  # Format plot
+  xlab("Total length (mm)") + ylab("Mass (g)") +
+  ggtitle("Lisa Marie") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
+
+lw.plot.comp.rl <- ggplot() +
+  # Plot L/W data for current survey
+  geom_point(data = lengths.rl,
+             aes(totalLength_mm, weightg), colour = "gray50", alpha = 0.75) +
+  # geom_point(data = lengths.ns,
+  #            aes(totalLength_mm, weightg), colour = "gray50", alpha = 0.75) +
+  # Plot seasonal length models for each species
+  geom_line(data = lw.df.ns, aes(totalLength_mm, weightg), 
+            alpha = 0.75, colour = "gray20", linetype = 'dashed') +
+  # Facet by species
+  facet_wrap(~scientificName, scales = "free", nrow = 1) +
+  # Format plot
+  xlab("Total length (mm)") + ylab("Mass (g)") +
+  ggtitle("Reuben Lasker") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold.italic"))
+
+lw.plot.comp.grid <-cowplot::plot_grid(lw.plot.comp.lm, lw.plot.comp.rl,
+          nrow = 2)
+
+ggsave(lw.plot.comp, filename = here("Figs/fig_LW_plots_LM-RL.pdf"),
+       width = 10, height = 6)
+
+ggsave(lw.plot.comp.grid, filename = here("Figs/fig_LW_plots_grid_LM-RL.pdf"),
+       width = 10, height = 6)
 
 # Summarize specimen data ------------------------------------------------
 lm.catch.summ <- lm.catch %>%
