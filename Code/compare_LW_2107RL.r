@@ -17,9 +17,11 @@ source(here::here("Doc/settings", prj.settings))
 # Plot RL data
 load("C:/KLS/CODE/Github/estimATM/2107RL/Data/Trawl/all_trawl_data-final.Rdata")
 
-ggplot(lengths, aes(totalLength_mm, weightg)) + 
-  geom_point() + 
-  facet_wrap(~scientificName, scales = "free")
+lengths <- filter(lengths, ship != "JCF")
+
+# ggplot(lengths, aes(totalLength_mm, weightg)) + 
+#   geom_point() + 
+#   facet_wrap(~scientificName, scales = "free")
 
 # Plot LM data
 load(here("Output/purse_seine_specimens.Rdata"))
@@ -63,6 +65,12 @@ lw.df.ns <- lw.df.ns %>%
     forkLength_mm     = convert_length(scientificName, totalLength_mm, "TL", "FL"),
     standardLength_mm = convert_length(scientificName, totalLength_mm, "TL", "SL")
   )
+
+# Rename RL data frame
+rl.specimens <- lengths
+# Save for Brittany
+save(lbc.specimens, lm.specimens, rl.specimens, lw.df.ns,
+     file = here("Output/specimens_2107RL.Rdata"))
 
 # Compare lengths and weights between LM/LBC/RL
 lw.plot.comp.lm <- ggplot() +
