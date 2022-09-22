@@ -74,7 +74,9 @@ cps.nasc.bubble <- ggplot(new.masked.file) +
   geom_line(aes(Dist_M, -top.habitat), colour = "red", linetype = "dashed") +
   geom_line(aes(Dist_M, -bottom.habitat), colour = "blue", linetype = "dashed") +
   theme_bw() +
-  labs(x = "Echoview distance (M)", y = "Mean depth (m)")
+  labs(
+    title = new.masked.filename,
+    x = "Echoview distance (M)", y = "Mean depth (m)")
 
 # Save the plot
 ggsave(cps.nasc.bubble,
