@@ -19,8 +19,8 @@ source(here::here("Code/estimate_CPS_NASC.R"))
 
 # Configure input and output paths ---------------------------------------------
 ## CSV input path (source)
-# path.in  <- here("Data/Backscatter/RL")
-path.in <- "C:/SURVEY/2207RL/PROCESSED/EV/CSV/LASKER"
+path.in  <- here("Data/Backscatter/RL")
+# path.in <- "C:/SURVEY/2207RL/PROCESSED/EV/CSV/LASKER"
 
 ## CSV output path (destination)
 path.out <- here("Data/Backscatter/RL")
@@ -29,14 +29,14 @@ path.out <- here("Data/Backscatter/RL")
 path.img <- "C:/SURVEY/2207RL/PROCESSED/EV/Exported_Images"
 
 # Run the function to estimate CPS backscatter --------------------------------
-extractNASC(path.in = path.in, # CSV file source
+extractNASC(path.in = path.in, # CSV file source                                                                                                 e
             pattern.in = "_CPS-Final 38 kHz CPS.csv", # CSV file regex
             path.out = path.out, # Processed file destination
             suffix.out = "_nasc_cps.csv", # Suffix applied to processed CSV files
             path.img = path.img,  # Location of exported image files
             pattern.img = "_CPS-38 kHz CPS for Image Export.png", # Exported image regex
-            expand.right = F,    # Expand right side of plot
-            expand.left  = T,    # Expand left side of plot
+            # expand.right = F,    # Expand right side of plot
+            # expand.left  = T,    # Expand left side of plot
             expansion = 2,       # Constant for expanding axes
             max.range = 250,     # Depth range for bubble plots
             root = 2,            # Constant for controlling bubble size (2)

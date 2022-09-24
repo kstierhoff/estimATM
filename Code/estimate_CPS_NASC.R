@@ -2,19 +2,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
                         x11.w = 1600, x11.h = 600, jpeg = TRUE,
                         path.img = NULL, pattern.img = NULL, 
                         max.range = 350, transparency = 0.2, 
-                        root = 1.5, scaling = 0.1, expansion = 2, 
-                        expand.left = FALSE, expand.right = FALSE) {
-  
-  # Initialize the expansion exponent
-  exponent <- 1
-  
-  if (expand.left) {
-    exponent <- 1 / expansion
-  }
-  
-  if (expand.right) {
-    exponent <- expansion
-  }
+                        root = 1.5, scaling = 0.1, expansion = 2) {
   
   # List CSV files for processing
   acoustic.file.list <- list.files(path = path.in, pattern = pattern.in, recursive = F)
@@ -78,6 +66,9 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
       cat("No echogram named:", echogram.img, ".\n\n")
     }
   }
+  
+  # Initialize the expansion exponent for the x-axis
+  exponent <- 1
   
   # plot
   if (jpeg) {
@@ -148,6 +139,66 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   abline(h = 250, col = "gray", lwd = 0.5)
   abline(h = 300, col = "gray", lwd = 0.5)
   abline(h =   0, col = "gray", lwd = 0.5)
+  
+  # Ask to expand left or right axes
+  cat("Do you want to expand the left or right axis? 1 = Yes; 0 = No\n")
+  axis.1 <- scan(n = 1)
+  
+  if (axis.1 == 1) {
+    cat("Which axis do you want to expand? 1 = Left; 2 = Right\n")
+    axis.2 <- scan(n = 1)
+    
+    # Expand left axis
+    if (axis.2 == 1) {
+      cat("Expanding left axis.\n")
+      exponent <- 1 / expansion
+    }
+    
+    if (axis.2 == 2) {
+      cat("Expanding right axis.\n")
+      exponent <- expansion
+    }
+    
+    # Close active device
+    dev.off()
+    
+    # Redraw interactive plot to pick top and bottom habitat lines
+    x11(width = x11.w, height = x11.h)
+    plot(temporary$Dist_M^exponent, 
+         temporary$Depth_mean, 
+         ylim = c(max.range, 0), type = "n", 
+         main = acoustic.file.list[test.1], 
+         ylab = "Depth (m)", xlab = "Dist_M", 
+         xaxt = "n") # this is better because it follows the images
+    axis(side = 1, at = seq(min(temporary$Dist_M^exponent), 
+                            max(temporary$Dist_M^exponent), l = 10), 
+         lab = floor(seq(min(temporary$Dist_M^exponent), 
+                         max(temporary$Dist_M^exponent), l = 10)^(1 / exponent)))
+    
+    lines(unlist(lapply(split(temporary$Dist_M^exponent, temporary$Dist_M), FUN = unique)), 
+          unlist(lapply(split(temporary$Depth_mean, temporary$Dist_M), FUN = max)), 
+          col = 1, lwd = 2)
+    
+    points(temporary$Dist_M^exponent, 
+           temporary$Depth_mean, 
+           cex = (temporary$NASC / (50000 / scaling))^(1 / root) * 30, 
+           pch = 19, 
+           col = rgb(t(col2rgb("blue")) / 255, alpha = transparency))
+    
+    points((temporary$Dist_M[temporary$NASC / 50000 * 30 > 1])^exponent, 
+           temporary$Depth_mean[temporary$NASC / 50000 * 30 > 1], pch = ".", cex = 2, col = "red")
+    
+    abline(h =  50, col = "gray", lwd = 0.5)
+    abline(h = 100, col = "gray", lwd = 0.5)
+    abline(h = 150, col = "gray", lwd = 0.5)
+    abline(h = 200, col = "gray", lwd = 0.5)
+    abline(h = 250, col = "gray", lwd = 0.5)
+    abline(h = 300, col = "gray", lwd = 0.5)
+    abline(h =   0, col = "gray", lwd = 0.5)
+    
+  } else {
+    cat("No axes are being expanded.\n")
+  }
   
   # Manual drawing only
   test.3 <- 0
