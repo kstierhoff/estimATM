@@ -11,9 +11,6 @@ pacman::p_load(tidyverse, here, fs)
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("kstierhoff/atm")
 
-# Set theme for plotting
-theme_set(theme_bw())
-
 # Close any open graphics windows
 graphics.off()
 
@@ -32,12 +29,12 @@ path.img <- "C:/SURVEY/2207RL/PROCESSED/EV/Exported_Images"
 
 # Run the function to estimate CPS backscatter --------------------------------
 extractNASC(path.in = path.in, # CSV file source
-            pattern.in = "CPS-Final 38 kHz CPS.csv", # CSV file regex
+            pattern.in = "_CPS-Final 38 kHz CPS.csv", # CSV file regex
             path.out = path.out, # Processed file destination
-            suffix.out = "_nasc_cps", # Suffix applied to processed CSV files
+            suffix.out = "_nasc_cps.csv", # Suffix applied to processed CSV files
             path.img = path.img,  # Location of exported image files
-            pattern.img = "38 kHz CPS for Image Export.png", # Exported image regex
-            expand.right = T,    # Expand right side of plot
+            pattern.img = "_CPS-38 kHz CPS for Image Export.png", # Exported image regex
+            expand.right = F,    # Expand right side of plot
             expand.left  = T,    # Expand left side of plot
             expansion = 2,       # Constant for expanding axes
             max.range = 250,     # Depth range for bubble plots

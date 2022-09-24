@@ -28,7 +28,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
     
     processed.file <- list.files(
       path = path.in,
-      pattern = paste0(substr(acoustic.file.list[test.1], 1, nchar(acoustic.file.list[test.1]) - 4), "_nasc_cps.csv"),
+      pattern = paste0(substr(acoustic.file.list[test.1], 1, nchar(acoustic.file.list[test.1]) - 4), suffix.out),
       recursive = FALSE)
     
     if (length(processed.file) > 0) {
@@ -45,7 +45,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
       print(acoustic.file.list[test.1])
       processed.file <- list.files(
         path = path.in,
-        pattern = paste0(substr(acoustic.file.list[test.1], 1, nchar(acoustic.file.list[test.1]) - 4), "_nasc_cps.csv"),
+        pattern = paste0(substr(acoustic.file.list[test.1], 1, nchar(acoustic.file.list[test.1]) - 4), suffix.out),
         recursive = FALSE)
       
       if (length(processed.file) > 0) {
@@ -61,7 +61,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   # Extract prefix to 
   acoustic.file.prefix <- unlist(strsplit(acoustic.file.name, "-"))[1]
   # Create name for output file
-  acoustic.file.out <- paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], suffix.out, ".csv")
+  acoustic.file.out <- paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], suffix.out)
   
   # Read the CSV file
   temporary <- read.csv(file.path(path.in, acoustic.file.name),
@@ -69,10 +69,9 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   
   if (!is.null(path.img)) {
     # If the image path is specified, open the corresponding echogram image
-    
     echogram.img <- file.path(path.img, 
-                              paste(unlist(strsplit(acoustic.file.name, "-"))[1], 
-                                    pattern.img, sep = "-"))
+                              paste0(gsub(pattern.in, "", acoustic.file.name), pattern.img))
+    
     if (file.exists(echogram.img)) {
       shell.exec(echogram.img)
     } else {
@@ -281,7 +280,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   }
   
   write.csv(temporary,
-            file.path(path.out, paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], suffix.out, ".csv")),
+            file.path(path.out, paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], suffix.out)),
             row.names = FALSE,
             quote = FALSE
   )
@@ -294,7 +293,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   new.masked.file <- read.csv(
     file.path(path.out,
               paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], 
-                     suffix.out, ".csv"))) %>% 
+                     suffix.out))) %>% 
     arrange(NASC)
   
   ## Summarize file for plotting the seabed depth
@@ -332,7 +331,8 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
          x = "Echoview distance (M)", 
          y = "Mean depth (m)") + 
     # Set themes
-    theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2))
+    theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2)) + 
+    theme_bw()
   
   # Save the plot
   ggsave(cps.nasc.bubble,
