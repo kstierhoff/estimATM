@@ -331,8 +331,8 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
          x = "Echoview distance (M)", 
          y = "Mean depth (m)") + 
     # Set themes
-    theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2)) + 
-    theme_bw()
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2)) 
   
   # Save the plot
   ggsave(cps.nasc.bubble,
