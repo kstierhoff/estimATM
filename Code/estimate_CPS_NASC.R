@@ -51,7 +51,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
       if (length(processed.file) > 0) {
         cat(paste("There is already a processed file with the name", processed.file, ".\n"))
       }
-      cat("Is this the file you want to integrate? 1 = Yes; 0 = No")
+      cat("Is this the file you want to integrate? 1 = Yes; 0 = No\n")
       test.2 <- scan(n = 1)
     }
   }
@@ -338,15 +338,15 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   ggsave(cps.nasc.bubble,
          filename = file.path(path.out, 
                               paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], 
-                                     suffix.out, ".png")),
+                                     gsub(".csv",".png", suffix.out))),
          width = 15, height = 7)
   
   # Open the newly created plot
   shell.exec(file.path(path.out, 
                        paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], 
-                              suffix.out, ".png")))
+                              gsub(".csv",".png", suffix.out))))
   
   # Print message at the end of processing
   cat("Finished processing file:", acoustic.file.name, 
-      "\n\nFor complaints and/or feature requests, contact J. Zwolinski (juan.zwolinski@noaa.gov) ;)")
+      "\n\nFor complaints and/or feature requests, contact J. Zwolinski (juan.zwolinski@noaa.gov) ;)\n")
 }
