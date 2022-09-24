@@ -24,83 +24,25 @@ source(here::here("Code/estimate_CPS_NASC.R"))
 ## CSV input path (source)
 path.in  <- here("Data/Backscatter/RL")
 
-## CSV output path (destination) and new file suffix
+## CSV output path (destination)
 path.out <- here("Data/Backscatter/RL")
-suffix.out <- "_nasc_cps"
 
 ## Path to echogram images exported from Echoview
 path.img <- "C:/SURVEY/2207RL/PROCESSED/EV/Exported_Images"
 
 # Run the function to estimate CPS backscatter --------------------------------
-estimate.cps.nasc(path.input = path.in, 
-                  pattern = "CPS-Final 38 kHz CPS.csv", 
-                  path.output = path.out, 
-                  suffix = suffix.out,
-                  path.img = path.img,
-                  pattern.img = "CPS-38 kHz CPS for Image Export.png",
-                  expand.right = TRUE,
-                  expand.left = TRUE,
-                  expansion = 2, max.range = 350, root = 2,  scaling = 0.1,
-                  jpeg = FALSE)
-
-# Create final figure showing results of processing ---------------------------
-# List new nasc_cps.csv files
-masked.file.list <- list.files(path = path.out, pattern = suffix.out, recursive = FALSE)
-print(masked.file.list)
-
-# Ask for the nasc_cps.csv file to plot
-print("Type the order of the file you want to plot:")
-masked.file.num <- scan(n = 1)
-
-# Create file info variables
-new.masked.filename <- masked.file.list[masked.file.num]
-new.masked.path <- file.path(path.out, new.masked.filename)
-new.masked.plot <- paste0(path_ext_remove(path_file(new.masked.path)), ".png")
-
-# Read new nasc_cps.csv file
-new.masked.file <- read_csv(new.masked.path) %>% 
-  arrange(NASC)
-
-## Summarize file for plotting the seabed depth
-seabed.depth <- new.masked.file %>% 
-  group_by(Dist_M) %>% 
-  summarize(max.depth = -max(Depth_mean))
-
-## Plot results
-cps.nasc.bubble <- ggplot(new.masked.file) +
-  # Plot the seabed
-  geom_line(data = seabed.depth,
-            aes(Dist_M, max.depth), alpha = 0.5) +
-  # Plot the surface
-  geom_hline(yintercept = 1) +
-  # Plot the top habitat line
-  geom_line(aes(Dist_M, -top.habitat), colour = "red", linetype = "dashed") +
-  # Plot the bottom habitat line
-  geom_line(aes(Dist_M, -bottom.habitat), colour = "blue", linetype = "dashed") +
-  # Plot NASC that was removed
-  geom_point(data = filter(new.masked.file, NASC != cps.nasc),
-    aes(Dist_M, -Depth_mean, size = NASC),
-    shape = 21, fill = NA, alpha = 0.8, show.legend = FALSE) +
-  # Plot NASC that was retained
-  geom_point(data = filter(new.masked.file, NASC > 0, NASC == cps.nasc),
-    aes(Dist_M, -Depth_mean, size = NASC, fill = NASC),
-    shape = 21, alpha = 0.9, show.legend = TRUE) +
-  # Configure axes and scales
-  scale_x_continuous(position = "top", breaks = seq(0, max(new.masked.file$Dist_M), 2000), expand = c(0,0)) +
-  scale_y_continuous(breaks = -rev(seq(0, signif(max(new.masked.file$Depth_mean), 1), 50))) +
-  scale_fill_viridis_c() +
-  # Configure labels and title
-  labs(title = new.masked.filename,
-       x = "Echoview distance (M)", 
-       y = "Mean depth (m)") + 
-  # Set themes
-  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2))
-
-# Save the plot
-ggsave(cps.nasc.bubble,
-       filename = file.path(path.out, new.masked.plot),
-       width = 15, height = 7
-)
-
-# Open the newly created plot
-shell.exec(file.path(path.out, new.masked.plot))
+extractNASC(path.in = path.in, # CSV file source
+            pattern.in = "CPS-Final 38 kHz CPS.csv", # CSV file regex
+            path.out = path.out, # Processed file destination
+            suffix.out = "_nasc_cps", # Suffix applied to processed CSV files
+            path.img = path.img,  # Location of exported image files
+            pattern.img = "38 kHz CPS for Image Export.png", # Exported image regex
+            expand.right = T,    # Expand right side of plot
+            expand.left  = T,    # Expand left side of plot
+            expansion = 2,       # Constant for expanding axes
+            max.range = 250,     # Depth range for bubble plots
+            root = 2,            # Constant for controlling bubble size (2)
+            scaling = 0.1,       # Constant for controlling bubble size (0.1)
+            jpeg = FALSE,        # Save intermediate plots from line picks
+            x11.w = 1600,        # Width of graphics window (px)
+            x11.h = 600)         # Height of graphics window (px)
