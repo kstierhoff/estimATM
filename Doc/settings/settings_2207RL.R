@@ -443,7 +443,7 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
-tx.rm                  <- list(RL  = NA,
+tx.rm                  <- list(RL  = c("076-078","074-076","080-078"),
                                LM  = NA,
                                LBC = NA,
                                SD  = NA)
