@@ -50,7 +50,7 @@ dir_create(here(c("Figs/TDR", "Output")))
 # User-specified settings
 copy.files      <- T # Copy TDR files
 process.tdr     <- T # Process TDR files
-process.tdr.all <- F # Process all TDR files
+process.tdr.all <- T # Process all TDR files
 get.db          <- T # Extract data from trawl database (F for testing)
 get.nav         <- T # Download NOAA Ship nav data
 nav.source      <- "SCS" # Navigation data source: ERDDAP or SCS
@@ -158,10 +158,10 @@ haul.all <- haul.all %>%
 haul <- filter(haul.all, cruise %in% cruise.name) %>% 
   arrange(haul) %>% 
   mutate(
-    netInWaterTime  = ymd_hms(netInWaterTime,  tz = "America/Los_Angeles"),
-    equilibriumTime = ymd_hms(equilibriumTime, tz = "America/Los_Angeles"),
-    haulBackTime    = ymd_hms(haulBackTime,    tz = "America/Los_Angeles"),
-    netOnDeckTime   = ymd_hms(netOnDeckTime,   tz = "America/Los_Angeles"),
+    netInWaterTime  = ymd_hms(netInWaterTime,  tz = tdr.tz),
+    equilibriumTime = ymd_hms(equilibriumTime, tz = tdr.tz),
+    haulBackTime    = ymd_hms(haulBackTime,    tz = tdr.tz),
+    netOnDeckTime   = ymd_hms(netOnDeckTime,   tz = tdr.tz),
     duration        = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
     cluster   = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
 
@@ -282,7 +282,7 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Kite",
-               time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+               time  = ymd_hms(time, tz = tdr.tz)) 
       
       
       tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
@@ -304,7 +304,7 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Footrope",
-               time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+               time  = ymd_hms(time, tz = tdr.tz)) 
       
       
       tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
@@ -330,7 +330,8 @@ if (process.tdr) {
 if(nrow(tbl.all.new) > 0) {
   for (k in unique(tbl.all.new$haul)) {
     # Get TDR data from haul k
-    tdr.plot <- filter(tbl.all.new, haul == k)
+    tdr.plot <- filter(tbl.all.new, haul == k) %>% 
+      mutate(time = time + hours(tdr.offset))
 
     # Get haul info from haul k
     trawl.window <- haul %>% 
@@ -339,14 +340,15 @@ if(nrow(tbl.all.new) > 0) {
     # Format data for text labels
     trawl.text <- trawl.window %>% 
       select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
-      pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") %>% 
-      mutate(time = time + hours(tdr.offset))
+      pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") 
+      # mutate(time = time + hours(tdr.offset))
     
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
-      filter(between(time, 
-                     min(tdr.plot$time) - minutes(30), 
-                     max(tdr.plot$time) + minutes(30)))
+      mutate(time = time + hours(tdr.offset))  %>% 
+      filter(between(time,  
+                     min(trawl.text$time) - minutes(30), 
+                     max(trawl.text$time) + minutes(30)))
     
     # Plot TDR data
     plot.tdr <- ggplot() + 
@@ -365,14 +367,14 @@ if(nrow(tbl.all.new) > 0) {
     if (nrow(trawl.window) > 0) {
       plot.tdr <- plot.tdr + 
         geom_rect(data = trawl.window,
-                  aes(xmin = equilibriumTime + hours(tdr.offset),
-                      xmax = haulBackTime + hours(tdr.offset),
+                  aes(xmin = equilibriumTime,
+                      xmax = haulBackTime,
                       ymin = min(tdr.plot$depth),
                       ymax = 10),
                   fill = 'gray70', alpha = 0.5) +
         geom_rect(data = trawl.window,
-                  aes(xmin = netInWaterTime + hours(tdr.offset),
-                      xmax = netOnDeckTime + hours(tdr.offset),
+                  aes(xmin = netInWaterTime,
+                      xmax = netOnDeckTime,
                       ymin = min(tdr.plot$depth),
                       ymax = 10), fill = NA,
                   colour = 'gray50', linetype = "dashed", alpha = 0.5) +
