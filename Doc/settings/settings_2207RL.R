@@ -334,7 +334,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             SD  = "PROCESSED/EV/CSV/SAILDRONE") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
                             SD  = "Final 38 kHz CPS.csv")
@@ -443,7 +443,7 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
-tx.rm                  <- list(RL  = NA,
+tx.rm                  <- list(RL  = c("076-078","074-076","080-078"),
                                LM  = NA,
                                LBC = NA,
                                SD  = NA)
@@ -521,7 +521,8 @@ tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
 tdr.pattern            <- "2207RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
-tdr.offset             <- 1    # Time offset in hours
+tdr.tz                 <- "US/Pacific" # Time zone setting for TDRs
+tdr.offset             <- -1 # Time offset, in hours (usually -1, PDT to PST in summer)
 
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 

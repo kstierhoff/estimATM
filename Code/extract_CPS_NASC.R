@@ -22,13 +22,13 @@ extractNASC(
   # Most used options ----------------------------------------------------------
   path.in     = "C:/SURVEY/2207RL/PROCESSED/EV/CSV/LASKER", # CSV file source                                                                                                 e
   pattern.in  = "_CPS-Final 38 kHz CPS.csv", # CSV file regex
-  path.out    = here("Data/Backscatter/RL"), # Processed file destination
+  path.out    = path.in,                     # Processed file destination
   suffix.out  = "_nasc_cps.csv",             # Suffix applied to processed CSV files
-  path.img    = "C:/SURVEY/2207RL/PROCESSED/EV/Exported_Images", # Location of exported image files, or NULL
+   path.img    = "C:/SURVEY/2207RL/PROCESSED/EV/Exported_Images", # Location of exported image files, or NULL
   pattern.img = "_CPS-38 kHz CPS for Image Export.png", # Exported image regex
   # Lesser used options --------------------------------------------------------
   expansion   = 2,     # Constant for expanding axes
-  max.range   = 250,   # Depth range for bubble plots
+  max.range   = 350,   # Depth range for bubble plots
   root        = 2,     # Constant for controlling bubble size (2)
   scaling     = 0.1,   # Constant for controlling bubble size (0.1)
   jpeg        = FALSE, # Save intermediate plots from line picks
