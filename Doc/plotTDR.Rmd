@@ -50,7 +50,7 @@ dir_create(here(c("Figs/TDR", "Output")))
 # User-specified settings
 copy.files      <- T # Copy TDR files
 process.tdr     <- T # Process TDR files
-process.tdr.all <- F # Process all TDR files
+process.tdr.all <- T # Process all TDR files
 get.db          <- T # Extract data from trawl database (F for testing)
 get.nav         <- T # Download NOAA Ship nav data
 nav.source      <- "SCS" # Navigation data source: ERDDAP or SCS
@@ -346,13 +346,13 @@ if(nrow(tbl.all.new) > 0) {
     trawl.nav <- nav %>% 
       mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
       filter(between(time,  
-                     min(trawl.text$time) - minutes(30), 
-                     max(trawl.text$time) + minutes(30)))
+                     min(trawl.text$time) - minutes(10), 
+                     max(trawl.text$time) + minutes(10)))
     
     tdr.plot <- tdr.plot %>% 
       filter(between(time,  
-                     min(trawl.text$time) - minutes(30), 
-                     max(trawl.text$time) + minutes(30)))
+                     min(trawl.text$time) - minutes(10), 
+                     max(trawl.text$time) + minutes(10)))
     
     # Plot TDR data
     plot.tdr <- ggplot() + 
@@ -365,7 +365,9 @@ if(nrow(tbl.all.new) > 0) {
            y = "Depth (m)",
            title = paste("Cruise:", unique(tdr.plot$cruise), 
                          "; Haul:", unique(tdr.plot$haul),
-                         "; Date:", date(tdr.plot$time[1])))
+                         "; Date:", date(tdr.plot$time[1]))) + 
+      theme(legend.position      = c(0.99,0.01),
+            legend.justification = c(1,0)) 
     
     # Add trawl window, if present
     if (nrow(trawl.window) > 0) {
