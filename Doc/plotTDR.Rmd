@@ -50,7 +50,7 @@ dir_create(here(c("Figs/TDR", "Output")))
 # User-specified settings
 copy.files      <- T # Copy TDR files
 process.tdr     <- T # Process TDR files
-process.tdr.all <- T # Process all TDR files
+process.tdr.all <- F # Process all TDR files
 get.db          <- T # Extract data from trawl database (F for testing)
 get.nav         <- T # Download NOAA Ship nav data
 nav.source      <- "SCS" # Navigation data source: ERDDAP or SCS
@@ -124,6 +124,7 @@ if (get.db) {
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
   haul.all <- haul.all %>% 
+    arrange(haul) %>% 
     mutate(
       startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
       startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
@@ -131,7 +132,7 @@ if (trawl.source == "Access") {
       stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>%
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) 
+      TRUE ~ haulBackTime))
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -143,6 +144,7 @@ if (trawl.source == "Access") {
   
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
+    arrange(haul) %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
@@ -282,13 +284,13 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Kite",
-               time  = ymd_hms(time, tz = tdr.tz)) 
+               time  = force_tz(time, tz = tdr.tz)) 
       
       
       tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
     }
   }
-  
+
   # Process Footrope files ----------------------------------------------------------------------
   ## Create tibble for storing results
   tbl.foot <- tibble()
@@ -304,8 +306,7 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Footrope",
-               time  = ymd_hms(time, tz = tdr.tz)) 
-      
+               time  = force_tz(time, tz = tdr.tz)) 
       
       tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
     }
@@ -330,8 +331,7 @@ if (process.tdr) {
 if(nrow(tbl.all.new) > 0) {
   for (k in unique(tbl.all.new$haul)) {
     # Get TDR data from haul k
-    tdr.plot <- filter(tbl.all.new, haul == k) %>% 
-      mutate(time = time + hours(tdr.offset))
+    tdr.plot <- filter(tbl.all.new, haul == k) %>% mutate(time = time + hours(tdr.offset[k]))
 
     # Get haul info from haul k
     trawl.window <- haul %>% 
@@ -341,11 +341,15 @@ if(nrow(tbl.all.new) > 0) {
     trawl.text <- trawl.window %>% 
       select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
       pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") 
-      # mutate(time = time + hours(tdr.offset))
     
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
-      mutate(time = time + hours(tdr.offset))  %>% 
+      mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
+      filter(between(time,  
+                     min(trawl.text$time) - minutes(30), 
+                     max(trawl.text$time) + minutes(30)))
+    
+    tdr.plot <- tdr.plot %>% 
       filter(between(time,  
                      min(trawl.text$time) - minutes(30), 
                      max(trawl.text$time) + minutes(30)))
@@ -357,7 +361,7 @@ if(nrow(tbl.all.new) > 0) {
       scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
       geom_hline(yintercept = 0, colour = "gray50") +
       ylim(min(tdr.plot$depth), 20) +
-      labs(x = "Time (PDT)",
+      labs(x = "Time (PST)",
            y = "Depth (m)",
            title = paste("Cruise:", unique(tdr.plot$cruise), 
                          "; Haul:", unique(tdr.plot$haul),
