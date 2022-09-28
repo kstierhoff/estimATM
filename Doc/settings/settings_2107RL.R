@@ -425,7 +425,7 @@ rm.transit             <- c(RL  = FALSE,
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = FALSE,
+                            SD  = TRUE,
                             JCF = FALSE) 
 
 # If T, removes transects with names including "inshore"
@@ -569,7 +569,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
