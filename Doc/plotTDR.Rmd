@@ -282,13 +282,13 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Kite",
-               time  = ymd_hms(time, tz = tdr.tz)) 
+               time  = force_tz(time, tz = tdr.tz)) 
       
       
       tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
     }
   }
-  
+
   # Process Footrope files ----------------------------------------------------------------------
   ## Create tibble for storing results
   tbl.foot <- tibble()
@@ -304,8 +304,7 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Footrope",
-               time  = ymd_hms(time, tz = tdr.tz)) 
-      
+               time  = force_tz(time, tz = tdr.tz)) 
       
       tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
     }
@@ -330,8 +329,7 @@ if (process.tdr) {
 if(nrow(tbl.all.new) > 0) {
   for (k in unique(tbl.all.new$haul)) {
     # Get TDR data from haul k
-    tdr.plot <- filter(tbl.all.new, haul == k) %>% 
-      mutate(time = time + hours(tdr.offset))
+    tdr.plot <- filter(tbl.all.new, haul == k) %>% mutate(time = time + hours(tdr.offset[k]))
 
     # Get haul info from haul k
     trawl.window <- haul %>% 
@@ -341,11 +339,10 @@ if(nrow(tbl.all.new) > 0) {
     trawl.text <- trawl.window %>% 
       select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
       pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") 
-      # mutate(time = time + hours(tdr.offset))
     
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
-      mutate(time = time + hours(tdr.offset))  %>% 
+      mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
       filter(between(time,  
                      min(trawl.text$time) - minutes(30), 
                      max(trawl.text$time) + minutes(30)))

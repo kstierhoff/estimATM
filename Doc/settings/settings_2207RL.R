@@ -521,8 +521,11 @@ tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
 tdr.pattern            <- "2207RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
-tdr.tz                 <- "US/Pacific" # Time zone setting for TDRs
-tdr.offset             <- -1 # Time offset, in hours (usually -1, PDT to PST in summer)
+tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
+# Time offset, in hours (usually -1, diff between PDT and PST in summer)
+tdr.offset <- c(rep(-1, 72), # Time settings were updated after haul 73
+                rep( 0, 20)) # Time settings were updated after haul 73
+tdr.offset <- setNames(tdr.offset, 1:length(tdr.offset)) # Add names from haul numbers
 
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
