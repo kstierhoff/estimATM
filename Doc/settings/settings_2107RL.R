@@ -114,7 +114,7 @@ erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric"
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
 survey.lat           <- c(25.83792,50.7)
 survey.long          <- c(-129.22,-112.9483)
-
+ 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
