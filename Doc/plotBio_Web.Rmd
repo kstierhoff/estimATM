@@ -1140,6 +1140,18 @@ if (sampling.cufes) {
 
 ```
 
+```{r load-ctds}
+if (file.exists(here("Output/uctd_summary_table.csv"))) {
+  uctd.casts <- read_csv(here("Output/uctd_summary_table.csv")) %>% 
+    st_as_sf(coords = c("Lon", "Lat"), crs = crs.geog)
+}
+
+if (file.exists(here("Output/ctd_summary_table.csv"))) {
+  ctd.casts <- read_csv(here("Output/ctd_summary_table.csv")) %>% 
+    st_as_sf(coords = c("Lon", "Lat"), crs = crs.geog)
+}
+```
+
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
@@ -1261,7 +1273,8 @@ i.map <- leaflet() %>%
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
-                      "Vessel Track", "Vessel Positions", "Trawls",
+                      "Vessel Track", "Vessel Positions", 
+                      "Trawls", "CTD Casts",
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
                       "Backscatter-Krill", "Backscatter-Krill (Small)",
                       "Backscatter (Large)",
@@ -1272,6 +1285,20 @@ i.map <- leaflet() %>%
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
+# Add UCTD casts
+if (exists("uctd.casts"))
+  i.map <- i.map %>% 
+  # Add uctd data
+  addMarkers(data = uctd.casts, label = ~Filename, popup = ~Filename, 
+             group = "CTD Casts")
+
+if (exists("uctd.casts"))
+  i.map <- i.map %>% 
+  # Add uctd data
+  addMarkers(data = ctd.casts, label = ~Filename, popup = ~Filename, 
+             group = "CTD Casts")
+
+# Add vessel positions
 if (exists("nav.paths.sf"))
   i.map <- i.map %>% 
   # Add nav data
@@ -1421,7 +1448,7 @@ i.map <- i.map %>%
               "CUFES Egg Density-Squid", "CUFES (Negative)",
               "Vessel Positions", "Saildrone Tracks", 
               "Saildrone Tracks", "Saildrone Positions",
-              "State Waters", "Exclusive Economic Zones"))
+              "State Waters", "Exclusive Economic Zones", "CTD Casts"))
 
 # Save i.map
 dir_create(here("Output/imap"))
@@ -1498,13 +1525,36 @@ if (get.nav.sd) {
 }
 ```
 
+```{r summarize-data}
+# Compute total survey distance
+nav.dist <- nav.paths.sf %>% 
+  st_transform(crs = crs.proj) %>% 
+  mutate(distance_km  = as.numeric(st_length(.)/1000),
+         distance_nmi = distance_km*0.539957)
+
+nasc.summ <- nasc.cps %>% 
+  group_by(transect) %>% 
+  summarise(
+    start     = min(datetime),
+    end       = max(datetime),
+    duration  = difftime(end, start, units = "hours"),
+    n_int     = length(Interval),
+    distance  = round(length(Interval)*nasc.interval/1852),
+    lat       = lat[which.min(long)],
+    long      = long[which.min(long)],
+    mean_nasc = mean(cps.nasc)) %>% 
+  arrange(transect, start)
+```
+
 ### Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the `r survey.name` 
 
 #### SWFSC Advanced Survey Technologies Group  
 
 _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`
 
-An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to `r nasc.depth.cps`-m deep) and krill (5 to `r nasc.depth.krill`-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.
+An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to `r nasc.depth.cps`-m deep) and krill (5 to `r nasc.depth.krill`-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.  
+
+To date, _`r survey.vessel`_ has transited a total of `r prettyNum(sum(nav.dist$distance_nmi), big.mark = ',' ,digits = 1)` nmi (or `r prettyNum(sum(nav.dist$distance_km), big.mark = ',' ,digits = 1)` km), completed `r n_distinct(nasc.cps$transect)` acoustic transects totaling `r prettyNum(sum(nasc.summ$distance),big.mark = ',', digits = 1)` nmi, conducted `r nrow(haul)` nighttime Nordic trawls, and collected `r n_distinct(cufes$SampleNumber)` CUFES samples.  
 
 ```{r interactive-map,out.height="12in",out.width="100%"}
 # Display map
@@ -1518,7 +1568,7 @@ For questions about this page, please contact Kevin Stierhoff ([kevin.stierhoff@
 
 (ref:nasc-outliers) An interactive plot of the top 100 backscatter ($s_A$) intervals, labeled with the transect name and interval to facilitate further scrutiny of processing steps in Echoview.
 
-```{r plot-big-nasc,fig.cap='(ref:nasc-outliers)'}
+```{r plot-big-nasc, fig.cap='(ref:nasc-outliers)'}
 if (file.exists(here("Output/nasc_backscatter_plotly.Rdata"))) {
   # Load NASC outliers
   load(here("Output/nasc_backscatter_plotly.Rdata"))
@@ -1595,7 +1645,7 @@ if (file.exists(here("Output/cufes_bad.Rdata"))) {
 
 # Trawl species proportions  
 
-(ref:trawl-proportion-haul-wt) Proportions of CPS species in trawl hauls, by weight (black points indicate trawl hauls with no CPS). 
+(ref:trawl-proportion-haul-wt) Proportions of CPS species in trawl hauls, by weight (black points indicate trawl hauls with no CPS).
 
 ```{r plot-trawl-proportion-haul-wt,fig.cap='(ref:trawl-proportion-haul-wt)',out.width='100%'}
 if (file.exists(here("Figs/fig_trawl_proportion_haul_wt.png"))) {
