@@ -40,7 +40,7 @@ show.maps <- TRUE
 
 ## Used by processTransects.R -----------
 # GPX file location
-gpx.dir          <- "//swc-storage3-s.nmfs.local/AST3/SURVEYS/20220627_LASKER_SummerCCE/PLANNING/Rose Point/GPX"
+gpx.dir          <- "//swc-storage4-s.nmfs.local/AST4/SURVEYS/20220627_LASKER_SummerCCE/PLANNING/Rose Point/GPX"
 gpx.file         <- "rosepoint_waypoints.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
@@ -61,9 +61,9 @@ transects.rm <- NA # Numbered transects to remove
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
 leg.ends <- c(ymd("2022-06-27"), ymd("2022-07-15"),
-              ymd("2022-07-21"), ymd("2022-08-06"),
+              ymd("2022-07-19"), ymd("2022-08-06"),
               ymd("2022-08-12"), ymd("2022-08-30"),
-              ymd("2022-09-06"), ymd("2022-09-23"))
+              ymd("2022-09-06"), ymd("2022-09-30"))
 
 # Compute days per leg
 leg.days <- (leg.ends[seq(2, length(leg.ends), 2)] - leg.ends[seq(1,length(leg.ends) - 1, 2)]) + 1
@@ -88,12 +88,12 @@ survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2207RL"        # SWFSC/AST survey name
 survey.start           <- "27 June"       # Survey start date
-survey.end             <- "23 September"  # Survey end date
+survey.end             <- "30 September"  # Survey end date
 survey.year            <- "2022"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 77              # Days at sea allocated
 survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
-survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
+survey.landmark.s      <- "Punta Baja, Baja CA Norte" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -143,7 +143,7 @@ survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
 erddap.url.sd <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2022"
-erddap.survey.start.sd <- "2022-07-09T00%3A00%3A00Z"
+erddap.survey.start.sd <- "2022-07-08T00%3A00%3A00Z"
 erddap.survey.end.sd   <- "2022-10-15T23%3A59%3A00Z"
 # Configure columns and classes
 erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
@@ -220,7 +220,7 @@ cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Etrumeus acuminatus")
 # CUFES
 cufes.start        <- "2022-06-27" # Start of survey for CUFES filtering
-cufes.end          <- "2022-09-24" # End of survey for CUFES filtering
+cufes.end          <- "2022-09-30" # End of survey for CUFES filtering
 # For legend objects
 cufes.date.range   <- c(start = ymd_hms("2022-06-27 19:30:00 UTC"), 
                         stop  = now())
@@ -294,7 +294,7 @@ use.seine.data         <- FALSE
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata?
-merge.vessels <- c(Core = TRUE,
+merge.vessels <- c(Core = FALSE,
                    OS = FALSE,
                    NS = FALSE)
 
@@ -393,7 +393,7 @@ strip.tx.nums          <- c(RL  = TRUE,
                             SD  = TRUE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = FALSE,
+strip.tx.chars         <- c(RL  = TRUE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE) 
@@ -443,13 +443,14 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
-tx.rm                  <- list(RL  = c("076-078","074-076","080-078"),
+tx.rm                  <- list(RL  = c("076-078","074-076","080-078",
+                                       "072","074","076-1","076-2","078-1","078-2","080"),
                                LM  = NA,
                                LBC = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 25,
+min.tx.length          <- c(RL  = 20,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
@@ -474,7 +475,7 @@ cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 max.cluster.dist       <- 30
 
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0, 6, 15, 35, 70, 100)
+tx.spacing.bins <- c(0,  6, 15, 35, 70, 100)
 tx.spacing.dist <- c(5, 10, 20, 40, 80)
 
 tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculating programatically
@@ -495,7 +496,7 @@ cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
 cufes.db.sqlite        <- "cufes202207RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
-cufes.vessels          <- c("RL", "JCF")
+cufes.vessels          <- c("RL")
 
 # Trawl data
 trawl.source           <- "Access" # "SQL" or "Access"
@@ -550,7 +551,7 @@ boot.num <- 5 # 1000 during final
 do.lf    <- TRUE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core", "Nearshore")
+estimate.regions   <- c("Core") # c("Core", "Nearshore")
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata
@@ -649,8 +650,8 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino
-stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
-# stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
+# stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
+stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
 
 # Transects used to define stock boundaries (primary or other)
 
@@ -666,7 +667,7 @@ raw.log.range <- 350  # depth of ER60 logging (m)
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
 ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v11.XX" # Echoview version
+ev.version    <- "v12.1" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <-  350  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
@@ -688,13 +689,13 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL","LBC","LM")
-cal.dir            <- "//swc-storage3-s/AST3/SURVEYS/SURVEYS/20220627_LASKER_SummerCCE/DATA/EK60/CALIBRATION/RESULTS"
-cal.datetime       <- "15 June"     # Date/time of calibration
-cal.plot.date      <- "2022-06-15" # Date of the calibration, used to plot cal time series
+cal.vessels        <- c("RL") # ,"LBC","LM"
+cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20220627_LASKER_SummerCCE/DATA/EK80/CALIBRATION/RESULTS"
+cal.datetime       <- "23 June"     # Date/time of calibration
+cal.plot.date      <- "2022-06-23" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
-cal.personnel      <- "J. Renfree, D. Demer"        # Calibration participants
+cal.personnel      <- "J. Renfree, D. Murfin, and S. Sessions" # Calibration participants
 cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
 cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
@@ -705,12 +706,12 @@ cal.sphere.name    <- "_Lasker_ sphere #1"
 cal.sphere.z       <- 6 # Nominal depth of calibration sphere below the transducer
 cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about impedance analyzer
 # Other notes about calibration
-cal.notes          <- "UPDATE CAL LOCATION. Lasker calibration sphere #1"
+cal.notes          <- "Lasker calibration sphere #1"
 
 # Physical conditions during calibration
-cal.temp           <-   21.1   # enter water temperature
-cal.sal            <-   34.0   # enter salinity
-cal.c              <- 1524.9   # enter sound speed (m/s)
+cal.temp           <-   23.42   # enter water temperature at sphere depth
+cal.sal            <-   35.0   # enter salinity at sphere depth
+cal.c              <- 1530.6   # enter sound speed (m/s)
 cal.min.z          <-    5     # enter minimum water depth below transducers
 cal.max.z          <-   10     # enter maximum water depth below transducers
  
