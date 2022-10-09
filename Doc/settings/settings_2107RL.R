@@ -122,7 +122,7 @@ wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory",
                           Saildrone = "Saildrone")
 wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
                           Nearshore = "#FF33F5", Offshore = "#FFA500",
-                          Saildrone = "#FFFF00") 
+                          Saildrone = "#00FFFF") 
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
                           Nearshore = "solid", Offshore = "dashed", 
                           Saildrone = "solid")
@@ -210,7 +210,8 @@ sardine.color      <- '#FF0000'
 anchovy.color      <- '#00CD66'
 jack.mack.color    <- '#0000FF'
 jacksmelt.color    <- '#A020F0'
-pac.mack.color     <- '#00FFFF'
+# pac.mack.color     <- '#00FFFF'
+pac.mack.color     <- '#FF9800'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
 
