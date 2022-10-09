@@ -299,7 +299,6 @@ if (sampling.trawl) {
   if (trawl.source == "Access") {
     if (year(haul.all$netInWaterTime[1]) >= 2021) {
       haul <- haul.all %>% 
-        arrange(haul) %>% 
         mutate(
           startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
           startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
@@ -371,8 +370,7 @@ if (sampling.trawl) {
     filter(!trawlPerformance %in% trawl.performance) %>% 
     arrange(haul) %>% 
     mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-           cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1,
-           leg      = cut(as.numeric(date(equilibriumTime)), leg.breaks, labels = FALSE))  
+           cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1)  
   
   # Find midpoint of each haul as the mean lat/long
   haul.mid <- haul %>% 
@@ -549,9 +547,7 @@ if (sampling.cufes) {
         cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
       Duration = as.numeric(difftime(Stop, Start, units = "mins")),
       Year = year(Start),
-      AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs,
-      leg = cut(as.numeric(date(Start)), leg.breaks, 
-                                labels = FALSE)) %>% 
+      AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
     rename(lat = StartLatitude, long = StartLongitude) %>%
     filter(!is.na(lat), !is.na(long), !is.na(Stop)) %>% 
     project_df(to = crs.proj)
@@ -575,7 +571,7 @@ if (sampling.cufes) {
            # Create bins for defining point size in NASC plots
            bin = cut(Density, cufes.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin)) %>% 
-    left_join(select(cufes.raw, SampleNumber, Start, Stop, leg)) 
+    left_join(select(cufes.raw, SampleNumber, Start, Stop)) 
   
   if (exists("cufes.date.range")) {
     if (!is.na(cufes.date.range["start"])) {
@@ -711,8 +707,7 @@ if (sampling.acoustics) {
       # Calculate summary interval
       nasc.cps <- nasc.cps %>%
         mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
-                         labels = FALSE, include.lowest = TRUE),
-               leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE)) %>% 
+                         labels = FALSE, include.lowest = TRUE)) %>% 
         arrange(datetime)
       
       # Save results
@@ -1029,9 +1024,6 @@ or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>%
 wc_mpas <- st_read(here("Data/GIS/wc_mpas.shp")) %>% 
   st_transform(crs.geog) 
 
-baja_mpas <- st_read(here("Data/GIS/baja_mpas.shp")) %>% 
-  st_transform(crs.geog) 
-
 # Read CA MPAs shapefile
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
   st_transform(crs.geog)
@@ -1144,18 +1136,6 @@ if (sampling.cufes) {
 
 ```
 
-```{r load-ctds}
-if (file.exists(here("Output/uctd_summary_table.csv"))) {
-  uctd.casts <- read_csv(here("Output/uctd_summary_table.csv")) %>% 
-    st_as_sf(coords = c("Lon", "Lat"), crs = crs.geog)
-}
-
-if (file.exists(here("Output/ctd_summary_table.csv"))) {
-  ctd.casts <- read_csv(here("Output/ctd_summary_table.csv")) %>% 
-    st_as_sf(coords = c("Lon", "Lat"), crs = crs.geog)
-}
-```
-
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}
 # Leaflet options
 # https://rstudio.github.io/leaflet/
@@ -1237,9 +1217,6 @@ i.map <- leaflet() %>%
   # Add West Coast MPAs
   addPolygons(data = wc_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalWC(Design),
               fillOpacity = 0.3, label = ~htmlEscape(Site_Nm), group = "MPAs") %>%
-    # Add Baja California MPAs
-  addPolygons(data = baja_mpas, color = "#000414", weight = 2, fillColor =  ~NOMBRE,
-              fillOpacity = 0.3, label = ~htmlEscape(NOMBRE), group = "MPAs") %>%
   # Add core planned transects
   addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,
@@ -1277,8 +1254,7 @@ i.map <- leaflet() %>%
     overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
-                      "Vessel Track", "Vessel Positions", 
-                      "Trawls", "CTD Casts",
+                      "Vessel Track", "Vessel Positions", "Trawls",
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
                       "Backscatter-Krill", "Backscatter-Krill (Small)",
                       "Backscatter (Large)",
@@ -1289,20 +1265,6 @@ i.map <- leaflet() %>%
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 
-# Add UCTD casts
-if (exists("uctd.casts"))
-  i.map <- i.map %>% 
-  # Add uctd data
-  addMarkers(data = uctd.casts, label = ~Filename, popup = ~Filename, 
-             group = "CTD Casts")
-
-if (exists("uctd.casts"))
-  i.map <- i.map %>% 
-  # Add uctd data
-  addMarkers(data = ctd.casts, label = ~Filename, popup = ~Filename, 
-             group = "CTD Casts")
-
-# Add vessel positions
 if (exists("nav.paths.sf"))
   i.map <- i.map %>% 
   # Add nav data
@@ -1452,7 +1414,7 @@ i.map <- i.map %>%
               "CUFES Egg Density-Squid", "CUFES (Negative)",
               "Vessel Positions", "Saildrone Tracks", 
               "Saildrone Tracks", "Saildrone Positions",
-              "State Waters", "Exclusive Economic Zones", "CTD Casts"))
+              "State Waters", "Exclusive Economic Zones"))
 
 # Save i.map
 dir_create(here("Output/imap"))
@@ -1529,52 +1491,13 @@ if (get.nav.sd) {
 }
 ```
 
-```{r summarize-data}
-# Compute total survey distance from nav data
-nav.dist <- nav.paths.sf %>% 
-  st_transform(crs = crs.proj) %>% 
-  mutate(distance_km  = as.numeric(st_length(.)/1000),
-         distance_nmi = distance_km*0.539957)
-
-# Compute transect distance from backscatter data
-nasc.summ <- nasc.cps %>% 
-  group_by(leg, transect) %>% 
-  summarise(
-    start     = min(datetime),
-    end       = max(datetime),
-    duration  = difftime(end, start, units = "hours"),
-    n_int     = length(Interval),
-    distance  = round(length(Interval)*nasc.interval/1852),
-    lat       = lat[which.min(long)],
-    long      = long[which.min(long)],
-    mean_nasc = mean(cps.nasc)) %>% 
-  arrange(transect, start)
-
-# Summarize acoustic distance by leg
-nasc.summ.leg <- nasc.summ %>% 
-  group_by(leg) %>% 
-  summarise(distance = sum(distance))
-
-# Summarize hauls
-haul.summ <- haul %>% 
-  group_by(leg) %>% 
-  tally()
-
-# Summarize cufes samples
-cufes.summ <- cufes %>% 
-  group_by(leg) %>% 
-  summarise(n  = n_distinct(SampleNumber)) 
-```
-
 ### Acoustic backscatter, CUFES Egg Density, and Trawl Species Proportions for the `r survey.name` 
 
 #### SWFSC Advanced Survey Technologies Group  
 
 _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`
 
-An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to `r nasc.depth.cps`-m deep) and krill (5 to `r nasc.depth.krill`-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.  
-
-To date, _`r survey.vessel`_ has transited a total of `r prettyNum(sum(nav.dist$distance_nmi), big.mark = ',' ,digits = 1)` nmi (or `r prettyNum(sum(nav.dist$distance_km), big.mark = ',' ,digits = 1)` km), completed `r n_distinct(nasc.cps$transect)` acoustic transects totaling `r prettyNum(sum(nasc.summ$distance),big.mark = ',', digits = 1)` nmi, conducted `r nrow(haul)` nighttime Nordic trawls, and collected `r n_distinct(cufes$SampleNumber)` CUFES samples.  
+An interactive map of the distribution of 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS (from 5 to `r nasc.depth.cps`-m deep) and krill (5 to `r nasc.depth.krill`-m deep); CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; catch (by weight) of CPS species in trawl clusters (the combination of up to three trawl hauls conducted within a 12 h period; white points); and some other miscellaneous survey data. Hover-over or click on some map objects for more info.
 
 ```{r interactive-map,out.height="12in",out.width="100%"}
 # Display map
@@ -1586,9 +1509,9 @@ For questions about this page, please contact Kevin Stierhoff ([kevin.stierhoff@
 # Acoustic backscatter
 ## Examine backscatter outliers 
 
-(ref:nasc-outliers) An interactive plot of the top 100 backscatter ($s_A$) intervals, labeled with the transect name and interval to facilitate further scrutiny of processing steps in Echoview.
+(ref:nasc-outliers) An interactive plot of the top 100 backscatter ($s_A$) intervals, labeled with the transect name and interval to facilitate futher scrutiny of processing steps in Echoview.
 
-```{r plot-big-nasc, fig.cap='(ref:nasc-outliers)'}
+```{r plot-big-nasc,fig.cap='(ref:nasc-outliers)'}
 if (file.exists(here("Output/nasc_backscatter_plotly.Rdata"))) {
   # Load NASC outliers
   load(here("Output/nasc_backscatter_plotly.Rdata"))
@@ -1665,7 +1588,7 @@ if (file.exists(here("Output/cufes_bad.Rdata"))) {
 
 # Trawl species proportions  
 
-(ref:trawl-proportion-haul-wt) Proportions of CPS species in trawl hauls, by weight (black points indicate trawl hauls with no CPS).
+(ref:trawl-proportion-haul-wt) Proportions of CPS species in trawl hauls, by weight (black points indicate trawl hauls with no CPS). 
 
 ```{r plot-trawl-proportion-haul-wt,fig.cap='(ref:trawl-proportion-haul-wt)',out.width='100%'}
 if (file.exists(here("Figs/fig_trawl_proportion_haul_wt.png"))) {

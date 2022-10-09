@@ -114,7 +114,7 @@ erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric"
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
 survey.lat           <- c(25.83792,50.7)
 survey.long          <- c(-129.22,-112.9483)
-
+ 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2107RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
@@ -122,7 +122,7 @@ wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory",
                           Saildrone = "Saildrone")
 wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
                           Nearshore = "#FF33F5", Offshore = "#FFA500",
-                          Saildrone = "#FFFF00") 
+                          Saildrone = "#00FFFF") 
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
                           Nearshore = "solid", Offshore = "dashed", 
                           Saildrone = "solid")
@@ -210,7 +210,7 @@ sardine.color      <- '#FF0000'
 anchovy.color      <- '#00CD66'
 jack.mack.color    <- '#0000FF'
 jacksmelt.color    <- '#A020F0'
-pac.mack.color     <- '#00FFFF'
+pac.mack.color     <- '#FF9800'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
 
@@ -425,7 +425,7 @@ rm.transit             <- c(RL  = FALSE,
 rm.offshore            <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = FALSE,
+                            SD  = TRUE,
                             JCF = FALSE) 
 
 # If T, removes transects with names including "inshore"
@@ -569,7 +569,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE

@@ -1,36 +1,41 @@
-# A utility for extracting CPS backscatter (cps.NASC)
+# A utility for extracting CPS backscatter (cps.nasc) from Echoview CSV files
+# Source the script (Ctrl+Shift+S) and respond to the prompts
+# If a path to Exported Images is provided (path.img), corresponding
+# echograms will be displayed to assist echo scrutiny
+
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse, here,fs)
-
+pacman::p_load(tidyverse, here, fs)
 # Install and load required packages from Github -------------------------------
-## atm
 pacman::p_load_gh("kstierhoff/atm")
 
-# Load CTDapp function
+# Close any open graphics windows
+graphics.off()
+
+# Load function used to estimate CPS NASC --------------------------------------
 source(here::here("Code/estimate_CPS_NASC.R"))
 
-# Configure input and output paths
-# path.in  <- here("Data/Backscatter/SD")
-# path.out <- here("Data/Backscatter/SD")
-# path.in  <- "C:/SURVEY/2107RL/PROCESSED/EV/CSV/SAILDRONE/SD1059"
-# path.out <- "C:/SURVEY/2107RL/PROCESSED/EV/CSV/SAILDRONE/SD1059"
-path.in  <- "C:/Users/josiah.renfree/Desktop/2107RL_SD_Reprocessing/EV/CSV/SD1059/CPSFilter_-13dB"
-path.out <- "C:/Users/josiah.renfree/Desktop/2107RL_SD_Reprocessing/EV/CSV/SD1059/CPSFilter_-13dB/POST-PROCESSED"
+# Extract only CPS backscatter -------------------------------------------------
+extractNASC(
+  # Most used options ----------------------------------------------------------
+  path.in     = "C:/SURVEY/2207RL/PROCESSED/EV/CSV/LASKER", # CSV file source                                                                                                 e
+  pattern.in  = "_CPS-Final 38 kHz CPS.csv", # CSV file regex
+  path.out    = "C:/SURVEY/2207RL/PROCESSED/EV/CSV/LASKER", # Processed file destination
+  suffix.out  = "_nasc_cps.csv",             # Suffix applied to processed CSV files
+  path.img    = "C:/SURVEY/2207RL/PROCESSED/EV/Exported_Images", # Location of exported image files, or NULL
+  pattern.img = "_CPS-38 kHz CPS for Image Export.png", # Exported image regex
+  # Lesser used options --------------------------------------------------------
+  expansion   = 2,     # Constant for expanding axes
+  max.range   = 350,   # Depth range for bubble plots
+  root        = 2,     # Constant for controlling bubble size (2)
+  scaling     = 0.1,   # Constant for controlling bubble size (0.1)
+  jpeg        = FALSE, # Save intermediate plots from line picks
+  x11.w       = 1600,  # Width of graphics window (px)
+  x11.h       = 600)   # Height of graphics window (px)
 
-# List CSV files (this is just for viewing the files; it's not used in the code)
-list.files(path = path.in, pattern = "CPS-Final 38 kHz CPS.csv", recursive = FALSE)
-
-# Run the function to estimate CPS backscatter
-estimate.cps.nasc(path.input = path.in, 
-                  pattern = "CPS-Final 38 kHz CPS.csv", 
-                  path.output = path.out, 
-                  expand.right = T,
-                  expand.left = F,
-                  expansion = 2, max.range = 350, root = 2,  scaling = 0.5)
-
-# Close both graphics devices
-dev.off()
-dev.off()
+# # Configure input and output paths ---------------------------------------------
+# ## CSV input path (source)
+# path.in  <- here("Data/Backscatter/RL") # KLS laptop
+# # path.in <- "C:/SURVEY/2207RL/PROCESSED/EV/CSV/LASKER" # Echoview PC

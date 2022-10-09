@@ -62,7 +62,8 @@ if (get.nav) {
   nav.paths.sf <- nav.sf %>% 
     group_by(leg) %>% 
     summarise(do_union = FALSE) %>% 
-    st_cast("LINESTRING")
+    st_cast("LINESTRING") %>% 
+    mutate(distance_nmi = as.numeric(st_length(.)*0.000539957))
   
   # Save results
   save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))

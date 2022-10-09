@@ -88,10 +88,10 @@ source(here("Doc/settings", prj.settings))
 ```{r user-controls}
 # Processing controls (T/F) ---------------------------------------------------
 ### Usually T
-get.db            <- F # Download data from databases (fast; generally TRUE)
+get.db            <- T # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
-copy.files        <- F # Copy data files to local directory 
+copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
@@ -105,9 +105,9 @@ save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
-process.csv.krill <- F # Process krill backscatter data
-process.cal       <- F # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
+process.csv.krill <- T # Process krill backscatter data
+process.cal       <- T # Process calibration results
+process.ctd       <- T # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -362,13 +362,8 @@ if (get.nav.sd) {
         "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
       
       # Download and parse ERDDAP nav data
-      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = FALSE, 
-                                         colClasses = erddap.classes.sd, 
-                                         row.names = NULL, skip = 0))
-      names(nav.temp.sd) <- erddap.headers.sd
-      
-      # Filter to remove bad SST values
-      nav.temp.sd <- nav.temp.sd %>% 
+      nav.temp.sd <- read_csv(saildroneURL, lazy = FALSE,
+                              col_names = erddap.headers.sd) %>% 
         mutate(datetime = ymd_hms(time)) %>%
         filter(!is.nan(lat), !is.nan(long)) %>%
         filter(long != 0, lat != 0)
@@ -714,14 +709,14 @@ if (process.csv) {
           filter(between(lat,  min.lat,  max.lat))
       }
       
-      # Remove letters from transect names (e.g., 105A, 105B, etc.)
-      if (strip.tx.chars[i]) {
-        nasc.vessel$transect <- gsub(tx.char.pattern[i], "", nasc.vessel$transect)  
-      }
-      
       # Remove numbers from transect names (e.g., 105-1, 105-2, etc.)
       if (strip.tx.nums[i]) {
         nasc.vessel$transect <- gsub(tx.num.pattern[i], "", nasc.vessel$transect)
+      }
+      
+      # Remove letters from transect names (e.g., 105A, 105B, etc.)
+      if (strip.tx.chars[i]) {
+        nasc.vessel$transect <- gsub(tx.char.pattern[i], "", nasc.vessel$transect)  
       }
       
       # Remove transit data
@@ -934,9 +929,9 @@ if (process.csv) {
                      aes(X, Y, size = cps.nasc, colour = cps.nasc.source),
                      shape = 21, fill = NA) +
           coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-          
+                   xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+                   ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+        
         # Save figure
         ggsave(compare.cps.nasc.map, 
                filename = here("Data/Backscatter", i, paste0("nasc_vessel_map_", i, ".png")), 
@@ -992,6 +987,10 @@ if (!is.na(merge.vessels["Core"])) {
           is.na(vessel.orig) ~ vessel.name,
           TRUE ~ vessel.name),
         vessel.name = survey.vessel.primary)
+  } else {
+    # Create vessel.orig if it doesn't exist
+    nasc <- nasc %>% 
+      mutate(vessel.orig = vessel.name)
   }
 }
 
@@ -1503,52 +1502,46 @@ Haul data are filtered, formatted, and assigned to clusters, where a trawl clust
 ```{r process-trawl-haul-data}
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
-  # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      # equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-      #                                    format(haul.all$EquilibriumTime,
-      #                                           format = "%H:%M:%S"))),
-      # haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-      #                                    format(haul.all$haulbackTime,
-      #                                           format = "%H:%M:%S")))
-      haulBackTime     = haulbackTime,
-      equilibriumTime  = EquilibriumTime) %>% 
-    mutate(haulbackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes) %>% 
-    rename(totalNum = TotalNum,
-           totalWeight = TotalWtKg)
-  
-  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
-  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-  
-  # Correct equilibriumTime or haulBackTime
-  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  
-  # Reformat length frequency data to match SQL
-  lengths.all <- lengths.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, species = Species)
-  
-  # Reformat length frequency data to match SQL
-  lengthFreq.all <- lengthFreq.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
-           species = Species, length = Length, lengthType = LengthType, 
-           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
-           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
-           subSampleNumber = SubSampleNumber)
-  
+  if (year(haul.all$netInWaterTime[1]) >= 2021) {
+    haul.all <- haul.all %>% 
+      arrange(haul) %>% 
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
+    
+  } else {
+    haul.all <- haul.all %>% 
+      arrange(haul) %>% 
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$EquilibriumTime,
+                                                  format = "%H:%M:%S"))),
+        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$haulbackTime,
+                                                  format = "%H:%M:%S")))) %>%
+      mutate(haulBackTime = case_when(
+        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+        TRUE ~ haulBackTime)) %>%
+      rename(cruise = Cruise, ship = Ship, haul = Haul,
+             collection = Collection, notes = Notes)
+    
+    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+    eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
+    hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
+    
+    # Correct equilibriumTime or haulBackTime
+    haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+    haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  }
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
+    arrange(haul) %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
@@ -1683,6 +1676,7 @@ haul %>%
 ```  
 
 ## Check trawl clustering  
+
 Trawl haul information is summarized by cluster. Those clusters where the difference in equilibrium time between the first and last haul in a cluster is $\geq$ 12 h are highlighted in yellow and should be examined in the Haul table of the Trawl database. 
 
 ```{r check-trawl-clusters}
@@ -1754,7 +1748,10 @@ include_graphics(here("Figs/fig_trawl_cluster_map.png"))
 ```  
 
 ## Process trawl catch data  
+
 Catch data are filtered, formatted, summarized by weight, and formatted for plotting.
+
+**[RESUME HERE; Check TotalWtKg and TotalCt]**
 
 ```{r process-trawl-catch-data, message=FALSE}
 # Filter catch data
@@ -1777,7 +1774,7 @@ if (survey.name %in% c("2107RL")) {
       key         = paste(haul, scientificName)) %>% 
     left_join(select(spp.codes, scientificName, commonName, species)) %>% 
     left_join(select(haul, haul, cluster))
-
+  
   # Combine catch data from each vessel
   catch <- bind_rows(catch, catch.jcf)
 }
@@ -2418,7 +2415,7 @@ lengths <- lengths.all %>%
   filter(!haul %in% haul.rm)
 
 if (survey.name %in% c("2107RL")) {
-    # Read specimen data from Carranza
+  # Read specimen data from Carranza
   lengths.jcf <- read_csv(here("Data/Trawl/JCFINP2110_specimens.csv")) %>% 
     mutate(cruise = as.character(cruise.name),
            ship = "JCF",
@@ -2439,7 +2436,7 @@ if (survey.name %in% c("2107RL")) {
           convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
         scientificName == "Trachurus symmetricus" ~ 
           convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Etrumeus acuminatus" ~ 
+        scientificName == "Etrumeus acuminatus" ~ 
           convert_length("Etrumeus acuminatus", .$standardLength_mm, "SL", "TL")),
       missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
     mutate(
@@ -2463,7 +2460,7 @@ if (survey.name %in% c("2107RL")) {
   
   # ggplotly(ggplot(lengths.jcf, aes(totalLength_mm, weightg, colour = sex, label = key)) + geom_point() + facet_wrap(~scientificName, scales = "free"))
   
-   # ggplotly(ggplot(lengths.jcf, aes(forkLength_mm, weightg, colour = sex, label = key)) + geom_point() + facet_wrap(~scientificName, scales = "free"))
+  # ggplotly(ggplot(lengths.jcf, aes(forkLength_mm, weightg, colour = sex, label = key)) + geom_point() + facet_wrap(~scientificName, scales = "free"))
   
   # ggplot(lengths.jcf, aes(standardLength_mm, forkLength_mm, label = key)) + geom_point() + facet_wrap(~scientificName)
   
@@ -6174,7 +6171,7 @@ if (do.imap) {
                 opacity = 1, 
                 group = "Biomass (J. mackerel)")
   
-   if(nrow(filter(strata.primary.sub, scientificName == "Etrumeus acuminatus")) > 0)
+  if(nrow(filter(strata.primary.sub, scientificName == "Etrumeus acuminatus")) > 0)
     i.map <- i.map %>%
       addPolygons(data = filter(strata.primary.sub, scientificName == "Etrumeus acuminatus"),
                   weight = 2, color =  ~cpsPal(scientificName), fillColor = "transparent",
@@ -8761,7 +8758,7 @@ cal.params <- cal.res %>%
 
 # add noise estimates
 # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
-if (is.na(cal.noise[cal.vessels])) { 
+if (is.na(cal.noise[survey.vessel.primary])) { 
   cal.params$noise <- rep("N/A", nrow(cal.res))
 }else{
   cal.params$noise <- unlist(cal.noise[cal.vessels])

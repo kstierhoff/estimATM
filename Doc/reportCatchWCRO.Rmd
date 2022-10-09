@@ -77,22 +77,42 @@ eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>%
 ```{r process-hauls}
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
-  # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      haulBackTime     = haulbackTime,
-      equilibriumTime  = EquilibriumTime) %>% 
-    mutate(haulbackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes)
-  
-  
+  if (year(haul.all$netInWaterTime[1]) >= 2021) {
+    haul.all <- haul.all %>% 
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
+    
+  } else {
+    haul.all <- haul.all %>% 
+      arrange(haul) %>% 
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$EquilibriumTime,
+                                                  format = "%H:%M:%S"))),
+        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$haulbackTime,
+                                                  format = "%H:%M:%S")))) %>%
+      mutate(haulBackTime = case_when(
+        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+        TRUE ~ haulBackTime)) %>%
+      rename(cruise = Cruise, ship = Ship, haul = Haul,
+             collection = Collection, notes = Notes)
+    
+    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+    eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
+    hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
+    
+    # Correct equilibriumTime or haulBackTime
+    haul$equilibriumTime[eq.fix] <- haul$equilibriumTime[eq.fix] + days(1)
+    haul$haulBackTime[eq.fix]    <- haul$haulBackTime[eq.fix] + days(1)
+  }
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     mutate(
@@ -111,7 +131,7 @@ if (trawl.source == "Access") {
 haul <- haul.all %>% 
   select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 
          stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
-         trawlPerformance, notes) %>% 
+         trawlPerformance, Notes) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
   st_as_sf(coords = c("startLongDecimal","startLatDecimal"), crs = crs.geog) %>% 
   st_intersection(eez_usa)
@@ -153,7 +173,7 @@ write_csv(catch.summary,
 
 _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`
 
-Catch for all trawl samples are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
+Catch for all trawl samples collected within the U.S. Exclusive Economic Zone (EEZ) are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
 
 ```{r catch-table}
 kable(catch.summary, format = knitr.format, booktabs = TRUE, 

@@ -9,8 +9,8 @@ haul.ts <- haul.all %>%
     month(equilibriumTime) < 6 ~ "Spring",
     TRUE ~ "Summer")) %>% 
   mutate(year = year(equilibriumTime),
-         lat = startLatDecimal,
-         long = startLongDecimal,
+         lat = DecLatitude,
+         long = DecLongitude,
          facet.group = paste(season, year)) %>% 
   filter(season == "Summer",
          year >= 2008,
@@ -29,8 +29,8 @@ catch.ts <- catch.all %>%
          !is.na(year))
 
 # ggplot(haul.ts, aes(long, lat, colour = ship)) + geom_point() + coord_map() + facet_wrap(~year, nrow = 2)
-# ggplot(haul.ts, aes(long, lat)) + 
-#   geom_point() + 
+# ggplot(haul.ts, aes(long, lat)) +
+#   geom_point() +
 #   geom_point(data = catch.all, aes(long, lat, size = totalWeight), colour = "red") +
 #   coord_map() + facet_wrap(~year, nrow = 2)
 
@@ -60,8 +60,8 @@ catch.ts <- catch.all %>%
 
 # Load catch data
 # 2017 
-load("C:/KLS/CODE/R_packages/EstimateCPS/1707RL/Output/catch_final.Rdata")
-load("C:/KLS/CODE/R_packages/EstimateCPS/1707RL/Output/haul_info.Rdata")
+load("C:/KLS/CODE/Github/EstimateCPS/1707RL/Output/catch_final.Rdata")
+load("C:/KLS/CODE/Github/EstimateCPS/1707RL/Output/haul_info.Rdata")
 
 source(here("Code/process_trawl_catch_1707RL.R"))
 
@@ -71,12 +71,12 @@ catch.all       <- catch %>%
   left_join(select(haul.mid, haul, long, lat)) %>% 
   mutate(survey = "Summer 2017")
 
-load("C:/KLS/CODE/R_packages/EstimateCPS/1707RL/Data/Nav/nav_data.Rdata")
+load("C:/KLS/CODE/Github/EstimateCPS/1707RL/Data/Nav/nav_data.Rdata")
 nav.all <- nav %>% mutate(survey = "Summer 2017")
 
 # 2018
-load("C:/KLS/CODE/R_packages/estimATM/1807RL/Output/catch_info.Rdata")
-load("C:/KLS/CODE/R_packages/estimATM/1807RL/Output/catch_final.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1807RL/Output/catch_info.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1807RL/Output/catch_final.Rdata")
 
 haul.pie.all    <- haul.pie %>% mutate(survey = "Summer 2018") %>% 
   bind_rows(haul.pie.all)
@@ -86,13 +86,13 @@ catch.all <- catch %>% mutate(survey = "Summer 2018") %>%
   left_join(select(haul.pie, haul, long, lat)) %>%
   bind_rows(catch.all)
 
-load("C:/KLS/CODE/R_packages/estimATM/1807RL/Data/Nav/nav_data.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1807RL/Data/Nav/nav_data.Rdata")
 nav.all <- nav %>% mutate(survey = "Summer 2018") %>% 
   bind_rows(nav.all)
 
 # 2019
-load("C:/KLS/CODE/R_packages/estimATM/1907RL/Output/catch_info.Rdata")
-load("C:/KLS/CODE/R_packages/estimATM/1907RL/Output/catch_final.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1907RL/Output/catch_info.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1907RL/Output/catch_final.Rdata")
 
 haul.pie.all    <- haul.pie %>% mutate(survey = "Summer 2019") %>% 
   bind_rows(haul.pie.all)
@@ -102,13 +102,13 @@ catch.all <- catch %>% mutate(survey = "Summer 2019") %>%
   left_join(select(haul.pie, haul, long, lat)) %>%
   bind_rows(catch.all)
 
-load("C:/KLS/CODE/R_packages/estimATM/1907RL/Data/Nav/nav_data.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1907RL/Data/Nav/nav_data.Rdata")
 nav.all <- nav %>% mutate(survey = "Summer 2019") %>% 
   bind_rows(nav.all)
 
 # 2021
-load("C:/KLS/CODE/R_packages/estimATM/2107RL/Output/catch_info.Rdata")
-load("C:/KLS/CODE/R_packages/estimATM/2107RL/Output/catch_final.Rdata")
+load("C:/KLS/CODE/Github/estimATM/2107RL/Output/catch_info.Rdata")
+load("C:/KLS/CODE/Github/estimATM/2107RL/Output/catch_final.Rdata")
 haul.pie.all   <- haul.pie %>% mutate(survey = "Summer 2021") %>% 
   bind_rows(haul.pie.all)
 cluster.pie.all <- cluster.pie %>% mutate(survey = "Summer 2021") %>% 
@@ -117,14 +117,26 @@ catch.all <- catch %>% mutate(survey = "Summer 2021") %>%
   left_join(select(haul.pie, haul, long, lat)) %>%
   bind_rows(catch.all)
 
-load("C:/KLS/CODE/R_packages/estimATM/2107RL/Data/Nav/nav_data.Rdata")
+load("C:/KLS/CODE/Github/estimATM/2107RL/Data/Nav/nav_data.Rdata")
 nav.all <- nav %>% 
   select(-time) %>% mutate(survey = "Summer 2021") %>% 
   bind_rows(nav.all)
 
+# 2022
+load("C:/KLS/CODE/Github/estimATM/2207RL/Output/trawl_pie_plotBio.Rdata")
+haul.pie.all    <- haul.pie %>% mutate(survey = "Summer 2022") %>% 
+  bind_rows(haul.pie.all)
+cluster.pie.all <- cluster.pie %>% mutate(survey = "Summer 2022") %>% 
+  bind_rows(cluster.pie.all)
+
+load("C:/KLS/CODE/Github/estimATM/2207RL/Data/Nav/nav_data.Rdata")
+nav.all <- nav %>% 
+  select(-time) %>% mutate(survey = "Summer 2022") %>% 
+  bind_rows(nav.all)
+
 # 2015
-load("C:/KLS/CODE/R_packages/estimATM/1507SH/Output/catch_info.Rdata")
-load("C:/KLS/CODE/R_packages/estimATM/1507SH/Output/catch_final.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1507SH/Output/catch_info.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1507SH/Output/catch_final.Rdata")
 haul.pie.all    <- haul.pie %>% mutate(survey = "Summer 2015") %>% 
   bind_rows(haul.pie.all)
 cluster.pie.all <- cluster.pie %>% mutate(survey = "Summer 2015") %>% 
@@ -133,14 +145,14 @@ catch.all <- catch %>% mutate(survey = "Summer 2015") %>%
   left_join(select(haul.pie, haul, long, lat)) %>%
   bind_rows(catch.all)
 
-load("C:/KLS/CODE/R_packages/estimATM/1507SH/Data/Nav/nav_data.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1507SH/Data/Nav/nav_data.Rdata")
 nav.all <- nav %>% 
   select(-time) %>% mutate(survey = "Summer 2015") %>% 
   bind_rows(nav.all)
 
 # 2016
-load("C:/KLS/CODE/R_packages/estimATM/1606RL/Output/catch_info.Rdata")
-load("C:/KLS/CODE/R_packages/estimATM/1606RL/Output/catch_final.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1606RL/Output/catch_info.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1606RL/Output/catch_final.Rdata")
 haul.pie.all    <- haul.pie %>% mutate(survey = "Summer 2016") %>% 
   bind_rows(haul.pie.all)
 cluster.pie.all <- cluster.pie %>% mutate(survey = "Summer 2016") %>% 
@@ -149,7 +161,7 @@ catch.all <- catch %>% mutate(survey = "Summer 2016") %>%
   left_join(select(haul.pie, haul, long, lat)) %>%
   bind_rows(catch.all)
 
-load("C:/KLS/CODE/R_packages/estimATM/1606RL/Data/Nav/nav_data.Rdata")
+load("C:/KLS/CODE/Github/estimATM/1606RL/Data/Nav/nav_data.Rdata")
 nav.all <- nav %>% 
   select(-time) %>% mutate(survey = "Summer 2016") %>% 
   bind_rows(nav.all)
@@ -173,7 +185,7 @@ nav.sf <- nav.all %>%
   st_cast("LINESTRING") 
 
 # Read bathy contours shapefile 
-bathy <- st_read(here("C:/KLS/CODE/R_packages/estimATM/1907RL/Data/GIS/bathy_contours.shp")) %>% 
+bathy <- st_read(here("C:/KLS/CODE/Github/estimATM/1907RL/Data/GIS/bathy_contours.shp")) %>% 
   st_transform(4326) %>% 
   rename(Depth = Contour)
 
@@ -185,7 +197,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
                 "Morro Bay","Long Beach","Cape Scott","San Diego")
 
 # Import landmarks
-locations <- filter(read.csv(here("C:/KLS/CODE/R_packages/estimATM/1907RL/Data/Map/locations.csv")), 
+locations <- filter(read.csv(here("C:/KLS/CODE/Github/estimATM/1907RL/Data/Map/locations.csv")), 
                     name %in% label.list) %>% 
   project_df(to = 3310)
 
@@ -205,8 +217,8 @@ map.bounds <- hauls.sf %>%
   st_transform(crs = 3310) %>%
   st_bbox()
 
-# Calculate pie radius based on latitude range
-pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*0.0125)
+# Calculate pie radius based on latitude range; 0.0125 too small when nrow = 2
+pie.radius <- as.numeric(abs(map.bounds$ymin - map.bounds$ymax)*0.0250) 
 
 # Filter for positive hauls and clusters
 haul.pos <- filter(haul.pie.all, AllCPS > 0) %>% 
@@ -273,13 +285,13 @@ base.map +
   facet_wrap(~survey, nrow = 1) +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold",
-                                    size = 20)) +
+                                    size = 14)) +
   coord_sf(crs = 3310, 
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 ggsave(here("Figs/fig_cluster_weight_time_series.png"),
-       height = 8, width = 20)
+       height = 8, width = 22)
 
 # Create trawl cluster figure, two rows
 base.map +
@@ -305,13 +317,82 @@ base.map +
   facet_wrap(~survey, nrow = 2) +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold",
-                                    size = 16)) +
+                                    size = 14)) +
   coord_sf(crs = 3310, 
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 ggsave(here("Figs/fig_cluster_weight_time_series_long.png"),
-       height = 11, width = 10)
+       height = 12, width = 12)
+
+# Create trawl cluster figure, two rows but uneven row on top
+top.surveys <- c("Summer 2015","Summer 2016","Summer 2017")
+
+top.plot <- base.map +
+  # plot ship track data
+  geom_sf(data = filter(nav.sf, survey %in% top.surveys), 
+          colour = "gray50", size = 0.5, alpha = 0.5) +
+  # Plot trawl pies
+  geom_scatterpie(data = filter(cluster.pos, survey %in% top.surveys),
+                  aes(X, Y, group = group,
+                      r = r),
+                  cols = c("Anchovy", "JackMack", "Jacksmelt",
+                           "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                  color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
+  # Configure trawl scale
+  scale_fill_manual(name = 'Species',
+                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                               pac.herring.color, pac.mack.color, rnd.herring.color, 
+                               sardine.color)) +
+  # Plot empty cluster locations
+  geom_point(data = filter(cluster.zero, survey %in% top.surveys), 
+             aes(X, Y),
+             size = 3, shape = 21, fill = 'black', colour = 'white') +
+  facet_wrap(~survey, nrow = 1) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold",
+                                    size = 14)) +
+  coord_sf(crs = 3310, 
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+bottom.plot <- base.map +
+  # plot ship track data
+  geom_sf(data = filter(nav.sf, !survey %in% top.surveys), 
+          colour = "gray50", size = 0.5, alpha = 0.5) +
+  # Plot trawl pies
+  geom_scatterpie(data = filter(cluster.pos, !survey %in% top.surveys),
+                  aes(X, Y, group = group,
+                      r = r),
+                  cols = c("Anchovy", "JackMack", "Jacksmelt",
+                           "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                  color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
+  # Configure trawl scale
+  scale_fill_manual(name = 'Species',
+                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                               pac.herring.color, pac.mack.color, rnd.herring.color, 
+                               sardine.color)) +
+  # Plot empty cluster locations
+  geom_point(data = filter(cluster.zero, !survey %in% top.surveys), 
+             aes(X, Y),
+             size = 3, shape = 21, fill = 'black', colour = 'white') +
+  facet_wrap(~survey, nrow = 1) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "bold",
+                                    size = 14)) +
+  coord_sf(crs = 3310, 
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+# Arrange in two rows
+cowplot::plot_grid(top.plot, bottom.plot, nrow = 2, align = "h")
+
+ggsave(here("Figs/fig_cluster_weight_time_series_3x4.png"),
+       height = 12, width = 12)
 
 
 # Filter sardine catch

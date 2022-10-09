@@ -17,7 +17,7 @@ csl: csl/ices-journal-of-marine-science.csl
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,
+pacman::p_load(tidyverse,plotly,lubridate,here,odbc,DBI,glue,
                knitr,DT,fs,cowplot,oce,sf,mapview,shadowtext)
 
 # Install and load required packages from Github -------------------------------
@@ -48,12 +48,12 @@ dir_create(here(c("Figs/TDR", "Output")))
 
 ```{r user-settings}
 # User-specified settings
-copy.files      <- T # Copy TDR files
-process.tdr     <- T # Process TDR files
-process.tdr.all <- F # Process all TDR files
-get.db          <- T # Extract data from trawl database (F for testing)
-get.nav         <- T # Download NOAA Ship nav data
-nav.source      <- "SCS" # Navigation data source: ERDDAP or SCS
+copy.files  <- T # Copy TDR files
+process.tdr <- F # Process TDR files
+process.all <- T # Process all TDR files
+get.db      <- T # Extract data from trawl database (F for testing)
+get.nav     <- T # Download NOAA Ship nav data
+nav.source  <- "SCS" # Navigation data source: ERDDAP or SCS
 ```
 
 ```{r copy-files}
@@ -124,6 +124,7 @@ if (get.db) {
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
   haul.all <- haul.all %>% 
+    arrange(haul) %>% 
     mutate(
       startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
       startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
@@ -131,7 +132,7 @@ if (trawl.source == "Access") {
       stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>%
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) 
+      TRUE ~ haulBackTime))
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -143,6 +144,7 @@ if (trawl.source == "Access") {
   
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
+    arrange(haul) %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime))
@@ -158,10 +160,10 @@ haul.all <- haul.all %>%
 haul <- filter(haul.all, cruise %in% cruise.name) %>% 
   arrange(haul) %>% 
   mutate(
-    netInWaterTime  = ymd_hms(netInWaterTime,  tz = "America/Los_Angeles"),
-    equilibriumTime = ymd_hms(equilibriumTime, tz = "America/Los_Angeles"),
-    haulBackTime    = ymd_hms(haulBackTime,    tz = "America/Los_Angeles"),
-    netOnDeckTime   = ymd_hms(netOnDeckTime,   tz = "America/Los_Angeles"),
+    netInWaterTime  = ymd_hms(netInWaterTime,  tz = tdr.tz),
+    equilibriumTime = ymd_hms(equilibriumTime, tz = tdr.tz),
+    haulBackTime    = ymd_hms(haulBackTime,    tz = tdr.tz),
+    netOnDeckTime   = ymd_hms(netOnDeckTime,   tz = tdr.tz),
     duration        = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
     cluster   = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
 
@@ -219,7 +221,7 @@ if (process.tdr) {
   rsk.files.foot <- dir_ls(tdr.dir.foot, 
                            recurse = tdr.recurse, regexp = tdr.pattern)
   
-  if (process.tdr.all) {
+  if (process.all) {
     # If processing all files, create empty tibbles for TDR data
     tbl.all <- tibble()
     
@@ -282,13 +284,13 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Kite",
-               time  = ymd_hms(time, tz = "America/Los_Angeles")) 
+               time  = force_tz(time, tz = tdr.tz)) 
       
       
       tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
     }
   }
-  
+
   # Process Footrope files ----------------------------------------------------------------------
   ## Create tibble for storing results
   tbl.foot <- tibble()
@@ -304,8 +306,7 @@ if (process.tdr) {
                haul = as.numeric(str_sub(filename, nchar(cruise) + 1, nchar(cruise) + 3)),
                depth = surveyR::calc_depth(mean.lat, pressure*100),
                loc   = "Footrope",
-               time  = ymd_hms(time, tz = "America/Los_Angeles")) 
-      
+               time  = force_tz(time, tz = tdr.tz)) 
       
       tbl.foot <- bind_rows(tbl.foot, tbl.foot.tmp)
     }
@@ -330,8 +331,8 @@ if (process.tdr) {
 if(nrow(tbl.all.new) > 0) {
   for (k in unique(tbl.all.new$haul)) {
     # Get TDR data from haul k
-    tdr.plot <- filter(tbl.all.new, haul == k)
-    
+    tdr.plot <- filter(tbl.all.new, haul == k) %>% mutate(time = time + hours(tdr.offset[k]))
+
     # Get haul info from haul k
     trawl.window <- haul %>% 
       filter(haul == k)
@@ -339,50 +340,64 @@ if(nrow(tbl.all.new) > 0) {
     # Format data for text labels
     trawl.text <- trawl.window %>% 
       select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
-      pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") %>% 
-      mutate(time = time + hours(tdr.offset))
+      pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") 
     
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
-      filter(between(time, 
-                     min(tdr.plot$time) - minutes(30), 
-                     max(tdr.plot$time) + minutes(30)))
+      mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
+      filter(between(time,  
+                     min(trawl.text$time) - minutes(10), 
+                     max(trawl.text$time) + minutes(10)))
     
-    # Plot results
+    tdr.plot <- tdr.plot %>% 
+      filter(between(time,  
+                     min(trawl.text$time) - minutes(10), 
+                     max(trawl.text$time) + minutes(10)))
+    
+    # Plot TDR data
     plot.tdr <- ggplot() + 
-      geom_rect(data = trawl.window,
-                aes(xmin = equilibriumTime + hours(tdr.offset), 
-                    xmax = haulBackTime + hours(tdr.offset), 
-                    ymin = min(tdr.plot$depth), 
-                    ymax = 10),
-                fill = 'gray70', alpha = 0.5) +
-      geom_rect(data = trawl.window,
-                aes(xmin = netInWaterTime + hours(tdr.offset), 
-                    xmax = netOnDeckTime + hours(tdr.offset), 
-                    ymin = min(tdr.plot$depth), 
-                    ymax = 10), fill = NA,
-                colour = 'gray50', linetype = "dashed", alpha = 0.5) +
-      geom_text(data = trawl.text,
-                aes(time, min(tdr.plot$depth), label = event),
-                size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) +
-      geom_text(data = trawl.text,
-                aes(time, min(tdr.plot$depth), label = event),
-                size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) +
       geom_line(data = tdr.plot,
                 aes(time, depth + 10, colour = loc)) + 
-      annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)", 
-               colour = "magenta", hjust = 0, size = 3) +
       scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
-      geom_line(data = trawl.nav,
-                aes(time, SOG), 
-                colour = "magenta") +
       geom_hline(yintercept = 0, colour = "gray50") +
       ylim(min(tdr.plot$depth), 20) +
-      labs(x = "Time (PDT)",
+      labs(x = "Time (PST)",
            y = "Depth (m)",
            title = paste("Cruise:", unique(tdr.plot$cruise), 
                          "; Haul:", unique(tdr.plot$haul),
-                         "; Date:", date(tdr.plot$time[1])))
+                         "; Date:", date(tdr.plot$time[1]))) + 
+      theme(legend.position      = c(0.99,0.01),
+            legend.justification = c(1,0)) 
+    
+    # Add trawl window, if present
+    if (nrow(trawl.window) > 0) {
+      plot.tdr <- plot.tdr + 
+        geom_rect(data = trawl.window,
+                  aes(xmin = equilibriumTime,
+                      xmax = haulBackTime,
+                      ymin = min(tdr.plot$depth),
+                      ymax = 10),
+                  fill = 'gray70', alpha = 0.5) +
+        geom_rect(data = trawl.window,
+                  aes(xmin = netInWaterTime,
+                      xmax = netOnDeckTime,
+                      ymin = min(tdr.plot$depth),
+                      ymax = 10), fill = NA,
+                  colour = 'gray50', linetype = "dashed", alpha = 0.5) +
+        geom_text(data = trawl.text,
+                  aes(time, min(tdr.plot$depth), label = event),
+                  size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1)
+    }
+    
+    # Add SOG if present
+    if (nrow(trawl.nav) > 0) {
+      plot.tdr <- plot.tdr + 
+        annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)",
+                 colour = "magenta", hjust = 0, size = 3) +
+        geom_line(data = trawl.nav,
+                  aes(time, SOG),
+                  colour = "magenta")
+    }
     
     # Save plot
     ggsave(plot.tdr, 
@@ -390,8 +405,32 @@ if(nrow(tbl.all.new) > 0) {
                            paste0(survey.name, "_TDR_", sprintf("%03d", k), ".png")),
            height = 5, width = 10)
   }
+  # Print processed TDR hauls.
+  cat(paste0("Processed TDR data from haul(s) ", glue_collapse(unique(tbl.all.new$haul), sep = ",", last = " and "), "."))
+  
 } else {
-  cat("No new TDR data to plot.")
+  cat("No new TDR data have been processed.")
+  
 }
 ```
+
+Display TDR data for the last three trawl hauls.
+
+```{r list-plots}
+tdr.figs <- tail(dir_ls(here("Figs/TDR")), 3)
+```
+
+```{r plot-1}
+include_graphics(tdr.figs[1])
+```
+
+```{r plot-2}
+include_graphics(tdr.figs[2])
+```
+
+```{r plot-31}
+include_graphics(tdr.figs[3])
+```
+
+
 
