@@ -106,7 +106,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2022-06-27", "2022-07-19",
                                           "2022-09-30")))
 
 # Define ERDDAP data variables
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2022-06-27" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2022-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
@@ -319,19 +319,22 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2207RL",
-                            LBC = "C:/SURVEY/2207RL",
-                            LM  = "C:/SURVEY/2207RL",
-                            SD  = "C:/SURVEY/2207RL")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCCE",
+                            LBC = "//swc-storage3-s/AST3/SURVEYS/20220627_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage3-s/AST3/SURVEYS/20220627_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20220627_SAILDRONE_SummerCPS")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage3-s/AST3/SURVEYS/20220672_LASKER_SummerCCE")
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCCE",
+                            LBC = "//swc-storage3-s/AST3/SURVEYS/20220627_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage3-s/AST3/SURVEYS/20220627_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20220627_SAILDRONE_SummerCPS")   
 }
 
-# Backscatter data (within survey.dir, typically; a vector of file paths)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
-                            LM  = "PROCESSED/EV/CSV/LISAMARIE",
-                            LBC = "PROCESSED/EV/CSV/CARNAGE",
-                            SD  = "PROCESSED/EV/CSV/SAILDRONE") 
+# Backscatter data (within survey.dir, typically)
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
+                            LM  = "PROCESSED/EV/CSV",
+                            LBC = "PROCESSED/EV/CSV",
+                            SD  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
@@ -499,7 +502,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "Access" # "SQL" or "Access"
+trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2207RL.accdb"
