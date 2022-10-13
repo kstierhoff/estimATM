@@ -210,7 +210,7 @@ sardine.color      <- '#FF0000'
 anchovy.color      <- '#00CD66'
 jack.mack.color    <- '#0000FF'
 jacksmelt.color    <- '#A020F0'
-pac.mack.color     <- '#FF9800'
+pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
 
