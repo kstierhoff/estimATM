@@ -40,7 +40,7 @@ show.maps <- TRUE
 
 ## Used by processTransects.R -----------
 # GPX file location
-gpx.dir          <- "//swc-storage4-s.nmfs.local/AST4/SURVEYS/20220627_LASKER_SummerCCE/PLANNING/Rose Point/GPX"
+gpx.dir          <- "//swc-storage4-s.nmfs.local/AST4/SURVEYS/20220627_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
 gpx.file         <- "rosepoint_waypoints.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
@@ -319,12 +319,12 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCCE",
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCPS",
                             LBC = "//swc-storage3-s/AST3/SURVEYS/20220627_CARNAGE_SummerCPS",
                             LM  = "//swc-storage3-s/AST3/SURVEYS/20220627_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20220627_SAILDRONE_SummerCPS")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCCE",
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCPS",
                             LBC = "//swc-storage3-s/AST3/SURVEYS/20220627_CARNAGE_SummerCPS",
                             LM  = "//swc-storage3-s/AST3/SURVEYS/20220627_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20220627_SAILDRONE_SummerCPS")   
@@ -693,7 +693,7 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
 cal.vessels        <- c("RL") # ,"LBC","LM"
-cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20220627_LASKER_SummerCCE/DATA/EK80/CALIBRATION/RESULTS"
+cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20220627_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
 cal.datetime       <- "23 June"     # Date/time of calibration
 cal.plot.date      <- "2022-06-23" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
