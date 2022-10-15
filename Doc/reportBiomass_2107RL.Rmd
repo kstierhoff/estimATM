@@ -764,18 +764,39 @@ load(here("Output/nasc_summ_tx_ns.Rdata"))
 
 nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
 nasc.summ.lm.ns  <- filter(nasc.summ.ns, vessel.name == "LM")
-```  
+``` 
+
+```{r nav-summary}
+# Summarize Lasker days at sea
+nav.rl <- readRDS(here("Data/Nav/nav_data_raw.rds"))
+das.rl <- n_distinct(date(nav.rl$time))
+
+# Summarize Lisa Marie days at sea
+nav.lm <- readRDS(here("Data/Nav/nav_vessel_lm.rds"))
+das.lm <- n_distinct(date(nav.lm$datetime))
+
+# Summarize Long Beach Carnage days at sea
+nav.lbc <- readRDS(here("Data/Nav/nav_vessel_lbc.rds"))
+das.lbc <- n_distinct(date(nav.lbc$datetime))
+
+# Summarize Saildrone days at sea
+load("C:/KLS/CODE/Github/estimATM/2107RL/Data/Nav/nav_data_saildrone.Rdata")
+das.sd <- nav.sd %>% 
+  group_by(saildrone) %>% 
+  summarise(das = n_distinct(date(datetime)))
+
+# Summarize Carranza days at sea
+nav.jcf <- read_csv(here("Data/Nav/JCF/nav_vessel_JCF.csv")) 
+das.jcf <- n_distinct(dmy(nav.jcf$date))
+```
 
 <!-- The `r tolower(survey.season)` `r survey.year` survey took place between `r survey.landmark.n` and `r survey.landmark.s` during `r survey.das` DAS between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`. In the core survey area, acoustic sampling was conducted along `r nrow(nasc.summ)` daytime east-west transects that totaled `r prettyNum(sum(nasc.summ$distance),big.mark=",",digits=3)` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. In the nearshore survey area, acoustic sampling was conducted along `r nrow(nasc.summ.ns)` daytime east-west transects by _Lisa Marie_ and _Long Beach Carnage_ in that totaled `r prettyNum(sum(nasc.summ.ns$distance),big.mark=",",digits=3)` nmi. As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.   -->
 
-
-**[RESUME HERE]**  
-
 The `r tolower(survey.season)` `r survey.year` survey took place between `r survey.landmark.n` and `r survey.landmark.s` between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd("2021-11-08"),"%d %B %Y")`.  
 
-The core survey region spanned an area from approximately `r survey.landmark.n` to `r survey.landmark.s` (**Fig. \@ref(fig:nasc-cufes-trawl)**). _`r survey.vessel`_ (`r survey.das` days at sea, DAS), _Carranza_ (**XX DAS**), and the three USVs (**XX mission days**) sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS.  
+The core survey region spanned an area from approximately `r survey.landmark.n` to `r survey.landmark.s` (**Fig. \@ref(fig:nasc-cufes-trawl)**). _`r survey.vessel`_ (`r das.rl` days at sea, DAS), _Carranza_ (`r das.jcf` DAS), and the three USVs (`r sum(das.sd$das)` mission days) sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. As many as `r num2words(max(as.numeric(be$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS.  
 
-The nearshore region spanned an area from approximately Cape Flattery, WA to San Diego, CA, including around Santa Cruz and Santa Catalina Islands. _Lisa Marie_ surveyed from approximately Cape Flattery, WA to Stewart's Point, CA, with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r nrow(lm.sets)` purse seine sets (**Fig. \@ref(fig:nasc-seine-lm)**). _Long Beach Carnage_ surveyed from approximately Stewarts Point to San Diego, CA, and around the Santa Cruz and Santa Catalina Islands, with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets (**Fig. \@ref(fig:nasc-seine-lbc)**). As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.  
+The nearshore region spanned an area from approximately Cape Flattery, WA to San Diego, CA, including around Santa Cruz and Santa Catalina Islands. _Lisa Marie_ (`r das.lm` DAS) surveyed from approximately Cape Flattery, WA to Stewart's Point, CA, with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r nrow(lm.sets)` purse seine sets (**Fig. \@ref(fig:nasc-seine-lm)**). _Long Beach Carnage_ (`r das.lbc` DAS) surveyed from approximately Stewarts Point to San Diego, CA, and around the Santa Cruz and Santa Catalina Islands, with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets (**Fig. \@ref(fig:nasc-seine-lbc)**). As many as `r num2words(max(as.numeric(be.ns$Stratum),na.rm = T))` post-survey strata were defined considering transect spacing and the densities of echoes attributed to CPS. Biomasses and abundances were estimated for each species in both the core and nearshore survey areas.  
 
 **Leg I**  
 
@@ -803,15 +824,17 @@ During Leg IV, _Carranza_ sampled Transects 055 to 027, between Las Flores to Pu
 
 ## Acoustic backscatter {#results-backscatter-distribution} 
 
-Acoustic backscatter ascribed to CPS was observed throughout the core survey area, but was most prevalent south of Monterey Bay, especially offshore in the Southern CA Bight south of the northern Channel Islands (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Acoustic backscatter ascribed to CPS was also observed throughout the nearshore survey area, but was most prevalent between Long Beach and Oceanside, CA (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Although not visible at this scale, zero-biomass intervals were observed at the offshore end of each transect. The majority (greater than `r cum.biomass.limit*100`%) of biomass for each species was apportioned using catch data from trawl clusters conducted within a distance of $\leq$ 20 nmi (**Fig. \@ref(fig:biomass-cluster-distance)**).  
+Acoustic backscatter ascribed to CPS was observed throughout the latitudinal range of the core survey area (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Between approximately Fort Bragg and Pt. Conception, backscatter from CPS was present from near the coast to the shelf break, but was compressed along the coast to the north and south and around the Channel Islands in the SCB. Although not always visible at this scale, zero-biomass intervals were observed at the offshore end of each transect in the core region. The majority (greater than `r cum.biomass.limit*100`%) of biomass for each species was apportioned using catch data from trawl clusters conducted within a distance of $\leq$ 30 nmi (**Fig. \@ref(fig:biomass-cluster-distance)**).  
+
+Acoustic backscatter ascribed to CPS was also observed throughout the nearshore survey area (**Figs. \@ref(fig:nasc-seine-lm)a** and **\@ref(fig:nasc-seine-lbc)a**), but was most prevalent in transects sampled by _Lisa Marie_ between Crescent City and Bodega Bay (**Fig. \@ref(fig:nasc-seine-lm)a**) and along transect sampled by _Long Beach Carnage_ between Bodega Bay and San Francisco, between Big Sur and Long Beach, and around Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-lbc)a**).  
 
 ## Egg densities and distributions {#results-cufes-density}  
 
-Northern Anchovy eggs were abundant in CUFES samples throughout the survey area south of Monterey Bay, but were most abundant and coincident with much of the observed acoustic backscatter in the offshore portion of transects in the SCB (**Fig. \@ref(fig:nasc-cufes-trawl)b**). A few samples in the SCB contained Pacific Sardine eggs, mostly along the southeast coast of Santa Catalina Island (**Fig. \@ref(fig:nasc-cufes-trawl)b**). No Jack Mackerel eggs were observed.  
+Jack Mackerel and Pacific Sardine eggs were predominant in CUFES samples collected north of Monterey Bay, but were most abundant around Cape Blanco and the mouth of the Columbia River (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Northern Anchovy eggs were predominant in the SCB and near El Rosario off the coast of Baja CA (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Even though Pacific Sardine eggs were purportedly observed in CUFES samples collected off the coast of Baja CA between Tijuana and El Rosario, these identifications have not been verified and preliminary re-analysis of several samples from that region suggest that they do not contain Pacific Sardine eggs (N. Bowlin, pers. comm.).  
 
 ## Trawl catch {#results-trawl-catch}  
 
-Northern Anchovy was the predominant species in trawl catches throughout the survey area (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were caught in relatively small numbers offshore of the northern Channel Islands and east of San Nicolas Island (**Fig. \@ref(fig:nasc-cufes-trawl)c**; not visible at this scale). A few Pacific Mackerel were caught west of San Nicolas Island (**Fig. \@ref(fig:nasc-cufes-trawl)c**; not visible at this scale). Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Anchovy'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'Sardine'),big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(sum(cluster.summ.wt$'PacMack'),big.mark=",",digits=3)` kg of Pacific Mackerel, and `r prettyNum(sum(cluster.summ.wt$'JackMack'),big.mark=",",digits=3)` kg of Jack Mackerel; no Pacific Herring were collected).  
+Trawl catches were comprised of mostly Jack Mackerel north of Cape Mendocino, and Northern Anchovy to the south (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Herring were present in several trawl clusters off the coast of WA and OR. Pacific Sardine were caught in relatively small numbers offshore of central OR, near Pt. Conception, and along the Baja CA coast south of El Rosario (**Fig. \@ref(fig:nasc-cufes-trawl)c**). A few Pacific Mackerel were caught in the SCB and off the Baja CA coast south of El Rosario (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Round Herring were the predominant species in most trawl clusters between El Rosario and Punta Abreojos (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Anchovy'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'Sardine'),big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(sum(cluster.summ.wt$'PacMack'),big.mark=",",digits=3)` kg of Pacific Mackerel, `r prettyNum(sum(cluster.summ.wt$'JackMack'),big.mark=",",digits=3)` kg of Jack Mackerel, `r prettyNum(sum(cluster.summ.wt$'PacHerring'),big.mark=",",digits=3)` kg of Pacific Herring, and `r prettyNum(sum(cluster.summ.wt$'RndHerring'),big.mark=",",digits=2)` kg of Round Herring).  
 
 ## Purse seine catch {#results-seine-catch}
 
@@ -833,11 +856,24 @@ seine.summ.lbc <- lbc.specimens %>%
   )
 ```
 
-Pacific Sardine were predominant, by weight, in purse seine samples collected off WA, OR, and central CA by _Lisa Marie_. Overall, the `r num2words(nrow(lm.sets))` seines captured a combined `r prettyNum(sum(seine.summ.lm$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Engraulis mordax"],big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Scomber japonicus"],big.mark=",",digits=3)` kg of Pacific Mackerel,; no Jack Mackerel, or Pacific Herring were collected). 
+### _Lisa Marie_  
+
+Pacific Herring were predominant, by weight, in purse seine samples collected nearshore by _Lisa Marie_ off WA, OR, and CA north of Cape Mendocino (**Fig. \@ref(fig:nasc-seine-lm)b**). Between Cape Mendocino and Bodega Bay, Northern Anchovy were most abundant (**Fig. \@ref(fig:nasc-seine-lm)b**). Overall, the `r num2words(nrow(lm.sets))` seines captured a combined `r prettyNum(sum(seine.summ.lm$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Engraulis mordax"],big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Clupea pallasii"],big.mark=",",digits=3)` kg of Pacific Herring, and `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine; no Pacific or Jack Mackerel were collected). 
+
+### _Long Beach Carnage_  
+
+Northern Anchovy were predominant, by weight, in purse seine samples collected nearshore by _Long Beach Carnage_ off central CA between Cape Mendocino and Monterey Bay, and in the SCB between Los Angeles and Long Beach (**Fig. \@ref(fig:nasc-seine-lbc)b**). Pacific Sardine were predominant between Big Sur and Pt. Conception; between Long Beach and San Diego; and around Santa Cruz and Santa Catalina Islands  (**Fig. \@ref(fig:nasc-seine-lbc)b**). Some Pacific Mackerel were collected between Oceanside, CA and San Diego and around Santa Cruz and Santa Catalina Islands, and Jack Mackerel were collected between Big Sur and Morro Bay, and off San Diego (**Fig. \@ref(fig:nasc-seine-lbc)b**). Overall, the `r num2words(nrow(lbc.sets))` seines captured a combined `r prettyNum(sum(seine.summ.lbc$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Scomber japonicus"],big.mark=",",digits=3)` kg of Pacific Mackerel, `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Trachurus symmetricus"],big.mark=",",digits=2)` kg of Jack Mackerel, and `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Engraulis mordax"],big.mark=",",digits=2)` kg of Northern Anchovy; no Pacific Herring were collected). 
+
+### Combined catch
+
++ Purse seine sets were sparse in some instances
++ For computing biomass, nearshore intervals were assigned the species proportions from the nearest trawl `cluster.source["NS"]`, as shown in **Fig. \@ref(fig:nasc-prop-ns)b**.
+
+\newpage
 
 (ref:biomass-cluster-distance) Total (top) and cumulative (bottom) biomass(t) versus distance to the nearest positive trawl cluster. Dashed vertical lines (bottom) represent the cluster distance where cumulative biomass equals `r cum.biomass.limit*100`%.
 
-```{r biomass-cluster-distance,fig.cap='(ref:biomass-cluster-distance)',out.width='6.5in',fig.pos='H'}
+```{r biomass-cluster-distance,fig.cap='(ref:biomass-cluster-distance)',out.width='6in',fig.pos='H'}
 include_graphics(here("Figs/fig_cluster_distance_cumulative_biomass.png"))
 ```  
 
@@ -846,16 +882,16 @@ include_graphics(here("Figs/fig_cluster_distance_cumulative_biomass.png"))
 
 (ref:nasc-cufes-trawl) Spatial distributions of: a) 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for Northern Anchovy, Pacific Sardine, and Jack Mackerel; and c) acoustic proportions of CPS in trawl clusters and purse seine sets (black points indicate trawl clusters with no CPS).
 
-```{r nasc-cufes-trawl, fig.cap='(ref:nasc-cufes-trawl)',out.width='8in',fig.pos='H'}
+```{r nasc-cufes-trawl, fig.cap='(ref:nasc-cufes-trawl)',out.width='9in',fig.pos='H'}
 include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster.png"))
 ```  
 
 \elandscape
 \newpage  
 
-(ref:nasc-seine-lm) Nearshore survey transects conducted by _Lisa Marie_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each purse seine catch (b). Species with low catch weights are not visible at this scale.
+(ref:nasc-seine-lm) Nearshore survey transects conducted by _Lisa Marie_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each purse seine catch (b). Species with low catch weights (e.g., Pacific Sardine) are not visible at this scale.
 
-```{r nasc-seine-lm, fig.cap='(ref:nasc-seine-lm)', out.height='7in', fig.pos='H'}
+```{r nasc-seine-lm, fig.cap='(ref:nasc-seine-lm)', out.height='8in', fig.pos='H'}
 if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LisaMarie.png"))) {
   include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LisaMarie.png"))  
 } else {
@@ -867,7 +903,7 @@ if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LisaMarie.png"))) {
 
 (ref:nasc-seine-lbc) Nearshore survey transects conducted by _Long Beach Carnage_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each purse seine catch (b). Species with low catch weights are not visible at this scale.
 
-```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.height='7in', fig.pos='H'}
+```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.height='8in', fig.pos='H'}
 if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))) {
   include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))  
 } else {
@@ -877,7 +913,7 @@ if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png
 
 \newpage
 
-(ref:nasc-prop-ns) Spatial distributions of: a) 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS from nearshore sampling and b) acoustic proportions of CPS in purse seine sets (off WA and OR) and trawl clusters (off CA). **This figure presently shows all nearshore backscatter, not just the backscatter that doesn't overlap with Lasker. And the catch proportions include Lasker clusters when those clusters are the closest in space.**
+(ref:nasc-prop-ns) Spatial distributions of: a) 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from 5 to 70 m deep) ascribed to CPS from nearshore sampling and b) acoustic proportions of CPS in purse seine sets (off WA and OR) and trawl clusters (off CA). **This figure presently shows all nearshore backscatter, not just the backscatter that doesn't overlap with Lasker. And shows the acoustic proportion from the nearest cluster, not the nearest haul.**
 
 ```{r nasc-prop-ns, fig.cap='(ref:nasc-prop-ns)',out.width='6.5in',fig.pos='H'}
 include_graphics(here("Figs/fig_nasc_acoustic_cluster_ns.png"))

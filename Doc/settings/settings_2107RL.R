@@ -182,8 +182,8 @@ map.height.region <- c(central = 12, mexico = 7, north = 7, south = 10)
 map.label.size <- c(central = 1, mexico = 2, north = 2, south = 2)
 
 # Leaflet tile options; set both to T if caching
-useCachedTile  <- T # Use cached tiles
-useCrossOrigin <- T # USe cross origin
+useCachedTile  <- F # Use cached tiles
+useCrossOrigin <- F # USe cross origin
 leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 
 # Trawl proportion plots
