@@ -87,14 +87,14 @@ rm.offshore = c(RL  = TRUE,
 
 ```{r controls, echo=F, error=F, message=F, warning=F}
 # Processing instructions (T/F)
-copy.files      <- F # copy files from source
+copy.files      <- F # copy trawl, CUFES, and NASC files from source
 copy.bib        <- F # copy files from source; requires VPN (LEAVE AS F)
 overwrite.csv   <- T # overwrite CSV files when copying
 overwrite.files <- T # overwrite files (non CSV) when copying
 download.hab    <- F # download habitat map (F if using temporal aggregate map)
 save.figs       <- T # draw plots and maps, or use existing
-get.db          <- T # import database data
-process.scs     <- T # process SCS logs, or load processed data
+get.db          <- F # import database data
+process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- T # download nav data from ERDDAP
 process.csv     <- T # process CSV files from Echoview
 process.csv.all <- T # Process all CSV files (F = only new files)
@@ -102,7 +102,7 @@ process.cal.FM  <- F # Process FM calibration results
 process.zmux    <- F # process impedance data
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
-calc.raw.size   <- T # computer RAW file size, or use existing
+calc.raw.size   <- F # computer RAW file size, or use existing
 ```
 
 ```{r copy-bib,include=F}
@@ -449,13 +449,18 @@ bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>%
   st_transform(crs.geog) %>% 
   rename(Depth = Contour)
 
-# Set padding around data  
+# If resize.map = T, then set map boundaries based on current navigation progress
 if (resize.map) {
   # Use nav data to resize map to survey progress
   map.bounds <- nav.sf %>% 
     st_transform(crs = crs.proj) %>%
     st_bbox() 
+  
+# Otherwise, set map boundaries to the entire planned transect area
 } else {
+  
+  # If the survey contains multiple core-area vessels, such as in 2021 when
+  # Lasker and Carranza split transects, then combine those vessels
   if (survey.name %in% c("2107RL")) {
     # Use combined planned transects
     map.bounds <- transects.jcf %>% 
@@ -463,6 +468,8 @@ if (resize.map) {
       bind_rows(transects.sf) %>% 
       st_transform(crs = crs.proj) %>%
       st_bbox()
+    
+  # Otherwise use the planned transects from just Lasker
   } else {
     # Use planned transects
     map.bounds <- transects.sf %>%
@@ -1270,9 +1277,7 @@ if (save.figs) {
   ggsave(nasc.cufes.trawl.plot, 
          filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
          width = map.width*3, height = map.height)
-}
 
-if (save.figs) {
   if (exists("google_map_api")) {
     # If the Google Map API key is present, map the calibration location
     source(here("Code/map_calibration_location.R"))
@@ -1287,9 +1292,9 @@ source(here("Code/plot_purseSeine_2107RL.R"))
 
 \pagenumbering{gobble}
 
-**Report on the `r survey.name.long` (`r survey.name`), `r survey.start` to `r survey.end` `r survey.year`, conducted aboard NOAA ship _`r survey.vessel.long`_, Mexican research vessel _Dr. Jorge Carranza Fraser_, fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and uncrewed surface vehicles**  
+**Report on the `r survey.name.long` (`r survey.name`), `r survey.start` to `r survey.end` `r survey.year`, conducted aboard NOAA ship _`r survey.vessel.long`_, fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and uncrewed surface vehicles**  
 
-Josiah S. Renfree^1^, Noelle M. Bowlin^1^, Brad E. Erisman^1^, Ramón Isaac Rojas-González^2^, Gabriel E. Johnson^1,3^, Scott A. Mau^1^, David W. Murfin^1^, Brittany D. Schwartzkopf^1^, Thomas S. Sessions^1^, Kevin L. Stierhoff^1^, Juan Roberto F. Vallarta-Zárate^2^, Lanora Vasquez^1^, William Watson^1^, Juan P. Zwolinski^1,4^, and David A. Demer^1^
+Josiah S. Renfree^1^, Alice Beittel^2^, Noelle M. Bowlin^1^, Brad E. Erisman^1^, Scott A. Mau^1^, David W. Murfin^1^, Brittany D. Schwartzkopf^1^, Thomas S. Sessions^1^, Kevin L. Stierhoff^1^, Lanora Vasquez^1^, William Watson^1^, Juan P. Zwolinski^1,4^, and David A. Demer^1^
 
 ^1^Fisheries Resources Division  
 Southwest Fisheries Science Center (SWFSC)  
@@ -1297,15 +1302,9 @@ NOAA-National Marine Fisheries Service
 8901 La Jolla Shores Dr.  
 La Jolla, CA 92037, USA  
 
-^2^Instituto Nacional de Pesca y Acuacultura (INAPESCA)   
-Mexico Avenue 190   
-Del Carmen, Coyoacán    
-04100 Ciudad de México, CDMX    
-MEXICO
+^2^NOAA Commissioned Officer Corps, Assigned to SWFSC 
 
-^3^NOAA Commissioned Officer Corps, Assigned to SWFSC 
-
-^4^University of California, Santa Cruz  
+^3^University of California, Santa Cruz  
 The Cooperative Institute for Marine, Earth and Atmospheric Systems (CIMEAS)  
 1156 High St
 Santa Cruz, CA 95064, USA
@@ -1326,7 +1325,7 @@ Santa Cruz, CA 95064, USA
 
 # Introduction {#introduction}
 
-The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA ship *`r survey.vessel.long`* (hereafter *`r survey.vessel`*) (**Fig.** \@ref(fig:vessel-pic)), `r survey.start` to `r survey.end` `r survey.year`, and augmented by data collected from the Mexican research vessel _Dr. Jorge Carranza Fraser_ (hereafter _Carranza_), fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and uncrewed surface vehicles (USVs; Saildrone, Inc.). The Acoustic-Trawl Method (ATM) is routinely used to assess coastal pelagic fish species (CPS) and krill within the California Current Ecosystem (CCE), between Vancouver Island, British Columbia and San Diego, CA. In 2021, for the first time, the survey extended southward to central Baja California, Mexico. Data were collected using multi-frequency echosounders, surface trawls, obliquely integrating net tows, a Continuous Underway Fish-Egg Sampler [CUFES; @Checkley1997], and conductivity-temperature-depth probes (CTDs).
+The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA ship *`r survey.vessel.long`* (hereafter *`r survey.vessel`*) (**Fig.** \@ref(fig:vessel-pic)), `r survey.start` to `r survey.end` `r survey.year`, and augmented by data collected from the fishing vessels _Lisa Marie_ and _Long Beach Carnage_ and uncrewed surface vehicles (USVs; Saildrone, Inc.). The Acoustic-Trawl Method (ATM) is routinely used to assess coastal pelagic fish species (CPS) and krill within the California Current Ecosystem (CCE), typically between Vancouver Island, British Columbia and San Diego, CA. Since 2021, the survey has extended southward to central Baja California, Mexico. Data were collected using multi-frequency echosounders, surface trawls, obliquely integrating net tows, a Continuous Underway Fish-Egg Sampler [CUFES; @Checkley1997], and conductivity-temperature-depth probes (CTDs).
 
 The objectives for the survey were to: 1) acoustically map the distributions, measure the species compositions and size-frequency distributions, and estimate the abundances of CPS, e.g., Pacific Sardine *Sardinops sagax*, Northern Anchovy *Engraulis mordax*, Pacific Herring *Clupea pallasii*, Pacific Round Herring *Etrumeus acuminatus*, Pacific Mackerel *Scomber japonicus*, and Jack Mackerel *Trachurus symmetricus*; and krill (euphausiid spp.); 2) characterize and investigate linkages to their biotic and abiotic environments; 3) gather information regarding their life histories; and 4) use fishing vessels and USVs to sample in offshore and nearshore areas when and where sampling from NOAA ships was deemed inefficient, unsafe, or both (**Fig.** \@ref(fig:vessel-pic)).
 
@@ -1334,12 +1333,10 @@ The survey domain, from Cape Flattery, WA to Central Baja California, Mexico, wa
 
 This report provides an overview of the survey objectives and a summary of the survey equipment, sampling protocols, and data collections. This report does not include estimates of the animal distributions and biomasses, which are documented separately. 
 
-**This survey was conducted with the approval of the Secretaria de Relaciones Exteriores (SRE, Diplomatic note CTC/1312/2021), the Instituto Nacional de Estadística y Geografía (INEGI; Permit: EG0082021), and the Comisión Nacional de Acuacultura y Pesca (CONAPESCA; Permit: PPFE/DGOPA-073/21).**  
-
-(ref:vessel-pic) NOAA ship _`r survey.vessel`_ (top left), RV _Dr. Jorge Carranza Fraser_ (bottom left), F/V _Long Beach Carnage_ (top right), F/V _Lisa Marie_ (middle right), and an uncrewed surface vehicle (Saildrone USV, bottom right).
+(ref:vessel-pic) NOAA ship _`r survey.vessel`_ (top), F/V _Lisa Marie_ (bottom left), F/V _Long Beach Carnage_ (bottom middle), and an uncrewed surface vehicle (Saildrone USV, bottom right).
 
 ```{r vessel-pic, fig.cap='(ref:vessel-pic)', out.height='5.0in', fig.pos='H'}
-include_graphics(here("Images/img_vessels_2107RL_V2.png"))
+include_graphics(here("Images/img_vessels_1907RL.png"))
 ```
 
 \newpage  
@@ -1353,36 +1350,24 @@ The collection and analysis of the survey data were conducted by members of 1-NO
 
 **Acoustic Data Collection and Processing:**
 
-* _Lasker_
-  + Leg I:   J. Renfree^1\*^ and G. Johnson^1^
-  + Leg II:  S. Mau^1^, E. Pérez-Flores^2^, and S. Dolan^4^
-  + Leg III: J. Zwolinski^1\*^, D. Murfin^1^, and L. Altamirano-López^2^
-  + Leg IV:  K. Stierhoff^1\*^, S. Sessions^1^, and R. Vallarta-Zárate^2^
+* Leg I:   J. Renfree^1^, D. Palance^1^, and M. Santiago
+* Leg II:  D. Palance, S. Dolan, and S. Mau^1^
+* Leg III: J. Zwolinski^1\*^ and S. Sessions^1^
+* Leg IV:  K. Stierhoff^1\*^, A. Beittel^1^, and M. Vasquez-Ortiz^2^
 
-* _Carranza_
-  + M. Vásquez-Ortiz^2^ and L. Altamirano-López^2^
-  
 **Trawl Sampling:**
 
-* _Lasker_
-  + Leg I:   M. Craig^1^, L. Heberer^1^, P. Kuriyama^1^, and S. Hensman^4^
-  + Leg II:  B. Schwartzkopf^1^, L. Martin^1^, B. Bellerud^1^, J. Barnes^4^, and D. Hernández-Cruz^2^
-  + Leg III: O. Snodgrass^1^, E. Adams^1^, C. Fahy^1^, Z. Skelton^1^, and J. Walker^1^
-  + Leg IV:  K. James^1^, K. Koch^1^, K. Lane^1^, D. Lowry^1^, and J. Osuna-Soto^3^
-
-* _Carranza_
-  + D. Hernández-Cruz^2^, L. Huidobro-Campos^2^, A. Lizárraga-Rodríguez^2^, and S. Padilla-Galindo^2^
+* Leg I:   O. Snodgrass^1^, A. Freire de Carvalho^1^, M. Human^1^, P. Kuriyama^1^, and O. Boisen
+* Leg II:  K. James^1^, E. Weber^1^, K. Walsh, and R. Backman
+* Leg III: J. Walker^1^, B. Erisman^1^, N. Concha-Saiz^1^, T. Batchel^1^, and L. Havana
+* Leg IV:  B. Schwartzkopf^1^, N. Concha-Saiz^1^, T. Batchel^1^, D. Lowry^1^, and D. Hernandez Cruz
 
 **CUFES Sampling:**
 
-* _Lasker_
-  + Leg I:   E. Gardner^1^ and A. Freire de Carvalho^1^
-  + Leg II:  W. Watson^1\*^ and M. Human^1^
-  + Leg III: E. Gardner^1^ and S. Morales-Gutiérrez^2^
-  + Leg IV:  L. Vasquez^1^ and V. Martínez-Magaña^2^
-
-* _Carranza_
-  + S. Gutiérrez^2^
+* Leg I:   N. Bowling^1\*^ L. Vasquez^1^
+* Leg II:  A. Thompson^1^, E. Gardner^1^, and W. Watson^1\*^
+* Leg III: A. Hays^1^
+* Leg IV:  TBD and S. Morales Gutierrez
 
 **Purse-seine Sampling:**  
 
