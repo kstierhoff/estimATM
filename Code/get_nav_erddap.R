@@ -1,4 +1,5 @@
 if (get.nav) {
+  
   # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
     load(here("Data/Nav/nav_data.Rdata"))
