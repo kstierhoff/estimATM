@@ -151,9 +151,9 @@ erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"character")
 
 # Define date range for each Saildrone to remove overlapping transits
-sd.date.range    <- data.frame(saildrone  = c(1055, 1059),
-                               start.date = ymd(c("2021-07-06", "2021-10-15")),
-                               end.date   = ymd(c("2021-07-06", "2021-10-15")))
+sd.date.range    <- data.frame(saildrone  = c(1076, 1077),
+                               start.date = ymd(c("2021-07-06", "2021-07-06")),
+                               end.date   = ymd(c("2021-10-15", "2021-10-15")))
 
 # Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
 sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
