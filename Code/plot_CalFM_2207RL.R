@@ -2,35 +2,35 @@ cal.files.fm <- dir_ls(here("Data/Calibration/FM"),
                        pattern = "*.xml")
 
 # Read calibration data from each frequency ---------------------------------------------
-cal.fm.38 <- extract_cal_fm(here("Data/Calibration/FM/38kHz_FM.xml"),
+cal.fm.38 <- extract_cal_fm(here("Data/Calibration/FM/38kHz FM calibration.xml"),
                             vessel.name = "RL",
                             survey.name = survey.name)$cal.res %>% 
   mutate(
     txdr = "ES38-7",
     txdr.freq = 38)
 
-cal.fm.70 <- extract_cal_fm(here("Data/Calibration/FM/70kHz_FM.xml"),
+cal.fm.70 <- extract_cal_fm(here("Data/Calibration/FM/70kHz FM calibration.xml"),
                              vessel.name = "RL",
                              survey.name = survey.name)$cal.res %>%  
   mutate(
     txdr = "ES70-7C",
     txdr.freq = 70)
 
-cal.fm.120 <- extract_cal_fm(here("Data/Calibration/FM/120kHz_FM_381mmWC.xml"),
+cal.fm.120 <- extract_cal_fm(here("Data/Calibration/FM/120kHz FM calibration.xml"),
                              vessel.name = "RL",
                              survey.name = survey.name)$cal.res %>% 
   mutate(
     txdr = "ES120-7C",
     txdr.freq = 120)
 
-cal.fm.200 <- extract_cal_fm(here("Data/Calibration/FM/200kHz_FM_381mmWC.xml"),
+cal.fm.200 <- extract_cal_fm(here("Data/Calibration/FM/200kHz FM calibration.xml"),
                              vessel.name = "RL",
                              survey.name = survey.name)$cal.res %>% 
   mutate(
     txdr = "ES200-7C",
     txdr.freq = 200)
 
-cal.fm.333 <- extract_cal_fm(here("Data/Calibration/FM/333kHz_FM_381mmWC.xml"),
+cal.fm.333 <- extract_cal_fm(here("Data/Calibration/FM/333kHz FM calibration.xml"),
                              vessel.name = "RL",
                              survey.name = survey.name)$cal.res %>% 
   mutate(
