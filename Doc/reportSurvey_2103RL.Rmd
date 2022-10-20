@@ -1718,55 +1718,27 @@ The EAL was used to control the EK80 software to modulate the echosounder record
 
 ### Data processing {#methods-acoustic-data-processing}
 
-Echoes from schooling CPS and plankton (**Figs. \@ref(fig:ev-filtering-example)a, d**) were identified using a semi-automated data processing algorithm implemented using Echoview software (`r ev.version`; Echoview Software Pty Ltd). The filters and thresholds were based on a subsample of echoes from randomly selected CPS schools. The aim of the filter criteria is to retain at least 95% of the noise-free backscatter from CPS while rejecting at least 95% of the non-CPS backscatter (**Fig. \@ref(fig:ev-filtering-example)**).  
+Echoes from schooling CPS and plankton (**Figs. \@ref(fig:ev-filtering-example)a, d**) were identified using a semi-automated data processing algorithm implemented using Echoview software (`r ev.version`; Echoview Software Pty Ltd). The filters and thresholds were based on a subsample of echoes from randomly selected CPS schools. The aim of the filter criteria is to retain at least 95% of the noise-free backscatter from CPS while rejecting at least 95% of the non-CPS backscatter (**Fig. \@ref(fig:ev-filtering-example)**). Data from _`r survey.vessel`_ and _Long Beach Carnage_ were processed using the following steps:  
 
-#### _`r survey.vessel`_ 
-\
-\
-Data from _`r survey.vessel`_ were processed using the following steps:  
-
-1. Match geometry of the 70-, 120-, 200-, and 333-kHz $S_v$ to the 38-kHz $S_v$;
+1. Match geometry of all $S_v$ variables to the 38-kHz $S_v$;
 2. Remove passive-mode pings;
 3. Estimate and subtract background noise using the background noise removal function [@DeRobertis2007] in Echoview (**Figs. \@ref(fig:ev-filtering-example)b, e**);
 4. Average the noise-free $S_v$ echograms using non-overlapping 11-sample by 3-ping bins;
 5. Expand the averaged, noise-reduced _S~v~_ echograms with a 7 pixel x 7 pixel dilation;
 6. For each pixel, compute: $S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}}$, $S_{v,\mathrm{120kHz}}-S_{v,\mathrm{38kHz}}$, and $S_{v,\mathrm{70kHz}}-S_{v,\mathrm{38kHz}}$;
 7. Create a Boolean echogram for $S_v$ differences in the CPS range: $-13.85 < S_{v,\mathrm{70kHz}}-S_{v,\mathrm{38kHz}} < 9.89 \text{ and} -13.5 < S_{v,\mathrm{120kHz}}-S_{v,\mathrm{38kHz}} < 9.37 \text{ and} -13.51 < S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}} < 12.53$;
-8. Compute the 120- and 200-kHz Variance-to-Mean Ratios [$VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$, respectively, @Demer2009] using the difference between noise-filtered $S_v$ (Step 3) and averaged $S_v$ (Step 4);
+8. Compute the 120- and 200-kHz Variance-to-Mean Ratios [$VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$, respectively, @Demer2009a] using the difference between noise-filtered $S_v$ (Step 3) and averaged $S_v$ (Step 4);
 9. Expand the $VMR_{\mathrm{120kHz}}$ and $VMR_{\mathrm{200kHz}}$ echograms with a 7 pixel x 7 pixel dilation;
-10. Create a Boolean echogram based on the $VMR$s in the CPS range: $VMR_{\mathrm{120kHz}}$ > -65 dB and $VMR_{\mathrm{200kHz}}$ > -65 dB. Diffuse backscattering layers have low $VMR$ [@Zwolinski2010] whereas fish schools have high $VMR$ [@Demer2009];
+10. Create a Boolean echogram based on the $VMR$s in the CPS range: $VMR_{\mathrm{120kHz}}$ > -65 dB and $VMR_{\mathrm{200kHz}}$ > -65 dB. Diffuse backscattering layers have low $VMR$ [@Zwolinski2010] whereas fish schools have high $VMR$ [@Demer2009a];
 11. Intersect the two Boolean echograms to create an echogram with "TRUE" samples for candidate CPS schools and "FALSE" elsewhere;
 12. Mask the noise-reduced echograms using the CPS Boolean echogram (**Figs. \@ref(fig:ev-filtering-example)c, f**);
 13. Create an integration-start line `r int.start` m below the transducer (~10 m depth);
-14. Create an integration-stop line `r adz.range` m above the estimated seabed [@Demer2009], or to the maximum logging range (e.g., `r int.stop` m), whichever is shallowest;
+14. Create an integration-stop line `r adz.range` m above the estimated seabed [@Demer2009a], or to the maximum logging range (e.g., `r int.stop` m), whichever is shallowest;
 15. Set the minimum $S_v$ threshold to -60 dB (corresponding to a density of approximately three 20-cm-long Pacific Sardine per 100 m^3^);
 16. Integrate the volume backscattering coefficients ($s_V$, m^2^ m^-3^) attributed to CPS over 5-m depths and averaged over 100-m distances;
 17. Output the resulting nautical area scattering coefficients ($s_A$; m^2^ nmi^-2^) and associated information from each transect and frequency to comma-delimited text (.csv) files.  
 
-#### _Long Beach Carnage_  
-\
-\
-Data from _Long Beach Carnage_ were processed using the following steps **[check these]**:  
-
-1. Remove shorter-duration, transient noise (e.g., ship’s asynchronous sonar) using the Impulse Noise Removal operator;
-2. Remove longer-duration, transient noise (e.g., wave-hull collisions) using the Transient Noise Removal operator;
-3. Compensate attenuated signals (e.g., from air-bubble attenuation) using the Attenuated Signal Removal operator;
-4. Average the noise-free $S_v$ echograms using non-overlapping 11-sample by 3-ping bins;
-5. Compute the $VMR$ using the difference between noise-filtered $S_v$ (Step 3) and averaged $S_v$ (Step 4);
-6. Create a Boolean echogram mask using $VMR$ > -48 dB;
-7. Expand the Boolean mask with a 7 pixel x 7 pixel dilation;
-8. Performs Steps 12-17 from _`r survey.vessel`_ processing.
-9. Data from the USVs were processed using the following:
-10. Match geometry of the $S_{v,\mathrm{200kHz}}$ to the $S_{v,\mathrm{38kHz}}$;
-11. Remove passive-mode pings;
-12. Perform Steps 3-5 from _`r survey.vessel`_ processing;
-13. For each pixel, compute: $S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}}$;
-14. Create a Boolean echogram for $S_v$ differences in the CPS range: $-3 < S_{v,\mathrm{200kHz}}-S_{v,\mathrm{38kHz}} < 9.37$
-15. Perform Steps 8-9 from _`r survey.vessel`_ processing;
-16. Create a Boolean echogram mask using $VMR$ > -57 dB;
-17. Performs Steps 11-17 from _`r survey.vessel`_ processing.  
-
-When necessary, the start and stop integration lines were manually edited to exclude reverberation due to bubbles, to include the entirety of shallow CPS aggregations, or to exclude seabed echoes.  
+When necessary, the start and stop integration lines were manually edited to exclude reverberation due to bubbles, to include the entirety of shallow CPS aggregations, or to exclude seabed echoes.  Echoes suspected to be from rockfish schools were further excluded.  
 
 (ref:ev-filtering-example) Echogram depicting CPS schools (red) and plankton aggregations (blue and green) at 38 kHz (top row) and 120 kHz (bottom row). Example data processing steps include the original echogram (left column), after noise subtraction and bin-averaging (middle column), and after filtering to retain only putative CPS echoes (right column).
 
@@ -1845,7 +1817,7 @@ The EK80s were calibrated on `r cal.datetime` while the vessel was alongside the
 
 \newpage
 
-(ref:cal-results) Wide-Bandwidth Transceiver (Simrad WBT; 18, 38, 70, 120, 200, and 333 kHz; Kongsberg) and transducer information; pre-calibration settings (above horizontal line); and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles ($\alpha_{-3dB}$ and $\beta_{-3dB}$), angle offsets ($\alpha_0$ and $\beta_0$), and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the control software (Simrad EK80 `r ek80.version`; Kongsberg).
+(ref:cal-results) Wide-Bandwidth Transceiver (Simrad WBT; 18, 38, 70, 120, 200, and 333 kHz; Kongsberg) and transducer information; pre-calibration settings (above horizontal line); and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles ($\alpha_{-3dB}$ and $\beta_{-3dB}$), angle offsets ($\alpha_0$ and $\beta_0$), and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the control software (Simrad EK80 `r ek80.version`; Kongsberg). **[Remove empty rows; adjust sig figs]**
 
 ```{r cal-results,results='asis'}
 if (doc.type == "docx") {
@@ -1877,7 +1849,7 @@ if (doc.type == "docx") {
 include_graphics(here("Figs/fig_cal_TSrel_scatter.png"))
 ``` 
 
-(ref:cal-plot-fm) Measurements of on-axis gain ($G_0$, dB); alongship ($\alpha_\mathrm{-3dB}$, cyan) and athwartship ($\beta_\mathrm{-3dB}$, magenta) beamwidths (deg); and alongship ($\alpha_\mathrm{0}$, cyan) and athwartship ($\beta_\mathrm{0}$, magenta) offset angles (deg) measured during calibrations of EK80 wideband transceivers (WBT; 38, 70, 120, 200, and 333 kHz) in frequency modulation (FM, or broadband) mode.
+(ref:cal-plot-fm) Measurements of on-axis gain ($G_0$, dB); alongship ($\alpha_\mathrm{-3dB}$, cyan) and athwartship ($\beta_\mathrm{-3dB}$, magenta) beamwidths (deg); and alongship ($\alpha_\mathrm{0}$, cyan) and athwartship ($\beta_\mathrm{0}$, magenta) offset angles (deg) measured during calibrations of EK80 Wide-Bandwidth Transceivers (WBT; 38, 70, 120, 200, and 333 kHz) in frequency modulation (FM, or broadband) mode.
 
 ```{r cal-plot-fm,fig.cap='(ref:cal-plot-fm)',out.width='6in',fig.align='center',fig.pos='H'}  
 # Plots generated using Code/plot_CalFM_[survey.name].R
@@ -1889,7 +1861,7 @@ include_graphics(here("Figs/fig_cal_FM_AllFreqs.png"))
 ### _Long Beach Carnage_ {#results-echosounder-calibration-lbc}  
 The echosounders were calibrated in a tank at the SWFSC. The beam model results were entered into the GPT-control software and are presented in **Table \@ref(tab:cal-results-lbc)**. The calibration parameters were adjusted for local environmental conditions using UCTD data collected from _`r survey.vessel`_.  
 
-(ref:cal-results-lbc) General Purpose Transceiver (Simrad EK60 GPT; Kongsberg) calibrated beam model results. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (Simrad EK80; Kongsberg).
+(ref:cal-results-lbc) General Purpose Transceiver (Simrad EK60 GPT; Kongsberg) calibrated beam model results. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (Simrad EK80; Kongsberg). **[Remove empty rows; adjust sig figs]**
 
 ```{r cal-results-lbc,results='asis'}
 if (doc.type == "docx") {
@@ -1948,7 +1920,7 @@ Acoustic backscatter sampled by  _`r survey.vessel`_ and ascribed to CPS (**Fig.
 
 Northern Anchovy eggs were observed throughout the survey region south of Monterey Bay, but were most abundant in CUFES samples along the offshore portions of transects in the Southern CA Bight, coincident with backscatter ascribed to CPS (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Few Pacific Sardine eggs were observed, mostly around the southeast coast of Santa Catalina Island (**Fig. \@ref(fig:nasc-cufes-trawl)b**). No Jack Mackerel eggs were observed.  
 
-Northern Anchovy catches were predominant, by weight, in trawl samples collected throughout the survey area (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Jack Mackerel were present in several trawls offshore in the SCB, and one near Long Beach (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were caught in nine trawls; however, catches were small and not visible except in one trawl haul offshore of the northern Channel Islands (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Mackerel were caught in two hauls in the SCB, but are not visible at this scale (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Overall, the `r nrow(trawl.summ)` trawls captured a combined `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, and `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel; **Appendix \@ref(appendix-trawl-sampling)**).  
+Northern Anchovy catches were predominant, by weight, in trawl samples collected throughout the survey area (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Jack Mackerel were present in several trawls offshore in the SCB, and one near Long Beach (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Sardine were caught in nine trawls; however, catches were small and not visible except in one trawl haul offshore of the northern Channel Islands (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Pacific Mackerel were caught in two hauls in the SCB, but are not visible at this scale (**Fig. \@ref(fig:nasc-cufes-trawl)c**). Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Anchovy'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'Sardine'),big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(sum(cluster.summ.wt$'PacMack'),big.mark=",",digits=3)` kg of Pacific Mackerel, and `r prettyNum(sum(cluster.summ.wt$'JackMack'),big.mark=",",digits=3)` kg of Jack Mackerel; no Pacific Herring were collected; **Appendix \@ref(appendix-trawl-sampling)**).  
 
 ### Nearshore region  
 
