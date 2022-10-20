@@ -485,7 +485,7 @@ tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculatin
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
-scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
+scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
@@ -777,6 +777,8 @@ cb.int.button      <- "CB Interm"
 cb.ext.button      <- "CB Extended"
 gps.lat.hdr        <- "SAMOS-Lat-VALUE"
 gps.lon.hdr        <- "SAMOS-Lon-VALUE"
+gps.lat.moa        <- "GP170-Lat"
+gps.lon.moa        <- "GP170-Lon"
 sst.hdr            <- "SAMOS-TSGT-VALUE"
 sog.hdr            <- "SAMOS-SOG-VALUE"
 wind.dir.hdr       <- "SAMOS-TrueWind-Dir-VALUE"

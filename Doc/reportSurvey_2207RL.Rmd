@@ -87,7 +87,7 @@ rm.offshore = c(RL  = TRUE,
 
 ```{r controls, echo=F, error=F, message=F, warning=F}
 # Processing instructions (T/F)
-copy.files      <- T # copy Lasker trawl, CUFES, and NASC files from source (data from other vessels must be manually copied)
+copy.files      <- F # copy Lasker trawl, CUFES, and NASC files from source (data from other vessels must be manually copied)
 copy.bib        <- F # copy files from source; requires VPN (LEAVE AS F to use existing file from GitHub)
 overwrite.csv   <- T # overwrite CSV files when copying
 overwrite.files <- T # overwrite non-CSV files when copying
@@ -515,13 +515,21 @@ if (process.scs) {
                                 full.names = T, recursive = T)
     # create temporary df
     bridge.snap <- data.frame()
+    
     # read and rbind all files
     for (i in bridge.events) {
-      bridge.snap.tmp <- read_csv(i) %>% 
-        select(Date, Time, Button, Notes = all_of(notes.hdr), 
-               Lat = all_of(gps.lat.hdr), Lon = all_of(gps.lon.hdr))
+      bridge.snap.tmp <- read_csv(i) 
       
-      bridge.snap <- bind_rows(bridge.snap, bridge.snap.tmp)
+      # Fixes problem with files that do not contain events
+      if (nrow(bridge.snap.tmp) > 0) {
+        bridge.snap.tmp <- bridge.snap.tmp %>% 
+          select(Date, Time, Button, Notes = all_of(notes.hdr), 
+                 Lat = all_of(gps.lat.moa), Lon = all_of(gps.lon.moa)) %>% 
+          mutate(datetime = mdy(Date) + hms(Time),
+                 filename = i)
+        
+        bridge.snap <- bind_rows(bridge.snap, bridge.snap.tmp)  
+      }
     }
   } else if (scs.source == "XLSX") {
     # Process bridge event data #####
@@ -541,12 +549,10 @@ if (process.scs) {
   }
   
   # Format data
-  bridge.snap <- bridge.snap %>% 
-    filter(Lon != "", Lat != "") %>% 
-    mutate(Lat      = as.numeric(substr(Lat, 1, 2)) + 
-             as.numeric(substr(Lat, 3, 7))/60,
-           Lon      = -(as.numeric(substr(Lon, 1, 3)) +
-                          as.numeric(substr(Lon, 4, 8))/60),
+    bridge.snap <- bridge.snap %>% 
+    filter(!is.na(Lon), !is.na(Lat)) %>% 
+    mutate(Lat = scs2dd(Lat),
+           Lon = scs2dd(Lon),
            Button = case_when(
              Button == cb.flush.button ~ "Retracted (5 m)",
              Button == cb.int.button ~  "Intermediate (7 m)",
