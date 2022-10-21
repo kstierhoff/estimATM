@@ -94,7 +94,7 @@ overwrite.files <- T # overwrite non-CSV files when copying
 download.hab    <- F # download habitat map (F if using temporal aggregate map)
 save.figs       <- T # draw plots and maps, or use existing
 get.db          <- T # import trawl database data
-process.scs     <- F # process SCS logs, or load processed data
+process.scs     <- T # process SCS logs, or load processed data
 get.nav         <- T # download nav data from ERDDAP
 process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
@@ -1062,24 +1062,24 @@ ctd.sta         <- filter(events_sf, Button == ctd.button)
 uctd.sta        <- filter(events_sf, Button == uctd.button)
 
 # Append CTD cast locations from other survey vessels
-if (survey.name %in% c("2107RL")) {
+if (survey.name %in% c("2207RL")) {
   
   # Read Carranza stations
-  ctd.jcf <- read_csv(here("Data/CTD/ctd_stations_jcf.csv")) %>% 
+  ctd.sh <- read_csv(here("Data/CTD/ctd_stations_sh.csv")) %>% 
     mutate(Button = "CTD") 
   
-  ctd.jcf.sf <- ctd.jcf %>% 
+  ctd.sh.sf <- ctd.sh %>% 
     st_as_sf(coords = c("long", "lat"), crs = crs.geog)
   
   # Combine with Lasker casts
   if (nrow(ctd.sta) == 0) {
-    ctd.sta <- ctd.jcf.sf  
+    ctd.sta <- ctd.sh.sf  
   } else {
-    ctd.sta <- bind_rows(ctd.sta, ctd.jcf.sf)  
+    ctd.sta <- bind_rows(ctd.sta, ctd.sh.sf)  
   }  
   
   # Create datetime column
-  ctd.jcf <- ctd.jcf %>%
+  ctd.sh <- ctd.sh %>%
     mutate(datetime = format(mdy_hms(paste(Date, Time)), format = "%m/%d/%Y %H:%M"))
   
 }
@@ -1103,7 +1103,7 @@ all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
 # Append CTD info from other survey vessels
 if (survey.name %in% c("2107RL")) {
   all.ctds <- all.ctds %>% 
-    bind_rows(select(ctd.jcf, Date = datetime, Button = Button, Latitude = lat, Longitude = long))
+    bind_rows(select(ctd.sh, Date = datetime, Button = Button, Latitude = lat, Longitude = long))
 }
 ```  
 
@@ -1294,7 +1294,7 @@ if (save.figs) {
 
 ```{r plot-maps-ns}
 # Plot nearshore purse seine catch and acoustic backscatter
-source(here("Code/plot_purseSeine_2107RL.R"))
+source(here("Code/plot_purseSeine_2207RL.R"))
 ```
 
 \pagenumbering{gobble}
@@ -1347,7 +1347,7 @@ include_graphics(here("Images/img_vessels_1907RL.png"))
 \newpage  
 
 ## Scientific Personnel {#introduction-personnel}
-The collection and analysis of the survey data were conducted by members of 1-NOAA, 2-UCSC/CIMEAS, 3-UCSD/SIO, 4-INAPESCA, and 5-volunteers. Asterisks denote Chief Scientists.
+The collection and analysis of the survey data were conducted by members of 1-NOAA, 2-UCSC/CIMEAS, 3-UCSD/SIO, 4-INAPESCA, 5-WDFW, 6-CDFW, and 7-volunteers. Asterisks denote Chief Scientists.
 
 Leg 1 of the survey on _`r survey.vessel`_ was cancelled due to OMAO staffing issues.
 
@@ -1363,8 +1363,8 @@ Leg 1 of the survey on _`r survey.vessel`_ was cancelled due to OMAO staffing is
 
 **Trawl Sampling:**
 
-* Leg II:  K. James^1^, E. Weber^1^, K. Walsh^3^, and R. Backman^5^
-* Leg III: J. Walker^2^, N. Concha-Saiz^1^, M. Illman^5^, and J. Wood^5^
+* Leg II:  K. James^1^, E. Weber^1^, K. Walsh^3^, and R. Backman^7^
+* Leg III: J. Walker^2^, N. Concha-Saiz^1^, M. Illman^5^, and J. Wood^7^
 * Leg IV:  B. Schwartzkopf^1^, N. Concha-Saiz^1^, O. Snodgrass^1^, D. Lowry^1^ , and D. Hernandez-Cruz^4^
 
 **CUFES Sampling:**
@@ -1376,22 +1376,20 @@ Leg 1 of the survey on _`r survey.vessel`_ was cancelled due to OMAO staffing is
 **Purse-seine Sampling:**  
 
 * _Lisa Marie_
-  + K. Hinton and P. Biondo
+  + K. Hinton^5^, Erin Jaco^5^, Emily Seubert^5^, Zac Calef^5^, and Jennifer Topping^5^
 * _Long Beach Carnage_
   + K. Kloos, T. Nguyen, J. van Noord, and T. Stocking
 
 **Echosounder Calibrations:**  
 
 * _Lasker_
-  + D. Demer^1^, D. Murfin^1^, J. Renfree^1^, and S. Dolan^4^
+  + D. Murfin^1^, J. Renfree^1^, and S. Sessions^1^
 * _Lisa Marie_
   + J. Renfree^1^
 * _Long Beach Carnage_
-  + D. Murfin^1^ and J. Renfree^1^
+  + J. Renfree^1^ and S. Sessions^1^
 * _Saildrone_
   + Saildrone, Inc. and J. Renfree^1^
-* _Carranza_
-  + M. Vásquez-Ortiz^2^, L. Altamirano-López^2^, and S. Padilla-Galindo^2^
 
 \newpage
 
@@ -1402,9 +1400,9 @@ The SWFSC’s ATM surveys of CPS in the CCE began in 2006 with a focus on the no
 
 During spring, the northern stock of Pacific Sardine typically aggregates offshore of central and southern California to spawn [@Demer2012, and reference therein]. During summer, if the stock is large enough, adults migrate north, compress along the coast, and feed in the upwelled regions (**Fig. \@ref(fig:sardine-distribution)**). Since approximately 2012, however, the seasonal migration of the northern stock of Pacific Sardine diminished to the extent that it remains north of Cape Mendocino year-round.  
 
-During `r tolower(survey.season)` `r survey.year`, the west coasts of the United States and Baja California were surveyed using _`r survey.vessel`_, _Carranza_, _Lisa Marie_, _Long Beach Carnage_, and USVs. Compulsory transects were nearly perpendicular to the coast and separated by 10 nmi. The survey began off `r survey.landmark.n` and the combination of survey platforms progressed southwards toward `r survey.landmark.s`.    
+During `r tolower(survey.season)` `r survey.year`, the west coasts of the United States and Baja California were surveyed using _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and USVs. Compulsory transects were nearly perpendicular to the coast and separated by 10 nmi. The survey began off `r survey.landmark.n` and the combination of survey platforms progressed southwards toward `r survey.landmark.s`.    
 
-The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent of the potential habitat of the northern stock of Pacific Sardine^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html] at the time of the survey (**Fig. \@ref(fig:sardine-habitat)**). For _`r survey.vessel`_, the planned transects ranged from Vancouver Island, British Columbia to Punta Eugenia, MX. Due to time constraints, Vancouver Island was omitted, and _`r survey.vessel`_’s southernmost transect ended at Las Flores, MX. The offshore extent of the planned transects was adjusted during the survey according to the observed distribution of putative CPS backscatter in the echograms, CPS eggs in the CUFES samples, or CPS caught in trawls. To survey farther south into Baja California, _Carranza_ planned to sample from Punta Eugenia to `r survey.landmark.s`, but began the former at Las Flores, MX to begin sampling where _`r survey.vessel`_ concluded. To increase the spatial sampling resolution from _`r survey.vessel`_, acoustic sampling was conducted by USVs interstitial to _`r survey.vessel`_ transects from Cape Flattery, WA to Crescent City, CA (SD-1055 and SD-1059) and Point Arena to Point Conception, CA (SD-1036, SD-1055, and SD-1059). USVs (SD-1036 and SD-1059) were additionally used to sample the offshore extents of _`r survey.vessel`_ transects in the Southern California Bight. To estimate CPS biomass near shore, where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was augmented with echosounder and purse-seine sampling from _Lisa Marie_ between Cape Flattery, WA to Bodega Bay, CA; and _Long Beach Carnage_ from Bodega Bay, CA to the US/Mexico border, and around Santa Cruz and Santa Catalina Islands (**Fig. \@ref(fig:survey-plan)**).  
+The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent of the potential habitat of the northern stock of Pacific Sardine^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html] at the time of the survey (**Fig. \@ref(fig:sardine-habitat)**). For _`r survey.vessel`_, the planned transects ranged from `r survey.landmark.n` to `r survey.landmark.s`. To increase the spatial sampling resolution from _`r survey.vessel`_, USVs conducted acoustic sampling interstitial to _`r survey.vessel`_ transects between Newport, OR and San Francisco, CA. To estimate CPS biomass near shore, where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was augmented with echosounder and purse-seine sampling from _Lisa Marie_ between `r survey.landmark.n` to Bodega Bay, CA; and from _Long Beach Carnage_ between Bodega Bay, CA to San Diego, CA, and around Santa Cruz and Santa Catalina Islands (**Fig. \@ref(fig:survey-plan)**). Due to OMAO staffing issues, Leg I on _`r survey.vessel`_ was cancelled; the decision was then made for _Lisa Marie_ to forego its nearshore transects and instead survey the _`r survey.vessel`_ transects between `r survey.landmark.n` to Bodega Bay, CA using 20 nmi spacing, while the USVs would survey interstitial to _Lisa Marie_ transects starting near Grays Harbor, WA and continuing as far south as time permitted. Further due to OMAO staffing issues, Leg III on _`r survey.vessel`_ was delayed by 16 days; the plan was then modified to use the remaining four days of the leg to survey northward from San Diego, CA into the Southern California Bight using 20 nmi spacing. Leg IV on _`r survey.vessel`_ then resumed sampling southward from Monterey Bay, CA to `r survey.landmark.s`. For _`r survey.vessel`_, the offshore extent of the planned transects was adjusted during the survey according to the observed distribution of putative CPS backscatter in the echograms, CPS eggs in the CUFES samples, or CPS caught in trawls.  
 
 (ref:sardine-distribution) Conceptual spring (shaded region) and summer (hashed region) distributions of potential habitat for the northern stock of Pacific Sardine along the west coasts of Mexico, the United States, and Canada. The dashed and dotted lines represent, respectively, the approximate summer and spring positions of the 0.2 mg m^–3^ chlorophyll-a concentration isoline. This isoline appears to oscillate in synchrony with the transition zone chlorophyll front [TZCF, @Polovina2001] and the offshore limit of the northern stock Pacific Sardine potential habitat [@Zwolinski2011]. Mackerels are found within and on the edge of the same oceanographic  habitat [e.g., @Demer2012; @Zwolinski2012]. The TZCF may delineate the offshore and southern limit of both Pacific Sardine and Pacific Mackerel distributions, and juveniles may have nursery areas in the Southern California Bight, downstream of upwelling regions.
 

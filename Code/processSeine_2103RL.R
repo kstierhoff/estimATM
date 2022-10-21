@@ -94,6 +94,9 @@ set.summ.wt <- set.summ.wt %>%
   right_join(select(set.clusters, -vessel.name)) %>% 
   replace(is.na(.), 0)
 
+# Save output for survey report
+saveRDS(set.summ.wt, file = here("Output/seine_set_summ_wt.rds"))
+
 set.pie <- set.summ.wt %>% 
   select(cluster, haul, long, lat, Anchovy, JackMack, 
          Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
