@@ -118,13 +118,13 @@ survey.long          <- c(-130,-113)
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2207RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
-                          Nearshore = "Nearshore",Offshore = "Offshore",
+                          Nearshore = "Nearshore", #Offshore = "Offshore",
                           Saildrone = "Saildrone")
 wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
-                          Nearshore = "#FF33F5", Offshore = "#FFA500",
+                          Nearshore = "#FF33F5", #Offshore = "#FFA500",
                           Saildrone = "#00FFFF") 
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
-                          Nearshore = "solid", Offshore = "dashed", 
+                          Nearshore = "solid", #Offshore = "dashed", 
                           Saildrone = "solid")
 
 # Saildrone info -----------------------------------------------
