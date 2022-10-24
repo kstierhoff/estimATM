@@ -686,6 +686,42 @@ nav.now <- tail(nav.sf, 1) %>%
   mutate(label = paste("Last position:", time, "UTC"))
 ```
 
+```{r creat-transect-labels}
+# Create acoustic transect labels for maps
+tx.labels.tmp <- wpts %>% 
+  group_by(Type, Transect) %>% 
+  # arrange(Longitude) %>% 
+  summarise(
+    # vessel.name = vessel.name[1],
+    transect.name = sprintf("%03d", Transect[1]),
+    start.lat = Latitude[which.max(Longitude)],
+    start.long = max(Longitude),
+    end.lat = Latitude[which.min(Longitude)],
+    end.long = min(Longitude),
+    brg = 90 - swfscMisc::bearing(end.lat,end.long,start.lat,start.long)[1])
+
+tx.end.labels <- tx.labels.tmp %>% 
+  filter(start.lat < 48.54116) %>% 
+  select(transect.name, Type, lat = end.lat, long = end.long, brg) 
+
+tx.start.labels <- tx.labels.tmp %>% 
+  filter(start.lat >= 48.54116) %>% 
+  select(transect.name, Type, lat = start.lat, long = start.long, brg) %>% 
+  rbind(tx.end.labels) %>% 
+  ungroup()
+
+tx.labels <- project_df(tx.start.labels, to = crs.proj)
+
+# ggplot() + 
+#    # Plot acoustic transect labels N of Cape Flattery
+#     geom_shadowtext(data = tx.labels, 
+#                     aes(X, Y, label = transect.name,
+#                         angle = 45),
+#                     size = 2, fontface = 'bold.italic', 
+#                     bg.colour = "black")
+```
+
+
 ```{r create-basemap,include=F}
 # Configure base map options -----------------
 # Import landmarks
@@ -1261,6 +1297,11 @@ if (process.csv) {
 bad.nasc.cps <- filter(nasc.cps, lat == 999, long == 999)
 write_csv(bad.nasc.cps, here("Output/nasc_bad_cps.csv"))
 
+# Remove transect segment designations (i.e., "-1", "-2")
+if (strip.tx.nums["RL"]) {
+  nasc.cps$transect <- gsub(tx.num.pattern["RL"], "", nasc.cps$transect)
+}
+
 # Summarize nasc for reporting effort
 nasc.summ <- nasc.cps %>% 
   group_by(transect) %>% 
@@ -1440,6 +1481,12 @@ if (save.figs) {
   survey.plan <- base.map +    
     geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
             show.legend = "line") +
+    # Plot acoustic transect labels
+    geom_shadowtext(data = filter(tx.labels, !Type == "Nearshore"), 
+                    aes(X, Y, label = transect.name,
+                        angle = brg),
+                    size = 2, fontface = 'bold.italic', 
+                    colour = "black", bg.colour = "white") +
     scale_colour_manual("Type", values = wpt.colors) +
     scale_linetype_manual(name = "Type", values = wpt.linetypes) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -1483,8 +1530,13 @@ if (save.figs) {
     geom_sf(data = nav.paths.sf, colour = "gray70", size = 0.5, alpha = 0.5) +
     # Plot acoustic transects
     geom_sf(data = nasc.tx.sf, size = 1) +
-    # scale_linetype_manual(name = "Type", values = wpt.linetypes) +
-    # Plot trawl transects
+    # # Plot acoustic transect labels
+    # geom_shadowtext(data = filter(tx.labels, !Type == "Nearshore"), 
+    #                 aes(X, Y, label = transect.name,
+    #                     angle = brg),
+    #                 size = 2, fontface = 'bold.italic', 
+    #                 colour = "black", bg.colour = "white") +
+    # Plot trawl midpoints
     geom_point(data = haul.catch, aes(X, Y),
                shape = 21, colour = "black", fill = "white", size = 3) +
     geom_sf(data = bongo.sta, 
@@ -1915,11 +1967,11 @@ The nearshore region spanned an area from approximately Pt. Conception to San Di
 
 **Leg I**  
 
-On 20 March, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in San Diego at ~1400 (all times UTC). Acoustic sampling commenced along the southernmost transect, 002 (**Fig. \@ref(fig:station-sampling)**, **Appendix \@ref(appendix-core-transects)**). On 1 April, acoustic sampling ceased in the middle of transect 010 off Pt. Mugu, CA, between Long Beach and Pt. Conception and due east of the northern Channel Islands, when _`r survey.vessel`_ transited to Dana Point to exchange scientific personnel before completing Leg I.  
+On 20 March, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in San Diego at ~1400 (all times UTC). Acoustic sampling commenced along the southernmost transect, 002 (**Fig. \@ref(fig:survey-plan)**, **Appendix \@ref(appendix-core-transects)**). On 1 April, acoustic sampling ceased in the middle of transect 010 off Pt. Mugu, CA, between Long Beach and Pt. Conception and due east of the northern Channel Islands, when _`r survey.vessel`_ transited to Dana Point to exchange scientific personnel before completing Leg I.  
 
 **Leg II**  
 
-On 1 April, _`r survey.vessel`_ resumed sampling along transect 012 (**Fig. \@ref(fig:station-sampling)**, **Appendix \@ref(appendix-core-transects)**) near Santa Barbara, which is northeast of the northern Channel Islands. On 12 April, acoustic sampling ceased after the completion of transect 028 off Bodega Bay. At ~1700 on 16 April, _`r survey.vessel`_ arrived at Pier 30/32 in San Francisco Bay to complete Leg II.  
+On 1 April, _`r survey.vessel`_ resumed sampling along transect 012 (**Fig. \@ref(fig:survey-plan)**, **Appendix \@ref(appendix-core-transects)**) near Santa Barbara, which is northeast of the northern Channel Islands. On 12 April, acoustic sampling ceased after the completion of transect 028 off Bodega Bay. At ~1700 on 16 April, _`r survey.vessel`_ arrived at Pier 30/32 in San Francisco Bay to complete Leg II.  
 
 During Legs I and II, _`r survey.vessel`_ coordinated with _Long Beach Carnage_, to sample the core and nearshore transects (**Fig. \@ref(fig:survey-plan)**, **Appendix \@ref(appendix-nearshore-transects)**), in the same areas, within less than three days of each other.  
 
