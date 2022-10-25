@@ -1,7 +1,10 @@
 # A utility for extracting CPS backscatter (cps.nasc) from Echoview CSV files
 # Source the script (Ctrl+Shift+S) and respond to the prompts
+
 # If a path to Exported Images is provided (path.img), corresponding
 # echograms will be displayed to assist echo scrutiny
+
+# To specify file paths by copy/paste from Windows Explorer, put path in r"(PATH)"
 
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
