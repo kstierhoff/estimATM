@@ -129,7 +129,7 @@ wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
-sd.numbers <- c("1055", "1059", "1036")
+sd.numbers <- c("1076", "1077")
 
 # Set Saildrone filter method
 sd.buffer.type   <- c("saildrone")
@@ -274,7 +274,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL","LM") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- NA # c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
