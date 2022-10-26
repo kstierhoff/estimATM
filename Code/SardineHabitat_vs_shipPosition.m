@@ -294,31 +294,31 @@ for i = 1:length(timeBin)
     % Set figure options
     set(gcf,'color','w');                            % Change background color to white
     set(gcf, 'PaperUnits', 'points', 'PaperPosition', [0 0 322.5 315]);
-    set(gcf, 'Position', [0 0 1120 850]);           % Figure size and position
+    set(gcf, 'Position', [0 0 700 850]);            % Figure size and position
     set(ax, 'Position', [0 0.1 0.8 0.85])           % Map size and position
     
     % Set colorbar options
-    set(hcb, 'Position', [0.65 0.1 0.0476 0.85])        % Colorbar size and position
+    set(hcb, 'Position', [0.76 0.1 0.0476 0.85])        % Colorbar size and position
     set(hcb, 'YAxisLocation', 'left')                   % Set colorbar y-axis to left side
     set(hcb, 'YTick', [0 .048 .32 .45 1])               % Define colorbar y-axis tick locations
     set(hcb, 'YtickLabel', {'0' '1' '10' '20' '100'})   % Set the colorbar y-axis tick labels
     ylabel(hcb, 'Cumulative sardine biomass (%)')       % Set colorbar y-axis label
 
     % Add colorbar labels
-    annotation(gcf, 'textbox', [0.70 0.67 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.81 0.67 0.049 0.054], ...
         'String', {'Optimal'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.70 0.39 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.81 0.39 0.049 0.054], ...
         'String', {'Good'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.70 0.22 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.81 0.22 0.049 0.054], ...
         'String', {'Bad'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.70 0.08 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.81 0.08 0.049 0.054], ...
         'String', {'Unsuitable'}, 'FitBoxToText', 'off', 'EdgeColor','none');
 
     % Create new invisible axis for displaying colorbar label text
     axes('position', [0 0 1 1], 'Visible', 'off');
 
     % Add label to colorbar
-    text(.79, .45, 'Potential habitat', 'Rotation', 90)
+    text(.91, .45, 'Potential habitat', 'Rotation', 90)
 
     % Write to animated gif
     frame = getframe(gcf);          % Get current frame
