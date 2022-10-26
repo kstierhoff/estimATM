@@ -742,8 +742,16 @@ cluster.mid <- haul.mid %>%
 # Save haul data
 save(haul, file = here("Output/haul_info.Rdata"))
 ``` 
+```{r process-seine-data}
+# Run plot_purseSeine in order to process the seine data from the fishing
+# vessels to obtain the necessary variables for merging with Lasker haul data
+# for plotting the pie maps
+source(here("Code/processSeine_2207RL.R"))
+```
 
 ```{r process-catch-data}
+# Process catch data from the Lasker trawls
+
 # Filter catch data
 catch <- catch.all %>% 
   left_join(dplyr::select(spp.codes, species, scientificName, commonName)) %>% 
@@ -854,6 +862,19 @@ haul.pie <- haul.summ.wt %>%
                   'P. mackerel:', PacMack, 'kg<br/>',
                   'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
+
+# If 2022 summer survey, merge Lisa Marie set data (set.pie) with Lasker haul
+# data (haul.pie)
+if (survey.name %in% c("2207RL")) {
+  
+  # Retain only Lisa Marie data
+  temp <- set.pie %>%
+    filter(vessel.name == "LM")
+  
+  # Merge with Lasker data
+  haul.pie <- bind_rows(haul.pie, temp)
+  
+}
 
 cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, RndHerring,
@@ -1067,7 +1088,7 @@ uctd.sta        <- filter(events_sf, Button == uctd.button)
 # Append CTD cast locations from other survey vessels
 if (survey.name %in% c("2207RL")) {
   
-  # Read Carranza stations
+  # Read Shimada stations
   ctd.sh <- read_csv(here("Data/CTD/ctd_stations_sh.csv")) %>% 
     mutate(Button = "CTD") 
   
@@ -1104,7 +1125,7 @@ all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
     TRUE ~ Button))
 
 # Append CTD info from other survey vessels
-if (survey.name %in% c("2107RL")) {
+if (survey.name %in% c("2207RL")) {
   all.ctds <- all.ctds %>% 
     bind_rows(select(ctd.sh, Date = datetime, Button = Button, Latitude = lat, Longitude = long))
 }
@@ -1299,7 +1320,7 @@ if (save.figs) {
 
 ```{r plot-maps-ns}
 # Plot nearshore purse seine catch and acoustic backscatter
-source(here("Code/plot_purseSeine_2207RL.R"))
+# source(here("Code/plot_purseSeine_2207RL.R"))
 ```
 
 \pagenumbering{gobble}
@@ -1352,7 +1373,7 @@ include_graphics(here("Images/img_vessels_1907RL.png"))
 \newpage  
 
 ## Scientific Personnel {#introduction-personnel}
-The collection and analysis of the survey data were conducted by members of 1-NOAA, 2-UCSC/CIMEAS, 3-UCSD/SIO, 4-INAPESCA, 5-WDFW, 6-CDFW, and 7-volunteers. Asterisks denote Chief Scientists.
+The collection and analysis of the survey data were conducted by members of 1-NOAA, 2-UCSC/CIMEAS, 3-UCSD/SIO, 4-INAPESCA, 5-WDFW, 6-CWPA, and 7-volunteers. Asterisks denote Chief Scientists.
 
 Leg 1 of the survey on _`r survey.vessel`_ was cancelled due to OMAO staffing issues.
 
@@ -1383,7 +1404,7 @@ Leg 1 of the survey on _`r survey.vessel`_ was cancelled due to OMAO staffing is
 * _Lisa Marie_
   + K. Hinton^5^, Erin Jaco^5^, Emily Seubert^5^, Zac Calef^5^, and Jennifer Topping^5^
 * _Long Beach Carnage_
-  + K. Kloos, T. Nguyen, J. van Noord, and T. Stocking
+  + J. van Noord^6^, [**UPDATE AFFILIATIONS**]J. Marcopoulos, and W Hargrave
 
 **Echosounder Calibrations:**  
 
@@ -1546,11 +1567,11 @@ include_graphics(here("Images/img_Nordic_264.png"))
 
 ## Purse seine sampling {#methods-seine-sampling}  
 
-Purse seine nets were set to provide information about size, age, and species composition of fishes observed in the echosounders mounted on the fishing vessels that sampled the nearshore region. _Lisa Marie_ used an approximately 440-m-long and 40-m-deep net with 17-mm-wide mesh (A. Blair, pers. comm.). _Long Beach Carnage_ used an approximately 200-m-long and 27-m-deep net with 17-mm-wide mesh; a small section on the back end of the net had 25-mm-wide mesh (R. Ashley, pers. comm.). Specimens collected by _Lisa Marie_ and _Long Beach Carnage_ were processed by the Washington Department of Fish and Wildlife (WDFW) and California Department of Fish and Wildlife (CDFW), respectively.
+Purse seine nets were set to provide information about size, age, and species composition of fishes observed in the echosounders mounted on the fishing vessels. _Lisa Marie_ used an approximately 440-m-long and 40-m-deep net with 17-mm-wide mesh (A. Blair, pers. comm.). _Long Beach Carnage_ used an approximately 200-m-long and 27-m-deep net with 17-mm-wide mesh; a small section on the back end of the net had 25-mm-wide mesh (R. Ashley, pers. comm.). Specimens collected by _Lisa Marie_ and _Long Beach Carnage_ were processed by the Washington Department of Fish and Wildlife (WDFW) and [**CHECK IF RIGHT**]California Department of Fish and Wildlife (CDFW), respectively.
 
-On _Lisa Marie_, as many as three purse seine sets were planned each day. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. Next, all three dip net samples were combined and up to 50 specimens of each CPS species were randomly sampled to provide a combined weight for each set. The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 50 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually, and gonads were collected and preserved from female specimens.
+On _Lisa Marie_, as many as five purse seine sets were planned each day. Originally the vessel was assigned to sample nearshore transects, for which there would be one set per transect. However, after Leg I on _`r survey.vessel`_ was cancelled, _Lisa Marie_ was redirected to survey _`r survey.vessel`_'s transects. The plan was then changed to allow _Lisa Marie_ to randomly set on observed schools during a transect, for up to five sets per transect. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. Next, all three dip net samples were combined and up to 50 specimens of each CPS species were randomly sampled to provide a combined weight for each set. The length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weight was measured for up to 50 randomly selected specimens of each species. Otoliths were extracted, macroscopic maturity stage was determined visually, and gonads were collected and preserved from female specimens.
 
-On _Long Beach Carnage_, as many as three purse seine sets were planned each day, including evenings. The total weight (tons) of the school was estimated by the captain. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. From each dip net sample, as many as 20 fish of each CPS species were chosen randomly throughout the sample, and combined for a random sample of 50 fish collected throughout the catch. The fish were then frozen for later analysis by CDFW biologists, yielding measures of total sample weight and individual fish weight, length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others), maturity, and otolith-derived ages. Because samples were frozen, no gonad samples from female specimens were analyzed.
+On _Long Beach Carnage_, as many as five purse seine sets were planned each day, including evenings, for an average of one set per transect. The vessel was to run each transect in its entirety, then randomly set on an observed school. The total weight (tons) of the school was estimated by the captain. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. From each dip net sample, as many as 20 fish of each CPS species were chosen randomly throughout the sample, and combined for a random sample of 50 fish collected throughout the catch. The fish were then frozen for later analysis by CDFW biologists, yielding measures of total sample weight and individual fish weight, length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others), maturity, and otolith-derived ages. Because samples were frozen, no gonad samples from female specimens were analyzed.
 
 ## Ichthyoplankton and oceanographic sampling {#methods-other-sampling}
 ### Egg and larva sampling {#methods-egg-sampling}  
@@ -1737,9 +1758,9 @@ During Leg IV, _Carranza_ sampled Transects 055 to 027, between Las Flores to Pu
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
 
-A total of `r nrow(ctd.sta)` CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted from _`r survey.vessel`_ and _Carranza_ (**Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**), and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were collected underway.  
+A total of `r nrow(ctd.sta)` CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted from _`r survey.vessel`_ (**Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**), and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were collected underway.  
 
-(ref:station-sampling) The locations of surface trawls (white points), CTD and UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_ (north of El Rosario, MX) and _Carranza_ (south of El Rosario, MX).
+(ref:station-sampling) [**UPDATE**] The locations of surface trawls (white points), CTD and UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_ (north of El Rosario, MX) and _Carranza_ (south of El Rosario, MX).
 
 ```{r station-sampling,fig.cap='(ref:station-sampling)',out.height='7in',fig.align='center',fig.pos='H'}
 include_graphics(here("Figs/fig_station_samples.png"))
@@ -1748,6 +1769,7 @@ include_graphics(here("Figs/fig_station_samples.png"))
 ## Distribution of CPS {#results-cps-distribution}
 ### Core region  
 
+[**UPDATE**]
 Acoustic backscatter ascribed to CPS (**Fig. \@ref(fig:nasc-cufes-trawl)a**), sampled by _`r survey.vessel`_, _Carranza_, and the USVs, was observed throughout the survey area, but was most prevalent: nearshore between Cape Flattery, WA to Newport, OR, Cape Blanco, OR to Cape Mendocino, CA, and in Baja California; offshore in the Southern California Bight; and dispersed both nearshore and offshore off the coast of California between Cape Mendocino and Point Conception. 
 
 Pacific Sardine eggs were abundant in CUFES samples offshore of the Columbia River; offshore between Newport and Cape Blanco, OR; between Tijuana and El Rosario, MX; and off Maria, MX (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Northern Anchovy eggs were most abundant in the Southern California Bight and off San Antonio, MX; and to a lesser extent off of Newport, OR, between Fort Bragg and Bodega Bay, CA, and outside Monterey Bay, CA. Jack Mackerel eggs were observed offshore between Westport, WA and the mouth of the Columbia River; between Newport, OR and Cape Mendocino, CA; and between San Francisco and Monterey Bay, CA. Jack Mackerel eggs were coincident with Pacific Sardine eggs north of Cape Mendocino, CA.  
