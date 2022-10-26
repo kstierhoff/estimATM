@@ -19,8 +19,8 @@ latBounds = [27 51];    % [30 40]
 lonBounds = [230 247];  % [234 245]
 
 % Define plot boundaries
-latPlot = [25 50];
-lonPlot = [232 246];
+latPlot = [27 50];
+lonPlot = [233 246];
 
 % Define +- decimal degrees for location bounding box
 latExtent = 2;
@@ -160,7 +160,7 @@ grid_lon = lonBounds(1):0.025:lonBounds(2);
 
 % Initialize matrix for holding averaged habitat data that will be plotted.
 % If no datapoints are available, want it to be NaN for plotting purposes.
-HAB = zeros(size(LAT));
+HAB = nan(size(LAT));
 COUNTS = zeros(size(LAT));  % Used for calculating cumulative average
 
 % Open new figure window
@@ -205,12 +205,17 @@ for i = 1:length(timeBin)
 
         % Retain samples within a bounding box around that position
         habidx = habidx | abs(latgrid - avgLat) <= latExtent & ...
-            abs(longrid - (360+avgLon)) <= lonExtent;% & ...
-            %~isnan(hab);
+            abs(longrid - (360+avgLon)) <= lonExtent & ...
+            ~isnan(hab);
     end
 
+    % If first time obtaining habitat for those points, change NaN to 0
+    temp = HAB(habidx);
+    temp(isnan(temp)) = 0;
+%     HAB(isnan(HAB(habidx))) = 0;
+
     % Compute new average for those samples
-    HAB(habidx) = (hab(habidx) + COUNTS(habidx).*HAB(habidx)) ./ (COUNTS(habidx) + 1);
+    HAB(habidx) = (hab(habidx) + COUNTS(habidx).*temp) ./ (COUNTS(habidx) + 1);
     COUNTS(habidx) = COUNTS(habidx) + 1;
 
     temp = HAB;
@@ -296,18 +301,18 @@ for i = 1:length(timeBin)
     % Add label to colorbar
     text(.87, .45, 'Potential habitat', 'Rotation', 90)
 
-    % Write to animated gif
-    %     frame = getframe(gcf);
-    %     im = frame2im(frame);
-    %     [imind,cm] = rgb2ind(im,256);
-    %
-    %     if i == 1
-    %         imwrite(imind, cm, fullfile(pwd, 'surveyData', [surveyName '.gif']),'gif','LoopCount',0,'DelayTime',.1);
-    % %     elseif i == length(habTimes)
-    % %         imwrite(imind, cm, fullfile(pwd, 'surveyData', gifName),'gif','WriteMode','append','DelayTime',2);
-    %     else
-    %         imwrite(imind, cm, fullfile(pwd, 'surveyData', [surveyName '.gif']),'gif','WriteMode','append','DelayTime',.1);
-    %     end
+%     Write to animated gif
+    frame = getframe(gcf);
+    im = frame2im(frame);
+    [imind,cm] = rgb2ind(im,256);
+
+    if i == 1
+        imwrite(imind, cm, fullfile(pwd, 'surveyData', [surveyName '.gif']),'gif','LoopCount',0,'DelayTime',.1);
+%     elseif i == length(habTimes)
+%         imwrite(imind, cm, fullfile(pwd, 'surveyData', gifName),'gif','WriteMode','append','DelayTime',2);
+    else
+        imwrite(imind, cm, fullfile(pwd, 'surveyData', [surveyName '.gif']),'gif','WriteMode','append','DelayTime',.1);
+    end
 
     waitbar(i/length(timeBin), h, char(timeBin(i)))
 end
