@@ -11,12 +11,15 @@ clear; close all;
 
 %% User Settings
 
-% Define vessels
+% Define vessels for which there are NASC CSVs
 vessels = {'RL' 'LM'};
 
+% Define color order for plotting vessel NASCs, respective to 'vessels'
+colors = 'kcmg';
+
 % Define boundary extents of habitat data to download
-latBounds = [27 51];    % [30 40]
-lonBounds = [230 247];  % [234 245]
+latBounds = [27 51];
+lonBounds = [230 247];
 
 % Define plot boundaries
 latPlot = [27 50];
@@ -48,10 +51,13 @@ lats = cell(length(vessels),1);
 lons = cell(length(vessels),1);
 groups = cell(length(vessels),1);
 
+% Cycle through each vessel and read CSV files
 for i = 1:length(vessels)
     
-    % Cycle through Lasker CSVs
+    % Get list of CSV files for the current vessel
     files = dir(['..\Data\Backscatter\' vessels{i} '\*nasc_cps.csv']);
+
+    % Cycle through each file
     h = waitbar(0, ['Reading ' vessels{i} ' CSV files...']);
     for j = 1:length(files)
 
@@ -63,7 +69,11 @@ for i = 1:length(vessels)
         % Read CSV file
         NASC = readtable(fullfile(files(j).folder, files(j).name), opts);
 
-        % Keep unique times (i.e., each time can have multiple rows)
+        % Remove any rows that don't have accurate positions
+        idx = NASC.Lat_M == 999 | NASC.Lat_M == 999;
+        NASC(idx,:) = [];
+
+        % Keep unique times (each time can have multiple rows)
         [uniqueTimes, IA] = unique(datetime(strcat(NASC.Date_M, NASC.Time_M), "InputFormat","uuuuMMddHH:mm:ss.SSSS"));
     
         % Extract and store times and positions
@@ -76,25 +86,18 @@ for i = 1:length(vessels)
     end
     close(h)
 
-    % Sort times
+    % Sort data by time
     [times{i}, I] = sort(times{i});
     lats{i} = lats{i}(I);
     lons{i} = lons{i}(I);
     groups{i} = groups{i}(I);
-
-    % Remove any 999s
-    idx = lats{i} == 999 | lons{i} == 999;
-    times{i}(idx) = [];
-    lats{i}(idx) = [];
-    lons{i}(idx) = [];
-    groups{i}(idx) = [];
 end
 
 %% Download habitat data
 % Download habitat data for every available time that spans all the times
 % from the various vessels
 
-% Get time limits from vessel data
+% Get min and max times over all vessels
 startTime = min(cellfun(@min, times));
 endTime = max(cellfun(@max, times));
 
@@ -115,14 +118,17 @@ habTimes = datetime(habTimes, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z');
 % Only keep times before end date
 habTimes(habTimes > endTime) = [];
 
+% Cycle through each available time and download habitat data
 h = waitbar(0, 'Downloading habitat data...');
 for i = 1:length(habTimes)
 
     % Generate filename
-    filename = fullfile(pwd, 'surveyData', [char(datetime(habTimes(i), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']);
+    filename = fullfile(pwd, 'habitatData', [char(datetime(habTimes(i), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']);
 
-    % If file doesn't exist, download it
+    % If file doesn't already exist, download it
     if exist(filename, 'file') == 0
+
+        % Generate string to ERDDAP data
         str = ['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' ...
             'sardine_habitat_modis_Lon0360.mat' ...
             '?potential_habitat%5B(' char(datetime(habTimes(i), 'Format', 'uuuu-MM-dd''T''HH:mm:ss''Z')) ')' ...
@@ -130,9 +136,9 @@ for i = 1:length(habTimes)
             '%5D%5B(' num2str(lonBounds(1)) '):(' num2str(lonBounds(2)) ')' ...
             '%5D&.draw=surface&.vars=longitude%7Clatitude%7Cpotential_habitat&.colorBar=%7C%7C%7C%7C%7C&.bgColor=0xffccccff'];
 
+        % Download data
         websave(filename, str, options);
     end
-
     waitbar(i/length(habTimes), h)
 end
 close(h)
@@ -146,9 +152,10 @@ close(h)
 % Create binned time vector
 timeBin = dateshift(startTime,'start','hour'):timespan:dateshift(endTime,'end','hour');
 
+% Initialize variable to hold binned groups for each vessel
 BINS = cell(length(vessels), 1);
 
-% Bin each vessel into that time vector
+% Bin each vessel using the binned time vector
 for i = 1:length(vessels)
     BINS{i} = discretize(times{i}, timeBin);
 end
@@ -176,69 +183,72 @@ for i = 1:length(timeBin)
     % Find habitat dataset closest in time
     [M,I] = min(abs(habTimes - timeBin(i)));
 
-    % If that's not the currently-loaded habitat file, then load it
+    % If it's not the currently-loaded habitat file, then load it
     if habTimes(I) ~= currFile
-        habData = load(fullfile(pwd, 'surveyData', ...
+        habData = load(fullfile(pwd, 'habitatData', ...
             [char(datetime(habTimes(I), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']));
         habData = struct2cell(habData);
 
-        % Parse out data
+        % Parse out habitat data
         lat = habData{1}.latitude;
         lon = habData{1}.longitude;
         hab = squeeze(habData{1}.potential_habitat);
 
+        % Convert to grid matrix
         [latgrid, longrid] = ndgrid(lat, lon);
 
+        % Update variable holding currently loaded file
         currFile = habTimes(I);
     end
 
-    % Cycle through each vessel
+    % Cycle through each vessel to obtain habitat data surrounding each
+    % vessel position
     habidx = zeros(size(latgrid));
     for j = 1:length(vessels)
 
         % Find the intervals that correspond to that bin
         idx = BINS{j} == i;
 
-        % Get average position from those times
+        % Get average position from those intervals
         avgLat = mean(lats{j}(idx));
         avgLon = mean(lons{j}(idx));
 
-        % Retain samples within a bounding box around that position
+        % Retain samples within a bounding box around that position, using
+        % the OR operator to merge samples from multiple vessels
         habidx = habidx | abs(latgrid - avgLat) <= latExtent & ...
             abs(longrid - (360+avgLon)) <= lonExtent & ...
             ~isnan(hab);
     end
 
-    % If first time obtaining habitat for those points, change NaN to 0
+    % Pull out the habitat for the positions surrounding all vessels. For
+    % the way 'habidx' was generated, only samples containing habitat data
+    % were retained, so if HAB at those samples is NaN, they should be
+    % changed to 0 so that the cumulative average can be calculated.
     temp = HAB(habidx);
     temp(isnan(temp)) = 0;
-%     HAB(isnan(HAB(habidx))) = 0;
 
     % Compute new average for those samples
     HAB(habidx) = (hab(habidx) + COUNTS(habidx).*temp) ./ (COUNTS(habidx) + 1);
     COUNTS(habidx) = COUNTS(habidx) + 1;
 
-    temp = HAB;
-%     temp(temp == 0) = NaN;
-
     % Clear current figure
     clf
 
     % Create new map projection
-    projection = 'Robinson';%'Mollweide'; % 'Lambert Conformal Conic'
+    projection = 'Robinson';
     m_proj(projection, ...
         'longitudes', lonPlot, ...
         'latitudes', latPlot);
 
     % Plot habitat
-    m_pcolor(LON, LAT, temp);
+    m_pcolor(LON, LAT, HAB);
     shading flat;
     colormap(map)
 
     % Set longitude direction appropriately
     m_grid('xlabeldir', 'end'); hold on;
 
-    % Draw outline of states
+    % Draw outline of US states
     [latstates,lonstates] = borders('continental us');
     for j = 1:length(latstates)
         m_plot(360+lonstates{j}, latstates{j}, 'k')
@@ -252,66 +262,76 @@ for i = 1:length(timeBin)
     [latstates,lonstates] = borders('mexico');
     m_plot(360+lonstates, latstates, 'k')
 
-    % Plot shiptrack from beginning to current position
-    colors = 'kcmg';
+    % Plot shiptrack for each vessel from beginning to current position
     for j = 1:length(vessels)
 
         % Get index of intervals (times) up to the current time bin
         idx = find(times{j} <= timeBin(i)+timespan, 1, 'last');
+
+        % Parse out position and group info for those intervals
         X = 360+lons{j}(1:idx);
         Y = lats{j}(1:idx);
         G = groups{j}(1:idx);
 
-        % Plot all the transects up to the current time bin. Plot them
-        % separately for each transect so it only shows transects
+        % Find unique group #s (i.e., transects) to plot them separately
         [C,IA,IC] = unique(G, 'stable');
+
+        % Plot data up to the current time bin separately for each transect
+        % so it only shows transects (i.e., not transits)
         for k = 1:length(C)
             m_plot(X(IC==k), Y(IC==k), 'Linewidth', 2, 'Color', colors(j))
         end
     end
 
     % Set color limit then add colorbar
-    clim(gca, [0 1])                   % Set color limits to 0 and 1
+    clim(gca, [0 1])            % Set color limits to 0 and 1
     ax = gca;
-    hcb = colorbar('peer', ax);         % Add colorbar
+    hcb = colorbar('peer', ax); % Add colorbar
 
-    % Set figure labels
-    set(gcf,'color','w');           % Change background color to white
+    % Add title to display current time bin
+    title(char(timeBin(i)))
+
+    % Set figure options
+    set(gcf,'color','w');                            % Change background color to white
     set(gcf, 'PaperUnits', 'points', 'PaperPosition', [0 0 322.5 315]);
-    set(gcf, 'Position', [0 0 1120 850]);
-    set(ax, 'Position', [0 0.1 0.8 0.85])
-    set(hcb, 'Position', [0.73 0.1 0.0476 0.85])
+    set(gcf, 'Position', [0 0 1120 850]);           % Figure size and position
+    set(ax, 'Position', [0 0.1 0.8 0.85])           % Map size and position
+    
+    % Set colorbar options
+    set(hcb, 'Position', [0.65 0.1 0.0476 0.85])        % Colorbar size and position
+    set(hcb, 'YAxisLocation', 'left')                   % Set colorbar y-axis to left side
+    set(hcb, 'YTick', [0 .048 .32 .45 1])               % Define colorbar y-axis tick locations
+    set(hcb, 'YtickLabel', {'0' '1' '10' '20' '100'})   % Set the colorbar y-axis tick labels
+    ylabel(hcb, 'Cumulative sardine biomass (%)')       % Set colorbar y-axis label
 
-    set(hcb, 'YAxisLocation', 'left')
-    set(hcb, 'YTick', [0 .048 .32 .45 1])
-    set(hcb, 'YtickLabel', {'0' '1' '10' '20' '100'})
-    ylabel(hcb, 'Cumulative sardine biomass (%)')
-    annotation(gcf, 'textbox', [0.78 0.67 0.049 0.054], ...
+    % Add colorbar labels
+    annotation(gcf, 'textbox', [0.70 0.67 0.049 0.054], ...
         'String', {'Optimal'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.78 0.39 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.70 0.39 0.049 0.054], ...
         'String', {'Good'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.78 0.22 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.70 0.22 0.049 0.054], ...
         'String', {'Bad'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.78 0.08 0.049 0.054], ...
+    annotation(gcf, 'textbox', [0.70 0.08 0.049 0.054], ...
         'String', {'Unsuitable'}, 'FitBoxToText', 'off', 'EdgeColor','none');
 
-    % Create new invisible axis for holding colorbar label text
+    % Create new invisible axis for displaying colorbar label text
     axes('position', [0 0 1 1], 'Visible', 'off');
 
     % Add label to colorbar
-    text(.87, .45, 'Potential habitat', 'Rotation', 90)
+    text(.79, .45, 'Potential habitat', 'Rotation', 90)
 
-%     Write to animated gif
-    frame = getframe(gcf);
-    im = frame2im(frame);
-    [imind,cm] = rgb2ind(im,256);
+    % Write to animated gif
+    frame = getframe(gcf);          % Get current frame
+    im = frame2im(frame);           % Convert to image
+    [imind,cm] = rgb2ind(im,256);   % Convert to indexed image
 
+    % If first frame define loop count
     if i == 1
-        imwrite(imind, cm, fullfile(pwd, 'surveyData', [surveyName '.gif']),'gif','LoopCount',0,'DelayTime',.1);
-%     elseif i == length(habTimes)
-%         imwrite(imind, cm, fullfile(pwd, 'surveyData', gifName),'gif','WriteMode','append','DelayTime',2);
+        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '.gif']),'gif','LoopCount',0,'DelayTime',.1);
+    
+    % Otherwise, append to existing gif
     else
-        imwrite(imind, cm, fullfile(pwd, 'surveyData', [surveyName '.gif']),'gif','WriteMode','append','DelayTime',.1);
+        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '.gif']),'gif','WriteMode','append','DelayTime',.1);
     end
 
     waitbar(i/length(timeBin), h, char(timeBin(i)))
@@ -319,4 +339,4 @@ end
 close(h)
 
 % Save final figure
-print(fullfile(pwd, 'surveyData', [surveyName '.png']), '-dpng')
+exportgraphics(gcf, '..\Figs\fig_sardine_habitat.png')
