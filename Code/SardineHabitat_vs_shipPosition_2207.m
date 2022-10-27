@@ -339,4 +339,4 @@ end
 close(h)
 
 % Save final figure
-exportgraphics(gcf, '..\Figs\fig_sardine_habitat.png')
+exportgraphics(gcf, ['..\Figs\fig_' surveyName '_habitat.png'])
