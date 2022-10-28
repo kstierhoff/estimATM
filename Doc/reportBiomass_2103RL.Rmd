@@ -225,7 +225,7 @@ if (survey.vessel.primary == "RL") {
 
 (ref:cb-config-lbc) Transducer locations on the bottom of the pole-mounted multi-transducer array (MTA4) installed on the F/V _Long Beach Carnage_.
 
-```{r cb-config-lbc,fig.cap='(ref:cb-config-lbc)',out.height = '4in',fig.align='center',fig.pos='H'}
+```{r cb-config-lbc,fig.cap='(ref:cb-config-lbc)',out.height = '4.75in',fig.align='center',fig.pos='H'}
 include_graphics(here("Images/img_carnage_mta4.jpg"))
 ```  
 
@@ -362,7 +362,7 @@ include_graphics(here("Images/img_Nordic_264.png"))
 
 (ref:lw-plot) Specimen length-versus-weight from the current survey (colored points, by sex) compared to those from previous SWFSC surveys during the same season (gray points, all sexes) and models [dashed lines, @Palance2019].
 
-```{r lw-plot, fig.cap='(ref:lw-plot)',out.width='6in',fig.pos='H'}
+```{r lw-plot, fig.cap='(ref:lw-plot)',out.width='7in',fig.pos='H'}
 include_graphics(here("Figs/fig_LW_plots.png"))
 ```  
 
@@ -422,9 +422,9 @@ In addition to echoes from target CPS, echoes may also be present from other pel
 include_graphics(here("Images/img_echoview_filtering_example-labeled.png"))
 ```  
 
-(ref:ctd-app) (Top) Integrated echo energy versus depth for all “CPS-like” targets and, (Bottom) integrated echo energy versus depth excluding likely rockfishes and near-surface reverberation [images created in R, @Rcore2021]. Both images show the seabed (black line), and the final upper (red line) and lower (blue line) integration depths by interval.
+(ref:ctd-app) (Top) Integrated echo energy versus depth for all "CPS-like" targets and, (Bottom) integrated echo energy versus depth excluding likely rockfishes and near-surface reverberation [images created in R, @Rcore2021]. Both images show the seabed (black line), and the final upper (red line) and lower (blue line) integration depths by interval.
 
-```{r ctd-app,fig.cap='(ref:ctd-app)',out.width='6in',fig.pos='H'}
+```{r ctd-app,fig.cap='(ref:ctd-app)',out.width='5in',fig.pos='H'}
 include_graphics(here("Images/img_ctd_app_rev.png"))
 ```  
 
@@ -470,43 +470,11 @@ TS_{\mathrm{38kHz}} = -15.44 \times \log_{10} (L_T) - 7.75 \text{, for Pacific a
 (\#eq:tl-ts-mackerel)
 \end{equation}
 
-where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^. **[Add the TS equations with units of dB re 1 m2 and the m(L) equations such that Eq (6)-(9) can be recreated, and their underlying m and b coefficients can be compared to those in the literature. Add from TS.indiv functions]**  
+where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.  
 
 Equations \@ref(eq:tl-ts-sardine) and \@ref(eq:tl-ts-mackerel) were derived from echosounder measurements of $\sigma_{bs}$ from in situ fish, and measures of $L_T$ and $W$ from concomitant catches of South American Pilchard (_Sardinops ocellatus_) and Horse Mackerel (_Trachurus trachurus_) off South Africa [@Barange1996]. Because mackerels have similar $TS$ [@Pena2008], Equation \@ref(eq:tl-ts-mackerel) is used for both Pacific and Jack Mackerels. For Pacific Herring, Equation \@ref(eq:tl-ts-herring) was derived from that of Thomas et al. [-@Thomas2002] measured at 120 kHz with the following modifications: 1) the intercept used here was calculated as the average intercept of Thomas et al.'s spring and fall regressions; 2) the intercept was compensated for swimbladder compression after Zhao et al. [-@Zhao2008] using the average depth for Pacific Herring of 44 m; and 3) the intercept was increased by 2.98 dB to account for the change of frequency from 120 to 38 kHz [@Saunders2012]. Equation \@ref(eq:tl-ts-herring) was also used for Round Herring. For Northern Anchovy, Equation \@ref(eq:tl-ts-anchovy) was derived from that of Kang et al. [-@Kang2009], after compensation of the swimbladder volume [@Ona2003;@Zhao2008] for the average depth of Northern Anchovy observed in summer 2016 [19 m, @Zwolinski2017].  
 
-To calculate $TS_{38\mathrm{kHz}}$, $L_T$ was estimated from measurements of $L_S$ or $L_F$ using linear relationships between length and weight derived from specimens collected in the CCE: for Pacific Sardine, $L_T = 0.3574 + 1.149L_S$; for Northern Anchovy, $L_T = 0.2056 + 1.1646 L_S$; for Pacific Mackerel, $L_T = 0.2994 + 1.092 L_F$; for Jack Mackerel $L_T = 0.7295 + 1.078 L_F$; and for Pacific and Round Herrings $L_T = -0.105 + 1.2 L_F$.  
-
-```{r ll-conversions,eval=FALSE}
-# (ref:ll-conversions) Slopes (_m_) and intercepts (_b_) from linear models used to convert standard length ($L_S$) and fork length ($L_F$) measurements to total length ($L_T$) using the equations: $L_T = \beta_1{L_S} + \beta_{0_{L_S}}$ and $L_T = \beta_1{L_F} + \beta_{0_{L_F}}$.
-
-# Set kable options for NAs
-options(knitr.kable.NA = '')
-
-# Spread and select columns to make a printable table
-ll.table <- tidyr::spread(ll.data, type, coef) %>% 
-  select(scientificName, contains("TLSL"), contains("TLFL")) 
-
-if (doc.type == "docx") {
-  # create kable object (for Word)
-  pander(ll.table)
-} else {
-  # Filter table of L/W models used
-  ll.table  %>% 
-    rename("$\\beta_{0_{L_S}}$" = TLSL_b,
-           "$\\beta_{0_{L_F}}$" = TLFL_b,
-           "$\\beta_{1_{L_S}}$" = TLSL_m,
-           "$\\beta_{1_{L_F}}$" = TLFL_m,
-           "Scientific name" = scientificName) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-          digits = c(0,7,7,7,7),
-          align = c("l","r","r","r","r"),
-          caption = '(ref:ll-conversions)') %>% 
-    kable_styling(bootstrap_options = c("hover","condensed"), 
-                  full_width = F) %>%
-    row_spec(0, align = c("c")) %>%
-    column_spec(1, italic = T)
-}
-```
+To calculate $TS_{38\mathrm{kHz}}$, $L_T$ was estimated from measurements of $L_S$ or $L_F$ using linear relationships between length measurements derived from specimens collected in the CCE [@Palance2019]: for Pacific Sardine, $L_T = 0.3574 + 1.149L_S$; for Northern Anchovy, $L_T = 0.2056 + 1.1646 L_S$; for Pacific Mackerel, $L_T = 0.2994 + 1.092 L_F$; for Jack Mackerel $L_T = 0.7295 + 1.078 L_F$; and for Pacific Herring $L_T = -0.105 + 1.2 L_F$. Since length-length conversions were not available for Round Herring, $L_T$ was approximated from $L_F$ using the equation for Pacific Herring. Specimen weights can be estimated from $L_T$ using the length-weight relationships described in Palance et al. [-@Palance2019].  
 
 The proportions of species in a trawl cluster were considered representative of the proportions of species in the vicinity of the cluster. Therefore, the proportion of the echo-integral from the $e$-th species ($P_e$) in an ensemble of $s$ species can be calculated from the species catches $N_1, N_2,..., N_s$ and the respective average backscattering cross-sections $\sigma_{bs_1}, \sigma_{bs_2},...,\sigma_{bs_s}$ [@Nakken1975]. The acoustic proportion for the $e$-th species in the $a$-th trawl ($P_{ae}$) is:
 
@@ -1384,14 +1352,14 @@ The principal objective of the Spring 2021 CPS survey was to assess the central 
 \
 The estimated biomass of the central stock of Northern Anchovy in the core survey region was `r prettyNum(sum(be.anch.c$Biomass), big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be$lower.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=5)` - `r prettyNum(be$upper.ci.B[be$Species == "Engraulis mordax" & be$Stock == "Central" & be$Stratum == "All"],big.mark=",",digits=5)` t) in spring 2021, which is `r round(1/(sum(be.anch.c$Biomass)/810634)*100)`% more than the 810,634 t (CI~95%~ = 587,317 - 1,066,265) observed in summer 2019 [@Stierhoff2020b]. In spring 2021, the distribution of $L_S$ had one mode between 10 and 13 cm, likely corresponding to a 2020 cohort.   
 
-Although most _`r survey.vessel`_ transects had practically zero biomass density at their western ends, the declines are abrupt The distribution of Northern Anchovy eggs from the spring 2021 CalCOFI survey **[REF]** also shows this pattern, which indicates that the abundance of Northern Anchovy farther offshore of the survey area is likely small (**Appendix \@ref(appendix-anchovy-distribution)**). **This was confirmed by the biomass of the central stock of Northern Anchovy, estimated from the summer 2021 CCE Survey, which was X,XXX,XXX t (CIs, CV).** 
+Although most _`r survey.vessel`_ transects had practically zero biomass density at their western ends, the declines are abrupt The distribution of Northern Anchovy eggs from the spring 2021 CalCOFI survey (unpublished data) also shows this pattern, which indicates that the abundance of Northern Anchovy farther offshore of the survey area is likely small (**Appendix \@ref(appendix-anchovy-distribution)**).  
 
-<!-- Data collected during the subsequent ATM survey in Summer 2021 provides more information on this possible bias.   -->
+<!-- **This was confirmed by the biomass of the central stock of Northern Anchovy, estimated from the summer 2021 CCE Survey, which was X,XXX,XXX t (CIs, CV).**  -->
 
 ### Pacific Sardine {#discussion-sardine}     
 #### Southern stock {#discussion-sardine-southern}  
 \
-The core survey area included some "good" and "optimal" habitat for the northern stock of Pacific Sardine, particularly north of Point Conception (**Fig. \@ref(fig:sardine-potential-habitat)a**). However, the Pacific Sardine sampled in the Southern CA Bight were exclusively in the nearshore region and around the northern Channel Islands, which had unsuitable habitat due to excessive chlorophyll-a concentration (**Fig. \@ref(fig:sardine-potential-habitat)b**, **Fig. \@ref(fig:sardine-habitat-spring2021)**). Therefore, the Pacific Sardine observed in the spring 2021 survey, with a biomass of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=4)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"],big.mark=",",digits=5)` t), were attributed to the southern stock. Pacific Sardine eggs were absent from the nearshore, suggesting that the Pacific Sardine, with a modal length between 12 and 13 cm, were immature, age-0 fish that apparently recruited locally to the southern stock because their forecast growth matched the 16 to 18 cm lengths of Pacific Sardine sampled in the Southern CA Bight in summer survey **[@Stierhoff2022a]**. Furthermore, few or none of them migrated and recruited to the northern stock because there were no Pacific Sardine with comparable sizes in northern stock habitat sampled off OR and WA during summer 2021 (**Fig. \@ref(fig:sardine-stock-allocation)**).  
+The core survey area included some "good" and "optimal" habitat for the northern stock of Pacific Sardine, particularly north of Point Conception (**Fig. \@ref(fig:sardine-potential-habitat)a**). However, the Pacific Sardine sampled in the Southern CA Bight were exclusively in the nearshore region and around the northern Channel Islands, which had unsuitable habitat due to excessive chlorophyll-a concentration (**Fig. \@ref(fig:sardine-potential-habitat)b**, **Fig. \@ref(fig:sardine-habitat-spring2021)**). Therefore, the Pacific Sardine observed in the spring 2021 survey, with a biomass of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=4)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"],big.mark=",",digits=5)` t), were attributed to the southern stock. Pacific Sardine eggs were absent from the nearshore, suggesting that the Pacific Sardine, with a modal length between 12 and 13 cm, were immature, age-0 fish that apparently recruited locally to the southern stock because their forecast growth matched the 16 to 18 cm lengths of Pacific Sardine sampled in the Southern CA Bight in summer survey [@Stierhoff2022a]. Furthermore, few or none of them migrated and recruited to the northern stock because there were no Pacific Sardine with comparable sizes in northern stock habitat sampled off OR and WA during summer 2021 (**Fig. \@ref(fig:sardine-stock-allocation)**).  
 
 \newpage
 \blandscape
@@ -1405,7 +1373,7 @@ include_graphics(here("Images/img_sardine_habitat_spring2021.jpg"))
 
 \newpage
 
-(ref:sardine-stock-allocation) Relative abundance versus $L_S$ for Pacific Sardine (_Sardinops sagax_) estimated during the spring 2021 (top) and the summer 2021 survey **[@Stierhoff2022a]**, separated by putative southern (middle) and northern stocks (bottom). The relative abundance of the summer survey is preliminary. **[Juan, update with final results from summer 2021 survey?]**
+(ref:sardine-stock-allocation) Relative abundance versus $L_S$ for Pacific Sardine (_Sardinops sagax_) estimated during the spring 2021 (top) and the summer 2021 survey [@Stierhoff2022a], separated by putative southern (middle) and northern stocks (bottom). **The relative abundance from the summer survey is preliminary.**
 
 ```{r sardine-stock-allocation,fig.cap='(ref:sardine-stock-allocation)',out.width='10in',fig.pos='H'}
 # Add figure provided by Juan
@@ -1417,11 +1385,11 @@ include_graphics(here("Images/img_sardine_stock_allocation.jpg"))
 
 ### Pacific Mackerel {#discussion-mack}  
 
-There was a negligible amount of Pacific mackerel observed by _`r survey.vessel`_ and _Long Beach Carnage_. See the summer 2021 CCE biomass report **[@Stierhoff2022a]** for a better indication of the status of this stock.  
+There was a negligible amount of Pacific mackerel observed by _`r survey.vessel`_ and _Long Beach Carnage_. See the summer 2021 CCE biomass report [@Stierhoff2022a] for a better indication of the status of this stock.  
 
 ### Jack Mackerel {#discussion-jack}  
 
-The estimated biomass of Jack Mackerel in the core survey region was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t), which is less than 5% of the biomass estimated in the summer 2019 survey. See the summer 2021 CCE biomass report **[@Stierhoff2022a]** for a better indication of the status of this stock.  
+The estimated biomass of Jack Mackerel in the core survey region was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t), which is less than 5% of the biomass estimated in the summer 2019 survey. See the summer 2021 CCE biomass report [@Stierhoff2022a] for a better indication of the status of this stock.  
 
 ## Ecosystem dynamics: Forage fish community {#discussion-ecosystem-dynamics}  
 
@@ -1495,7 +1463,7 @@ include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symm
 
 # Investigation of Northern Anchovy offshore of the surveyed area {#appendix-anchovy-distribution}
 
-The biomass of the central stock of Northern Anchovy occupied mostly the central to western sections of the survey area (**Fig. \@ref(fig:biom-dens-anch-c)a**). Two lines or reason indicate that the esaimted stock biomass was not substantially biased due to unsampled Northern Anchovy farther offshore. First, and most significantly, there was practically zero biomass on the western ends of all the survey transects (**Fig. \@ref(fig:offshore-anchovy)**). Second, there were few Norhtern Anchovy eggs west of the Spring 2021 CPS Survey area during the Spring 2021 CalCOFI Survey **[REF]**, less than a month later.  
+The biomass of the central stock of Northern Anchovy occupied mostly the central to western sections of the survey area (**Fig. \@ref(fig:biom-dens-anch-c)a**). Two lines or reason indicate that the estimated stock biomass was not substantially biased due to unsampled Northern Anchovy farther offshore. First, and most significantly, there was practically zero biomass on the western ends of all the survey transects (**Fig. \@ref(fig:offshore-anchovy)**). Second, there were few Northern Anchovy eggs west of the Spring 2021 CPS Survey area during the Spring 2021 CalCOFI Survey (unpublished data), less than a month later.  
 
 (ref:offshore-anchovy) Distribution of Northern Anchovy inferred from the Spring 2021 CPS and CalCOFI surveys. From the CPS survey, the red circles represent the lowest biomass densities that sum to 5% of the total biomass, and the green circles represent the largest biomass densities that sum to 95% of the biomass. From the CalCOFI survey, less than one month later, the blue circles indicate the lowest densities of Northern Anchovy eggs that sum to 5% of the total Northern Anchovy eggs, and the "+" symbols indicate the highest densities of Northern Anchovy eggs that sum to 95% of the total Northern Anchovy eggs.
 
