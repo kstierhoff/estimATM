@@ -809,6 +809,7 @@ cluster.mid <- haul.mid %>%
 # Save haul data
 save(haul, file = here("Output/haul_info.Rdata"))
 ``` 
+
 ```{r process-seine-data}
 # Run plot_purseSeine in order to process the seine data from the fishing
 # vessels to obtain the necessary variables for merging with Lasker haul data
@@ -1272,14 +1273,14 @@ processed.cps <- unique(nasc$filename)
 save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 ```
 
-```{r plot-nearshore-figure}
+```{r plot-nearshore-figure, eval=T}
 # Currently plot_purseSeine_xxxx is used to create the maps which show the NASC
 # and seine data from the nearshore vessels (LBC in 2022), however that script
 # does not currently run. So this chunk will be used to create that map using
 # the necessary code chunks from plot_purseSeine.
 
 # Load nearshore data
-nasc.nearshore <- readRDS("~/EstimATM/2207RL/Data/Backscatter/LBC/nasc_vessel_LBC_nearshore.rds")
+nasc.nearshore <- readRDS(here("Data/Backscatter/LBC/nasc_vessel_LBC_nearshore.rds"))
 
 # Summarize nasc for plotting
 nasc.plot.ns <- nasc.nearshore %>%
@@ -1328,13 +1329,18 @@ nasc.map.ns.lbc <- base.map +
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
 
+map.bounds.lbc <- lbc.catch.summ.sf %>%
+  st_transform(crs = 3310) %>%
+  st_bbox()
+pie.radius.lbc <- as.numeric(abs(map.bounds.lbc$ymin - map.bounds.lbc$ymax)*.05)
+
 # Create map of seine data
 set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect)) +
   # Plot purse seine pies
   scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
-                              aes(X, Y, group = key.set, r = r*2.5),
+                              aes(X, Y, group = key.set, r = pie.radius.lbc),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
@@ -1354,7 +1360,7 @@ nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, ncol = 2,
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
-       height = 15, width = 8)
+       height = 10, width = 8)
 ```
 
 ```{r plot-maps, include=F}
@@ -1495,7 +1501,7 @@ nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
 ```
 
 
-```{r plot-maps-ns}
+```{r plot-maps-ns, eval=F}
 # Plot nearshore purse seine catch and acoustic backscatter
 
 # First load nearshore data
