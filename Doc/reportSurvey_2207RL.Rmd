@@ -236,6 +236,9 @@ if (download.hab) {
 # vessel, obtains the calibration info, then formats it for displaying in a
 # table
 
+# Source function for reading ECS files
+source(here("Code/extract_cal_ECS.R"))
+
 # Cycle through each vessel
 for (i in cal.vessels) {
   
@@ -243,10 +246,8 @@ for (i in cal.vessels) {
   cal.dir <- paste(here("Data/Calibration"), i, sep = '/')
   
   # Get list of calibration files for that vessel
-  cal.files <- sort(c(list.files(cal.dir, pattern = ".txt", 
-                                     full.names = TRUE),
-                          list.files(cal.dir, pattern = ".xml", 
-                                     full.names = TRUE)))
+  cal.files <- sort(list.files(cal.dir, pattern = ".xml", 
+                               full.names = TRUE))
   
   # Initialize data frames for storing results
   cal.res   <- data.frame()
@@ -265,56 +266,74 @@ for (i in cal.vessels) {
     cal.pings <- bind_rows(cal.pings, cal$cal.pings)
   }
   
-  # create data frame of echosounder parameters
+  # create data frame of important echosounder parameters
   cal.params <- cal.res %>% 
-    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
-           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
-           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
-           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
-           txdr_alon_oa,txdr_athw_oa,target_ts) 
-  
+    select(txdr_freq,  # Transducer frequency
+           txdr_type,  # Transducer model
+           txdr_sn,    # Transducer serial number
+           gpt_power,  # Transmit power
+           gpt_pd,     # Pulse duration
+           target_ts)  # Theoretical sphere TS
+
   # Specify names for echosounder parameters 
-  names(cal.params) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
-                         "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
-                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
-                         "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
-                         "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
-                         "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
-                         "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
-                         "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
-                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                         "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+  names(cal.params) <- c("Frequency",
+                         "Model",
+                         "Serial Number",
+                         "Transmit Power ($p_\\mathrm{et}$)",
+                         "Pulse Duration ($\\tau$)",
                          "Theoretical TS ($TS_\\mathrm{theory}$)")
 
+  # Now read calibration results from ECS file
+  cal.ECS <- list.files(cal.dir, pattern = ".ecs$", 
+                        full.names = TRUE) %>%
+    extract_cal_ECS()
+
   # create data frame of beam model results
-  bm.res <- cal.res %>% 
-    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
-           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa)
+  bm.res <- select(cal.ECS, 
+                   Frequency, 
+                   Gain, 
+                   Sa_correction, 
+                   Beamwidth_alongship, 
+                   Beamwidth_athwartship,
+                   OffsetAngle_alongship, 
+                   OffsetAngle_athwartship)
   
   # Specify number of significant digits for certain parameters
-  bm.res$bm_sa_corr <- formatC(bm.res$bm_sa_corr, format="f", digits=2)
-  bm.res$dev_bm_rms <- formatC(bm.res$dev_bm_rms, format="f", digits=2)
+  bm.res$Frequency <- formatC(bm.res$Frequency, format="d", digits=0)
+  bm.res$Gain <- formatC(bm.res$Gain, format="f", digits=2)
+  bm.res$Sa_correction <- formatC(bm.res$Sa_correction, format="f", digits=2)
+  bm.res$Beamwidth_alongship <- formatC(bm.res$Beamwidth_alongship, format="f", digits=2)
+  bm.res$Beamwidth_athwartship <- formatC(bm.res$Beamwidth_athwartship, format="f", digits=2)
+  bm.res$OffsetAngle_alongship <- formatC(bm.res$OffsetAngle_alongship, format="f", digits=2)
+  bm.res$OffsetAngle_athwartship <- formatC(bm.res$OffsetAngle_athwartship, format="f", digits=2)
 
   # Specify names for beam model results
-  names(bm.res) <- c("Frequency","On-axis Gain ($G_0$)",
-                   "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
-                   "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                   "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                   "Angle Offset Along. ($\\alpha_{0}$)",
-                   "Angle Offset Athw. ($\\beta_{0}$)")
-
+  names(bm.res) <- c("Frequency",
+                     "On-axis Gain ($G_0$)",
+                     "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                     "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                     "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                     "Angle Offset Along. ($\\alpha_{0}$)",
+                     "Angle Offset Athw. ($\\beta_{0}$)")
+  
   # Sort data frames by frequency
   param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
   bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
 
   # Create column defining parameter units
-  param.units <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
-                                      "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
-                                      "deg","deg","deg","deg","dB re 1 m$^{2}$"))#,"dB re 1 W"))
+  param.units <- data.frame(Units = c(" ",                 # Model number
+                                      " ",                 # Serial number
+                                      "W",                 # Transmit power
+                                      "ms",                # Pulse duration
+                                      "dB re 1 m$^{2}$"))  # Theoretical sphere TS
 
   # Create column defining beam model units
-  bm.units <- data.frame(Units = c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  bm.units <- data.frame(Units = c("dB re 1",              # Transducer gain
+                                   "dB re 1",              # Sa correction factor
+                                   "deg",                  # Alongship beamwidth
+                                   "deg",                  # Athwartship beamwidth
+                                   "deg",                  # Alongship offset angle
+                                   "deg"))                 # Athwartship offset angle
 
   # Add units column to parameter data frame
   param.output <- bind_cols(param.output, param.units) %>% 
