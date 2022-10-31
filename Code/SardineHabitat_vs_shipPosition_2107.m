@@ -338,5 +338,8 @@ for i = 1:length(timeBin)
 end
 close(h)
 
+% Remove title
+title(ax, '')
+
 % Save final figure
 exportgraphics(gcf, ['..\Figs\fig_' surveyName '_habitat.png'])
