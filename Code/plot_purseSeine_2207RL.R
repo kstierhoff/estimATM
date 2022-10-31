@@ -422,7 +422,7 @@ lm.path <- lm.points.sf %>%
   st_transform(crs.proj)
 
 # Load Lasker nav
-load("C:/KLS/CODE/Github/estimATM/2207RL/Data/Nav/nav_data.Rdata")
+load(here("Data/Nav/nav_data.Rdata"))
 
 # Plot Lisa Marie data ----------------------------------------------------
 # Use nav data to resize map to survey progress
@@ -483,7 +483,7 @@ save(set.pie, set.zero, set.pos,
 # nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
 # nasc.colors.all <- nasc.colors[nasc.levels.all]
 
-load("C:/KLS/CODE/Github/estimATM/2207RL/Data/Map/basemap.Rdata")
+load(here("Data/Map/basemap.Rdata"))
 
 load(here("Output/trawl_pie_plotBio.Rdata"))
 
@@ -556,7 +556,7 @@ haul.pies <- base.map +
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]))
 
-ggsave(haul.pies, filename = here("Figs/fig_seine_proportion_set_wt_Carnage.png"),
+ggsave(haul.pies, filename = here("Figs/fig_seine_proportion_set_wt_Lasker.png"),
        height = 10, width = 6)
 
 set.haul.combo <- cowplot::plot_grid(set.pies.lm, set.pies.lbc, haul.pies, 

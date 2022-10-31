@@ -214,6 +214,10 @@ pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
 
+# Set gear type colors
+seine.color <- "white"
+trawl.color <- "black"
+
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus", 
@@ -274,9 +278,9 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL","LM") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL","LM","LBC","SD") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- NA # c("LBC","LM")
+nasc.vessels.nearshore <- c("LBC")
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -339,7 +343,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final 38 kHz CPS_nasc_cps.csv",
-                            LBC = "Final 38 kHz CPS.csv",
+                            LBC = "Final 38 kHz CPS_nasc_cps.csv",
                             SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",

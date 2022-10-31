@@ -4,7 +4,7 @@ output:
     number_sections: yes
     toc: no
     includes: 
-      in_header: yaml/header.tex
+      in_header: yaml/header_final.tex
   bookdown::word_document2:
     reference_docx: template/report_template_DRAFT_Rmarkdown.docx
 csl: csl/ices-journal-of-marine-science.csl
@@ -54,6 +54,9 @@ options(knitr.table.format = knitr.format,knitr.kable.NA = '')
 # global pander options
 panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
 panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+
+# Register Google Maps API; remove 
+if (exists("google_map_api")) register_google(key = google_map_api)
 ```
 
 ```{r user-input,include=FALSE}
@@ -992,6 +995,7 @@ if (nrow(catch) > 0) {
   if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
   if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
   if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (!has_name(haul.summ.wt, "Etrumeus acuminatus"))   {haul.summ.wt$`Etrumeus acuminatus` <- 0}
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>%  
@@ -1003,7 +1007,8 @@ if (nrow(catch) > 0) {
            "Anchovy"    = "Engraulis mordax",
            "Sardine"    = "Sardinops sagax",
            "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus") 
+           "JackMack"   = "Trachurus symmetricus",
+           "RndHerring" = "Etrumeus acuminatus")  
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
@@ -1029,6 +1034,7 @@ if (nrow(catch) > 0) {
                               "Sardine"    = rep(0, nrow(haul)),
                               "PacMack"    = rep(0, nrow(haul)),
                               "JackMack"   = rep(0, nrow(haul)),
+                              "RndHerring" = rep(0, nrow(haul)),
                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
     right_join(haul.mid)
   
@@ -1046,7 +1052,7 @@ if (nrow(catch) > 0) {
 # Select and rename trawl data for pie charts
 haul.pie <- haul.summ.wt %>% 
   select(haul, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   project_df(to = crs.proj) %>% 
@@ -1058,11 +1064,12 @@ haul.pie <- haul.summ.wt %>%
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   project_df(to = crs.proj) %>% 
@@ -1074,6 +1081,7 @@ cluster.pie <- cluster.summ.wt %>%
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 # Filter for empty trawls
@@ -1120,8 +1128,10 @@ haul.Sardine.kg    <- sum(haul.catch$Sardine, na.rm = T)
 haul.PacMack.kg    <- sum(haul.catch$PacMack, na.rm = T)
 haul.JackMack.kg   <- sum(haul.catch$JackMack, na.rm = T)
 haul.PacHerring.kg <- sum(haul.catch$PacHerring, na.rm = T)
+haul.RndHerring.kg <- sum(haul.catch$RndHerring, na.rm = T)
 haul.CPS.kg        <- sum(haul.Anchovy.kg, haul.Sardine.kg, haul.PacMack.kg,
-                          haul.JackMack.kg, haul.PacHerring.kg, na.rm = T)
+                          haul.JackMack.kg, haul.PacHerring.kg, haul.RndHerring.kg,
+                          na.rm = T)
 
 # summarize trawl haul data
 trawl.summ <- haul.catch %>% 
@@ -1129,7 +1139,7 @@ trawl.summ <- haul.catch %>%
                    Longitude = startLongDecimal)) %>% 
   select(Haul = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
          "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
-         Jacksmelt, "All CPS" = AllCPS) %>% 
+         "R. Herring" = RndHerring, Jacksmelt, "All CPS" = AllCPS) %>% 
   mutate(Date = format(Date, "%m/%d/%Y %H:%M"))
 ```
 
@@ -1348,8 +1358,8 @@ nasc.plot.cps <- project_sf(nasc.cps.sf, crs.proj)
 
 # Convert acoustic transects to sf
 nasc.tx.sf <- st_as_sf(nasc.cps.sf, coords = c("long","lat"), crs = crs.geog) %>% 
-  select(transect) %>% 
-  group_by(transect) %>% 
+  select(filename, transect) %>% 
+  group_by(filename, transect) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   filter(!transect %in% tx.rm)
@@ -1705,7 +1715,7 @@ During `r tolower(survey.season)` `r survey.year`, the central stock Northern An
 
 The survey began off `r survey.landmark.s`. Sampling from _`r survey.vessel`_ progressed northwards and concluded near `r survey.landmark.n`. The offshore extents of the planned transects were adjusted during the survey according to the observed CPS distribution. To estimate CPS biomasses in areas south of Pt. Conception and around Santa Cruz and Santa Catalina Islands too shallow for _`r survey.vessel`_ to navigate safely, the core survey area was augmented with nearshore transects (**Fig. \@ref(fig:survey-plan)**) sampled by _Long Beach Carnage_.  
 
-(ref:anchovy-distribution) The distributions of Northern Anchovy eggs sampled by the CUFES during spring surveys from 2017 (left) through 2019 (right). Eggs indicate the presence of spawning Northern Anchovy and their distributions were used to delineate the spring 2021 survey area.
+(ref:anchovy-distribution) The distributions of Northern Anchovy eggs sampled by the CUFES during spring surveys from (left) 2017 through (right) 2019. Eggs indicate the presence of spawning Northern Anchovy and their distributions were used to delineate the spring 2021 survey area.
 
 ```{r anchovy-distribution, fig.cap='(ref:anchovy-distribution)',out.width='7in',fig.pos='H'}
 include_graphics(here("Images/img_anchovy_distribution.jpeg"))  
@@ -1873,13 +1883,7 @@ The EK80s were calibrated on `r cal.datetime` while the vessel was alongside the
 ```{r cal-results,results='asis'}
 # Remove unwanted lines
 all.output <- all.output %>%
-  filter(!` ` %in% c("Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
-                     "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
-                     "Bandwidth ($W_\\mathrm{f}$)", 
-                     "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
-                     "Angle Offset Along. ($\\alpha_{0}$)",
-                     "Angle Offset Athw. ($\\beta_{0}$)",
-                     "Ambient Noise"))
+  slice(-7, -10, -11, -12, -15, -16, -18)
 
 if (doc.type == "docx") {
     # create kable object (for Word)
@@ -1925,14 +1929,7 @@ The echosounders were calibrated in a tank at the SWFSC. The beam model results 
 ```{r cal-results-lbc,results='asis'}
 # Remove unwanted lines
 all.output.lbc <- all.output.lbc %>%
-  filter(!` ` %in% c("Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
-                     "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
-                     "Bandwidth ($W_\\mathrm{f}$)", 
-                     "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
-                     "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
-                     "Angle Offset Along. ($\\alpha_{0}$)",
-                     "Angle Offset Athw. ($\\beta_{0}$)",
-                     "Ambient Noise"))
+  slice(-6, -7, -10, -11, -12, -15, -16, -18)
 
 if (doc.type == "docx") {
   # create kable object (for Word)
@@ -2167,11 +2164,11 @@ if (calc.raw.size) {
 }
 ```  
 
-All raw EK60, EK80, ME70, MS70, and SX90 data, including the EK60 and EK80 calibration data, are archived on the SWFSC data server. For more information, contact: David Demer (Southwest Fisheries Science Center, 8901 La Jolla Shores Drive, La Jolla, California, 92037, U.S.A.; phone: 858-546-5603; email: <david.demer@noaa.gov>). A subset of acoustic data will also be available via NOAA's National Centers for Environmental Information (NCEI) Water Column Sonar Data portal^[https://www.ncei.noaa.gov/products/water-column-sonar-data]. Trawl catch^[https://coastwatch.pfeg.noaa.gov/erddap/tabledap/FRDCPSTrawlLHHaulCatch.html] and specimen^[https://coastwatch.pfeg.noaa.gov/erddap/tabledap/FRDCPSTrawlLHSpecimen.html] data are available via ERDDAP.
+All raw EK60, EK80, ME70, MS70, and SX90 data, including the EK60 and EK80 calibration data, are archived on the SWFSC data server. For more information, contact: David Demer (Southwest Fisheries Science Center, 8901 La Jolla Shores Drive, La Jolla, California, 92037, U.S.A.; phone: 858-546-5603; email: <david.demer@noaa.gov>). A subset of acoustic data will also be available via NOAA's National Centers for Environmental Information (NCEI) Water Column Sonar Data portal^[https://www.ncei.noaa.gov/products/water-column-sonar-data]. Trawl catch^[https://coastwatch.pfeg.noaa.gov/erddap/tabledap/FRDCPSTrawlLHHaulCatch.html] and specimen^[https://coastwatch.pfeg.noaa.gov/erddap/tabledap/FRDCPSTrawlLHSpecimen.html] data are available via ERDDAP. CUFES egg data^[https://coastwatch.pfeg.noaa.gov/erddap/tabledap/erdCalCOFIcufes.html] are also available via ERDDAP.  
 
 # Acknowledgements {#acknowledgements}  
 
-We thank the crew members of NOAA Ship _`r survey.vessel`_, as well as the scientists that participated in the sampling operations at sea and the catch processing aboard. We thank Captains Rich Ashley and Tom Brinton, John Marcopolous, and William Hargrave (_Long Beach Carnage_) for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting _Long Beach Carnage_ to conduct the nearshore survey. We thank Joel van Noord for conducting the biological sampling at sea aboard _Long Beach Carnage_. Critical reviews by Annie Yau improved this report.  
+We thank the crew members of NOAA Ship _`r survey.vessel`_, as well as the scientists that participated in the sampling operations at sea and the catch processing aboard. We thank Captains Rich Ashley and Tom Brinton, John Marcopolous, and William Hargrave (_Long Beach Carnage_) for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting _Long Beach Carnage_ to conduct the nearshore survey. We thank Joel van Noord for conducting the biological sampling at sea aboard _Long Beach Carnage_. Critical reviews by Matthew Craig and Annie Yau improved this report.  
 
 # References {-}  
 
