@@ -673,7 +673,7 @@ raw.log.range <- 350  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
-ek80.version  <- "v1.12.2" # EK80 version
+ek80.version  <- "v21.15.1" # EK80 version
 ev.version    <- "v12.1" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <-  350  # Integration start line depth (m)
