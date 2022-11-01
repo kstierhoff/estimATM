@@ -33,10 +33,10 @@ extract_cal_ECS <- function(filename) {
   
   # Define column names
   names(cal.res) <- c("Frequency",
-                      "Beamwidth_alongship",
                       "Beamwidth_athwartship",
-                      "OffsetAngle_alongship",
+                      "Beamwidth_alongship",
                       "OffsetAngle_athwartship",
+                      "OffsetAngle_alongship",
                       "Sa_correction",
                       "Gain",
                       "TwoWayBeamAngle")
