@@ -10,7 +10,7 @@ output: html_document
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,lubridate,here,fs,sf,mapview,DT)
+pacman::p_load(tidyverse,lubridate,here,fs,sf,mapview,DT,lwgeom)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -32,6 +32,9 @@ resize.map <- F # Resize map during survey; if T, uses anticipated bounds of sur
 knitr::opts_chunk$set(
   echo = FALSE, warning = FALSE, message = FALSE, 
   fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150)
+
+# Create output directory
+fs::dir_create(here("Output"))
 ```
 
 ```{r user-input,echo=FALSE}
@@ -49,18 +52,6 @@ settings.files <- dir(here("Doc/settings"))
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
 ```
-
-# Load Lasker NASC data  
-
-```{r load-nasc,include=FALSE,message=FALSE}
-# Load backscatter data
-load(here("Data/Backscatter/nasc_all.Rdata"))
-
-# Remove bad intervals
-nasc <- nasc %>% 
-  filter(lat != 999, long != 999)
-```
-
 
 ```{r process-nav,include=FALSE,message=FALSE}
 # Source code to get nav data from ERDDAP or SCS
@@ -232,22 +223,9 @@ nav.sd <- nav.sd %>%
 # Convert Lasker data to spatial and buffer
 
 ```{r process-lasker,message=FALSE}
-# Convert Lasker transects to lines
-tx.lines <- nasc %>% 
-  arrange(vessel.name, long) %>% 
-  st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
-  group_by(transect.name) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING") %>% 
-  filter(str_detect(transect.name, "RL"))
-
 # Buffer lines by 3 nmi
 tx.buffer <- transects.sf %>% 
   st_buffer(dist = 3/60)
-
-# # View result of buffering
-# mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) + 
-#   mapview(tx.lines, color = "black", legend = FALSE)
 ```
 
 # Downsample Saildrone nav and convert to spatial
