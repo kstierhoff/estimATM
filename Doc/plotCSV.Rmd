@@ -39,9 +39,12 @@ knitr::opts_chunk$set(
 Files listed below are processed and plotted at any time, but ideally prior to being processed using plotBio, estimateBiomass, etc. 
 
 ```{r list-files, echo=TRUE}
+# Controls
+process.csv <- FALSE
+
 # List full file paths
-csv.paths <- c(dir_ls("C:/SURVEY/2107RL/PROCESSED/EV/CSV/LASKER", 
-                      regexp = "*Final 38 kHz CPS.csv"))
+csv.paths <- c(dir_ls("\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_SAILDRONE_SummerCPS\\PROCESSED\\EV\\CSV", 
+                      regexp = "_CPS-Final 38 kHz CPS.csv"))
 ```
 
 ```{r user-input}
@@ -57,9 +60,6 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r process-csv-cps, include=FALSE}
-# Controls
-process.csv <- TRUE
-
 if (process.csv) {
   # Create data frame for results
   nasc <- data.frame()
@@ -94,9 +94,12 @@ if (process.csv) {
 # Get intervals with bad lat/long values
 bad.nasc <- filter(nasc, lat == 999, long == 999)
 
+# Remove data with bad positions
+nasc <- nasc %>%
+  filter(lat != 999, long != 999)
+
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ <- nasc %>%
-  filter(lat != 999, long != 999) %>% 
   group_by(transect, int) %>%
   summarise(
     bins    = length(int),
@@ -109,7 +112,6 @@ nasc.summ <- nasc %>%
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.sf <- nasc %>%
-  filter(lat != 999, long != 999) %>%
   select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
@@ -154,7 +156,7 @@ big.nasc <- nasc %>%
   select(rank, NASC, label, popup, type, datetime, dist_m, lat, long) 
 
 # Save NASC outliers
-save(big.nasc, file = here("Output/nasc_big_plotNASC.Rdata"))
+save(big.nasc, file = here("Output/nasc_big_plotCSV.Rdata"))
 ```
 
 ```{r get-spatial-files,include=F}
@@ -169,7 +171,7 @@ big.nasc.sf <- big.nasc %>%
 ```
 
 ```{r load-nav-data}
-load(here("Data/Nav/nav_data.Rdata"))
+# load(here("Data/Nav/nav_data.Rdata"))
 
 # Read transect waypoints
 wpts <- read_csv(here("Data/Nav", wpt.filename)) %>% 
@@ -259,8 +261,8 @@ i.map <- leaflet() %>%
                    popup = ~popup,
                    group = "Planned Transects (Ancillary)") %>%
   # Add nav data
-  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
-               label = ~leg, group = "Vessel Track") %>%
+  # addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+  #              label = ~leg, group = "Vessel Track") %>%
   # Add backscatter data
   addPolylines(data = nasc.paths, color = "#000414", weight = 3, 
                label = ~transect, group = "Vessel Track") %>%
@@ -293,7 +295,7 @@ i.map <- leaflet() %>%
     overlayGroups = c("Backscatter", "Backscatter (Small)", "Vessel Track",
                       "Planned Transects (Core)", "Planned Transects (Ancillary)"),
     options = layersControlOptions(collapsed = F)) %>%  
-  hideGroup(c("Planned Transects (Core)", "Planned Transects (Ancillary)")) %>% 
+  # hideGroup(c("Planned Transects (Core)", "Planned Transects (Ancillary)")) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 ```
