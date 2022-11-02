@@ -15,29 +15,24 @@ dir.CTD <- 'U:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\
 
 # Directory to store processed data results
 dir.output <- 'U:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\PROCESSED\\REPROCESSED\\'
-# dir.output <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- 'U:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\PSA\\'
-# dir.PSA <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\PSA\\'
 
 # CTD configuration file
 file.con <- 'U:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\UCTD.con'
-# file.con <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\UCTD.con'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'U:\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\EV\\ECS\\_2207RL_Template_20221012.ecs'
-# ECS.template <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\_2107RL_Template.ecs'
+ECS.template <- 'U:\\SURVEYS\\20220627_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\_2207SD_1077_Template.ecs'
 
 # ECS output directory
-dir.ECS <- 'U:\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\EV\\ECS\\REPROCESSED\\'
-# dir.ECS <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\'
+dir.ECS <- 'U:\\SURVEYS\\20220627_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1077\\LASKER\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
-pause <- 0.5
+pause <- 2
 
 
 # Process CTD data --------------------------------------------------------
