@@ -41,8 +41,8 @@ lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
 
 save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
 
-set.clusters <- select(lm.sets, key.set, vessel.name, lat, long) %>%
-  bind_rows(select(lbc.sets, key.set, vessel.name, lat, long)) %>%
+set.clusters <- select(lm.sets, key.set, date, vessel.name, lat, long) %>%
+  bind_rows(select(lbc.sets, key.set, date, vessel.name, lat, long)) %>%
   filter(vessel.name %in% seine.vessels) %>%
   # Use order of sets until Lasker data are available
   # mutate(cluster = as.numeric(as.factor(key.set)),
@@ -250,6 +250,7 @@ set.pie <- set.summ.wt %>%
          Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   atm::project_df(to = 3310) %>% 
   mutate(
+    sample.type = "Purse seine",
     label = paste("Set", key.set),
     popup = paste('<b>Set:', key.set, '</b><br/>',
                   'Anchovy:', Anchovy, 'kg<br/>',
@@ -286,6 +287,17 @@ if (nrow(set.pos) > 0) {
   set.pos <- set.pos %>% 
     replace(. == 0, 0.0000001) 
 }
+
+# Summarize seine set data
+seine.summ <- set.summ.wt %>% 
+  left_join(select(set.clusters, key.set, Vessel = vessel.name, Date = date, 
+                   Latitude = lat, Longitude = long)) %>%
+  select(Vessel, Set = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
+         "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
+         "R. Herring" = RndHerring, 
+         Jacksmelt, "All CPS" = AllCPS) %>% 
+  mutate(Date = format(Date, "%m/%d/%Y")) %>% 
+  arrange(desc(Vessel), Set)
 
 # Select positive clusters
 super.clusters.ns <- filter(set.clusters, cluster %in% unique(set.pos$cluster)) %>% 

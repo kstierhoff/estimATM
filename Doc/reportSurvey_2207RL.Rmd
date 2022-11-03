@@ -98,7 +98,7 @@ process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- F # download nav data from ERDDAP
 process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
-process.cal.FM  <- T # Process FM calibration results
+process.cal.FM  <- F # Process FM calibration results
 process.zmux    <- F # process impedance data
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
@@ -190,7 +190,6 @@ if (copy.files) {
 ```
 
 ```{r process-nav, include=FALSE}
-
 # Source code to get Lasker nav data from ERDDAP
 source(here("Code/get_nav_erddap.R"))
 
@@ -928,19 +927,6 @@ haul.pie <- haul.summ.wt %>%
                   'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
-# If 2022 summer survey, merge Lisa Marie set data (set.pie) with Lasker haul
-# data (haul.pie)
-if (survey.name %in% c("2207RL")) {
-  
-  # Retain only Lisa Marie data
-  temp <- set.pie %>%
-    filter(vessel.name == "LM")
-  
-  # Merge with Lasker data
-  haul.pie <- bind_rows(haul.pie, temp)
-  
-}
-
 cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, RndHerring,
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
@@ -958,8 +944,24 @@ cluster.pie <- cluster.summ.wt %>%
                   'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
-# Filter for empty trawls
-haul.zero    <- filter(haul.pie, AllCPS == 0)
+# If 2022 summer survey, merge Lisa Marie set data (set.pie) with Lasker haul and cluster
+# data (haul.pie and cluster.pie)
+if (survey.name %in% c("2207RL")) {
+  # Add vessel.name to RL data
+  haul.pie <- haul.pie %>% 
+    mutate(vessel.name = "RL",
+           sample.type = "Trawl") %>% 
+    # Merge with Lasker data; retain only Lisa Marie data
+    bind_rows(filter(set.pie, vessel.name == "LM")) %>% 
+    arrange(haul)
+  
+  cluster.pie <- cluster.pie %>% 
+    mutate(vessel.name = "RL",
+           sample.type = "Trawl") %>% 
+    # Merge with Lasker data; retain only Lisa Marie data
+    bind_rows(filter(set.pie, vessel.name == "LM")) %>% 
+    arrange(cluster)
+}
 
 # Filter for empty trawls
 haul.zero    <- filter(haul.pie, AllCPS == 0)
@@ -1010,15 +1012,16 @@ haul.CPS.kg        <- sum(haul.Anchovy.kg, haul.Sardine.kg, haul.PacMack.kg,
                           haul.JackMack.kg, haul.PacHerring.kg, haul.RndHerring.kg, 
                           na.rm = T)
 
-# summarize trawl haul data
+# Summarize trawl haul data
 trawl.summ <- haul.catch %>% 
   left_join(select(haul, haul, Date = equilibriumTime, Latitude = startLatDecimal,
-                   Longitude = startLongDecimal)) %>% 
+                   Longitude = startLongDecimal)) %>%
   select(Haul = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
          "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
          "R. Herring" = RndHerring, 
          Jacksmelt, "All CPS" = AllCPS) %>% 
-  mutate(Date = format(Date, "%m/%d/%Y %H:%M"))
+  mutate(Date = format(Date, "%m/%d/%Y %H:%M")) %>% 
+  arrange(Haul)
 ```
 
 ```{r process-cufes}
@@ -1144,11 +1147,12 @@ cufes.plot.ofe <- cufes %>%
 ```  
 
 ```{r process-ctd-stations}
-# Extract CTD and UCTD cast locations
+# Convert events to sf
 events_sf <- st_as_sf(bridge.snap, coords = c("Lon","Lat"), crs = crs.geog)
 
-ctd.sta         <- filter(events_sf, Button == ctd.button)
-uctd.sta        <- filter(events_sf, Button == uctd.button)
+# Extract CTD and UCTD cast locations
+ctd.sta  <- filter(events_sf, Button == ctd.button, !is.na(Notes)) 
+uctd.sta <- filter(events_sf, Button == uctd.button) 
 
 # Append CTD cast locations from other survey vessels
 if (survey.name %in% c("2207RL")) {
@@ -1192,7 +1196,11 @@ all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
 # Append CTD info from other survey vessels
 if (survey.name %in% c("2207RL")) {
   all.ctds <- all.ctds %>% 
-    bind_rows(select(ctd.sh, Date = datetime, Button = Button, Latitude = lat, Longitude = long))
+    mutate(Vessel = "RL") %>% 
+    bind_rows(select(ctd.sh, Date = datetime, Button = Button, Latitude = lat, Longitude = long)) %>% 
+    replace_na(list(Vessel = "SH")) %>% 
+    select(Date, Vessel, everything()) %>% 
+    arrange(Vessel, Date)
 }
 ```  
 
@@ -1229,8 +1237,8 @@ nasc.summ.cps <- nasc %>%
 nasc.sf <- nasc %>%
   filter(lat != 999, long != 999) %>%
   # arrange(filename, datetime) %>% 
-  select(filename, transect.name, transect, int, dist_m, datetime, lat, long, cps.nasc) %>% 
-  group_by(filename, transect.name, transect, int) %>% 
+  select(vessel.name, filename, transect.name, transect, int, dist_m, datetime, lat, long, cps.nasc) %>% 
+  group_by(vessel.name, filename, transect.name, transect, int) %>% 
   summarise(
     lat   = lat[1],
     long  = long[1],
@@ -1251,8 +1259,8 @@ nasc.plot.cps <- project_sf(nasc.sf, crs.proj)
 
 # Convert acoustic transects to sf
 nasc.tx.sf <- st_as_sf(nasc.sf, coords = c("long","lat"), crs = crs.geog) %>% 
-  select(transect.name, transect) %>% 
-  group_by(transect.name, transect) %>% 
+  select(vessel.name, transect.name, transect) %>% 
+  group_by(vessel.name, transect.name, transect) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") %>% 
   filter(!transect %in% tx.rm)
@@ -1294,7 +1302,8 @@ nasc.plot.ns <- nasc.nearshore %>%
   project_df(to = crs.proj)
 
 # Retain NASC for just LBC
-nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(vessel.name, "LBC"))
+nasc.plot.ns.sub <- filter(nasc.plot.ns, vessel.name %in% nasc.vessels.nearshore)
+# nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(vessel.name, "LBC"))
 
 nasc.levels.all <- sort(unique(nasc.plot.ns.sub$bin.level))
 nasc.labels.all <- nasc.labels[nasc.levels.all]
@@ -1336,18 +1345,19 @@ set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
+  scatterpie::geom_scatterpie(data = filter(set.pos, vessel.name %in% nasc.vessels.nearshore),
+  # scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
                               aes(X, Y, group = key.set, r = pie.radius.lbc),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
+                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
                               color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
+                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
-  geom_point(data = set.zero, aes(X, Y)) +
+                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+  geom_point(data = filter(set.zero, vessel.name %in% nasc.vessels.nearshore), aes(X, Y)) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
@@ -1494,17 +1504,6 @@ nasc.summ.ns <- nasc.nearshore %>%
   arrange(vessel.name, start)
 
 nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
-
-```
-
-
-```{r plot-maps-ns, eval=F}
-# Plot nearshore purse seine catch and acoustic backscatter
-
-# First load nearshore data
-nasc.nearshore <- readRDS("~/EstimATM/2207RL/Data/Backscatter/LBC/nasc_vessel_LBC_nearshore.rds")
-
-source(here("Code/plot_purseSeine_2207RL.R"))
 ```
 
 \pagenumbering{gobble}
