@@ -1,27 +1,27 @@
 # This script imports and processes purse seine data from fishing vessels -------
 # Source following the section entitled estimateNearshore in estimateBiomass ----
 
-# Install and load pacman (library management package)
-if (!require("pacman")) install.packages("pacman")
-
-# Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,readr, lubridate, here, plotly, sf, mapview)
-
-# Install and load required packages from Github -------------------------------
-# surveyR
-pacman::p_load_gh("kstierhoff/surveyR")
-pacman::p_load_gh("kstierhoff/atm")
-
-# Get project settings----------------------------------------------------------
-# Get project name from directory
-prj.name <- last(unlist(str_split(here(),"/")))
-
-# Get all settings files
-settings.files <- dir(here("Doc/settings"))
-
-# Source survey settings file
-prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
-source(here("Doc/settings", prj.settings))
+# # Install and load pacman (library management package)
+# if (!require("pacman")) install.packages("pacman")
+# 
+# # Install and load required packages from CRAN ---------------------------------
+# pacman::p_load(tidyverse,readr, lubridate, here, plotly, sf, mapview)
+# 
+# # Install and load required packages from Github -------------------------------
+# # surveyR
+# pacman::p_load_gh("kstierhoff/surveyR")
+# pacman::p_load_gh("kstierhoff/atm")
+# 
+# # Get project settings----------------------------------------------------------
+# # Get project name from directory
+# prj.name <- last(unlist(str_split(here(),"/")))
+# 
+# # Get all settings files
+# settings.files <- dir(here("Doc/settings"))
+# 
+# # Source survey settings file
+# prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+# source(here("Doc/settings", prj.settings))
 
 # Import data ------------------------------------------------------------------
 ## Import set data 
@@ -45,11 +45,11 @@ set.clusters <- select(lm.sets, key.set, vessel.name, lat, long) %>%
   bind_rows(select(lbc.sets, key.set, vessel.name, lat, long)) %>%
   filter(vessel.name %in% seine.vessels) %>%
   # Use order of sets until Lasker data are available
-  mutate(cluster = as.numeric(as.factor(key.set)),
-         haul    = as.numeric(as.factor(key.set))) %>%
+  # mutate(cluster = as.numeric(as.factor(key.set)),
+  #        haul    = as.numeric(as.factor(key.set))) %>%
   # Begin clustering after Lasker clusters; un-comment if processing after trawl clusters created
-  # mutate(cluster = max(cluster.mid$cluster) + as.numeric(as.factor(key.set)),
-  #        haul    = max(haul.mid$haul) + as.numeric(as.factor(key.set))) %>%
+  mutate(cluster = max(cluster.mid$cluster) + as.numeric(as.factor(key.set)),
+         haul    = max(haul.mid$haul) + as.numeric(as.factor(key.set))) %>%
   project_df(to = crs.proj)
 
 save(lm.sets, lbc.sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
@@ -133,7 +133,7 @@ lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
-### LM
+### LBC
 # lbc.lengths <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
 #   left_join(select(lbc.sets, date, set, key.set)) %>%
 #   mutate(vessel.name = "LM",
@@ -334,9 +334,9 @@ l.summ.set <- lengths.seine %>%
 
 # Create a data frame with abbreviations
 trawl.ts.names <- data.frame(
-  scientificName = c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
-                     "Scomber japonicus","Trachurus symmetricus"),
-  shortName      = c("her","anch","sar",
+  scientificName = c("Clupea pallasii","Engraulis mordax","Etrumeus acuminatus",
+                     "Sardinops sagax","Scomber japonicus","Trachurus symmetricus"),
+  shortName      = c("her","anch","rher","sar",
                      "mack","jack"))
 
 # Remove seine TS data
