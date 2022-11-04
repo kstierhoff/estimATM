@@ -293,7 +293,8 @@ for (i in cal.vessels) {
                    Beamwidth_alongship, 
                    Beamwidth_athwartship,
                    OffsetAngle_alongship, 
-                   OffsetAngle_athwartship)
+                   OffsetAngle_athwartship,
+                   TwoWayBeamAngle)
   
   # Specify number of significant digits for certain parameters
   bm.res$Frequency <- formatC(bm.res$Frequency, format="d", digits=0)
@@ -303,6 +304,7 @@ for (i in cal.vessels) {
   bm.res$Beamwidth_athwartship <- formatC(bm.res$Beamwidth_athwartship, format="f", digits=2)
   bm.res$OffsetAngle_alongship <- formatC(bm.res$OffsetAngle_alongship, format="f", digits=2)
   bm.res$OffsetAngle_athwartship <- formatC(bm.res$OffsetAngle_athwartship, format="f", digits=2)
+  bm.res$TwoWayBeamAngle <- formatC(bm.res$TwoWayBeamAngle, format="f", digits=2)
 
   # Specify names for beam model results
   names(bm.res) <- c("Frequency",
@@ -311,7 +313,8 @@ for (i in cal.vessels) {
                      "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
                      "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
                      "Angle Offset Along. ($\\alpha_{0}$)",
-                     "Angle Offset Athw. ($\\beta_{0}$)")
+                     "Angle Offset Athw. ($\\beta_{0}$)",
+                     "Equivalent Two-way Beam Angle ($\\Psi$)")
   
   # Sort data frames by frequency
   param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
@@ -329,7 +332,8 @@ for (i in cal.vessels) {
                                    "deg",                  # Alongship beamwidth
                                    "deg",                  # Athwartship beamwidth
                                    "deg",                  # Alongship offset angle
-                                   "deg"))                 # Athwartship offset angle
+                                   "deg",                  # Athwartship offset angle
+                                   "dB re 1 sr"))          # Equivalent two-way beam angle
 
   # Add units column to parameter data frame
   param.output <- bind_cols(param.output, param.units) %>% 
@@ -484,6 +488,45 @@ for (i in cal.vessels) {
            width = fig.width, height = 6)
   }
 }
+```
+
+```{r process-cal-saildrone}
+
+# Create a column with beam model units
+bm.units.sd <- data.frame(Units = c("",                 # Echosounder serial #
+                                    "",                 # Transducer serial #
+                                    "dB re 1 sr",       # Equivalent two-way beam angle
+                                    "dB re 1",          # Gain
+                                    "dB re 1",          # Sa_correction
+                                    "deg",              # Alongship beamwidth
+                                    "deg",              # Athwartship beamwidth
+                                    "deg",              # Alongship offset angle
+                                    "deg",              # Athwartship offset angle
+                                    "dB"))              # RMS
+
+all.output.sd <- tibble::tribble(
+  ~" ", ~"1076 (38)", ~"1076 (200)", ~"1077 (38)", ~"1077 (200)",
+  "Echosounder SN", "266961-07", "266961-08", "268632-07", "268632-08",
+  "Transducer SN", "136", "136", "131", "131",
+  "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",                  "-12.9",   "-11.7",   "-12.4",   "-11.6",
+  "On-axis Gain ($G_0$)",                                        "19.18",   "19.45",   "18.87",   "19.00",
+  "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",  "0.08",    "0.08",    "0.02",    "0.09",
+  "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",            "17.3",    "19.4",    "18.2",    "20.1",
+  "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",              "17.0",    "20.2",    "18.4",    "19.9",
+  "Angle Offset Along. ($\\alpha_{0}$)",                         "0.1",     "0.5",     "0.3",     "0.2",
+  "Angle Offset Athw. ($\\beta_{0}$)",                           "-0.5",    "0.2",     "-0.6",    "-0.4",
+  "RMS",                                                         "0.27",    "0.46",    "0.32",    "0.41",
+) %>% 
+  bind_cols(bm.units.sd) %>% 
+  select(1, Units, everything())
+
+# save output to .Rdata and CSV
+save(all.output.sd,
+     file = here("Output/cal_output_table_Saildrone.Rdata"))
+
+write.csv(all.output.sd,
+          file = here("Output/cal_output_table_Saildrone.csv"), 
+          quote = F, row.names = F)
 ```
 
 ```{r plot-cal-fm}
@@ -1611,7 +1654,7 @@ During spring, the northern stock of Pacific Sardine typically aggregates offsho
 
 During `r tolower(survey.season)` `r survey.year`, the west coasts of the United States and Baja California were surveyed using _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and USVs. Compulsory transects were nearly perpendicular to the coast and separated by 10 nmi. The survey began off `r survey.landmark.n` and the combination of survey platforms progressed southwards toward `r survey.landmark.s`.    
 
-The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent of the potential habitat of the northern stock of Pacific Sardine^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html] at the beginning of the survey (**Fig. \@ref(fig:sardine-habitat)**). For _`r survey.vessel`_, the planned transects ranged from `r survey.landmark.n` to `r survey.landmark.s`. To increase the spatial sampling resolution from _`r survey.vessel`_, USVs were to conduct acoustic sampling interstitial to _`r survey.vessel`_ transects between Newport, OR and San Francisco, CA. To estimate CPS biomass near shore, where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was to be augmented with echosounder and purse-seine sampling from _Lisa Marie_ between `r survey.landmark.n` to Bodega Bay, CA; and from _Long Beach Carnage_ between Bodega Bay, CA to San Diego, CA, and around Santa Cruz and Santa Catalina Islands (**Fig. \@ref(fig:survey-plan)**). After Leg I on _`r survey.vessel`_ was cancelled due to OMAO staffing issues, the plan was modified for _Lisa Marie_ to forego its nearshore sampling and instead survey _`r survey.vessel`_'s transects between `r survey.landmark.n` to Bodega Bay, CA using 20 nmi spacing, while the USVs would survey interstitial to _Lisa Marie_ transects starting near Grays Harbor, WA and continuing as far south as time permitted. Further due to OMAO staffing issues, Leg III on _`r survey.vessel`_ was delayed by 16 days; the plan was then modified to use the remaining four days of the leg to survey northward from San Diego, CA into the Southern California Bight using 20 nmi spacing. Leg IV on _`r survey.vessel`_ then resumed sampling southward from Monterey Bay, CA to `r survey.landmark.s`. For _`r survey.vessel`_, the offshore extent of the planned transects was adjusted during the survey according to the observed distribution of putative CPS backscatter in the echograms, CPS eggs in the CUFES samples, or CPS caught in trawls.  
+The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent of the potential habitat of the northern stock of Pacific Sardine^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html] at the beginning of the survey (**Fig. \@ref(fig:sardine-habitat-preSurvey)**). For _`r survey.vessel`_, the planned transects ranged from `r survey.landmark.n` to `r survey.landmark.s`. To increase the spatial sampling resolution from _`r survey.vessel`_, USVs were to conduct acoustic sampling interstitial to _`r survey.vessel`_ transects between Newport, OR and San Francisco, CA. To estimate CPS biomass near shore, where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was to be augmented with echosounder and purse-seine sampling from _Lisa Marie_ between `r survey.landmark.n` to Bodega Bay, CA; and from _Long Beach Carnage_ between Bodega Bay, CA to San Diego, CA, and around Santa Cruz and Santa Catalina Islands (**Fig. \@ref(fig:survey-plan)**). After Leg I on _`r survey.vessel`_ was cancelled due to OMAO staffing issues, the plan was modified for _Lisa Marie_ to forego its nearshore sampling and instead survey _`r survey.vessel`_'s transects between `r survey.landmark.n` to Bodega Bay, CA using 20 nmi spacing, while the USVs would survey interstitial to _Lisa Marie_ transects starting near Grays Harbor, WA and continuing as far south as time permitted. Further due to OMAO staffing issues, Leg III on _`r survey.vessel`_ was delayed by 16 days; the plan was then modified to use the remaining four days of the leg to survey northward from San Diego, CA into the Southern California Bight using 20 nmi spacing. Leg IV on _`r survey.vessel`_ then resumed sampling southward from Monterey Bay, CA to `r survey.landmark.s`. For _`r survey.vessel`_, the offshore extent of the planned transects was adjusted during the survey according to the observed distribution of putative CPS backscatter in the echograms, CPS eggs in the CUFES samples, or CPS caught in trawls.  
 
 (ref:sardine-distribution) Conceptual spring (shaded region) and summer (hashed region) distributions of potential habitat for the northern stock of Pacific Sardine along the west coasts of Mexico, the United States, and Canada. The dashed and dotted lines represent, respectively, the approximate summer and spring positions of the 0.2 mg m^–3^ chlorophyll-a concentration isoline. This isoline appears to oscillate in synchrony with the transition zone chlorophyll front [TZCF, @Polovina2001] and the offshore limit of the northern stock Pacific Sardine potential habitat [@Zwolinski2011]. Mackerels are found within and on the edge of the same oceanographic  habitat [e.g., @Demer2012; @Zwolinski2012]. The TZCF may delineate the offshore and southern limit of both Pacific Sardine and Pacific Mackerel distributions, and juveniles may have nursery areas in the Southern California Bight, downstream of upwelling regions.
 
@@ -1629,10 +1672,10 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 
 \newpage  
 
-(ref:sardine-habitat) Distribution of potential habitat for the northern stock of Pacific Sardine, temporally aggregated using an average of the habitat centered ±2° around _`r survey.vessel`_ positions throughout the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
+(ref:sardine-habitat-preSurvey) Distribution of potential habitat for the northern stock of Pacific Sardine at the beginning of the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
 
-```{r sardine-habitat,fig.cap='(ref:sardine-habitat)',out.height = '6in',fig.align='center',fig.pos='H'}
-include_graphics(here("Figs/fig_summer2022_habitat.png"))
+```{r sardine-habitat-preSurvey,fig.cap='(ref:sardine-habitat-preSurvey)',out.height = '6in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_habitat_20220628.png"))
 ```  
 
 \newpage
@@ -1676,7 +1719,7 @@ Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and t
 
 To minimize acoustic interference, transmit pulses from the EK80s, acoustic Doppler current profiler and echosounder (Simrad EC150-3C), multibeam echosounder (Simrad ME70), imaging sonar (Simrad MS70), scanning sonar (Simrad SX90), and a separate acoustic Doppler current profiler (Teledyne RD Instruments OS75 ADCP) were triggered using a synchronization system (Simrad K-Sync). The K-Sync trigger rate, and thus the echosounder ping interval, was modulated by the EAL using the 18-kHz seabed depth provided by _`r survey.vessel`_'s Scientific Computing System (SCS). During daytime, the EC150-3C, ME70, SX90, and ADCP were operated continuously, while the MS70 was only operated at times when CPS were present. At nighttime, only the EK80, EC150-3C, and ADCP were operated. All other instruments that can produce sound within the EK80's CW bandwidths were secured during daytime-survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Model SRD-500A, Sperry Marine), or both.
 
-On _Lisa Marie_ and _Long Beach Carnage_, the EAL was used to control the EK80 software to modulate the echosounder recording ranges and ping intervals to avoid aliased seabed echoes. When the EAL was not utilized, the EK80 software **CHECK THIS** recorded to 200 and 1000 m, respectively, and used the maximum ping rate. Transmit pulses from the EK60s and fishing sonars were not synchronized. Therefore, the latter was secured during daytime acoustic transects.
+On _Lisa Marie_ and _Long Beach Carnage_, the EAL was used to control the EK80 software to modulate the echosounder recording ranges and ping intervals to avoid aliased seabed echoes. When the EAL was not utilized, the EK80 software recorded to 1000 m and used the maximum ping rate. Transmit pulses from the EK60s and fishing sonars were not synchronized. Therefore, the latter was secured during daytime acoustic transects.
 
 On the USVs, the echosounders were programmed to transmit CW pulses to a range dependent on the transect depth. For deeper seabed depths, the ping interval was 2 s and the 38 and 200-kHz echosounders recorded to 1000 and 400 m, respectively. For shallower depths, the ping interval was 1 s and both echosounders recorded to 250 m. Once an hour, the echosounders would operate in passive mode and record three pings to obtain estimates of the background noise level.
 
@@ -1874,7 +1917,7 @@ For the two USVs, the echosounders were calibrated while dockside by Saildrone, 
 
 (ref:cal-results-sd) Miniature Wideband Transceiver (Simrad WBT Mini) beam model results estimated from calibrations of echosounders aboard USVs using a WC38.1.
 
-```{r cal-results-sd,results='asis',eval=FALSE}
+```{r cal-results-sd,results='asis',eval=T}
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(all.output.sd)
@@ -1889,7 +1932,7 @@ if (doc.type == "docx") {
                   font_size = 8) %>% 
     # row_spec(18, hline_after = T) %>% 
     # add_header_above(c(" " = 2, "1045" = 2, "1046" = 2, "1047" = 2)) %>% 
-    add_header_above(c(" " = 2, "Saildrone (Frequency)" = 6))
+    add_header_above(c(" " = 2, "Saildrone (Frequency)" = 4))
 }
 ```  
 
@@ -1906,10 +1949,16 @@ nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
 nasc.summ.lm.ns <- filter(nasc.summ.ns, vessel.name == "LM")
 ```  
 
-The core survey region spanned an area from approximately `r survey.landmark.n` to `r survey.landmark.s` (**Fig. \@ref(fig:station-sampling)**). _`r survey.vessel`_, _Lisa Marie_, and the two USVs sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(trawl.summ)` Nordic trawls [**INSERT NUMBER OF LM SETS**].
+The core survey region spanned an area from approximately `r survey.landmark.n` to `r survey.landmark.s` (**Fig. \@ref(fig:transects-and-habitat)**). _`r survey.vessel`_, _Lisa Marie_, and the two USVs sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(trawl.summ)` Nordic trawls [**INSERT NUMBER OF LM SETS**].
+
+(ref:transects-and-habitat) Summary of all transects sampled during the survey by each vessel or platform in relation to the potential habitat for the northern stock of Pacific Sardine. The habitat is temporally aggregated using an average of the habitat centered ±2° around each vessel during the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
+
+```{r transects-and-habitat,fig.cap='(ref:transects-and-habitat)',out.height = '6in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_summer2022_habitat.png"))
+```  
 
 **UPDATE AFTER NASC DATA IS AVAILABLE**
-The nearshore region spanned an area from approximately Cape Flattery, WA to San Diego, CA, including around Santa Cruz and Santa Catalina Islands. _Long Beach Carnage_ surveyed from approximately Stewarts Point to San Diego, CA, and around the Santa Cruz and Santa Catalina Islands, with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets (**Fig. \@ref(fig:nasc-seine-lbc)**).
+The nearshore region spanned an area from approximately Cape Flattery, WA to San Diego, CA, including around Santa Cruz and Santa Catalina Islands. _Long Beach Carnage_ surveyed from approximately Stewarts Point to San Diego, CA, and around the Santa Cruz and Santa Catalina Islands, with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-seine-lbc)**).
 
 **Leg I**  
 
@@ -1943,7 +1992,7 @@ During Leg IV, _Carranza_ sampled Transects 055 to 027, between Las Flores to Pu
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
 
-A total of `r nrow(ctd.sta)` CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted from _`r survey.vessel`_ (**Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**), and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were collected underway.  A total of `r nrow(ctd.sh)` CTD casts were obtained from the NWFSC's 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_, which were utilized for processing the _Lisa Marie_ and USV transects off of Oregon and Washington.
+A total of 8 CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted from _`r survey.vessel`_ (**Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**), and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were collected underway.  A total of `r nrow(ctd.sh)` CTD casts were obtained from the NWFSC's 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_, which were utilized for processing the _Lisa Marie_ and USV transects off of Oregon and Washington.
 
 (ref:station-sampling) [**UPDATE**] The locations of surface trawls (white points), CTD and UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_. The CTD casts off of Oregon and Washington were provided by the NWFSC from their 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_.
 
