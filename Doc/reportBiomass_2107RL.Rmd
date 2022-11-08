@@ -1795,7 +1795,7 @@ be.jack <- be %>%
 
 \newpage  
 
-(ref:l-freq-summ-jack) Abundance versus fork length ($L_F$, cm) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions.
+(ref:l-freq-summ-jack) Abundance versus fork length ($L_F$, cm) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions. **[Split columns to fit on one page, if possible; current effort negatively affects page layout for other figures/tables.]**
 
 ```{r l-freq-summ-jack}
 # Print table for mackerel
@@ -2162,6 +2162,18 @@ if (combine.regions) {
 
 \newpage
 
+```{r process-biomass-ts}
+if (plot.time.series) {
+  source(here("Code/plot_BiomassTimeSeries.R"))
+} else {
+  if (file.exists(here("Output/biomass_timeseries_final.Rdata"))) {
+    load(here("Output/biomass_timeseries_final.Rdata"))  
+  } else {
+    print("No time series data available")
+  }
+}
+```
+
 # Discussion {#discussion}  
 
 The principal objectives of the `r survey.das`-day, summer 2021 CCE Survey were to estimate the biomasses and distributions of the northern and southern stocks of Pacific Sardine and the northern and central stocks of Northern Anchovy. Secondary objectives were to produce estimates for Pacific Mackerel, Jack Mackerel, Pacific Herring, and Round Herring within the survey area at the time of the survey. 
@@ -2172,18 +2184,42 @@ This is the first time that the SWFSC's ATM sampling was coordinated with INAPES
 
 ## Biomass and abundance
 ### Northern Anchovy {#discussion-anchovy-biomass} 
-#### Northern stock {#discussion-anchovy-biomass-northern}  
+#### Northern stock {#discussion-anchovy-biomass-northern} 
 
-The estimated biomass of the northern stock of Northern Anchovy in the survey region north of Cape Mendocino was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Northern"], big.mark=",", digits = 4)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Northern"],big.mark=",",digits=4)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Northern"],big.mark=",",digits=5)` t) in summer 2021. The northern stock biomass has comprised a small fraction (**X to XX%**) of the total biomass in the ATM surveys conducted in the CCE since at least 2015 [@Stierhoff2021a].  
+```{r}
+# Summarize percent total biomass for NS anchovy
+biomass.pct.anch.n <- biomass.spp.summ %>% 
+  filter(species == "Engraulis mordax", stock == "Northern")
+
+# round(min(biomass.pct.anch.n$biomass.pct), 1)
+```
+
+The estimated biomass of the northern stock of Northern Anchovy in the survey region north of Cape Mendocino was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Northern"], big.mark=",", digits = 4)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Northern"],big.mark=",",digits=4)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Northern"],big.mark=",",digits=5)` t) in summer 2021. The northern stock biomass has comprised a small fraction (`r round(min(biomass.pct.anch.n$biomass.pct),1)` to `r round(max(biomass.pct.anch.n$biomass.pct),1)`%) of the total biomass in the ATM surveys conducted in the CCE since at least 2015 [@Stierhoff2021a].  
 
 #### Central stock {#discussion-anchovy-biomass-central}  
 
-The estimated biomass of the central stock of Northern Anchovy in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Central"],big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Central"],big.mark=",",digits=5)` t) in summer 2021, and comprised `r round(be.all.summ$Biomass[be.all$Species == "Engraulis mordax" & be.all$Stock == "Central"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass in summer 2021. The biomass represents a ~`r round(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"]/1371634,1)`-fold increase over the 1,371,634 t estimated in spring 2021 [@Zwolinski2022b] and a ~`r round(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"]/810634, digits=1)`-fold increase over the 810,634 t (CI~95%~ = 587,317 - 1,066,265) estimated for the stock, between San Diego **and Bodega Bay**, in summer 2019 [@Stierhoff2020b]. In summer 2021, `r prettyNum(sum(be.anch.c$Biomass[be.anch.c$Stratum %in% c(1,2)])/sum(be.anch.c$Biomass)*100, big.mark=",", digits = 1)`% of the central stock Northern Anchovy biomass was observed in Mexican waters. In 2015, the ATM survey documented a large recruitment to the central stock of Northern Anchovy, and since 2018, the central stock of Northern Anchovy has been the dominant forage fish species in the survey area (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**).  
+```{r}
+# Summarize percent total biomass for CS anchovy sardine
+biomass.pct.anch.c <- biomass.spp.summ %>% 
+  filter(species == "Engraulis mordax", stock == "Central")
+
+# round(max(biomass.pct.anch.c$biomass))
+```
+
+The estimated biomass of the central stock of Northern Anchovy in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Central"],big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Central"],big.mark=",",digits=5)` t) in summer 2021, and comprised `r round(be.all.summ$Biomass[be.all$Species == "Engraulis mordax" & be.all$Stock == "Central"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass in summer 2021. The biomass represents a ~`r round(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"]/1371634,1)`-fold increase over the 1,371,634 t estimated in spring 2021 [@Zwolinski2022b] and a ~`r round(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"]/biomass.pct.anch.c$biomass[biomass.pct.anch.c$year == 2019], digits=1)`-fold increase over the `r prettyNum(biomass.pct.anch.c$biomass[biomass.pct.anch.c$year == 2019],big.mark=",", digits = 5)` t estimated for the stock, between San Diego and Fort Bragg, in summer 2019 [@Stierhoff2020b]. In summer 2021, `r prettyNum(sum(be.anch.c$Biomass[be.anch.c$Stratum %in% c(1,2)])/sum(be.anch.c$Biomass)*100, big.mark=",", digits = 1)`% of the central stock Northern Anchovy biomass was observed in Mexican waters. In 2015, the ATM survey documented a large recruitment to the central stock of Northern Anchovy, and since 2018, the central stock of Northern Anchovy has been the dominant forage fish species in the survey area (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**).  
 
 ### Pacific Sardine {#discussion-sardine}     
-#### Northern stock {#discussion-sardine-biomass-northern}  
+#### Northern stock {#discussion-sardine-biomass-northern} 
 
-Similar to spring 2021 [@Zwolinski2022b], the boundary between the northern and southern stocks of Pacific Sardine was San Francisco, based foremost on associations with potential habitat but corroborated by the distributions of biomass density north and south of San Francisco Bay, and differences in length distribution (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar), but confirm with Juan**). The estimated biomass of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all$Stock == "Northern"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"], big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"], big.mark=",",digits=5)` t) in the survey region was a `r round((be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"]/33623)-1, digits=1)*100`% increase in biomass compared to the 33,623 t estimated in summer 2019 [@Stierhoff2020b]. The biomass of the northern stock of Pacific Sardine has remained less than **XX,XXX t** since 2014 (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**). 
+```{r}
+# Summarize percent total biomass for NS sardine
+biomass.pct.sar.n <- biomass.spp.summ %>% 
+  filter(species == "Sardinops sagax", stock == "Northern", year >= 2015)
+
+# round(max(biomass.pct.sar.n$biomass))
+```
+
+Similar to spring 2021 [@Zwolinski2022b], the boundary between the northern and southern stocks of Pacific Sardine was San Francisco, based foremost on associations with potential habitat but corroborated by the distributions of biomass density north and south of San Francisco Bay, and differences in length distribution (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar), but confirm with Juan**). The estimated biomass of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all$Stock == "Northern"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"], big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"], big.mark=",",digits=5)` t) in the survey region was a `r round((be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"]/33623)-1, digits=1)*100`% increase in biomass compared to the `r prettyNum(biomass.pct.sar.n$biomass[biomass.pct.sar.n$year == 2019],big.mark=",", digits = 5)` t estimated in summer 2019 [@Stierhoff2020b]. The biomass of the northern stock of Pacific Sardine has remained less than `r prettyNum(max(biomass.pct.sar.n$biomass), big.mark=",", digits = 1)` t since 2014 (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**). 
 
 \newpage
 
@@ -2198,39 +2234,62 @@ include_graphics(here("Figs/fig_sardine_stock_structure_lengths_summer2021.jpeg"
 
 #### Southern stock {#discussion-sardine-biomass-southern}  
 
-The estimated biomass of the southern stock of Pacific Sardine in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all$Stock == "Southern"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"],big.mark=",",digits=5)` t). In summer 2021, `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum %in% c(2:4)]), big.mark=",", digits = 5)` t (strata 2-4; `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum %in% c(2:4)])/sum(be.sar.s$Biomass)*100, big.mark=",", digits = 1)`% of the total biomass) of southern stock biomass was observed in U.S. waters, and the remaining `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum ==1]), big.mark=",", digits = 5)` t (stratum 1; `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum ==1])/sum(be.sar.s$Biomass)*100, big.mark=",", digits = 1)`% of the total biomass) was observed off Baja CA. In summer 2019, the estimated biomass of the southern stock of Pacific Sardine in U.S. waters was 8,322 t [@Stierhoff2020b]. The summer 2021 survey area was the first to survey south of the U.S.-Mexico border.  **[Describe, tabulate, or plot the time series of southern stock sardine in U.S. waters. State when the southern stock was first observed in the ATM surveys and if there is an increasing trend.]**  
+```{r}
+# Summarize percent total biomass for SS sardine
+biomass.pct.sar.s <- biomass.spp.summ %>% 
+  filter(species == "Sardinops sagax", stock == "Southern")
 
-### Pacific Mackerel {#discussion-mack}  
+# round(max(biomass.pct.sar.s$biomass))
+```
 
-In summer 2021, the estimated biomass of Pacific Mackerel in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t), which is not significantly different from the 24,643 t estimated in summer 2019, and is within the range of 8,000 t [summer 2013; @Zwolinski2014] to 41,139 t [summer 2018; @Zwolinski2019a] estimated during summer surveys since 2013 (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**).  
+The estimated biomass of the southern stock of Pacific Sardine in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all$Stock == "Southern"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"],big.mark=",",digits=5)` t). In summer 2021, `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum %in% c(2:4)]), big.mark=",", digits = 5)` t (strata 2-4; `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum %in% c(2:4)])/sum(be.sar.s$Biomass)*100, big.mark=",", digits = 1)`% of the total biomass) of southern stock biomass was observed in U.S. waters, and the remaining `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum ==1]), big.mark=",", digits = 5)` t (stratum 1; `r prettyNum(sum(be.sar.s$Biomass[be.sar.s$Stratum ==1])/sum(be.sar.s$Biomass)*100, big.mark=",", digits = 1)`% of the total biomass) was observed off Baja CA. **The southern stock was first observed in U.S. waters by the SWFSC's ATM surveys in 2016 [`r prettyNum(biomass.pct.sar.s$biomass[biomass.pct.sar.s$year == 2016],big.mark=",", digits = 1)` t, @Stierhoff2021b]. Southern stock biomass was `r prettyNum(biomass.pct.sar.s$biomass[biomass.pct.sar.s$year == 2018],big.mark=",", digits = 1)` t in summer 2018 [@Stierhoff2019b], and was `r prettyNum(biomass.pct.sar.s$biomass[biomass.pct.sar.s$year == 2019],big.mark=",", digits = 1)` t in summer 2019 [@Stierhoff2020b]. The summer 2021 survey area was the first to survey south of the U.S.-Mexico border.**  
+
+### Pacific Mackerel {#discussion-mack}
+
+```{r}
+# Summarize percent total biomass for SS sardine
+biomass.pct.mack <- biomass.spp.summ %>% 
+  filter(species == "Scomber japonicus") %>% 
+  arrange(year)
+
+# round(max(biomass.pct.mack$biomass))
+```
+
+In summer 2021, the estimated biomass of Pacific Mackerel in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t), which is not significantly different from the `r prettyNum(biomass.pct.mack$biomass[biomass.pct.mack$year == 2019],big.mark=",", digits = 5)` t estimated in summer 2019, and is within the range of `r prettyNum(biomass.pct.mack$biomass[biomass.pct.mack$year == 2013],big.mark=",", digits = 5)` t [summer 2013; @Zwolinski2014] to `r prettyNum(biomass.pct.mack$biomass[biomass.pct.mack$year == 2017],big.mark=",", digits = 5)` t [summer 2017; @Zwolinski2019a] estimated during summer surveys since 2013 (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**).  
 
 ### Jack Mackerel {#discussion-jack}  
 
-In summer 2021, the estimated biomass of Jack Mackerel in the survey region, south of Cape Flattery, was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t), which is `r round(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus']/385801,1)`-fold higher than 385,801 t estimated in summer 2019 [@Stierhoff2020b]. In summer 2021, Jack Mackerel was the second most abundant CPS overall, and comprised `r round(be.all.summ$Biomass[be.all.summ$Species == "Trachurus symmetricus"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**).  
+```{r}
+# Summarize percent total biomass for SS sardine
+biomass.pct.jack <- biomass.spp.summ %>% 
+  filter(species == "Trachurus symmetricus") %>% 
+  arrange(year)
+
+# round(max(biomass.pct.jack$biomass))
+```
+
+In summer 2021, the estimated biomass of Jack Mackerel in the survey region, south of Cape Flattery, was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t), which is `r round(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus']/biomass.pct.jack$biomass[biomass.pct.jack$year == 2019],1)`-fold higher than `r prettyNum(biomass.pct.jack$biomass[biomass.pct.jack$year == 2019],big.mark=",", digits = 5)` t estimated in summer 2019 [@Stierhoff2020b]. In summer 2021, Jack Mackerel was the second most abundant CPS overall, and comprised `r round(be.all.summ$Biomass[be.all.summ$Species == "Trachurus symmetricus"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass (**Figs. \@ref(fig:biomass-ts-line)** and **\@ref(fig:biomass-ts-bar)**).  
 
 ### Pacific Herring {#discussion-herring} 
 
-In summer 2021, the estimated biomass of Pacific Herring in the survey region, south of Cape Flattery, was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t). This was `r round(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii']/267792*100,1)`% of the 267,792 t estimated in summer 2019 [@Stierhoff2020b], when the survey also included the west coast of Vancouver Island, Canada [@Stierhoff2020b]. In summers 2021, 2018 [@Stierhoff2019b], and 2017 [@Zwolinski2019a], the stock was closer to shore and more patchily distributed compared to summer 2019 when the stock spanned a greater portion of the continental shelf [@Stierhoff2020b]. **[For what survey domains? Are they the same during 2019 and 2021?]**  
+```{r}
+# Summarize percent total biomass for SS sardine
+biomass.pct.her <- biomass.spp.summ %>% 
+  filter(species == "Clupea pallasii") %>% 
+  arrange(year)
+
+# round(max(biomass.pct.her$biomass))
+```
+
+In summer 2021, the estimated biomass of Pacific Herring in the survey region, south of Cape Flattery, was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t). This was `r round(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii']/biomass.pct.her$biomass[biomass.pct.her$year == 2019]*100,1)`% of the `r prettyNum(biomass.pct.her$biomass[biomass.pct.her$year == 2019],big.mark=",", digits = 5)` t estimated in summer 2019 [@Stierhoff2020b], when the survey also included the west coast of Vancouver Island, Canada [@Stierhoff2020b]. The summer surveys in 2017 and 2018 also included Vancouver Island. However, in summers 2021, 2018 [@Stierhoff2019b], and 2017 [@Zwolinski2019a], the stock was closer to shore and more patchily distributed compared to summer 2019 when the stock spanned a greater portion of the continental shelf [@Stierhoff2020b].    
 
 ### Round Herring {#discussion-rherring} 
 
-In summer 2021, the estimated biomass of Round Herring in the core survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t), and was observed entirely in the southernmost portion **[Where? Give two landmarks bounding the distribution.]** of the survey area surveyed by _`r survey.vessel`_ and _Carranza_. This was the first time the SWFSC's ATM survey has encountered Round Herring and estimated its biomass.  
+In summer 2021, the estimated biomass of Round Herring in the core survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t), and was observed entirely in the southernmost portion of the survey area surveyed by _`r survey.vessel`_ and _Carranza_, between El Rosario and Punta Abreojos. This was the first time the SWFSC's ATM survey has encountered Round Herring and estimated its biomass.  
 
 \newpage
 
 ## Ecosystem dynamics: Forage fish community {#discussion-ecosystem-dynamics}  
-
-```{r process-biomass-ts}
-if (plot.time.series) {
-  source(here("Code/plot_BiomassTimeSeries.R"))
-} else {
-  if (file.exists(here("Output/biomass_timeseries_final.Rdata"))) {
-    load(here("Output/biomass_timeseries_final.Rdata"))  
-  } else {
-    print("No time series data available")
-  }
-}
-``` 
 
 The acoustic-trawl method (ATM) has been used to monitor the biomasses and distributions of pelagic and mid-water fish stocks worldwide [e.g., @Coetzee2008; @Karp1994; @Simmonds2009]. In the CCE, ATM surveys have been used to directly assess Pacific Hake [@JTC2014; @Edwards2018], rockfishes [@Starr1996; @Demer2012b; @Demer2012c; @Demer2012d], Pacific Herring [@Thomas2003], and CPS [@Mais1974; @Mais1977; @Hill2017]. In 2006, the SWFSC's ATM survey in the CCE was focused on Pacific Sardine [@Cutter2008], but evolved to assess the five most abundant CPS [@Zwolinski2014]: Pacific Sardine, Northern Anchovy, Jack Mackerel, Pacific Mackerel, and Pacific Herring. The proportions of these stocks that are in water too shallow to be sampled by NOAA shops are estimated using samples collected from fishing vessels and USVs. Also, concurrent satellite- and ship-based measures of their biotic and abiotic habitats are used to provide an ecosystem perspective.  
 
