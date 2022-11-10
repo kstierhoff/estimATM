@@ -65,10 +65,17 @@ biomass.ts <- biomass.ts %>%
 # Summarize community biomass by year
 biomass.comm.summ <- biomass.ts %>% 
   # filter(group != "Sardinops sagax-Southern") %>% 
-  group_by(year) %>% 
+  group_by(year, survey) %>% 
   summarise(biomass.total = sum(biomass))
 
-save(biomass.ts, biomass.comm.summ, 
+# Summarize species biomass per year
+biomass.spp.summ <- biomass.ts %>% 
+  group_by(year, survey, species, stock) %>% 
+  summarise(biomass = sum(biomass)) %>% 
+  left_join(biomass.comm.summ) %>% 
+  mutate(biomass.pct = biomass/biomass.total*100)
+
+save(biomass.ts, biomass.comm.summ, biomass.spp.summ,
      file = here("Output/biomass_timeseries_final.Rdata"))
 
 # Create plot ------------------------------------------------------------------
