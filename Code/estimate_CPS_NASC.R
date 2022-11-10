@@ -347,8 +347,20 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
                      suffix.out))) %>% 
     arrange(NASC)
   
+  # Create GPS status data frame; missing Lat/Lon (999) will plot red
+  gps.status <- new.masked.file %>% 
+    select(Dist_M, Lat_M, Lon_M) %>% 
+    group_by(Dist_M) %>% 
+    summarize(Lat_M = Lat_M[1],
+              Lon_M = Lon_M[1]) %>% 
+    mutate(gps.good = case_when(
+      is.na(Lat_M) | is.na(Lon_M) ~ FALSE,
+      TRUE ~ TRUE)) %>% 
+    arrange(Dist_M)
+
   ## Summarize file for plotting the seabed depth
   seabed.depth <- new.masked.file %>% 
+    arrange(Dist_M) %>% 
     group_by(Dist_M) %>% 
     summarize(max.depth = -max(Depth_mean))
   
@@ -371,12 +383,15 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
     geom_point(data = filter(new.masked.file, NASC > 0, NASC == cps.nasc),
                aes(Dist_M, -Depth_mean, size = NASC, fill = NASC),
                shape = 21, alpha = 0.9, show.legend = FALSE) +
+    # Plot GPS status
+    geom_point(data = gps.status, aes(Dist_M, 5, colour = gps.good), size = 1) +
     # Configure axes and scales
     scale_x_continuous(position = "top", breaks = seq(0, max(new.masked.file$Dist_M), 2000), expand = c(0,0)) +
     scale_y_continuous(breaks = -rev(seq(0, signif(max(new.masked.file$Depth_mean), 1), 50))) +
     scale_size_area(breaks = c(0,100,1000,10000,50000,100000,1000000),
                     guide = guide_legend(reverse = TRUE)) +
     scale_fill_viridis_c(option = "plasma") +
+    scale_colour_manual(name = "GPS Good", values = c("TRUE" = "green", "FALSE" = "red")) +
     # Configure labels and title
     labs(title = acoustic.file.out,
          x = "Echoview distance (M)", 
