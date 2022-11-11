@@ -389,9 +389,9 @@ source.cps.nasc        <- c(RL  = FALSE,
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2207RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL  = "[^0-9]",
-                            LM  = "[^0-9]",
-                            LBC = "[^0-9]") 
+tx.char.pattern        <- c(RL  = "[A-Za-z]",
+                            LM  = "[A-Za-z]",
+                            LBC = "[A-Za-z]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
