@@ -12,10 +12,10 @@ clear; close all;
 %% User Settings
 
 % Define vessels for which there are NASC CSVs
-vessels = {'RL' 'LM'};
+vessels = {'RL' 'LM' 'LBC' 'SD\1076' 'SD\1077'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
-colors = 'kcmg';
+colors = 'kcgmm';
 
 % Define boundary extents of habitat data to download
 latBounds = [27 51];
@@ -292,7 +292,7 @@ for i = 1:length(timeBin)
     title(char(timeBin(i)))
 
     % Set figure options
-    set(gcf,'color','w');                            % Change background color to white
+    set(gcf,'color','w');                           % Change background color to white
     set(gcf, 'PaperUnits', 'points', 'PaperPosition', [0 0 322.5 315]);
     set(gcf, 'Position', [0 0 700 850]);            % Figure size and position
     set(ax, 'Position', [0 0.1 0.8 0.85])           % Map size and position
