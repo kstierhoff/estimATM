@@ -9,31 +9,25 @@ library(readr)    # For reading and writing plain text files
 # User Settings -----------------------------------------------------------
 
 # Directory of CTD files to process
-dir.CTD <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\CTD_to_Process\\'
-# dir.CTD <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\CTD_to_Process\\'
+dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\CTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\PROCESSED\\'
-# dir.output <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\PROCESSED\\'
+dir.output <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\CTD\\PROCESSED\\REPROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
-dir.PSA <- 'C:\\SURVEY\\2207RL\\DATA\\UCTD\\PSA\\'
-# dir.PSA <- 'C:\\SURVEY\\2107RL\\DATA\\UCTD\\PSA\\'
+dir.PSA <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\CTD\\PSA\\'
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\test.XMLCON'
-# file.con <- 'C:\\SURVEY\\2107RL\\DATA\\CTD\\test.XMLCON'
+# file.con <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\test.XMLCON'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2207RL\\PROCESSED\\EV\\ECS\\_2207RL_Template.ecs'
-# ECS.template <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\_2107RL_Template.ecs'
+ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\EV\\ECS\\_2207RL_Template_20221012.ecs'
 
 # ECS output directory
-dir.ECS <- 'C:\\SURVEY\\2207RL\\PROCESSED\\EV\\ECS\\'
-# dir.ECS <- 'C:\\SURVEY\\2107RL\\PROCESSED\\EV\\ECS\\'
+dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\REPROCESSING\\ECS\\CTD\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
 pause <- 0.5
@@ -53,7 +47,7 @@ for (i in files.CTD) {
   # Use DatCnv to convert from .hex to .cnv
   cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'DatCnvW.exe', sep = ''),
-                 file.con,
+                 paste(dir.CTD, file.name, '.XMLCON', sep = ''),
                  paste(dir.CTD, file.name, '.hex', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
@@ -84,7 +78,7 @@ for (i in files.CTD) {
   # Perform Derive to obtain depth
   cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'DeriveW.exe', sep = ''),
-                 file.con,
+                 paste(dir.CTD, file.name, '.XMLCON', sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
@@ -106,7 +100,7 @@ for (i in files.CTD) {
   # density
   cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'DeriveW.exe', sep = ''),
-                 file.con,
+                 paste(dir.CTD, file.name, '.XMLCON', sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
@@ -140,14 +134,14 @@ for (i in files.CTD) {
                    header = T, sep = "\t")
   
   # Perform basic data error checks
-  idx <- data$DepSM < 0 | data$Tnc90C <= 0 | data$Sal00 < 0
+  idx <- data$DepSM < 0 | data$T090C <= 0 | data$Sal00 < 0
   data[idx,] <- NA
   
   # For CPS, take the average sound velocity at 70 m then calculate the average
   # temperature, salinity, and depth
   idx <- data$DepSM <= 70
   avgSoundSpeed.CPS <- tail(data$AvgsvCM[idx], n = 1)
-  avgTemperature.CPS <- mean(data$Tnc90C[idx], na.rm = T)
+  avgTemperature.CPS <- mean(data$T090C[idx], na.rm = T)
   avgSalinity.CPS <- mean(data$Sal00[idx], na.rm = T)
   avgDepth.CPS <- mean(data$DepSM[idx], na.rm = T)
   
@@ -155,7 +149,7 @@ for (i in files.CTD) {
   # average temperature, salinity, and depth
   idx <- data$DepSM <= 350
   avgSoundSpeed.Krill <- tail(data$AvgsvCM[idx], n = 1)
-  avgTemperature.Krill <- mean(data$Tnc90C[idx], na.rm = T)
+  avgTemperature.Krill <- mean(data$T090C[idx], na.rm = T)
   avgSalinity.Krill <- mean(data$Sal00[idx], na.rm = T)
   avgDepth.Krill <- mean(data$DepSM[idx], na.rm = T)
   

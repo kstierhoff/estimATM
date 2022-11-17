@@ -214,6 +214,10 @@ pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
 
+# Set gear type colors
+seine.color <- "white"
+trawl.color <- "black"
+
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
                         "Scomber japonicus","Trachurus symmetricus", 

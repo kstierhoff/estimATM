@@ -89,8 +89,8 @@ survey.end             <- "13 April"   # Survey end date
 survey.year            <- "2021"          # Survey year, for report
 survey.season          <- "Spring"        # Survey season, for report
 survey.das             <- 25              # Days at sea allocated
-survey.landmark.n      <- "San Francisco, CA" # Landmark - N extent of survey
-survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
+survey.landmark.n      <- "San Francisco" # Landmark - N extent of survey
+survey.landmark.s      <- "San Diego" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -201,6 +201,10 @@ jacksmelt.color    <- '#A020F0'
 pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
+
+# Set gear type colors
+seine.color <- "white"
+trawl.color <- "black"
 
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
@@ -595,7 +599,7 @@ cal.plot.date      <- "2021-03-01" # Date of the calibration, used to plot cal t
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "S. Sessions, J. Renfree, D. Murfin, D. Demer"        # Calibration participants
-cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
+cal.loc            <- "10th Avenue Marine Terminal" # Location name
 cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)

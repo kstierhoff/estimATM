@@ -4,7 +4,7 @@ load(here("Output/biomass_bootstrap_estimates_final.Rdata"))
 load(here("Output/biomass_bootstrap_estimates_final_ns.Rdata"))
 load(here("Output/biomass_bootstrap_estimates_final_nse.Rdata"))
 
-# Get survey estiamtes for all strata
+# Get survey estimates for all strata
 be.all     <- be %>% 
   mutate(Region = "Core") %>% 
   select(Species, Stock, Region, everything()) %>% 

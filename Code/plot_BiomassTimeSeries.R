@@ -59,16 +59,23 @@ biomass.ts <- biomass.ts %>%
          season = case_when(
            month(date_start) < 6 ~ "Spring",
            TRUE ~ "Summer")) %>% 
-  filter(!group %in% c("Sardinops sagax-Southern","Engraulis mordax-Northern")) %>% 
+  # filter(!group %in% c("Sardinops sagax-Southern","Engraulis mordax-Northern")) %>% 
   filter(!biomass == 0)
 
 # Summarize community biomass by year
 biomass.comm.summ <- biomass.ts %>% 
-  filter(group != "Sardinops sagax-Southern") %>% 
-  group_by(year) %>% 
+  # filter(group != "Sardinops sagax-Southern") %>% 
+  group_by(year, survey) %>% 
   summarise(biomass.total = sum(biomass))
 
-save(biomass.ts, biomass.comm.summ, 
+# Summarize species biomass per year
+biomass.spp.summ <- biomass.ts %>% 
+  group_by(year, survey, species, stock) %>% 
+  summarise(biomass = sum(biomass)) %>% 
+  left_join(biomass.comm.summ) %>% 
+  mutate(biomass.pct = biomass/biomass.total*100)
+
+save(biomass.ts, biomass.comm.summ, biomass.spp.summ,
      file = here("Output/biomass_timeseries_final.Rdata"))
 
 # Create plot ------------------------------------------------------------------
@@ -79,14 +86,31 @@ biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0),
   geom_point() +
   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
   scale_colour_manual(name = 'Species',
-                    labels = c("Clupea pallasii", "Engraulis mordax-Central", "Etrumeus acuminatus",
-                               "Sardinops sagax-Northern", "Scomber japonicus", "Trachurus symmetricus"),
-                    values = c(pac.herring.color, anchovy.color, rnd.herring.color, 
-                               sardine.color, pac.mack.color, jack.mack.color)) +
+                    labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Engraulis mordax (Northern)",
+                               "Etrumeus acuminatus", "Sardinops sagax (Northern)", "Sardinops sagax (Southern)",
+                               "Scomber japonicus", "Trachurus symmetricus"),
+                    values = c(pac.herring.color, anchovy.color, "#93F09F",
+                               rnd.herring.color, sardine.color, "#FF7256",
+                               pac.mack.color, jack.mack.color)) +
   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
   theme_bw() +
   theme(legend.text = element_text(face = "italic"))
+
+# biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0), 
+#                           aes(x = date_start, y = biomass, colour = group, group = group)) +
+#   geom_path() +
+#   geom_point() +
+#   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
+#   scale_colour_manual(name = 'Species',
+#                       labels = c("Clupea pallasii", "Engraulis mordax-Central", "Etrumeus acuminatus",
+#                                  "Sardinops sagax-Northern", "Scomber japonicus", "Trachurus symmetricus"),
+#                       values = c(pac.herring.color, anchovy.color, rnd.herring.color, 
+#                                  sardine.color, pac.mack.color, jack.mack.color)) +
+#   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
+#   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
+#   theme_bw() +
+#   theme(legend.text = element_text(face = "italic"))
 
 # Save figure
 ggsave(biomass.ts.line, 
@@ -117,17 +141,37 @@ ggsave(biomass.ts.line.facet,
 biomass.ts.bar <- ggplot(biomass.ts, 
                          aes(x = date_start, y = biomass, fill = group)) + 
   geom_bar(colour = "black", position = "stack", stat = "identity") +
-  scale_fill_manual(name = 'Species (Stock)',
-                    labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Etrumeus acuminatus",
-                               "Sardinops sagax (Northern)", "Scomber japonicus", "Trachurus symmetricus"),
-                    values = c(pac.herring.color, anchovy.color, rnd.herring.color,  
-                               sardine.color, pac.mack.color, jack.mack.color)) +
+  scale_fill_manual(name = 'Species',
+                      labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Engraulis mordax (Northern)",
+                                 "Etrumeus acuminatus", "Sardinops sagax (Northern)", "Sardinops sagax (Southern)",
+                                 "Scomber japonicus", "Trachurus symmetricus"),
+                      values = c(pac.herring.color, anchovy.color, "#93F09F",
+                                 rnd.herring.color, sardine.color, "#FF7256",
+                                 pac.mack.color, jack.mack.color)) +
   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
   ylab(expression(Biomass~(italic(t)))) +
   theme_bw() + 
   theme(axis.text.y = element_text(angle = 0),
         legend.text = element_text(face = "italic"))
+
+# # Create stacked bar plot
+# biomass.ts.bar <- ggplot(biomass.ts,
+#                          aes(x = date_start, y = biomass, fill = group)) +
+#   geom_bar(colour = "black", position = "stack", stat = "identity") +
+#   scale_fill_manual(name = 'Species (Stock)',
+#                     labels = c("Clupea pallasii", "Engraulis mordax (Central)", 
+#                                "Etrumeus acuminatus", "Sardinops sagax (Northern)", 
+#                                "Scomber japonicus", "Trachurus symmetricus"),
+#                     values = c(pac.herring.color, anchovy.color, 
+#                                rnd.herring.color, sardine.color, 
+#                                pac.mack.color, jack.mack.color)) +
+#   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
+#   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
+#   ylab(expression(Biomass~(italic(t)))) +
+#   theme_bw() +
+#   theme(axis.text.y = element_text(angle = 0),
+#         legend.text = element_text(face = "italic"))
 
 # Save figure
 ggsave(biomass.ts.bar, 

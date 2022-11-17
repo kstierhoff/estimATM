@@ -118,18 +118,18 @@ survey.long          <- c(-130,-113)
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2207RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
-                          Nearshore = "Nearshore",Offshore = "Offshore",
+                          Nearshore = "Nearshore", #Offshore = "Offshore",
                           Saildrone = "Saildrone")
 wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
-                          Nearshore = "#FF33F5", Offshore = "#FFA500",
+                          Nearshore = "#FF33F5", #Offshore = "#FFA500",
                           Saildrone = "#00FFFF") 
 wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
-                          Nearshore = "solid", Offshore = "dashed", 
+                          Nearshore = "solid", #Offshore = "dashed", 
                           Saildrone = "solid")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
-sd.numbers <- c("1055", "1059", "1036")
+sd.numbers <- c("1076", "1077")
 
 # Set Saildrone filter method
 sd.buffer.type   <- c("saildrone")
@@ -151,9 +151,9 @@ erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"character")
 
 # Define date range for each Saildrone to remove overlapping transits
-sd.date.range    <- data.frame(saildrone  = c(1055, 1059),
-                               start.date = ymd(c("2021-07-06", "2021-10-15")),
-                               end.date   = ymd(c("2021-07-06", "2021-10-15")))
+sd.date.range    <- data.frame(saildrone  = c(1076, 1077),
+                               start.date = ymd(c("2021-07-06", "2021-07-06")),
+                               end.date   = ymd(c("2021-10-15", "2021-10-15")))
 
 # Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
 sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
@@ -213,6 +213,10 @@ jacksmelt.color    <- '#A020F0'
 pac.mack.color     <- '#00FFFF'
 pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
+
+# Set gear type colors
+seine.color <- "white"
+trawl.color <- "black"
 
 # Define species to be analysed
 cps.spp            <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
@@ -274,9 +278,9 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL","LM","LBC","SD") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- NA # c("LBC","LM")
+nasc.vessels.nearshore <- c("LBC")
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -338,9 +342,9 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
-                            LM  = "Final CPS.csv",
-                            LBC = "Final 38 kHz CPS.csv",
-                            SD  = "Final 38 kHz CPS.csv")
+                            LM  = "Final 38 kHz CPS_nasc_cps.csv",
+                            LBC = "Final 38 kHz CPS_nasc_cps.csv",
+                            SD  = "Final 38 kHz CPS_nasc_cps.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
                             LM  = "*Krill-Juan Krill Final 120.csv",
@@ -385,9 +389,9 @@ source.cps.nasc        <- c(RL  = FALSE,
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2207RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL  = "[^0-9]",
-                            LM  = "[^0-9]",
-                            LBC = "[^0-9]") 
+tx.char.pattern        <- c(RL  = "[A-Za-z]",
+                            LM  = "[A-Za-z]",
+                            LBC = "[A-Za-z]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
@@ -485,7 +489,7 @@ tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculatin
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
-scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
+scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
@@ -669,7 +673,7 @@ raw.log.range <- 350  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
-ek80.version  <- "v1.12.2" # EK80 version
+ek80.version  <- "v21.15.1" # EK80 version
 ev.version    <- "v12.1" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <-  350  # Integration start line depth (m)
@@ -692,7 +696,7 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL") # ,"LBC","LM"
+cal.vessels        <- c("RL","LBC","LM")
 cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20220627_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
 cal.datetime       <- "23 June"     # Date/time of calibration
 cal.plot.date      <- "2022-06-23" # Date of the calibration, used to plot cal time series
@@ -777,6 +781,8 @@ cb.int.button      <- "CB Interm"
 cb.ext.button      <- "CB Extended"
 gps.lat.hdr        <- "SAMOS-Lat-VALUE"
 gps.lon.hdr        <- "SAMOS-Lon-VALUE"
+gps.lat.moa        <- "GP170-Lat"
+gps.lon.moa        <- "GP170-Lon"
 sst.hdr            <- "SAMOS-TSGT-VALUE"
 sog.hdr            <- "SAMOS-SOG-VALUE"
 wind.dir.hdr       <- "SAMOS-TrueWind-Dir-VALUE"

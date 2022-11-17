@@ -10,7 +10,7 @@ output: html_document
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,lubridate,here,fs,sf,mapview,DT)
+pacman::p_load(tidyverse,lubridate,here,fs,sf,mapview,DT,lwgeom)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -413,6 +413,20 @@ mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0
   mapview(sd.int.final, zcol = "saildrone")
 ```
 
+# Intersect filtered Saildrone with planned transect buffers
 
+```{r intersect-nav-final,out.height='10in',out.width='100%'}
+shimadaCTD_raw <- read.csv("Q:/SURVEYS/20220627_LISA-MARIE_SummerCPS/DATA/CTD/NWFSC Cruise SH22-08/2022_all_ctd_meta.csv")
+shimadaCTD<- st_as_sf(shimadaCTD_raw, coords = c("Longitude", "Latitude"), crs = 4326)
+
+sd.int.final <- filter(sd.intersection, saildrone %in% saildrone.list) %>% 
+  mutate(saildrone = as.character(saildrone))
+
+mapview(sd.lines, zcol = "saildrone") + 
+  mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
+   mapview(sd.lines, zcol = "saildrone") +
+  mapview(sd.int.final, zcol = "saildrone") +
+  mapview(shimadaCTD, xcol = "Longitude", ycol = "Latitude")
+```
 
 

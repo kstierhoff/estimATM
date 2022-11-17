@@ -1,4 +1,5 @@
 if (get.nav) {
+  
   # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
     load(here("Data/Nav/nav_data.Rdata"))
@@ -7,7 +8,7 @@ if (get.nav) {
     nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
     
     # Get new ERDDAP start date from max date
-    erddap.survey.start.new <- max(date(nav$time))
+    erddap.survey.start.new <- date(tail(nav$time,1))
   } else {
     nav.lag <- 24
     # Set new ERDDAP start date equal to original
