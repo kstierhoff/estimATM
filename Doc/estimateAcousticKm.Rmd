@@ -61,11 +61,11 @@ source(here("Doc/settings", prj.settings))
 ```{r user-input}
 # Set processing controls -------------------------------------------------
 save.figs     <- T # Create new figures
-get.nav       <- T # Download Lasker nav data from ERDDAP
-nav.source    <- "SCS" # Navigation data source: ERDDAP or SCS
+get.nav       <- F # Download Lasker nav data from ERDDAP
+nav.source    <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sd    <- T # Download Saildrone nav data from ERDDAP
 get.nav.ns    <- T # Process data from nearshore vessels
-get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
+get.bathy     <- F # Download ETOPO1 bathymetry data in the survey footprint
 extract.bathy <- T # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
@@ -121,9 +121,6 @@ if (resize.map) {
 
 ```{r process-nav-nearshore}
 if (get.nav.ns) {
-  # Get nearshore vessels
-  nav.vessels.ns <- c("LM","LBC")
-  
   # Load existing nav data
   if (get.nav) {
     # Remove existing nav data
@@ -192,29 +189,27 @@ if (get.nav.ns) {
         }
       }  
     }
+    
+    # Convert nearshore nav to spatial
+    nav.ns.sf <- st_as_sf(nav.ns, coords = c("long","lat"), crs = crs.geog)
+    
+    #Save processed nav data
+    save(nav.ns, nav.ns.sf, file = here("Data/Nav/nav_data_nearshore.Rdata"))
   }  
-  
-  # Convert saildrone nav to spatial
-  nav.ns.sf <- st_as_sf(nav.ns, coords = c("long","lat"), crs = crs.geog)
-  
-  #Save processed nav data
-  save(nav.ns, nav.ns.sf, file = here("Data/Nav/nav_data_nearshore.Rdata"))
-  
 } else {
   # Load nav data
   load(here("Data/Nav/nav_data_nearshore.Rdata"))
 }
 ```
 
-
-```{r process-nav-saildrone}
+```{r get-saildrone-nav}
 if (get.nav.sd) {
   # Load existing nav data
   if (file.exists(here("Data/Nav/nav_data_saildrone.Rdata"))) {
     load(here("Data/Nav/nav_data_saildrone.Rdata"))
     
     # Calculate difference between max nav time and now
-    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$time)), units = "hours")
+    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime)), units = "hours")
     
     # Get new erddap start date from max date
     erddap.survey.start.sd <- paste0(format(max(date(nav.sd$time)), ""), "T00%3A00%3A00Z")
@@ -223,6 +218,7 @@ if (get.nav.sd) {
   }
   
   if (get.nav) {
+    # Update only every 24 h to reduce processing time, especially at sea
     if (nav.lag.sd >= 24) {
       # Generate ERDDAP URL
       saildroneURL <- URLencode(paste0(
@@ -230,14 +226,9 @@ if (get.nav.sd) {
         "&time%3E=", erddap.survey.start.sd, "&time%3C=", erddap.survey.end.sd))
       
       # Download and parse ERDDAP nav data
-      nav.temp.sd <- data.frame(read.csv(saildroneURL, header = F, 
-                                         colClasses = erddap.classes.sd, 
-                                         row.names = NULL, skip = 0))
-      names(nav.temp.sd) <- erddap.headers.sd
-      
-      # Filter to remove bad SST values
-      nav.temp.sd <- nav.temp.sd %>% 
-        mutate(time = ymd_hms(time)) %>%
+      nav.temp.sd <- read_csv(saildroneURL, lazy = FALSE,
+                              col_names = erddap.headers.sd) %>% 
+        mutate(datetime = ymd_hms(time)) %>%
         filter(!is.nan(lat), !is.nan(long)) %>%
         filter(long != 0, lat != 0)
       
@@ -257,30 +248,34 @@ if (get.nav.sd) {
     nav.now.sd <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
       slice(n()) %>% 
-      mutate(label = paste("Saildrone", saildrone, "Last position:", time, "UTC"),
+      mutate(label = paste("Saildrone", saildrone, "Last position:", datetime, "UTC"),
              popup = paste0('<b>Saildrone: </b>', saildrone, '<br/>',
-                            '<b>Last position: </b>', time, ' UTC<br/>'))
+                            '<b>Last position: </b>', datetime, ' UTC<br/>'))
     
     # Convert saildrone nav to spatial
-    nav.sd.sf <- nav.sd.sf %>% 
+    nav.sd.paths.sf <- nav.sd.sf %>% 
       group_by(saildrone) %>% 
-      summarise(do_union = F) %>% 
+      summarise(do_union = FALSE) %>% 
       st_cast("LINESTRING") %>% 
       mutate(tracklength = st_length(.))
     
     # Save nav data
-    save(nav.sd, nav.sd.sf, nav.now.sd, 
-         file = here("Data/Nav/nav_data_saildrone.Rdata"))
+    save(nav.sd, nav.sd.sf, nav.sd.paths.sf, nav.now.sd, 
+         file = here("Data/NAV/nav_data_saildrone.Rdata"))
     
+    # Create gps.csv files from ERDDAP data
+    for (i in unique(nav.sd$saildrone)) {
+      saildrone.gps <- filter(nav.sd, saildrone == i) %>% 
+        mutate(GPS_date = format(datetime, format = "%F"),
+               GPS_time = format(datetime, format = "%T")) %>% 
+        select(GPS_date, GPS_time, latitude = lat, longitude = long)
+      
+      write_csv(saildrone.gps, here("Output", paste(i, "_erddap.gps.csv", sep = "")))
+    }
   } else {
     # Load nav data
-    load(here("Data/Nav/nav_data_saildrone.Rdata"))
+    load(here("Data/NAV/nav_data_saildrone.Rdata"))
   }
-}
-
-if (exists("nav.sd")) {
-  # Filter Saildrones by number
-  nav.sd <- filter(nav.sd, saildrone %in% sd.numbers)  
 }
 ```
 
@@ -288,8 +283,22 @@ if (exists("nav.sd")) {
 # Get bathymetry data across range of nav data (plus/minus one degree lat/long)
 if (get.bathy) {
   # Get boundaries for bathymetry grid
+  # From NOAA vessel
   bathy.bounds <- nav.sf %>% 
-    st_bbox() 
+    select(geometry) 
+  
+  # Add Saildrone, if present
+  if (exists("nav.sd.sf")) {
+    bathy.bounds <- bind_rows(bathy.bounds, select(nav.sd.sf, geometry))
+  }
+  
+  # Add nearshore, if present
+  if (exists("nav.ns.sf")) {
+    bathy.bounds <- bind_rows(bathy.bounds, select(nav.ns.sf, geometry))
+  }
+  
+  # Create bounding box
+  bathy.bounds <- st_bbox(bathy.bounds) 
   
   # Download bathy grid
   noaa.bathy <- getNOAA.bathy(

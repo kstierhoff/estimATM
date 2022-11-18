@@ -80,6 +80,10 @@ leg.breaks.gpx <- cumsum(as.numeric(leg.length))
 # Region vector used to break transects for waypoint files
 region.vec <- c(0, 32.5353, 34.7, 41.99, 48.490, 55)
 
+## Used by estimateAcousticKm.Rmd ------
+# Get nearshore vessels
+nav.vessels.ns <- c("LM","LBC")
+
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
 survey.name.long       <- "Summer 2022 California Current Ecosystem Survey (CCES)"
