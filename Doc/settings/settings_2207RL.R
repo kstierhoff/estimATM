@@ -521,7 +521,7 @@ trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., fo
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD/PROCESSED")
 ctd.hdr.pattern        <- "RL2203*.*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
-ctd.depth              <- 350
+ctd.cast.depth         <- 350
 
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")

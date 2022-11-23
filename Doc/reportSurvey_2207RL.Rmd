@@ -99,6 +99,7 @@ get.nav         <- F # download nav data from ERDDAP
 process.csv     <- T # process CSV files from Echoview
 process.csv.all <- F # Process all CSV files (F = only new files)
 process.cal.FM  <- F # Process FM calibration results
+process.ctd     <- T # Process CTD and UCTD casts
 process.zmux    <- F # process impedance data
 resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
@@ -1194,18 +1195,37 @@ cufes.plot.ofe <- cufes %>%
 events_sf <- st_as_sf(bridge.snap, coords = c("Lon","Lat"), crs = crs.geog)
 
 # Extract CTD and UCTD cast locations
-ctd.sta  <- filter(events_sf, Button == ctd.button, !is.na(Notes)) 
-uctd.sta <- filter(events_sf, Button == uctd.button) 
+## Source CTD processing script
+source(here("Code/processCTD-All.R"))
+ctd.sta  <- all.ctd.hdr %>% 
+  project_df(to = crs.proj) %>%
+  st_as_sf(coords = c("X","Y"), crs = crs.proj) %>% 
+  mutate(time = ymd_hms(cast.date),
+         datetime = format(time, format = "%m/%d/%Y %H:%M"),
+         Button = "CTD Cast",
+         Vessel = survey.vessel.primary) 
+
+## Source UCTD processing script
+source(here("Code/processUCTD-All.R"))
+uctd.sta <- all.uctd.hdr %>% 
+  project_df(to = crs.proj) %>%
+  st_as_sf(coords = c("X","Y"), crs = crs.proj) %>% 
+  mutate(Button = "UCTD Cast",
+         datetime = format(time, format = "%m/%d/%Y %H:%M"),
+         Vessel = survey.vessel.primary)
 
 # Append CTD cast locations from other survey vessels
 if (survey.name %in% c("2207RL")) {
-  
   # Read Shimada stations
   ctd.sh <- read_csv(here("Data/CTD/ctd_stations_sh.csv")) %>% 
-    mutate(Button = "CTD") 
+    mutate(Button = "CTD Cast",
+           time = mdy_hms(paste(Date, Time)),
+           datetime = format(time, format = "%m/%d/%Y %H:%M"),
+           Vessel = "SH")
   
   ctd.sh.sf <- ctd.sh %>% 
-    st_as_sf(coords = c("long", "lat"), crs = crs.geog)
+    project_df(to = crs.proj) %>% 
+    st_as_sf(coords = c("X", "Y"), crs = crs.proj)
   
   # Combine with Lasker casts
   if (nrow(ctd.sta) == 0) {
@@ -1213,11 +1233,6 @@ if (survey.name %in% c("2207RL")) {
   } else {
     ctd.sta <- bind_rows(ctd.sta, ctd.sh.sf)  
   }  
-  
-  # Create datetime column
-  ctd.sh <- ctd.sh %>%
-    mutate(datetime = format(mdy_hms(paste(Date, Time)), format = "%m/%d/%Y %H:%M"))
-  
 }
 
 # Extract bongo locations
@@ -1227,24 +1242,19 @@ bongo.sta       <- filter(events_sf, Button == bongo.button)
 pairovet.sta    <- filter(events_sf, Button == pairovet.button)
 
 # Extract all CTD/UCTD stations
-all.ctds        <- bind_rows(filter(bridge.snap, Button == ctd.button),
-                             filter(bridge.snap, Button == uctd.button)) %>% 
-  arrange(datetime) %>% 
-  select(Date = datetime, Button, Latitude = Lat, Longitude = Lon) %>% 
-  mutate(Button = case_when(
-    Button == ctd.button ~ "CTD Cast",
-    Button == uctd.button ~ "UCTD Cast", 
-    TRUE ~ Button))
+all.ctds <- bind_rows(ctd.sta, uctd.sta) %>% 
+  select(Vessel, Date = datetime, Button, Latitude = lat, Longitude = long) %>% 
+  arrange(Vessel, Date)
 
-# Append CTD info from other survey vessels
-if (survey.name %in% c("2207RL")) {
-  all.ctds <- all.ctds %>% 
-    mutate(Vessel = "RL") %>% 
-    bind_rows(select(ctd.sh, Date = datetime, Button = Button, Latitude = lat, Longitude = long)) %>% 
-    replace_na(list(Vessel = "SH")) %>% 
-    select(Date, Vessel, everything()) %>% 
-    arrange(Vessel, Date)
-}
+# # Append CTD info from other survey vessels
+# if (survey.name %in% c("2207RL")) {
+#   all.ctds <- all.ctds %>% 
+#     mutate(Vessel = "RL") %>% 
+#     bind_rows(select(ctd.sh, Date = datetime, Button = Button, Latitude = lat, Longitude = long)) %>% 
+#     replace_na(list(Vessel = "SH")) %>% 
+#     select(Date, Vessel, everything()) %>% 
+#     arrange(Vessel, Date)
+# }
 ```  
 
 ```{r process-csv-cps}
@@ -1862,7 +1872,7 @@ On _`r survey.vessel`_, a CalCOFI bongo oblique net [a bridleless pair of 71-cm 
 
 ### Conductivity and temperature versus depth (CTD) sampling {#methods-ctd-sampling}  
 
-On _`r survey.vessel`_, conductivity and temperature were measured versus depth to `r ctd.depth` and 500 m, respectively, using calibrated sensors on a probe cast from the vessel while on station (CTD), or a probe cast from the vessel while underway (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth during acoustic data processing. These data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005].
+On _`r survey.vessel`_, conductivity and temperature were measured versus depth to `r ctd.cast.depth` and 500 m, respectively, using calibrated sensors on a probe cast from the vessel while on station (CTD), or a probe cast from the vessel while underway (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth during acoustic data processing. These data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005].
 
 Due to the cancellation of Leg I, _`r survey.vessel`_ did not survey north of Cape Mendocino, CA. Therefore, oceanographic data was obtained from CTD casts during the Northwest Fisheries Science Center's (NWFSC) 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard NOAA ship _Shimada_, which spanned a region from Cape Flattery, WA to Coos Bay, OR. The nearest CTD data from either _`r survey.vessel`_ or _Shimada_ was then used for processing acoustic data collected from _Lisa Marie_ or the USVs.
 
@@ -2162,14 +2172,16 @@ if (doc.type == "docx") {
 
 # CTD and UCTD sampling locations {#appendix-ctd-sampling}
 
-Times and locations of conductivity and temperature versus depth casts while on station (CTD) and underway (UCTD). Included are CTD casts conducted by _Shimada_ during the NWFSC's 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey, used for processing acoustic data from _Lisa Marie_ and the USVs.
+Times and locations of conductivity and temperature versus depth casts while on station (CTD) and underway (UCTD) from _`r survey.vessel`_ (RL). Also included are CTD casts conducted by _Shimada_ (SH) during the NWFSC's 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey, used for processing acoustic data from _Lisa Marie_ and the USVs.
 
 ```{r uctd-sample-table,results='asis'}
 # Rename
 all.ctds.table <- all.ctds %>% 
   mutate(Button = str_replace(Button, " Cast","")) %>% 
   rename(`Date Time` = Date, `Cast Type` = Button,
-         `Latitude` = Latitude, `Longitude` = Longitude)
+         `Latitude` = Latitude, `Longitude` = Longitude) %>% 
+  st_set_geometry(NULL) %>% 
+  remove_rownames()
 
 if (doc.type == "docx") {
   # create flextable object (for Word)
