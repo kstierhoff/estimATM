@@ -18,12 +18,12 @@ vessels = {'RL' 'LM' 'LBC' 'JCF' 'SD'};
 colors = 'rcgmb';
 
 % Define boundary extents of habitat data to download
-latBounds = [24 51];
-lonBounds = [230 247];
+latBounds = [24.04166 51.04166];
+lonBounds = [-129.9583 -111.0417];
 
 % Define plot boundaries
 latPlot = [25 50];
-lonPlot = [233 248];
+lonPlot = [-127 -112];
 
 % Define +- decimal degrees for location bounding box
 latExtent = 2;
@@ -110,14 +110,14 @@ startTime = min(cellfun(@min, times));
 endTime = max(cellfun(@max, times));
 
 % Download metadata to obtain last available date 
-data = webread('https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.das?potential_habitat%5B(2018-07-31T19:00:00Z):1:(2021-08-17T12:00:00Z)%5D%5B(36.1):1:(36.1)%5D%5B(238.1):1:(238.1)%5D');
+data = webread('https://polarwatch.noaa.gov/erddap/griddap/sardine_habitat_gapfilled.das?potential_habitat%5B(2018-07-31T19:00:00Z):1:(2021-08-17T12:00:00Z)%5D%5B(36.1):1:(36.1)%5D%5B(238.1):1:(238.1)%5D');
 coverageEnd = regexp(data, 'time_coverage_end "([^"]*)', 'tokens', 'once');
 
 % Download single pixel over time to get available time stamps
-data = webread(['https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.json?potential_habitat%5B' ...
+data = webread(['https://polarwatch.noaa.gov/erddap/griddap/sardine_habitat_gapfilled.json?potential_habitat%5B' ...
     '(' char(datetime(startTime, 'Format', 'uuuu-MM-dd')) 'T00:00:00Z):1:(' coverageEnd{1} ')%5D%5B' ...
-    '(36.1):1:(36.1)%5D%5B' ...
-    '(238.1):1:(238.1)%5D'], options);
+    '(36):1:(36)%5D%5B' ...
+    '(-122):1:(-122)%5D'], options);
 
 % Get list of available habitat times
 habTimes = cellfun(@(x) x{1}, data.table.rows, 'UniformOutput', false);
@@ -137,8 +137,8 @@ for i = 1:length(habTimes)
     if exist(filename, 'file') == 0
 
         % Generate string to ERDDAP data
-        str = ['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' ...
-            'sardine_habitat_modis_Lon0360.mat' ...
+        str = ['https://polarwatch.noaa.gov/erddap/griddap/' ...
+            'sardine_habitat_gapfilled.mat' ...
             '?potential_habitat%5B(' char(datetime(habTimes(i), 'Format', 'uuuu-MM-dd''T''HH:mm:ss''Z')) ')' ...
             '%5D%5B(' num2str(latBounds(1)) '):(' num2str(latBounds(2)) ')' ...
             '%5D%5B(' num2str(lonBounds(1)) '):(' num2str(lonBounds(2)) ')' ...
@@ -167,16 +167,6 @@ BINS = cell(length(vessels), 1);
 for i = 1:length(vessels)
     BINS{i} = discretize(times{i}, timeBin);
 end
-
-% Create latitude/longitude grid
-grid_lat = latBounds(1):0.025:latBounds(2);
-grid_lon = lonBounds(1):0.025:lonBounds(2);
-[LAT, LON] = ndgrid(grid_lat, grid_lon);
-
-% Initialize matrix for holding averaged habitat data that will be plotted.
-% If no datapoints are available, want it to be NaN for plotting purposes.
-HAB = nan(size(LAT));
-COUNTS = zeros(size(LAT));  % Used for calculating cumulative average
 
 % Open new figure window
 figure;
@@ -209,6 +199,15 @@ for i = 1:length(timeBin)
         currFile = habTimes(I);
     end
 
+    % If first file, initialize habitat variables
+    if ~exist("HAB", "var")
+
+        % Initialize matrix for holding averaged habitat data that will be plotted.
+        % If no datapoints are available, want it to be NaN for plotting purposes.
+        HAB = nan(size(latgrid));
+        COUNTS = zeros(size(latgrid));  % Used for calculating cumulative average
+    end
+
     % Cycle through each vessel to obtain habitat data surrounding each
     % vessel position
     habidx = zeros(size(latgrid));
@@ -224,7 +223,7 @@ for i = 1:length(timeBin)
         % Retain samples within a bounding box around that position, using
         % the OR operator to merge samples from multiple vessels
         habidx = habidx | abs(latgrid - avgLat) <= latExtent & ...
-            abs(longrid - (360+avgLon)) <= lonExtent & ...
+            abs(longrid - (avgLon)) <= lonExtent & ...
             ~isnan(hab);
     end
 
@@ -249,7 +248,7 @@ for i = 1:length(timeBin)
         'latitudes', latPlot);
 
     % Plot habitat
-    m_pcolor(LON, LAT, HAB);
+    m_pcolor(longrid, latgrid, HAB);
     shading flat;
     colormap(map)
 
@@ -259,16 +258,16 @@ for i = 1:length(timeBin)
     % Draw outline of US states
     [latstates,lonstates] = borders('continental us');
     for j = 1:length(latstates)
-        m_plot(360+lonstates{j}, latstates{j}, 'k')
+        m_plot(lonstates{j}, latstates{j}, 'k')
     end
 
     % Draw outline of Canada
     [latstates,lonstates] = borders('canada');
-    m_plot(360+lonstates, latstates, 'k')
+    m_plot(lonstates, latstates, 'k')
 
     % Draw outline of Mexico
     [latstates,lonstates] = borders('mexico');
-    m_plot(360+lonstates, latstates, 'k')
+    m_plot(lonstates, latstates, 'k')
 
     % Plot shiptrack for each vessel from beginning to current position
     for j = 1:length(vessels)
@@ -277,7 +276,7 @@ for i = 1:length(timeBin)
         idx = find(times{j} <= timeBin(i)+timespan, 1, 'last');
 
         % Parse out position and group info for those intervals
-        X = 360+lons{j}(1:idx);
+        X = lons{j}(1:idx);
         Y = lats{j}(1:idx);
         G = groups{j}(1:idx);
 
