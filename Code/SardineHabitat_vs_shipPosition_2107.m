@@ -18,7 +18,7 @@ vessels = {'RL' 'LM' 'LBC' 'JCF' 'SD'};
 colors = 'rcgmb';
 
 % Define boundary extents of habitat data to download
-latBounds = [27 51];
+latBounds = [24 51];
 lonBounds = [230 247];
 
 % Define plot boundaries
