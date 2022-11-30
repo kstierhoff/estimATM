@@ -539,6 +539,7 @@ tdr.offset             <- c(rep(-1, 72), # Time settings were updated after haul
                             rep( 0, 20)) # Time settings were updated after haul 73
 tdr.offset             <- setNames(tdr.offset, 1:length(tdr.offset)) # Add names from haul numbers
 tdr.nav.source         <- "ERDDAP"
+tdr.trawl.source       <- "Access"
 
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
