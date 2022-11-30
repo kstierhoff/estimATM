@@ -42,15 +42,15 @@ pacman::p_load_gh("kstierhoff/atm")
 # rnaturalearth data
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
+```
 
+```{r knitr-options,echo=FALSE}
 # Define method of table generation (whether kable or xtable) for best formatting
 doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
 doc.name <- knitr::current_input()
 if (is.null(doc.type)) {doc.type <- "html"}
 if (is.null(doc.name)) {doc.name <- "estimateBiomass.Rmd"}
-```
 
-```{r knitr-options,echo=FALSE}
 # Set global knitr chunk options
 if (.Platform$OS.type == "unix") {
   # Do not specify Cairo device for MacOS
@@ -93,11 +93,11 @@ get.nav           <- F # Download primary vessel nav data from ERDDAP
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 
 ### Sometimes F
 do.imap           <- T # Create interactive Leaflet map
@@ -539,7 +539,7 @@ save(base.map, base.map.bw, file = here("Data/Map/basemap.Rdata"))
 
 ```{r map-survey-plan,fig.cap='(ref:map-survey-plan)'}
 # Map planned transects
-if (!survey.name %in% c("2107RL")) {
+if (!survey.name %in% c("2107RL", "2207RL")) {
   # Create map for surveys not in Mexico
   survey.plan <- base.map +    
     geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
@@ -1751,8 +1751,6 @@ include_graphics(here("Figs/fig_trawl_cluster_map.png"))
 
 Catch data are filtered, formatted, summarized by weight, and formatted for plotting.
 
-**[RESUME HERE; Check TotalWtKg and TotalCt]**
-
 ```{r process-trawl-catch-data, message=FALSE}
 # Filter catch data
 catch <- catch.all %>% 
@@ -2593,7 +2591,7 @@ summ.lengths <- lengths %>%
   ungroup()
 
 # Merge catch table with weight summary and arrange by species and haul
-catch.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSampleCount),
+catch.comp <- left_join(select(catch, ship, haul, scientificName, subSampleWtkg, subSampleCount),
                         select(summ.lengths, haul, scientificName, totalWtSpecimens,
                                totalCtSpecimens, binnedLengths)) %>%
   arrange(scientificName, haul) %>% 
@@ -2602,7 +2600,7 @@ catch.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSa
          diffWtPct = abs(diffWt / subSampleWtkg * 100),
          diffCt    = subSampleCount - totalCtSpecimens) %>%
   # Reorder columns
-  select(scientificName, haul, subSampleWtkg, totalWtSpecimens, diffWt, 
+  select(scientificName, ship, haul, subSampleWtkg, totalWtSpecimens, diffWt, 
          diffWtPct, subSampleCount, totalCtSpecimens, diffCt, binnedLengths) %>% 
   replace(is.na(.), -999)
 
@@ -2627,8 +2625,8 @@ catch.comp %>%
     binnedLengths    = cell_spec(binnedLengths,knitr.format,color = "black",
                                  background = ifelse(binnedLengths == 0,"white","green"))) %>%
   kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-        digits = c(0,0,3,3,4,0,0,0,0),
+        align = c("c","l","l",rep("r",ncol(catch.comp) - 2)),
+        digits = c(0,0,0,3,3,4,0,0,0,0),
         format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
@@ -2679,8 +2677,8 @@ if (nrow(catch.comp.errors) > 0) {
                                    background = ifelse(binnedLengths == 0, "white", "green"))) %>% 
     arrange(haul, scientificName) %>% 
     kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-          align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-          digits = c(0,0,3,3,4,0,0,0,0),
+          align = c("c","l","l",rep("r",ncol(catch.comp) - 2)),
+          digits = c(0,0,0,3,3,4,0,0,0,0),
           format.args = list(big.mark = ",")) %>% 
     kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
@@ -3783,6 +3781,7 @@ include_graphics(here("Figs/fig_nasc_acoustic_proportions.png"))
 ```  
 
 ## Summarize biomass density by transect 
+
 For each species, biomass density is summarized by transect, and is one criteria for defining sampling strata. Only two consecutive transects where log10(biomass + 1) = 0 are allowed withing a sampling strata, and each strata must have a transect with zero biomass on each end.
 
 ```{r estimate-acoustic-biomass-density}
@@ -3924,11 +3923,17 @@ nasc.clust.biom <- nasc.clust.hist %>%
   summarise(total.density = sum(density)) %>% 
   mutate(distance = dist.bin * ceiling(max(nasc$cluster.distance)/30))
 
+# nasc.clust.biom.summ <- nasc.clust.biom %>% 
+#   group_by(species) %>% 
+#   summarise(max.density = sum(total.density))
+
 # Calculate cumulative acoustic biomass versus distance to positive clusters
 nasc.clust.biom <- nasc.clust.biom %>% 
+  left_join(nasc.clust.biom.summ) %>% 
   group_by(species) %>% 
   mutate(cum.biom = cumsum(total.density),
-         rel.cum.biom = cum.biom/max(cum.biom))
+         rel.cum.biom = cum.biom/max(cum.biom),
+         prop.biom = total.density/sum(total.density))
 
 # Summarize ECDF to get max cluster distance to X % cumulative biomass
 nasc.clust.biom.summ <- nasc.clust.biom %>% 
@@ -3936,11 +3941,11 @@ nasc.clust.biom.summ <- nasc.clust.biom %>%
   summarise(max.cluster.dist = distance[min(which(rel.cum.biom >= cum.biomass.limit))])
 
 # Plot histogram of acoustic biomass
-clust.biom.hist <- ggplot(nasc.clust.biom, aes(distance, total.density)) + 
+clust.biom.hist <- ggplot(nasc.clust.biom, aes(distance, prop.biom)) + 
   geom_bar(stat = "identity") + 
   facet_wrap(~species, nrow = 1) +
   theme_bw() + xlab("Distance to positive cluster (nmi)") + 
-  ylab("Total biomass") +
+  ylab("Biomass-Proportion") +
   # ggtitle("Biomass") +
   theme(strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "italic"))
@@ -3954,7 +3959,7 @@ clust.biom.ecdf <- ggplot(nasc.clust.biom, aes(distance, rel.cum.biom)) +
   facet_wrap(~species, nrow = 1) +
   theme_bw() + 
   xlab("Distance to positive cluster (nmi)") + 
-  ylab("Cumulative biomass") +
+  ylab("Biomass-Cumulative") +
   theme(strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "italic"))
 
@@ -4264,7 +4269,7 @@ landmarks <- data.frame(
          lat.start < max(nasc.density$lat))
 
 stock.breaks <- data.frame(
-  name = c("Sardinops sagax", "Engraulis mordax"),
+  scientificName = c("Sardinops sagax", "Engraulis mordax"),
   lat.start = c(stock.break.sar, stock.break.anch),
   y = rep(0,2)) %>% 
   filter(lat.start > min(nasc.density$lat),
@@ -4351,15 +4356,16 @@ if (nrow(strata.summ.rm) > 0) {
               fill = 'gray70', alpha = 0.5) +
     geom_hline(yintercept = 0, colour = 'gray20') +
     geom_vline(xintercept = landmarks$lat.start) +
-    geom_vline(xintercept = stock.breaks$lat.start, linetype = "dashed", colour = "red") +
+    geom_vline(data = stock.breaks, aes(xintercept = lat.start, group = scientificName), 
+               linetype = "dashed", colour = "red") +
     geom_text(data = landmarks, 
               aes(lat.start, max.tx.dens.log, label = name), 
               inherit.aes = FALSE, nudge_x = 0.1, hjust = 1, vjust = 0, 
               fontface = "italic", alpha = 0.5) +
     geom_text(data = stock.breaks,
-              aes(lat.start, max.tx.dens.log, label = name),
+              aes(lat.start, max.tx.dens.log, label = scientificName, group = scientificName),
               inherit.aes = FALSE, nudge_x = -0.1, hjust = 1, vjust = 1,
-              fontface = "italic", alpha = 0.5, colour = "red", size = 3) +
+              fontface = "italic", alpha = 0.5, colour = "red") +
     geom_path(data = nasc.density.summ,  
               aes(start.lat, log(density + 1), group = scientificName)) +
     geom_point(data = nasc.density.summ, 
@@ -4371,7 +4377,7 @@ if (nrow(strata.summ.rm) > 0) {
                     colour = 'blue', size = 3, fontface = 'italic', nudge_y = 1) +
     scale_colour_discrete("Stratum") +
     scale_fill_discrete("Spacing (nmi)") +
-    facet_wrap(scientificName ~ vessel.name, nrow = 1) + 
+    facet_wrap(~scientificName, nrow = 1) + 
     scale_x_continuous("Start latitude", 
                        breaks = seq(floor(min(strata.summ$lat.start)), 
                                     ceiling(max(strata.summ$lat.end)),1)) + 
@@ -4412,7 +4418,7 @@ if (nrow(strata.summ.rm) > 0) {
 if (diff(range(nasc.density.summ$start.lat)) > 6) {
   ggsave(biomass.dens.plot.lat, 
          filename = here("Figs/fig_biomass_density_transect_lat.png"),
-         height = 10, width = 8.5*n_distinct(strata.summ$vessel.name))
+         height = 12, width = 12*n_distinct(strata.summ$vessel.name))
   
   ggsave(biomass.dens.plot.tx, 
          filename = here("Figs/fig_biomass_density_transect_tx.png"),
