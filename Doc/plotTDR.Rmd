@@ -48,7 +48,7 @@ dir_create(here(c("Figs/TDR", "Output")))
 
 ```{r user-settings}
 # User-specified settings
-copy.files  <- T # Copy TDR files
+copy.files  <- F # Copy TDR files
 process.tdr <- T # Process TDR files
 process.all <- T # Process all TDR files
 get.db      <- T # Extract data from trawl database (F for testing)
@@ -82,14 +82,14 @@ if (tdr.nav.source == "ERDDAP") {
 
 ```{r get-trawl-data}
 if (get.db) {
-  if (trawl.source == "SQL") {
+  if (tdr.trawl.source == "SQL") {
     # Configure ODBC connection to TRAWL database
     trawl.con  <- dbConnect(odbc(), 
                             Driver = "SQL Server", 
                             Server = "161.55.235.187", 
                             Database = "Trawl", 
                             Trusted_Connection = "True")
-  } else if (trawl.source == "Access") {
+  } else if (tdr.trawl.source == "Access") {
     # Copy trawl Access database
     haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
                       regexp = trawl.db.access)
@@ -120,7 +120,7 @@ if (get.db) {
 
 ```{r modify-data}
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
-if (trawl.source == "Access") {
+if (tdr.trawl.source == "Access") {
   # Reformat haul data to match SQL
   haul.all <- haul.all %>% 
     arrange(haul) %>% 
@@ -141,12 +141,17 @@ if (trawl.source == "Access") {
   haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
   haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
   
-} else if (trawl.source == "SQL") {
+} else if (tdr.trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     arrange(haul) %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime))
+      haulBackTime    = ymd_hms(haulBackTime)) #%>% 
+#     mutate(
+#         startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+#         startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+#         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+#         stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)))
 }
 
 # Classify hauls by season (spring or summer)
@@ -338,15 +343,16 @@ if(nrow(tbl.all.new) > 0) {
     
     # Format data for text labels
     trawl.text <- trawl.window %>% 
-      select(haul, netInWaterTime, equilibriumTime, haulBackTime, netOnDeckTime) %>% 
-      pivot_longer(cols = netInWaterTime:netOnDeckTime, names_to = "event", values_to = "time") 
-    
+      select(haul, 'Net in water' = netInWaterTime, 'Equilibrium' = equilibriumTime, 
+             'Haul back' = haulBackTime, 'Net on deck' = netOnDeckTime) %>% 
+      pivot_longer(cols = 'Net in water':'Net on deck', names_to = "event", values_to = "time") 
+
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
       mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
       filter(between(time,  
-                     min(trawl.text$time) - minutes(10), 
-                     max(trawl.text$time) + minutes(10)))
+                     min(trawl.text$time, na.rm = TRUE) - minutes(10), 
+                     max(trawl.text$time, na.rm = TRUE) + minutes(10)))
     
     tdr.plot <- tdr.plot %>% 
       filter(between(time,  
@@ -357,9 +363,12 @@ if(nrow(tbl.all.new) > 0) {
     plot.tdr <- ggplot() + 
       geom_line(data = tdr.plot,
                 aes(time, depth + 10, colour = loc)) + 
-      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red")) +
+      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red"),
+                          guide = guide_legend(reverse = TRUE)) +
       geom_hline(yintercept = 0, colour = "gray50") +
-      ylim(min(tdr.plot$depth), 20) +
+      # ylim(min(tdr.plot$depth), 10) +
+      scale_y_continuous(limits = c(min(tdr.plot$depth),12), 
+                         breaks = c(-50, -40, -30, -20, -10, seq(0, 12,4))) +
       labs(x = "Time (PST)",
            y = "Depth (m)",
            title = paste("Cruise:", unique(tdr.plot$cruise), 
@@ -375,13 +384,13 @@ if(nrow(tbl.all.new) > 0) {
                   aes(xmin = equilibriumTime,
                       xmax = haulBackTime,
                       ymin = min(tdr.plot$depth),
-                      ymax = 10),
+                      ymax = 12),
                   fill = 'gray70', alpha = 0.5) +
         geom_rect(data = trawl.window,
                   aes(xmin = netInWaterTime,
                       xmax = netOnDeckTime,
                       ymin = min(tdr.plot$depth),
-                      ymax = 10), fill = NA,
+                      ymax = 12), fill = NA,
                   colour = 'gray50', linetype = "dashed", alpha = 0.5) +
         geom_text(data = trawl.text,
                   aes(time, min(tdr.plot$depth), label = event),
@@ -391,11 +400,11 @@ if(nrow(tbl.all.new) > 0) {
     # Add SOG if present
     if (nrow(trawl.nav) > 0) {
       plot.tdr <- plot.tdr + 
-        annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)",
-                 colour = "magenta", hjust = 0, size = 3) +
+        # annotate("text", x = min(trawl.nav$time), y = trawl.nav$SOG[1] + 2, label = "SOG (kn)",
+        #          colour = "magenta", hjust = 0, size = 3) +
         geom_line(data = trawl.nav,
                   aes(time, SOG),
-                  colour = "magenta")
+                  colour = "magenta") 
     }
     
     # Save plot
