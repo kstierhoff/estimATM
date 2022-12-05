@@ -1363,6 +1363,10 @@ nasc.labels.all <- nasc.labels[nasc.levels.all]
 nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
 nasc.colors.all <- nasc.colors[nasc.levels.all]
 
+map.bounds.lbc <- nasc.plot.ns.sub %>% st_as_sf(coords = c("long","lat"), crs = 4326) %>%
+  st_transform(crs = 3310) %>%
+  st_bbox()
+
 # Create map of backscatter
 nasc.map.ns.lbc <- base.map +
   # Plot transects data
@@ -1385,12 +1389,13 @@ nasc.map.ns.lbc <- base.map +
   # Plot title
   # ggtitle("CPS Backscatter-Long Beach Carnage") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
-           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*1.4))
+           xlim = c(map.bounds.lbc["xmin"], map.bounds.lbc["xmax"]*1.1), 
+           ylim = c(map.bounds.lbc["ymin"], map.bounds.lbc["ymax"]*0.95))
 
-map.bounds.lbc <- lbc.catch.summ.sf %>%
-  st_transform(crs = 3310) %>%
-  st_bbox()
+# map.bounds.lbc <- lbc.catch.summ.sf %>%
+#   st_transform(crs = 3310) %>%
+#   st_bbox()
+
 pie.radius.lbc <- as.numeric(abs(map.bounds.lbc$ymin - map.bounds.lbc$ymax)*.05)
 
 # Create map of seine data
@@ -1412,15 +1417,15 @@ set.pies <- base.map +
                                pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = filter(set.zero, vessel.name %in% nasc.vessels.nearshore), aes(X, Y)) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
-           ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*1.4))
+           xlim = c(map.bounds.lbc["xmin"], map.bounds.lbc["xmax"]*1.1), 
+           ylim = c(map.bounds.lbc["ymin"], map.bounds.lbc["ymax"]*0.95))
 
 nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, ncol = 2,
                                labels = c("a)", "b)"))
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
-       height = 10, width = 8)
+       height = 5, width = 8)
 ```
 
 ```{r plot-maps, include=F}
@@ -1890,8 +1895,6 @@ Due to the cancellation of Leg I, _`r survey.vessel`_ did not survey north of Ca
 
 For _`r survey.vessel`_, the EK80s were calibrated on `r cal.datetime` while the vessel was alongside the pier near `r cal.loc` (`r cal.lat.dd` $^\circ$N, `r cal.lon.dd` $^\circ$W). Measurements of sea-surface temperature ($t_w$ = `r cal.temp` $^\circ$C) and salinity ($s_w$ = `r cal.sal` psu) were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) and input to the WBT-control software (EK80 `r ek80.version`, Simrad), which derived estimates of sound speed ($c_w$ = `r cal.c` m s^-1^) and absorption coefficients. The centerboard was placed in the Retracted position, which resulted in the seabed being approximately `r cal.min.z` to `r cal.max.z` m beneath the transducers, depending on the tide. The calibration spheres were positioned in the far-field of each transducer, at 3.5- to 7-m range. WBT information, settings, and calibration results are presented in **Table \@ref(tab:cal-results)**. Measurements of beam-compensated sphere target strength relative to the theoretical target strength ($TS_{rel}$, dB re 1 m^2^) are presented in **Fig. \@ref(fig:tsc-plot)**. Measurements of gains, beamwidths, and offset angles from WBTs operated in FM mode are presented in **Fig. \@ref(fig:cal-plot-fm)**.
 
-\newpage
-
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT; 18, 38, 70, 120, 200, and 333 kHz) and transducer information aboard _`r survey.vessel`_ (above horizontal line); and beam model results following calibration (below horizontal line).
 
 ```{r cal-results,results='asis'}
@@ -1918,8 +1921,6 @@ if (doc.type == "docx") {
     add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
 }
 ```  
-
-\newpage
 
 (ref:tsc-plot) Relative beam-compensated target strength ($TS_{rel}$, dB re 1 m^2^) measurements of a WC38.1 sphere at `r echo.freqs` kHz for echosounders aboard _`r survey.vessel`_. $TS_{rel}$ is calculated as the difference between the beam-compensated target strength ($TS_c$) and the theoretical target strength ($TS_{theory}$). Crosses indicate measurements marked as outliers after viewing the beam model results.
 
@@ -1958,8 +1959,6 @@ if (doc.type == "docx") {
 }
 ```  
 
-\newpage
-
 For _Long Beach Carnage_, the echosounders were calibrated using the standard sphere technique with a WC38.1 on 7 July, 2022 in a tank at the SWFSC. Calibration results for _Long Beach Carnage_ are presented in **Table \@ref(tab:cal-results-lbc)**.  
 
 (ref:cal-results-lbc) General Purpose Transceiver (Simrad EK60 GPT) and transducer information (above horizontal line) and beam model results (below horizontal line) estimated from a tank calibration of echosounders aboard _Long Beach Carnage_ using a WC38.1.
@@ -1981,8 +1980,6 @@ if (doc.type == "docx") {
     add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.LBC) - 2))
 }
 ```  
-
-\newpage
 
 For the two USVs, the echosounders were calibrated while dockside by Saildrone, Inc. using the standard sphere technique with a WC38.1. The results were processed and derived by the SWFSC [@Renfree2019], and are presented in **Table \@ref(tab:cal-results-sd)**.
 
@@ -2092,14 +2089,13 @@ include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
 
 ### Nearshore region  
 
-[**UPDATE**]
-Acoustic backscatter sampled by _Long Beach Carnage_ was observed throughout the entire nearshore survey area off California between Bodega Bay and San Diego, CA San Francisco, San Simeon to Point Conception, Santa Barbara to Ventura, and around Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-lbc)a**).  
+Acoustic backscatter sampled by _Long Beach Carnage_ was observed throughout the entire nearshore survey area off California between Bodega Bay and San Diego, CA, including around Santa Cruz and Santa Catalina Islands (**Fig. \@ref(fig:nasc-seine-lbc)a**).  
 
-Purse seine catches by _Long Beach Carnage_ included predominantly Northern Anchovy north of Long Beach, CA; Pacific Sardine south of San Simeon, CA; and Pacific Mackerel near Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-lbc)b**).
+Purse seine catches by _Long Beach Carnage_ included predominantly Northern Anchovy north of Point Conception, CA; Pacific Sardine south of Morro Bay, CA; and Pacific Mackerel near Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-lbc)b**). The combined catches of the `r nrow(lbc.sets)` purse seine sets included `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$AllCPS, na.rm = T), digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$Sardine, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$Anchovy, na.rm = T), digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$JackMack, na.rm = T), digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$PacMack, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Mackerel, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$PacHerring, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Herring, and `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$RndHerring, na.rm = T), digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-trawl-sampling)**)
 
 (ref:nasc-seine-lbc) Nearshore survey transects conducted by _Long Beach Carnage_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each purse seine catch (b). Species with low catch weights are not visible at this scale.
 
-```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.height='7in', fig.pos='H'}
+```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.width='6in', fig.pos='H'}
 if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))) {
   include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))  
 } else {
@@ -2111,7 +2107,9 @@ if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png
 
 # Discussion {#discussion}  
 
-The principal objectives of the `r survey.das`-day Summer 2021 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, to survey the stocks of Pacific Mackerel, Jack Mackerel, Pacific Herring, Pacific Round Herring, and the southern stock of Pacific Sardine. For the first time, the domain of the CCE survey extended coverage into Mexico. The combined sampling from _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and Saildrones spanned the offshore and nearshore areas from Cape Flattery, WA to Punta Abreojos, MX. The forage fish assemblage was dominated by Jack Mackerel between Westport, WA and Cape Mendocino, CA; Northern Anchovy between Cape Mendocino and El Rosario, MX; and Pacific Sardine between Punta Eugenia, MX and Punta Abreojos, MX. Sardine were virtually absent from catches between Cape Blanco, OR and Monterey Bay, CA, a distance of over 700 km.  
+The principal objectives of the `r survey.das`-day Summer 2022 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, to survey the stocks of Pacific Mackerel, Jack Mackerel, Pacific Herring, Pacific Round Herring, and the southern stock of Pacific Sardine. The combined sampling from _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and Saildrones spanned the offshore and nearshore areas from Cape Flattery, WA to Punta Baja, MX. 
+
+The forage fish assemblage was dominated by Northern Anchovy south of Bodega Bay, CA. To the north, trawl catches from _`r survey.vessel`_ were predominantly Jack Mackerel, while seine catches from _Lisa Marie_ were predominantly Pacific Sardine between the WA/OR border to Fort Bragg, CA. Based on the differences in _`r survey.vessel`_ and _Lisa Marie_ catches in the overlapping region, in addition to comparative historical results [@Renfree2022] and personal communications with the _Lisa Marie_ captain, it is hypothesized that purse seines are ineffective in catching Jack Mackerel. Therefore, species proportions derived from purse seine data in regions with high Jack Mackerel abundance should be analyzed with caution. 
 
 # Disposition of Data {#data-disposition}
 
@@ -2140,7 +2138,7 @@ All raw EK60, EK80, ME70, MS70, SX90, and EC150-3C data, including the EK60 and 
 
 # Acknowledgements {#acknowledgements}  
 
-We thank the crew members of the NOAA ship _`r survey.vessel`_ and all of the scientists who participated in the sampling operations at sea. We thank Captains Rick Blair (_Lisa Marie_) and Rich Ashley and Tom Brinton (_Long Beach Carnage_), along with all the F/V crew members, for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey. We thank Trevor Stocking, Diego Aceituno, Dane McDermott, Angela Garelick, Trung Nguyen, Chelsea Protasio, and Michelle Horeczko (CDFW) for their efforts to coordinate with and process samples from _Long Beach Carnage_, and Dianna Porzio for coordinating the biological sampling and organizing, validating, and disseminating the resulting data. We thank Kristen Hinton, Erin Jaco, Emily Seubert, and Zac Calef (WDFW) for processing biological specimens aboard _Lisa Marie_, and Jennifer Topping (WDFW) for the ageing of biological samples from _Lisa Marie_. Andy Blair [President, West Coast Pelagic Conservation Group (WCPCG)], Mike Okoniewski (Secretary, WCPCG), and Greg Shaughnessy (Vice President of WCPCG and Chief Operating Officer of Ocean Gold Seafoods) were integral in the permitting and planning for _Lisa Marie_. Finally, we thank John Pohl and the NWFSC's Fisheries Engineering and Acoustic Technologies (FEAT) team for providing CTD data from their 2022 Pacific Hake survey. Critical reviews by [**UPDATE**] improved this report.  
+We thank the crew members of the NOAA ship _`r survey.vessel`_ and all of the scientists who participated in the sampling operations at sea. We thank Captains Rick Blair (_Lisa Marie_) and Rich Ashley and Tom Brinton (_Long Beach Carnage_), along with all the F/V crew members, for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey. We thank Trevor Stocking, Diego Aceituno, Dane McDermott, Angela Garelick, Trung Nguyen, Chelsea Protasio, and Michelle Horeczko (CDFW) for their efforts to coordinate with and process samples from _Long Beach Carnage_, and Dianna Porzio for coordinating the biological sampling and organizing, validating, and disseminating the resulting data. We thank Jennifer Topping (WDFW) for the ageing of biological samples from _Lisa Marie_. Andy Blair [President, West Coast Pelagic Conservation Group (WCPCG)], Mike Okoniewski (Secretary, WCPCG), and Greg Shaughnessy (Vice President of WCPCG and Chief Operating Officer of Ocean Gold Seafoods) were integral in the permitting and planning for _Lisa Marie_. Finally, we thank John Pohl and the NWFSC's Fisheries Engineering and Acoustic Technologies (FEAT) team for providing CTD data from their 2022 Pacific Hake survey. Critical reviews by [**UPDATE**] improved this report.  
 
 # References {-}  
 
