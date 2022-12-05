@@ -262,8 +262,8 @@ set.pie <- set.summ.wt %>%
                   'All CPS:', AllCPS, 'kg'))
 
 # Determine map bounds from set data
-map.bounds.ns <- lm.catch.summ.sf %>%
-  bind_rows(lbc.catch.summ.sf) %>% 
+map.bounds.ns <- lbc.catch.summ.sf %>%
+  # bind_rows(lbc.catch.summ.sf) %>% 
   st_transform(crs = 3310) %>%
   st_bbox()
 
