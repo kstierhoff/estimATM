@@ -1580,8 +1580,10 @@ if (save.figs) {
 }
 
 # Create blank plots for missing species
-for (i in unique(strata.nearshore$scientificName)) {
-  for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
+for (i in unique(strata.primary$scientificName)) {
+  # for (i in unique(strata.nearshore$scientificName)) {
+  for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
+    # for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
     if (is.null(biomass.dens.figs.ns[[i]][[j]])) {
       biomass.dens.temp <- base.map + 
         annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
