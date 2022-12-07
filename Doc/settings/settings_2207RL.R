@@ -302,7 +302,7 @@ use.seine.data         <- FALSE
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata?
-merge.vessels <- c(Core = FALSE,
+merge.vessels <- c(Core = TRUE,
                    OS = FALSE,
                    NS = FALSE)
 
@@ -452,13 +452,15 @@ use.tx.number          <- c(RL  = TRUE,
                             SD  = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-# Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
-# but will ultimately be included in a joint analysis
+# Lasker transects were sampled asynchronously during Leg 3; inter-transect data were also removed
+# Lisa Marie transects 114-128 were also sampled by Lasker; only Lasker transects are used for biomass estimation
+# Saildrone transects 122-128 were also sampled by Lasker; only Lasker transects are used for biomass estimation
 tx.rm                  <- list(RL  = c("076-078","074-076","080-078",
                                        "072","074","076-1","076-2","078-1","078-2","080"),
-                               LM  = NA,
+                               LM  = seq(114,128,2),
                                LBC = NA,
-                               SD  = NA)
+                               SD  = c(paste0(seq(122,128,2),"-1"),
+                                       paste0(seq(122,128,2),"-2")))
 
 # Minimum acoustic transect length (nmi)
 min.tx.length          <- c(RL  = 20,
