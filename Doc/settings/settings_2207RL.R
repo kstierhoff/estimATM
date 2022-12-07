@@ -457,7 +457,7 @@ use.tx.number          <- c(RL  = TRUE,
 # Saildrone transects 122-128 were also sampled by Lasker; only Lasker transects are used for biomass estimation
 tx.rm                  <- list(RL  = c("076-078","074-076","080-078",
                                        "072","074","076-1","076-2","078-1","078-2","080"),
-                               LM  = seq(114,128,2),
+                               LM  = seq(120,128,2),
                                LBC = NA,
                                SD  = c(paste0(seq(122,128,2),"-1"),
                                        paste0(seq(122,128,2),"-2")))
@@ -579,7 +579,7 @@ nIndiv.min    <- 1
 nClusters.min <- 1
 
 # Use manually defined strata?
-stratify.manually    <- FALSE
+stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
@@ -589,79 +589,99 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 46:53),
+    transect = 54:65),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 2,
-    transect = 55:66),
+    transect = 69:78),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 3,
-    transect = 70:78),
+    transect = 82:89),
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 4,
-    transect = 82:88),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 5,
-    transect = 94:99),
+    transect = 93:96),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:51),
+    transect = 1:8),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
+    transect = 9:24),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 25:40),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 4,
     transect = 52:58),
   data.frame(
     scientificName = "Engraulis mordax", 
-    stratum = 3,
-    transect = 72:88),
+    stratum = 5,
+    transect = 72:89),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 1:13),
+    transect = 1:5),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 14:20),
+    transect = 9:17),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 23:28),
+    transect = 19:24),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 47:60),
+    transect = 25:34),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 5,
-    transect = 66:84),
+    transect = 40:59),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 6,
+    transect = 65:84),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 1:14),
+    transect = 1:8),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 41:46),
+    transect = 9:20),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 3,
-    transect = 58:71),
+    transect = 44:49),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 4,
-    transect = 79:83),
+    transect = 57:70),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 5,
+    transect = 79:84),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:35),
+    transect = 1:8),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 41:97))
+    transect = 9:24),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 3,
+    transect = 25:31),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 4,
+    transect = 34:94))
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino

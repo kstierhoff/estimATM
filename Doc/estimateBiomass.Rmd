@@ -104,7 +104,7 @@ do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- F # Process krill backscatter data
 process.cal       <- T # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
@@ -1848,13 +1848,19 @@ if (survey.name %in% c("2107RL")) {
 }
 
 if (survey.name %in% c("2207RL")) {
+  # Get 2022 hauls to filter 2021 catch
+  hauls.2022 <- haul$haul
+  
   # Read and process catch data from Lasker in summer 2021
   catch.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/catch_info.rds") %>% 
+    # filter(ship == "RL") %>% 
+    select(-cluster) %>% 
     mutate(
-      haul        = haul + max.haul.rl,
-      key         = paste(haul, scientificName)) %>% 
-    left_join(select(spp.codes, scientificName, commonName, species)) %>% 
-    right_join(select(haul, haul, cluster))
+      haul    = haul + max.haul.rl,
+      # cluster = cluster + max.cluster.rl,
+      key     = paste(haul, scientificName)) %>% 
+    left_join(select(haul, haul, cluster)) %>% 
+    filter(haul %in% hauls.2022)
   
   # Combine catch data from each vessel
   catch <- bind_rows(catch, catch.2021)
@@ -2496,6 +2502,20 @@ if (survey.name %in% c("2107RL")) {
   # ggplot(lengths.jcf, aes(standardLength_mm, forkLength_mm, label = key)) + geom_point() + facet_wrap(~scientificName)
   
   lengths <- bind_rows(lengths, lengths.jcf)
+}
+
+if (survey.name %in% c("2207RL")) {
+  # Read specimen data from Lasker in 2021
+  lengths.2021 <- read_csv("C:/KLS/CODE/Github/estimATM/2107RL/Output/lengths_final.csv") %>% 
+    # select(-cluster) %>% 
+    mutate(
+      cruise = as.character(cruise),
+      haul    = haul + max.haul.rl) %>% 
+    # left_join(select(haul, haul, cluster)) %>% 
+    filter(haul %in% hauls.2022)
+  
+  # Combine length data
+  lengths <- bind_rows(lengths, lengths.2021)
 }
 
 # Get max TL for plotting L/W models
@@ -3914,7 +3934,8 @@ clust.dist.hist <- ggplot(filter(nasc.clust.hist, density > 0)) +
   xlab("Distance to positive cluster (nmi)") + 
   ylab("Frequency") +
   # ggtitle("Positive Intervals") +
-  theme(strip.background.x = element_blank(),
+  theme(axis.title.x = element_blank(),
+        strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "italic"))
 
 # Plot ECDF of positive interval distance
@@ -3980,7 +4001,8 @@ clust.biom.hist <- ggplot(nasc.clust.biom, aes(distance, prop.biom)) +
   theme_bw() + xlab("Distance to positive cluster (nmi)") + 
   ylab("Biomass-Proportion") +
   # ggtitle("Biomass") +
-  theme(strip.background.x = element_blank(),
+  theme(axis.title.x = element_blank(),
+        strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "italic"))
 
 # Plot ECDF
@@ -4060,8 +4082,6 @@ nasc.density.summ <- nasc.density.summ %>%
 ```
 
 ## Create final sampling strata  
-
-**[RESUME HERE]**
 
 Sampling strata are defined automatically according to survey vessel, transect spacing, coastline features, and 
 biomass density. For a stratum to be included in the analysis, it must:
@@ -6362,7 +6382,7 @@ if (match.intervals) {
 }
 ```  
 
-# Calculate abundance and biomass estimates  
+# Calculate abundance and biomass estimates - Core Region  
 For each species, point and bootstrap estimates of abundance and biomass are estimated.
 
 ## Calculate biomass - Point estimates
@@ -7366,9 +7386,9 @@ include_graphics(here("Figs/fig_biomass_histogram_survey_nse.png"))
 ```
 
 ## Calculate biomass - Other estimates
-### Offshore strata  
+### Offshore Region  
 
-If desired, estimate biomass in the offshore strata. 
+If desired, estimate biomass in the offshore region. 
 
 ```{r estimate-offshore-biomass}
 if (estimate.os) {
@@ -7460,9 +7480,9 @@ if (exists("be.os")) {
 }
 ``` 
 
-### Nearshore strata
+### Nearshore Region
 
-If desired, estimate biomass in the nearshore strata.
+If desired, estimate biomass in the nearshore region.
 
 ```{r estimate-nearshore-biomass}
 if (estimate.ns) {
@@ -8767,7 +8787,7 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Etrumeus acuminatus-All.png"))) 
 # Appendices
 ## **Appendix A.** Acoustic calibration results.
 
-```{r process-cal-all}
+```{r process-cal-all,eval=FALSE}
 if (process.cal) {
   source(here("Code/extractCalAll.R"))
 } else {
@@ -8779,7 +8799,7 @@ if (save.figs) {
 }
 ```  
 
-```{r process-cal}
+```{r process-cal,eval=FALSE}
 # Get results from current survey ---------------------------------------------
 cal.res <- cal.res.all %>% 
   mutate(cal_date = mdy(cal_date)) %>% 
@@ -8880,7 +8900,7 @@ write.csv(all.output,
 
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80).
 
-```{r cal-results, results='asis'}
+```{r cal-results, results='asis',eval=FALSE}
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(all.output)
@@ -8905,7 +8925,7 @@ if (file.exists(here("Figs/fig_cal_time_series_combo.png"))) {
 ```
 
 
-```{r work-complete}
+```{r work-complete,eval=FALSE}
 beep(4)
 ```
 
