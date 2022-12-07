@@ -1,12 +1,12 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
-process.seine     <- F # Process purse seine data, if present
-process.nearshore <- F # Process near backscatter data; typically TRUE
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.seine     <- T # Process purse seine data, if present
+process.nearshore <- T # Process near backscatter data; typically TRUE
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
@@ -295,9 +295,9 @@ nasc.depth.krill <- "NASC.350"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
-seine.vessels          <- c("LBC","LM")
+seine.vessels          <- c("LBC")
 # Use seine data to apportion backscatter
-use.seine.data         <- FALSE
+use.seine.data         <- TRUE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
@@ -566,7 +566,7 @@ boot.num <- 1000 # 1000 during final
 do.lf    <- TRUE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core") # c("Core", "Nearshore")
+estimate.regions   <- c("Core","Nearshore") # c("Core", "Nearshore")
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata
