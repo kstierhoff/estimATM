@@ -28,21 +28,27 @@
 ### LM
 lm.sets <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>% 
   mutate(date = mdy(date),
+         datetime = ymd_hms(paste(date, time), tz = "America/Los_Angeles"),
          vessel_name = "Lisa Marie",
          vessel.name = "LM",
-         key.set = paste(vessel.name, date, set))
+         key.set = paste(vessel.name, date, set)) %>% 
+  # Convert datetime to UTC
+  mutate(datetime = with_tz(datetime, tzone = "UTC"))
 
 ### LBC
 lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
   mutate(date = mdy(date),
+         datetime = ymd_hms(paste(date, time), tz = "America/Los_Angeles"),
          vessel_name = "Long Beach Carnage",
          vessel.name = "LBC",
-         key.set = paste(vessel.name, date, set))
+         key.set = paste(vessel.name, date, set)) %>% 
+  # Convert datetime to UTC
+  mutate(datetime = with_tz(datetime, tzone = "UTC"))
 
 save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
 
-set.clusters <- select(lm.sets, key.set, date, vessel.name, lat, long) %>%
-  bind_rows(select(lbc.sets, key.set, date, vessel.name, lat, long)) %>%
+set.clusters <- select(lm.sets, key.set, date, datetime, vessel.name, lat, long) %>%
+  bind_rows(select(lbc.sets, key.set, date, datetime, vessel.name, lat, long)) %>%
   filter(vessel.name %in% seine.vessels) %>%
   # Use order of sets until Lasker data are available
   # mutate(cluster = as.numeric(as.factor(key.set)),
@@ -163,9 +169,9 @@ save(lm.lengths, lbc.lengths, file = here("Output/purse_seine_specimens.Rdata"))
 # After we receive LBC data
 lengths.ns <- bind_rows(lm.lengths, lbc.lengths)
 
-ggplot(lengths.ns, aes(totalLength_mm, weightg, colour = vessel.name)) + 
-  geom_point() + 
-  facet_wrap(~scientificName, scales = "free")
+# ggplot(lengths.ns, aes(totalLength_mm, weightg, colour = vessel.name)) + 
+#   geom_point() + 
+#   facet_wrap(~scientificName, scales = "free")
 
 saveRDS(lengths.ns, here("output/lw_data_nearshore.rds"))
 
@@ -240,7 +246,7 @@ set.summ.wt <- set.summ.wt %>%
   summarise_all(list(sum)) %>% 
   ungroup() %>% 
   mutate(AllCPS = rowSums(select(., -key.set, -cluster, -haul))) %>% 
-  right_join(select(set.clusters, key.set, vessel.name, long, lat)) %>%
+  right_join(select(set.clusters, key.set, vessel.name, datetime, long, lat)) %>%
   replace(is.na(.), 0)
 
 set.pie <- set.summ.wt %>% 
