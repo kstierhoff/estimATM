@@ -53,7 +53,7 @@ transit.distance <- 850
 transit.duration <- ceiling(transit.distance/transit.speed/24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
-leg.waste <- c(4, 2, 2, 2)
+leg.waste <- c(4, 2, 2)
 
 # Remove transects to adjust survey progress
 transects.rm <- NA # Numbered transects to remove
