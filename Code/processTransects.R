@@ -13,48 +13,38 @@ wpts <- route$waypoints %>%
 
 write_csv(wpts, here("Output/waypoints/all_waypoints.csv"))
 
+# Process waypoints
+transects <- wpts %>% 
+  filter(!str_detect(name, "UCTD")) %>%
+  filter(!str_detect(name, "Pairovet")) %>% 
+  mutate(
+    type = case_when(
+      str_detect(name, "A+$") ~ "Adaptive",
+      str_detect(name, "C+$") ~ "Compulsory",
+      str_detect(name, "S+$") ~ "Saildrone",
+      str_detect(name, "M+$") ~ "Mammal",
+      str_detect(name, "E+$") ~ "Extra",
+      str_detect(name, "T+$") ~ "Transit",
+      str_detect(name, "N+$") ~ "Nearshore",
+      str_detect(name, "O+$") ~ "Offshore",
+      TRUE ~ "Unknown"),
+    Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}"))) %>% 
+  arrange(type, Waypoint)
+
 # Extract transect waypoints
-if (!exists("renumber.transects")) {
+if (!exists("renumber.transects")|renumber.transects == FALSE) {
   # Process normally
-  transects <- wpts %>% 
-    filter(!str_detect(name, "UCTD")) %>%
-    filter(!str_detect(name, "Pairovet")) %>% 
-    mutate(
-      type = case_when(
-        str_detect(name, "A+$") ~ "Adaptive",
-        str_detect(name, "C+$") ~ "Compulsory",
-        str_detect(name, "S+$") ~ "Saildrone",
-        str_detect(name, "M+$") ~ "Mammal",
-        str_detect(name, "E+$") ~ "Extra",
-        str_detect(name, "T+$") ~ "Transit",
-        str_detect(name, "N+$") ~ "Nearshore",
-        str_detect(name, "O+$") ~ "Offshore",
-        TRUE ~ "Unknown"),
-      Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}")),
-      Transect = floor(Waypoint)) %>%
+  transects <- transects %>% 
+    # filter(!str_detect(name, "UCTD")) %>%
+    # filter(!str_detect(name, "Pairovet")) %>% 
+    mutate(Transect = floor(Waypoint)) %>%
     mutate(group = paste(Transect, type)) %>% 
     arrange(type, Transect, Waypoint) %>% 
     select(Transect, Waypoint, Latitude = lat, Longitude = lon, Type = type, group, name) %>% 
     filter(!is.na(Type), !is.na(Transect))  
-} else {
-  # Renumber transects
-  transects <- wpts %>% 
-    filter(!str_detect(name, "UCTD")) %>%
-    filter(!str_detect(name, "Pairovet")) %>% 
-    mutate(
-      type = case_when(
-        str_detect(name, "A+$") ~ "Adaptive",
-        str_detect(name, "C+$") ~ "Compulsory",
-        str_detect(name, "S+$") ~ "Saildrone",
-        str_detect(name, "M+$") ~ "Mammal",
-        str_detect(name, "E+$") ~ "Extra",
-        str_detect(name, "T+$") ~ "Transit",
-        str_detect(name, "N+$") ~ "Nearshore",
-        str_detect(name, "O+$") ~ "Offshore",
-        TRUE ~ "Unknown"),
-      Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}"))) %>% 
-    arrange(type, Waypoint)
   
+} else if (renumber.transects == TRUE) {
+  # Renumber transects
   transects.adjusted <- data.frame()
   
   for (kk in unique(transects$type)) {
@@ -98,11 +88,10 @@ if (!exists("renumber.transects")) {
     # Combine results
     transects.adjusted <- bind_rows(transects.adjusted, tx.kk)
   }
+  # Replace existing data frame with new values
+  transects <- transects.adjusted %>%
+    arrange(Type, Transect, Waypoint)
 }
-
-# Replace existing data frame with new values
-transects <- transects.adjusted %>%
-  arrange(Type, Transect, Waypoint)
 
 # If specific transects are to be removed manually
 if (!is.na(rm.i.transects)) {
@@ -120,17 +109,31 @@ starts <- transects %>%
   ungroup()
 
 # Calculate day length across survey area ----------------------------------
-daylength.max <- day_length(date = min(leg.ends),
-                            geocode = data.frame(lat = max(starts$lat), lon = max(starts$long)),
-                            twilight = "none")
+if (survey.direction == "Southward") {
+  # Calculate the day length at the start of the survey at the northernmost latitude
+  daylength.start <- day_length(date = min(leg.ends),
+                              geocode = data.frame(lat = max(starts$lat), lon = max(starts$long)),
+                              twilight = "none")
+  # Calculate the day length at the end of the survey at the northernmost latitude
+  daylength.end <- day_length(date = max(leg.ends),
+                              geocode = data.frame(lat = min(starts$lat), lon = min(starts$long)),
+                              twilight = "none")
+  
+} else if (survey.direction == "Northward") {
+  # Calculate the day length at the start of the survey at the southernmost latitude
+  daylength.start <- day_length(date = min(leg.ends),
+                              geocode = data.frame(lat = min(starts$lat), lon = max(starts$long)),
+                              twilight = "none")
+  # Calculate the day length at the end of the survey at the northernmost latitude
+  daylength.end <- day_length(date = max(leg.ends),
+                              geocode = data.frame(lat = max(starts$lat), lon = min(starts$long)),
+                              twilight = "none")
+}
 
-daylength.min <- day_length(date = max(leg.ends),
-                            geocode = data.frame(lat = min(starts$lat), lon = min(starts$long)),
-                            twilight = "none")
-
+# Create final day length data frame
 daylength.df <- data.frame(Transect = seq(1, max(starts$Transect)),
-                           daylength = seq(daylength.min, daylength.max,
-                                           (daylength.max - daylength.min)/(max(starts$Transect) - 1))) %>% 
+                           daylength = seq(daylength.start, daylength.end,
+                                           (daylength.end - daylength.start)/(max(starts$Transect) - 1))) %>% 
   left_join(select(starts, Transect, lat))
 
 # Get survey regions from inshore most waypoints
@@ -231,13 +234,13 @@ base.map <- get_basemap(transects, states, countries, locations, bathy, map.boun
   # Add scalebar
   annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
 
-# Extract odd (Compulsory) transects, sort onshore to offshore
+# Extract odd transects, sort onshore to offshore
 transects.odd <- filter(transects, Transect %% 2 == 1) %>% 
   # filter(!Transect %in% transects.rm) %>% 
   arrange(desc(Transect), Waypoint) %>% 
   mutate(order = seq_along(Transect))
 
-# Extract odd transects (Adaptive), sort offshore to onshore
+# Extract even transects, sort offshore to onshore
 transects.even <- filter(transects, Transect %% 2 == 0) %>% 
   # filter(!Transect %in% transects.rm) %>% 
   arrange(desc(Transect), desc(Waypoint)) %>% 
@@ -246,11 +249,38 @@ transects.even <- filter(transects, Transect %% 2 == 0) %>%
 # Create route for planning
 empty <- st_as_sfc("POINT(EMPTY)")
 
-# Create route plan for the FSV -------------------------------------------
-# Combine even and odd transects into one continuous route
-route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>% 
-  bind_rows(filter(transects.even, Type %in% c("Adaptive","Compulsory"))) %>% 
-  arrange(desc(Transect), order) %>%
+# Create route plan for the various transect types -------------------------------------------
+# Combine even and odd transects into one continuous route and filter based on transect types
+## FSV transects
+route.fsv <- bind_rows(transects.even, transects.odd) %>% 
+  filter(Type %in% c("Adaptive","Compulsory")) %>% 
+  arrange(desc(Transect), order)
+
+## Nearshore transects
+route.ns <- bind_rows(transects.even, transects.odd) %>% 
+  filter(Type %in% c("Nearshore")) %>% 
+  arrange(desc(Transect), order)
+
+## Saildrone transects
+route.sd <- bind_rows(transects.even, transects.odd) %>% 
+  filter(Type %in% c("Saildrone")) %>% 
+  arrange(desc(Transect), order)
+
+if (survey.direction == "Northward") {
+  # Reverse route if surveying from north to south
+  route.fsv <- arrange(route.fsv, Transect, order) 
+  
+  if (nrow(route.ns) > 0) {
+    route.ns <- arrange(route.ns, Transect, order)   
+  }
+  if (nrow(route.sd) > 0) {
+    route.sd <- arrange(route.sd, Transect, order)   
+  }
+}
+  
+# Compute timing and distances
+## FSV
+route.fsv <- route.fsv %>%
   left_join(daylength.df) %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   select(-group, -order) %>%
@@ -280,7 +310,78 @@ route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>%
       speed == transit.speed ~ "transit",
       TRUE ~ "other")) %>% 
   select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
-         distance_to_next, distance_cum, time_to_next, time_cum, leg, Region) 
+         distance_to_next, distance_cum, time_to_next, time_cum, leg, Region)
+
+## Nearshore
+route.ns <- route.ns %>%
+  # left_join(daylength.df) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  select(-group, -order) %>%
+  mutate(long = as.data.frame(st_coordinates(.))$X,
+         lat  = as.data.frame(st_coordinates(.))$Y,
+         distance_to_next = as.numeric(
+           na.omit(c(0, st_distance(geometry,
+                                    lead(geometry, 
+                                         default = NA),
+                                    by_element = TRUE))))/1852,
+         distance_to_next = c(distance_to_next[2:n()],0)) %>% 
+  # mutate(distance_to_next = c(distance_to_next[2:n()],0),
+  #        distance_cum = cumsum(distance_to_next),
+  #        time_to_next = distance_to_next / survey.speed / daylength,
+  #        time_cum     = cumsum(time_to_next) + transit.duration,
+  #        on_off       = 1,
+  #        leg          = cut(time_cum, leg.breaks.gpx, 
+  #                           labels = FALSE, include.lowest = TRUE)) %>%
+  st_set_geometry(NULL) %>% 
+  project_df(to = 3310) %>% 
+  mutate(
+    diff.wpt = c(diff(round(Waypoint)), 0),
+    speed = case_when(
+      diff.wpt == 0 ~ survey.speed,
+      TRUE ~ transit.speed),
+    mode         = case_when(
+      speed == survey.speed ~ "survey",
+      speed == transit.speed ~ "transit",
+      TRUE ~ "other")) %>% 
+  # select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
+  #        distance_to_next, distance_cum, time_to_next, time_cum, leg, Region) %>% 
+  select(Transect, Waypoint, Type, long, lat, X, Y, speed, mode, 
+         distance_to_next, Region)
+
+# # Combine even and odd transects into one continuous route
+# route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>% 
+#   bind_rows(filter(transects.even, Type %in% c("Adaptive","Compulsory"))) %>% 
+#   arrange(desc(Transect), order) %>%
+#   left_join(daylength.df) %>% 
+#   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+#   select(-group, -order) %>%
+#   mutate(long = as.data.frame(st_coordinates(.))$X,
+#          lat  = as.data.frame(st_coordinates(.))$Y,
+#          distance_to_next = as.numeric(
+#            na.omit(c(0, st_distance(geometry,
+#                                     lead(geometry, 
+#                                          default = NA),
+#                                     by_element = TRUE))))/1852) %>% 
+#   mutate(distance_to_next = c(distance_to_next[2:n()],0),
+#          distance_cum = cumsum(distance_to_next),
+#          time_to_next = distance_to_next / survey.speed / daylength,
+#          time_cum     = cumsum(time_to_next) + transit.duration,
+#          on_off       = 1,
+#          leg          = cut(time_cum, leg.breaks.gpx, 
+#                             labels = FALSE, include.lowest = TRUE)) %>%
+#   st_set_geometry(NULL) %>% 
+#   project_df(to = 3310) %>% 
+#   mutate(
+#     diff.wpt = c(diff(round(Waypoint)), 0),
+#     speed = case_when(
+#       diff.wpt == 0 ~ survey.speed,
+#       TRUE ~ transit.speed),
+#     mode         = case_when(
+#       speed == survey.speed ~ "survey",
+#       speed == transit.speed ~ "transit",
+#       TRUE ~ "other")) %>% 
+#   select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
+#          distance_to_next, distance_cum, time_to_next, time_cum, leg, Region) 
 
 # Plot the route
 route.plot.fsv <- base.map + 
@@ -294,6 +395,10 @@ ggsave(route.plot.fsv, filename = here("Figs/fig_route_plan.png"),
 # Write route plan to CSV
 write_csv(select(route.fsv, -X, -Y), 
           here("Output/routes/route_plan_fsv.csv"))
+write_csv(select(route.ns, -X, -Y), 
+          here("Output/routes/route_plan_ns.csv"))
+# write_csv(select(route.sd, -X, -Y), 
+#           here("Output/routes/route_plan_sd.csv"))
 
 # Add legs to transects ---------------------------------------------------
 leg.summ <- route.fsv %>% 
@@ -351,6 +456,7 @@ transects.sf <- transects %>%
   mutate(dist = as.numeric(st_length(.)/1852))
 
 # mapview(transects.sf, zcol = "Type")
+# mapview(transects.sf, zcol = "Leg")
 
 # Create acoustic transect labels for maps
 tx.labels.tmp <- transects %>% 
