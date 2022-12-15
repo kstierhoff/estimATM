@@ -855,6 +855,18 @@ save(haul, file = here("Output/haul_info.Rdata"))
 # vessels to obtain the necessary variables for merging with Lasker haul data
 # for plotting the pie maps
 source(here("Code/processSeine_2207RL.R"))
+
+# Summarize seine catch data for Appendices
+seine.summ <- set.summ.wt %>% 
+  arrange(datetime) %>% 
+  mutate(Date = format(datetime, "%m/%d/%Y %H:%M")) %>%
+  select(Vessel = vessel.name, Date, 
+         Latitude = lat, Longitude = long, 
+         "N. Anchovy" = Anchovy, "P. Sardine" = Sardine,
+         "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, 
+         "P. Herring" = PacHerring, "R. Herring" = RndHerring,
+         Jacksmelt, "All CPS" = AllCPS) %>%
+  arrange(Date)
 ```
 
 ```{r process-catch-data}
@@ -1396,7 +1408,8 @@ nasc.map.ns.lbc <- base.map +
 #   st_transform(crs = 3310) %>%
 #   st_bbox()
 
-pie.radius.lbc <- as.numeric(abs(map.bounds.lbc$ymin - map.bounds.lbc$ymax)*.05)
+# Set pie radius to a reasonable size for the reduced survey area
+pie.radius.lbc <- as.numeric(abs(map.bounds.lbc$ymin - map.bounds.lbc$ymax)*.03)
 
 # Create map of seine data
 set.pies <- base.map +
@@ -2241,6 +2254,89 @@ if (doc.type == "docx") {
     kable_styling(position = "center", 
                   latex_options = c("repeat_header","hold_position"))
 }
-```  
+``` 
+
+\newpage 
+
+# Seine sample summary {#appendix-seine-sampling}
+## _Lisa Marie_ {#appendix-seine-sampling-lm}
+
+Date, time (UTC), location, and biomasses (kg) of CPS collected for each purse seine set by _Lisa Marie_.
+
+```{r seine-catch-summary-lm,results='asis'}
+# Summarize catch by species, used to subset columns
+pos.cps.lm <- seine.summ %>% 
+  filter(Vessel == "LM") %>% 
+  select(-Vessel, -Date, -Latitude, -Longitude, -"All CPS") %>% 
+  gather(key = "scientificName", value = "weight") %>% 
+  group_by(scientificName) %>% 
+  summarise(weight = sum(weight, na.rm = T)) %>% 
+  filter(weight != 0) %>% 
+  pull(scientificName)
+
+# Select only species with positive catch weight
+seine.summ.lm <- seine.summ %>% 
+  filter(Vessel == "LM") %>% 
+  mutate(Set = seq_along(Vessel)) %>% 
+  select(Set, `Date Time` = Date, Latitude, Longitude,
+         all_of(pos.cps.lm), "All CPS") %>% 
+  arrange(Set)
+
+# Replace zeros with NA
+seine.summ.lm[seine.summ.lm == 0] <- NA
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(seine.summ.lm)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(seine.summ.lm,escape = F,longtable = T,booktabs = T,
+        align = c("c","c",rep("r",ncol(seine.summ.lm) - 2)),
+        digits = c(0,0,4,4,rep(2, ncol(seine.summ.lm) - 4))) %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("repeat_header","hold_position"))
+}
+``` 
+
+\newpage
+
+## _Long Beach Carnage_ {#appendix-seine-sampling-lbc}
+
+Date, time (UTC), location, and biomasses (kg) of CPS collected for each purse seine set by _Long Beach Carnage_.
+
+```{r seine-catch-summary-lbc,results='asis'}
+# Summarize catch by species, used to subset columns
+pos.cps.lbc <- seine.summ %>% 
+  filter(Vessel == "LBC") %>% 
+  select(-Vessel, -Date, -Latitude, -Longitude, -"All CPS") %>% 
+  gather(key = "scientificName", value = "weight") %>% 
+  group_by(scientificName) %>% 
+  summarise(weight = sum(weight, na.rm = T)) %>% 
+  filter(weight != 0) %>% 
+  pull(scientificName)
+
+# Select only species with positive catch weight
+seine.summ.lbc <- seine.summ %>% 
+  filter(Vessel == "LBC") %>% 
+  mutate(Set = seq_along(Vessel)) %>%
+  select(Set, `Date Time` = Date, Latitude, Longitude,
+         all_of(pos.cps.lm), "All CPS") %>% 
+  arrange(Set)
+
+# Replace zeros with NA
+seine.summ.lbc[seine.summ.lbc == 0] <- NA
+
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(seine.summ.lbc)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(seine.summ.lbc,escape = F,longtable = T,booktabs = T,
+        align = c("c","c",rep("r",ncol(seine.summ.lbc) - 2)),
+        digits = c(0,0,4,4,rep(2, ncol(seine.summ.lbc) - 4))) %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("repeat_header","hold_position"))
+}
+``` 
 
 \elandscape

@@ -295,7 +295,7 @@ nasc.depth.krill <- "NASC.350"
 
 # Purse seine data info
 # Survey vessels that collected purse seine data
-seine.vessels          <- c("LBC")
+seine.vessels          <- c("LBC","LM")
 # Use seine data to apportion backscatter
 use.seine.data         <- TRUE
 
