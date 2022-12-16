@@ -495,7 +495,8 @@ ts.proportions.seine <- clf.seine %>%
     prop.her     = (num.her     * sigmaindiv.her)  / weighted.num,
     prop.her.wg  = (meanwg.her  * sigmawg.her  * num.her) / weighted.wg,
     prop.rher    = (num.rher    * sigmaindiv.rher)  / weighted.num,
-    prop.rher.wg = (meanwg.rher * sigmawg.rher  * num.rher) / weighted.wg)
+    prop.rher.wg = (meanwg.rher * sigmawg.rher  * num.rher) / weighted.wg) %>% 
+  replace(is.na(.), 0) 
 
 # Replace all NaNs with zeros
 ts.proportions.seine[atm:::is.nan.df(ts.proportions.seine)] <- NA
