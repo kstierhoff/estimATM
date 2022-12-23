@@ -12,10 +12,10 @@ clear; close all;
 %% User Settings
 
 % Define vessels for which there are NASC CSVs
-vessels = {'RL' 'LM' 'LBC' 'JCF' 'SD'};
+vessels = {'RL' 'LM' 'LBC' 'JCF' 'SD\SD1036' 'SD\SD1055' 'SD\SD1059'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
-colors = 'rcgmb';
+colors = 'rcgmbbb';
 
 % Define boundary extents of habitat data to download
 latBounds = [27 51];
