@@ -138,6 +138,7 @@ if (!has_name(set.summ.wt, "Scomber japonicus"))     {set.summ.wt$`Scomber japon
 if (!has_name(set.summ.wt, "Trachurus symmetricus")) {set.summ.wt$`Trachurus symmetricus` <- 0}
 if (!has_name(set.summ.wt, "Clupea pallasii"))       {set.summ.wt$`Clupea pallasii`       <- 0}
 if (!has_name(set.summ.wt, "Atherinopsis californiensis")) {set.summ.wt$`Atherinopsis californiensis` <- 0}
+if (!has_name(set.summ.wt, "Etrumeus acuminatus"))   {set.summ.wt$`Etrumeus acuminatus` <- 0}
 
 # Calculate total weight of all CPS species
 set.summ.wt <- set.summ.wt %>%  
@@ -151,11 +152,12 @@ set.summ.wt <- set.summ.wt %>%
          "Anchovy"    = "Engraulis mordax",
          "Sardine"    = "Sardinops sagax",
          "PacMack"    = "Scomber japonicus",
-         "JackMack"   = "Trachurus symmetricus") 
+         "JackMack"   = "Trachurus symmetricus",
+         "RndHerring" = "Etrumeus acuminatus")  
 
 set.pie <- set.summ.wt %>% 
   select(key.set, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   atm::project_df(to = 3310) %>% 
   mutate(
     label = paste("Set", key.set),
@@ -165,6 +167,7 @@ set.pie <- set.summ.wt %>%
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 # Load nearshore backscatter data -----------------------------------------
@@ -252,14 +255,14 @@ set.pies <- base.map +
   scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "Lisa Marie")), 
                               aes(X, Y, group = key.set, r = r*1.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
+                                       "PacHerring", "PacMack", "RndHerring","Sardine"),
                               color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
+                               "P. Herring", "P. Mackerel", "R. Herrinng", "Sardine"),
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
+                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = set.zero, aes(X, Y)) +
   # ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -344,7 +347,7 @@ set.pies <- base.map +
   scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "Long Beach Carnage")), 
                               aes(X, Y, group = key.set, r = r*2.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
+                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
                               color = 'black', alpha = 0.8) +
   # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = r*0.5),
   #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
@@ -353,9 +356,9 @@ set.pies <- base.map +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
+                               "P. Herring", "P. Mackerel", "R. Herring", "Sardine"),
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
+                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = set.zero, aes(X, Y)) +
   # ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -395,12 +398,12 @@ nasc.map.ns.lbc <- base.map +
 ggsave(nasc.map.ns.lbc, filename = here("Figs/fig_backscatter_cps_LongBeachCarnage.png"),
        height = 6, width = 10)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, nrow = 2,
+nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, nrow = 1,
                                labels = c("a)", "b)"))
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
-       height = 10, width = 8)
+       height = 6, width = 10)
 
 # # Plot Saildrone data ----------------------------------------------------
 # # Assign backscatter to trawl hauls ------------------------------------

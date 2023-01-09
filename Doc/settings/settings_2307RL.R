@@ -28,7 +28,7 @@ uctd.spacing   <- 15
 ### Transect removal and renumbering
 rm.n.transects     <- 37 # Number of transects to remove from the start (if near Mexico)
 rm.i.transects     <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
-renumber.transects <- FALSE # Renumber transects to start at zero if transect are removed
+renumber.transects <- TRUE # Renumber transects to start at zero if transect are removed
 
 # Locations to remove from planning (e.g., north, central, south, and mexico)
 rm.location <- NA # c("mexico")
@@ -45,15 +45,15 @@ gpx.file         <- "rosepoint_waypoints.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
-transit.speed    <- 12
+transit.speed    <- 10
 survey.direction <- "Northward" # Southward or Northward; to compute day lengths
 
 # Beginning transit length (d)
-transit.distance <- 850
+transit.distance <- 320 # From SD to Punta Eugenia in 2023
 transit.duration <- ceiling(transit.distance/transit.speed/24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
-leg.waste <- c(4, 2, 2, 2)
+leg.waste <- c(3, 2, 6)
 
 # Remove transects to adjust survey progress
 transects.rm <- NA # Numbered transects to remove

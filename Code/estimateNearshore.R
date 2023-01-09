@@ -59,8 +59,16 @@ if (process.nearshore) {
       left_join(select(cps.nasc.temp, datetime, cps.nasc))
     
   } else {
-    # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
-    nasc.nearshore$cps.nasc <- purrr::pluck(nasc.nearshore, nasc.depth.cps)
+    # Use cps.nasc extracted using extract_cps_nasc.R
+    if ("cps.nasc" %in% colnames(nasc.vessel)) {
+      nasc.vessel$cps.nasc.source <- "cps.nasc"
+    } else {
+      # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
+      # nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
+      nasc.vessel <- nasc.vessel %>% 
+        mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
+               cps.nasc.source = nasc.depth.cps)
+    }
   }
   
   # Process purse seine data
@@ -599,7 +607,8 @@ nasc.density.summ.ns <- nasc.density.summ.ns %>%
 # Get boundaries for bathymetry grid using nearshore waypoints
 if (get.bathy) {
   # Get nearshore waypoints
-  bathy.wpts <- region.wpts %>% ungroup()
+  bathy.wpts <- wpts %>% 
+    filter(Type == "Nearshore")
   
   # Get bathymetry
   bathy.bounds.ns <- bathy.wpts %>%
@@ -1571,8 +1580,10 @@ if (save.figs) {
 }
 
 # Create blank plots for missing species
-for (i in unique(strata.nearshore$scientificName)) {
-  for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
+for (i in unique(strata.primary$scientificName)) {
+  # for (i in unique(strata.nearshore$scientificName)) {
+  for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
+    # for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
     if (is.null(biomass.dens.figs.ns[[i]][[j]])) {
       biomass.dens.temp <- base.map + 
         annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +

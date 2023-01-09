@@ -193,12 +193,19 @@ if (get.nav.ns) {
     # Convert nearshore nav to spatial
     nav.ns.sf <- st_as_sf(nav.ns, coords = c("long","lat"), crs = crs.geog)
     
+    nav.ns.paths.sf <- nav.ns.sf %>% 
+      group_by(vessel.name) %>% 
+      summarise(do_union = FALSE) %>% 
+      st_cast("LINESTRING") %>% 
+      mutate(tracklength = st_length(.))
+    
     #Save processed nav data
-    save(nav.ns, nav.ns.sf, file = here("Data/Nav/nav_data_nearshore.Rdata"))
-  }  
-} else {
-  # Load nav data
-  load(here("Data/Nav/nav_data_nearshore.Rdata"))
+    save(nav.ns, nav.ns.sf, nav.ns.paths.sf, file = here("Data/Nav/nav_data_nearshore.Rdata"))
+  } else {
+    # Load nav data
+    load(here("Data/Nav/nav_data_nearshore.Rdata"))
+    
+  }
 }
 ```
 
@@ -299,6 +306,8 @@ if (get.bathy) {
   
   # Create bounding box
   bathy.bounds <- st_bbox(bathy.bounds) 
+  
+  # mapview(nav.paths.sf) + mapview(nav.sd.paths.sf) + mapview(nav.ns.paths.sf) + mapview(bathy.bounds)
   
   # Download bathy grid
   noaa.bathy <- getNOAA.bathy(

@@ -556,6 +556,20 @@ uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD
 uctd.hdr.pattern       <- ".*UCTD\\d{3}.*asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
+# TDR data
+tdr.dir.kite           <- here("Data/TDR/Kite")
+tdr.dir.foot           <- here("Data/TDR/Footrope")
+tdr.pattern            <- "2107RL*.*rsk"
+tdr.recurse            <- TRUE # Recursively search TDR directory
+tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
+# Time offset, in hours (usually -1, diff between PDT and PST in summer)
+tdr.offset             <- 0
+# tdr.offset <- c(rep(-1, 72), # Time settings were updated after haul 73
+#                 rep( 0, 20)) # Time settings were updated after haul 73
+tdr.offset             <- setNames(tdr.offset, 1:length(tdr.offset)) # Add names from haul numbers
+tdr.nav.source         <- "ERDDAP"
+tdr.trawl.source       <- "Access"
+
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
 length.min <- 1 # Minimum length bin for length frequencies

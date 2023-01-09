@@ -12,10 +12,10 @@ clear; close all;
 %% User Settings
 
 % Define vessels for which there are NASC CSVs
-vessels = {'RL' 'LM' 'LBC' 'JCF' 'SD'};
+vessels = {'RL' 'LM' 'LBC' 'JCF' 'SD\SD1036' 'SD\SD1055' 'SD\SD1059'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
-colors = 'kmmgc';
+colors = 'rcgmbbb';
 
 % Define boundary extents of habitat data to download
 latBounds = [27 51];
@@ -35,13 +35,21 @@ options = weboptions('Timeout', 60);
 % Add path to m_map package and load habitat colormarp
 addpath 'C:\Users\josiah.renfree\Documents\MATLAB\m_map'
 addpath 'C:\Users\josiah.renfree\Documents\MATLAB\borders'
-load('C:\Users\josiah.renfree\Documents\Website\Sardine habitat\Juan cmap.mat');
 
 % Define timespan between ship positions
 timespan = hours(6);
 
 % Define animated gif name
 surveyName = 'summer2021';
+
+%% Create colormap
+% Define the colormap to use for the habitat. First 5% is bad, next 27% is
+% unsuitable, next 13% is good, and last 55% is optimal
+
+map = 0.0 * ones(50, 3);            % Bad
+map = [map; 0.3 * ones(270, 3)];    % Unsuitable
+map = [map; 0.6 * ones(130, 3)];    % Good
+map = [map; 0.8 * ones(550, 3)];    % Optimal
 
 %% Get vessel positions using integrated CSV data
 
@@ -279,7 +287,7 @@ for i = 1:length(timeBin)
         % Plot data up to the current time bin separately for each transect
         % so it only shows transects (i.e., not transits)
         for k = 1:length(C)
-            m_plot(X(IC==k), Y(IC==k), 'Linewidth', 2, 'Color', colors(j))
+            m_plot(X(IC==k), Y(IC==k), 'Linewidth', 1, 'Color', colors(j))
         end
     end
 
@@ -292,7 +300,7 @@ for i = 1:length(timeBin)
     title(char(timeBin(i)))
 
     % Set figure options
-    set(gcf,'color','w');                            % Change background color to white
+    set(gcf,'color','w');                           % Change background color to white
     set(gcf, 'PaperUnits', 'points', 'PaperPosition', [0 0 322.5 315]);
     set(gcf, 'Position', [0 0 700 850]);            % Figure size and position
     set(ax, 'Position', [0 0.1 0.8 0.85])           % Map size and position
@@ -301,7 +309,9 @@ for i = 1:length(timeBin)
     set(hcb, 'Position', [0.76 0.1 0.0476 0.85])        % Colorbar size and position
     set(hcb, 'YAxisLocation', 'left')                   % Set colorbar y-axis to left side
     set(hcb, 'YTick', [0 .048 .32 .45 1])               % Define colorbar y-axis tick locations
+%     set(hcb, 'YTick', [0 .32 1])               % Define colorbar y-axis tick locations
     set(hcb, 'YtickLabel', {'0' '1' '10' '20' '100'})   % Set the colorbar y-axis tick labels
+%     set(hcb, 'YtickLabel', {'0' '10' '100'})   % Set the colorbar y-axis tick labels
     ylabel(hcb, 'Cumulative sardine biomass (%)')       % Set colorbar y-axis label
 
     % Add colorbar labels
