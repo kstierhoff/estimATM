@@ -1354,8 +1354,12 @@ nasc.nearshore <- readRDS(here("Data/Backscatter/LBC/nasc_vessel_LBC_nearshore.r
 
 # Summarize nasc for plotting
 nasc.plot.ns <- nasc.nearshore %>%
-  select(filename, transect, vessel.name, Interval, lat, long, cps.nasc) %>%
-  group_by(filename, transect, vessel.name, Interval) %>%
+  mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
+                                         nasc.summ.interval),
+                           labels = FALSE, include.lowest = TRUE),
+                 transect.name = paste(vessel.name, transect)) %>% 
+  select(filename, transect, vessel.name, int, lat, long, cps.nasc) %>%
+  group_by(filename, transect, vessel.name, int) %>%
   summarise(
     lat  = lat[1],
     long = long[1],
