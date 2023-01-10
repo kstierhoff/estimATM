@@ -259,13 +259,6 @@ nasc.sizes         <- c(0.1, 0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
 nasc.colors        <- c("#000000", "#C2E6F2", "#1E90FF", "#FFFF00", "#FF8C00", 
                         "#FF0000", "#FFC0CB", "#FFFFFF")
 
-# Make NASC breaks specifically for nearshore transects
-nasc.breaks.ns        <- c(0, 1, 50000, 100000, 150000, 200000, 250000, 20000000)
-nasc.labels.ns        <- c("0", "1-50,000", "50,000-100,000", "100,000-150,000",
-                           "150,000-200,000", "200,000-250,000",">250,000")
-nasc.scale.ns         <- 1.0 # Scale percentage (smaller for larger scale)
-nasc.sizes.ns         <- c(0.1, 0.25, 2, 3, 4, 5, 6, 7)*nasc.scale.ns
-
 # Acoustic biomass density map
 dens.breaks        <- c(0, 1, 10, 100, 500, 1000, 10000, 50000, 1000000)
 dens.labels        <- c("0-1", "1-10", "10-100", "100-500", "500-1000",
