@@ -92,8 +92,9 @@ panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOption
 
 ```{r loop-controls}
 # User-defined loop controls
+save.figs        <- T # Save figures during processing
 combine.regions  <- T # Combine core and nearshore biomass plots
-plot.time.series <- T # Plot biomass time series 
+plot.time.series <- F # Plot biomass time series 
 get.db           <- T # Query biomass estimates from AST database
 copy.files       <- F # Copy bib and CSL from AST server; requires internet
 ```
@@ -176,7 +177,7 @@ Presented here are:  1) a detailed description of the ATM used to survey CPS in 
 ## Data collection {#methods-data-collection}
 ### Survey design {#methods-survey-design}  
 
-The `r tolower(survey.season)` `r survey.year` survey was conducted principally using _`r survey.vessel`_ and _Lisa Marie_. The sampling domain, between `r survey.landmark.n` and `r survey.landmark.s`, was defined by the conceptual distribution of potential habitat for the northern stock of Pacific Sardine at the beginning of the survey (**Fig. \@ref(fig:sardine-distribution)**), and information recently gathered from other research projects [e.g., California Cooperative Oceanic Fisheries Investigations (CalCOFI^[https://calcofi.org/]) samples] or the fishing industry (e.g., catch and bycatch data). East to west, the sampling domain extends from the coast to at least the 1,000 ftm (~1830 m) isobath (**Fig. \@ref(fig:survey-plan)**). This area encompassed the anticipated distributions of the northern and southern stocks of Pacific Sardine (**Fig. \@ref(fig:sardine-potential-habitat)**) and the central and northern stocks of Northern Anchovy off the west coasts of the U.S., and Mexico, but also spanned portions of the Pacific Mackerel, Jack Mackerel, and Pacific Herring populations. Considering the expected distribution of the target species, the acceptable uncertainty in biomass estimates, and the available ship time (`r survey.das` planned days at sea, DAS), the principal survey objectives were the estimations of biomasses for the northern and southern stocks of Pacific Sardine and the northern and central stocks of Northern Anchovy in the survey region. Additionally, biomass estimates were sought for Pacific Mackerel, Jack Mackerel, and Pacific Herring in the survey region.  
+The `r tolower(survey.season)` `r survey.year` survey was conducted principally using _`r survey.vessel`_ and _Lisa Marie_. The sampling domain, or core region, between `r survey.landmark.n` and `r survey.landmark.s`, was defined by the conceptual distribution of potential habitat for the northern stock of Pacific Sardine during summer (**Fig. \@ref(fig:sardine-distribution)**). East to west, the sampling domain extends from the coast to at least the 1,000 ftm (~1830 m) isobath (**Fig. \@ref(fig:survey-plan)**). This area encompassed the anticipated distributions of the northern and southern stocks of Pacific Sardine (**Fig. \@ref(fig:sardine-potential-habitat)**) and the northern and central stocks of Northern Anchovy off the west coasts of the U.S., and Mexico, but also spanned portions of the Pacific Mackerel, Jack Mackerel, Pacific Herring, and Round Herring populations. Considering the expected distribution of the target species, the acceptable uncertainty in biomass estimates, and the available ship time (`r survey.das` planned days at sea, DAS), the principal survey objectives were the estimations of biomasses for the northern and southern stocks of Pacific Sardine and the northern and central stocks of Northern Anchovy in the survey region. Additionally, biomass estimates were sought for Pacific Mackerel, Jack Mackerel, and Pacific Herring in the survey region.  
 
 The transects are perpendicular to the coast, extending from the shallowest navigable depth (~25 m) to either a distance of 35 nmi or to the 1,000 ftm isobath, whichever is farthest (**Fig. \@ref(fig:survey-plan)**). When CPS are observed within the westernmost 3 nmi of a transect, that transect and the next one to the south are extended in 5-nmi increments until no CPS are observed in the last 3 nmi of the extension.  
 
@@ -243,6 +244,309 @@ include_graphics(here("Images/img_carnage_mta4.jpg"))
 ```{r cal-results-other, eval=FALSE}
 # Source calibration results from other vessels\
 source(here("Code", paste0("processCal_", prj.name, ".R")))
+```
+
+```{r process-cal}
+# Currently, the process-cal-all section must be run first to either extract all
+# calibration results from a SQL database or load it from an RData file. This
+# section then pulls out the results for the current survey then formats it into
+# a dataframe for displaying the results. This is then done separately for each
+# survey vessel. This should be updated so that it loops through each survey
+# vessel, obtains the calibration info, then formats it for displaying in a
+# table
+
+# Source function for reading ECS files
+source(here("Code/extract_cal_ECS.R"))
+
+# Cycle through each vessel
+for (i in cal.vessels) {
+  
+  # Define directory with calibration files for current vessel
+  cal.dir <- paste(here("Data/Calibration"), i, sep = '/')
+  
+  # Get list of calibration files for that vessel
+  cal.files <- sort(list.files(cal.dir, pattern = ".xml", 
+                               full.names = TRUE))
+  
+  # Initialize data frames for storing results
+  cal.res   <- data.frame()
+  cal.info  <- data.frame()
+  cal.pings <- data.frame()
+  
+  # Cycle through each calibration file (frequency)
+  for (j in cal.files) {
+  
+    # Extract calibration info for that frequency
+    cal <- extract_cal(j)
+    
+    # Append to data frames
+    cal.res <- bind_rows(cal.res,   cal$cal.res)
+    cal.info <- bind_rows(cal.info,  cal$cal.info)
+    cal.pings <- bind_rows(cal.pings, cal$cal.pings)
+  }
+  
+  # create data frame of important echosounder parameters
+  cal.params <- cal.res %>% 
+    select(txdr_freq,  # Transducer frequency
+           txdr_type,  # Transducer model
+           txdr_sn,    # Transducer serial number
+           gpt_power,  # Transmit power
+           gpt_pd)     # Pulse duration
+
+  # Specify names for echosounder parameters 
+  names(cal.params) <- c("Frequency",
+                         "Model",
+                         "Serial Number",
+                         "Transmit Power ($p_\\mathrm{et}$)",
+                         "Pulse Duration ($\\tau$)")
+
+  # Now read calibration results from ECS file
+  cal.ECS <- list.files(cal.dir, pattern = ".ecs$", 
+                        full.names = TRUE) %>%
+    extract_cal_ECS()
+
+  # create data frame of beam model results
+  bm.res <- select(cal.ECS, 
+                   Frequency, 
+                   Gain, 
+                   Sa_correction, 
+                   Beamwidth_alongship, 
+                   Beamwidth_athwartship,
+                   OffsetAngle_alongship, 
+                   OffsetAngle_athwartship,
+                   TwoWayBeamAngle)
+  
+  # Specify number of significant digits for certain parameters
+  bm.res$Frequency <- formatC(bm.res$Frequency, format="d", digits=0)
+  bm.res$Gain <- formatC(bm.res$Gain, format="f", digits=2)
+  bm.res$Sa_correction <- formatC(bm.res$Sa_correction, format="f", digits=2)
+  bm.res$Beamwidth_alongship <- formatC(bm.res$Beamwidth_alongship, format="f", digits=2)
+  bm.res$Beamwidth_athwartship <- formatC(bm.res$Beamwidth_athwartship, format="f", digits=2)
+  bm.res$OffsetAngle_alongship <- formatC(bm.res$OffsetAngle_alongship, format="f", digits=2)
+  bm.res$OffsetAngle_athwartship <- formatC(bm.res$OffsetAngle_athwartship, format="f", digits=2)
+  bm.res$TwoWayBeamAngle <- formatC(bm.res$TwoWayBeamAngle, format="f", digits=2)
+
+  # Specify names for beam model results
+  names(bm.res) <- c("Frequency",
+                     "On-axis Gain ($G_0$)",
+                     "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                     "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                     "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                     "Angle Offset Along. ($\\alpha_{0}$)",
+                     "Angle Offset Athw. ($\\beta_{0}$)",
+                     "Equivalent Two-way Beam Angle ($\\Psi$)")
+  
+  # Sort data frames by frequency
+  param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
+  bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+
+  # Create column defining parameter units
+  param.units <- data.frame(Units = c(" ",                 # Model number
+                                      " ",                 # Serial number
+                                      "W",                 # Transmit power
+                                      "ms"))               # Pulse duration
+                                      
+  # Create column defining beam model units
+  bm.units <- data.frame(Units = c("dB re 1",              # Transducer gain
+                                   "dB re 1",              # Sa correction factor
+                                   "deg",                  # Alongship beamwidth
+                                   "deg",                  # Athwartship beamwidth
+                                   "deg",                  # Alongship offset angle
+                                   "deg",                  # Athwartship offset angle
+                                   "dB re 1 sr"))          # Equivalent two-way beam angle
+
+  # Add units column to parameter data frame
+  param.output <- bind_cols(param.output, param.units) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+
+  # Add units column to beam model results data frame
+  bm.output <- bind_cols(bm.output, bm.units) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+
+  # combine the parameters and results data frames
+  all.output <- rbind(param.output, bm.output) %>% 
+    rename(" " = "Frequency ($f$, kHz)")
+  
+  # Store in data frame specific to the current vessel
+  assign(paste("all.output.", i, sep = ""), all.output)
+
+  # save output to .Rdata and CSV
+  save(all.output,
+       file = here(paste("Output/cal_output_table_", i, ".Rdata", sep = '')))
+
+  write.csv(all.output,
+            file = here(paste("Output/cal_output_table_", i, ".csv", sep = '')),
+            quote = F, row.names = F)
+
+  # If saving figures, then plot and save calibration polar plots
+  if (save.figs) {
+  
+    # Format ping data for plotting
+    cal.pings <- cal.pings %>% 
+      mutate(cal_date = date(date_time)) %>% 
+      filter(between(cal_date,
+                     ymd(cal.plot.date) - days(cal.window),
+                     ymd(cal.plot.date) + days(cal.window))) %>% 
+      arrange(txdr_freq, ping_num)
+  
+    # Set axis limits based on range of ping angles
+    cal.lim.tmp <- round(max(max(cal.pings$along), max(cal.pings$athw))) 
+  
+    if (cal.lim.tmp %% 2) {
+      # If range is odd, add 1 to make axis ticks look nice
+      cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
+    } else {
+      cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
+    }
+  
+    # subset only outlier points
+    outliers <- filter(cal.pings, outlier == 1)
+  
+    cal.pings <- cal.pings %>% 
+      left_join(select(cal.res,txdr_freq,txdr_type,target_ts,
+                       txdr_gain,bm_txdr_gain,
+                       bm_alon_ba,bm_athw_ba,
+                       bm_alon_oa,bm_athw_oa)) %>% 
+      mutate(
+        txdr_type      = fct_reorder(txdr_type, txdr_freq),
+        TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
+        alpha          = along - bm_alon_oa,
+        beta           = athw - bm_athw_oa,
+        x              = (2*alpha) / bm_alon_ba,
+        y              = (2*beta) / bm_athw_ba,
+        B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
+        TS_c_new       = TS_u_new + B,
+        relTS_c        = TS_c_new - target_ts,
+        relTS_c_scaled = case_when(
+          relTS_c >= 1 ~ 1,
+          relTS_c <= -1 ~-1,
+          between(relTS_c,-1,1) ~ relTS_c))
+    
+    if (cal.scales == "fixed") {
+      # Plot beam-uncompensated target strength data #####
+      tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+        geom_point(aes(colour = TS_u)) + 
+        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
+                   shape = "+", size = 1, alpha = 0.7) +
+        facet_wrap(~txdr_type, scales = cal.scales) +
+        viridis::scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                             option = "magma") +
+        scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
+                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+        scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+        guides(size =  "none") + theme_bw() + 
+        theme(panel.spacing    = unit(1, "lines"),
+              strip.background = element_rect(fill = "white"),
+              strip.text.x     = element_text(face = "bold")) + 
+        coord_equal()
+      
+      # Plot beam-compensated target strength data #####
+      tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+        geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
+        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
+                   shape = "+", size = 4) +
+        facet_wrap(~txdr_type, scales = cal.scales) + 
+        scale_fill_distiller(name = expression(italic(TS)[rel]),
+                             type = "div", palette = "RdBu", limits = c(-1,1)) +
+        scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
+                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+        scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
+                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
+        theme_bw() + 
+        theme(panel.spacing = unit(1, "lines"),
+              strip.background = element_rect(fill = "white"),
+              strip.text.x = element_text(face = "bold")) +
+        coord_equal()
+      
+    } else {
+      # Plot beam-uncompensated target strength data #####
+      tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+        geom_point(aes(colour = TS_u)) + 
+        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
+                   shape = "+", size = 1, alpha = 0.7) +
+        facet_wrap(~txdr_type, scales = cal.scales) +
+        viridis::scale_colour_viridis(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
+                             option = "magma") +
+        scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+        scale_y_continuous('Alongship Beam Angle (deg)\n') +
+        guides(size =  "none") + theme_bw() + 
+        theme(panel.spacing    = unit(1, "lines"),
+              strip.background = element_rect(fill = "white"),
+              strip.text.x     = element_text(face = "bold")) 
+      
+      # Plot beam-compensated target strength data #####
+      tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+        geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
+        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
+                   shape = "+", size = 4) +
+        facet_wrap(~txdr_type, scales = cal.scales) + 
+        scale_fill_distiller(name = expression(italic(TS)[rel]),
+                             type = "div", palette = "RdBu", limits = c(-1,1)) +
+        scale_x_continuous('\nAthwartship Beam Angle (deg)') +
+        scale_y_continuous('Alongship Beam Angle (deg)\n') +
+        theme_bw() + 
+        theme(panel.spacing = unit(1, "lines"),
+              strip.background = element_rect(fill = "white"),
+              strip.text.x = element_text(face = "bold")) 
+    }
+    
+    # Define figure widths based on vessel so that plots are relatively square
+    fig.width <- switch(i,
+                        "RL" = 10,
+                        "LM" = 11.5,
+                        "LBC" = 7)
+    
+    # Save TS_c plot 
+    ggsave(tsu.scatter, filename = here(paste("Figs/fig_cal_TSu_scatter_", i, ".png", sep = '')),  
+           width = fig.width, height = 6)
+    
+    # Save TS_c plot 
+    ggsave(here(paste("Figs/fig_cal_TSrel_scatter_", i, ".png", sep = '')), tsc.scatter,
+           width = fig.width, height = 6)
+  }
+}
+```
+
+```{r process-cal-saildrone}
+
+# Create a column with beam model units
+bm.units.sd <- data.frame(Units = c("",                 # Echosounder serial #
+                                    "",                 # Transducer serial #
+                                    "dB re 1 sr",       # Equivalent two-way beam angle
+                                    "dB re 1",          # Gain
+                                    "dB re 1",          # Sa_correction
+                                    "deg",              # Alongship beamwidth
+                                    "deg",              # Athwartship beamwidth
+                                    "deg",              # Alongship offset angle
+                                    "deg",              # Athwartship offset angle
+                                    "dB"))              # RMS
+
+all.output.sd <- tibble::tribble(
+  ~" ", ~"1076 (38)", ~"1076 (200)", ~"1077 (38)", ~"1077 (200)",
+  "Echosounder SN", "266961-07", "266961-08", "268632-07", "268632-08",
+  "Transducer SN", "136", "136", "131", "131",
+  "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",                  "-12.9",   "-11.7",   "-12.4",   "-11.6",
+  "On-axis Gain ($G_0$)",                                        "19.18",   "19.45",   "18.87",   "19.00",
+  "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",  "0.08",    "0.08",    "0.02",    "0.09",
+  "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",            "17.3",    "19.4",    "18.2",    "20.1",
+  "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",              "17.0",    "20.2",    "18.4",    "19.9",
+  "Angle Offset Along. ($\\alpha_{0}$)",                         "0.1",     "0.5",     "0.3",     "0.2",
+  "Angle Offset Athw. ($\\beta_{0}$)",                           "-0.5",    "0.2",     "-0.6",    "-0.4",
+  "RMS",                                                         "0.27",    "0.46",    "0.32",    "0.41",
+) %>% 
+  bind_cols(bm.units.sd) %>% 
+  select(1, Units, everything())
+
+# save output to .Rdata and CSV
+save(all.output.sd,
+     file = here("Output/cal_output_table_Saildrone.Rdata"))
+
+write.csv(all.output.sd,
+          file = here("Output/cal_output_table_Saildrone.csv"), 
+          quote = F, row.names = F)
 ```
 
 #### Echosounder calibrations {#methods-echosounder-calibration}  
