@@ -15,7 +15,8 @@ clear; close all;
 vessels = {'RL' 'LM' 'LBC' 'SD\1076' 'SD\1077'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
-colors = 'rcgmm';
+% colors = 'rcgmm';
+colors = 'rygbb';
 
 % Define boundary extents of habitat data to download
 latBounds = [27 51];
