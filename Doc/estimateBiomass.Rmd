@@ -97,7 +97,7 @@ save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- T # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 
 ### Sometimes F
 do.imap           <- T # Create interactive Leaflet map
@@ -1625,7 +1625,7 @@ if (survey.name %in% c("2207RL")) {
   max.cluster.rl <- max(haul$cluster)
   max.haul.rl    <- max(haul$haul)
   
-  # Get Lasker data from  
+  # Get Lasker data from 2021, to replace purse seine catch from Lisa Marie  
   haul.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/haul_info.rds") %>% 
     # Remove hauls south of northernmost RL trawl from 2022
     filter(startLatDecimal >= 40.42) %>%
@@ -1633,11 +1633,19 @@ if (survey.name %in% c("2207RL")) {
            cluster = cluster + max.cluster.rl) %>% 
     filter(cluster <=50)
   
+  # Get Lasker data from 2019, to replace purse seine catch from Lisa Marie  
+  haul.2019 <- readRDS("C:/KLS/CODE/Github/estimATM/1907RL/Output/haul_info.rds") %>% 
+    # Remove hauls south of northernmost RL trawl from 2022
+    filter(startLatDecimal >= 40.42) %>%
+    mutate(haul = haul + max.haul.rl,
+           cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1 + max.cluster.rl) 
+  
   # Combine haul data
-  haul <- bind_rows(haul, haul.2021)
+  # haul <- bind_rows(haul, haul.2021)
+  haul <- bind_rows(haul, haul.2019)
   
   # ggplot(haul, aes(startLongDecimal, startLatDecimal, colour = cruise)) +
-  #   geom_text(aes(label = haul)) + 
+  #   geom_text(aes(label = cluster)) +
   #   coord_map() + facet_wrap(~cruise)
 }
 
@@ -1867,8 +1875,21 @@ if (survey.name %in% c("2207RL")) {
     left_join(select(haul, haul, cluster)) %>% 
     filter(haul %in% hauls.2022)
   
+    # Read and process catch data from Lasker in summer 2021
+  catch.2019 <- readRDS("C:/KLS/CODE/Github/estimATM/1907RL/Output/catch_info.rds") %>% 
+    # filter(ship == "RL") %>% 
+    select(-cluster) %>% 
+    mutate(
+      totalNum = (subSampleCount/subSampleWtkg)*totalWeight,
+      haul     = haul + max.haul.rl,
+      # cluster = cluster + max.cluster.rl,
+      key      = paste(haul, scientificName)) %>% 
+    left_join(select(haul, haul, cluster)) %>% 
+    filter(haul %in% hauls.2022)
+  
   # Combine catch data from each vessel
-  catch <- bind_rows(catch, catch.2021)
+  # catch <- bind_rows(catch, catch.2021)
+  catch <- bind_rows(catch, catch.2019)
 }
 
 # Save haul data
@@ -2519,8 +2540,18 @@ if (survey.name %in% c("2207RL")) {
     # left_join(select(haul, haul, cluster)) %>% 
     filter(haul %in% hauls.2022)
   
+    # Read specimen data from Lasker in 2021
+  lengths.2019 <- read_csv("C:/KLS/CODE/Github/estimATM/1907RL/Output/lengths_final.csv") %>% 
+    # select(-cluster) %>% 
+    mutate(
+      cruise = as.character(cruise),
+      haul    = haul + max.haul.rl) %>% 
+    # left_join(select(haul, haul, cluster)) %>% 
+    filter(haul %in% hauls.2022)
+  
   # Combine length data
-  lengths <- bind_rows(lengths, lengths.2021)
+  # lengths <- bind_rows(lengths, lengths.2021)
+  lengths <- bind_rows(lengths, lengths.2019)
 }
 
 # Get max TL for plotting L/W models
