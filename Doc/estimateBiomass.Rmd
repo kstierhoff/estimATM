@@ -3647,6 +3647,16 @@ write_csv(clf, file = here("Output/clf_ts_proportions.csv"))
 
 save(clf, file = here("Output/clf_ts_proportions.Rdata"))
 
+# In summer 2022, sardine proportions were adjusted based on catches from 2018-2021
+# and for clusters with sardine present, jack mackerel were assumed to make up the remaining proportion
+if (survey.name == "2207RL") {
+  # Read file adjusted by Juan
+  clf.adjusted <- read_csv(here("Output/clf_ts_proportions_JPZ.csv"))
+  
+  # Replace existing clf file
+  clf <- clf.adjusted
+}
+
 # Calculate haul length frequencies, for use with nearshore sampling
 source(here("Code/calculate_haul_length_frequency.R"))
 ```
@@ -3952,6 +3962,17 @@ for (i in unique(lengths$scientificName)) {
   ggsave(lf.plot.haul, 
          filename = paste0(here("Figs/fig_haul_length_frequency_"), i, ".png"),
          height = 7, width = 10)
+}
+
+# In summer 2022, the clf files for sardine and jack mackerel were adjusted N of Cape Mendocino
+  # Read adjusted files from 
+if (survey.name == "2207RL") {
+  cluster.final.sar.adj  <- read_csv(here("Output/cluster_length_frequency_Sardinops sagax_2207RL_JPZ.csv"))
+  cluster.final.jack.adj <- read_csv(here("Output/cluster_length_frequency_Trachurus symmetricus_2207RL_JPZ.csv"))
+  
+  # Replace cluster.final[[i]] for sardine and jack mackerel
+  cluster.final[["Sardinops sagax"]]       <- cluster.final.sar.adj
+  cluster.final[["Trachurus symmetricus"]] <- cluster.final.jack.adj
 }
 
 # Save results
