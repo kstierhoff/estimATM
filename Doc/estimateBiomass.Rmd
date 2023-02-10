@@ -106,7 +106,7 @@ overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- F # Process krill backscatter data
-process.cal       <- T # Process calibration results
+process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
@@ -3343,11 +3343,6 @@ First, total number from each haul is estimated from the subsample weight, subsa
 (ref:summarize-ts) A comparison of cross-sectional backscatter coefficient estimates per weight and individual. If done correctly, all points should fall along the 1-to-1 lines.
 
 ```{r summarize-ts,fig.cap='(ref:summarize-ts)'}
-## RESUME HERE
-if (survey.name == "2207RL") {
-  
-}
-
 # Calculate numeric abundance by species and haul
 n.summ.haul <- catch %>% 
   group_by(scientificName, cluster, haul) %>%
@@ -3362,7 +3357,7 @@ l.summ.haul <- lengths %>%
     sigmaindiv   = mean(sigma.ind),
     sigmawg      = sum(estimated.wg*sigma.wg)/sum(estimated.wg)) %>% 
   left_join(n.summ.haul) %>% 
-  filter(is.na(cluster))
+  filter(!is.na(cluster))
 
 # Summarise weights and sigmas by cluster
 l.summ.cluster <- l.summ.haul %>% 
@@ -3512,12 +3507,6 @@ clf <- cluster.mid %>%
   # Add other TS estimates to clf
   left_join(ts.sub.other,by  = c("cluster" = "cluster.other"))
 
-# Remove purse seine samples from the clf data frame; will be added from an 
-# external file later
-# if (survey.name == "2207RL") {
-#   clf <- filter(clf, sample.type == "Trawl")
-# }
-
 # Calculate total CPS number in each cluster
 catch.summ.num <- clf %>% 
   group_by(cluster) %>% 
@@ -3612,47 +3601,46 @@ clf$sigmawg.other[clf$prop.other  == 0]   <- 1
 
 # Add sample type and adjusted to clf, for combination with seine data and for
 # when species proportions must be adjusted (e.g., 2022, N of Cape Mendocino)
-clf <- clf %>% 
-  mutate(sample.type = "Trawl",
-         adjusted = as.logical(FALSE))
-
-# Add adjusted seine catches from LM in 2022 here
-if (survey.name == "2207RL") {
-  clf.lm.2022 <- read_csv(here("Data/Seine/lm_clusters_2022_adjusted.csv")) %>% 
-    # Remove duplicate Lasker clusters
-    # Remove LM and LBC clusters S of Cape Mendocino
-    filter(cluster > 32,
-           lat >= 40.42) %>% 
-    mutate(sample.type = "Purse seine",
-           adjusted = as.logical(adjusted)) 
-  
-  # Replace NA's with 0's
-  clf.lm.2022[is.na(clf.lm.2022)] <- 0
-  
-  
-  clf.lm.2022 <- clf.lm.2022 %>% 
-    ## Add prop and sigmas for "other" species
-    mutate(
-      prop.other = case_when(
-        prop.sar != 0 & adjusted == TRUE ~ 1 - prop.sar,
-        # prop.sar == 0 & adjusted == TRUE ~ 1,
-        TRUE ~ prop.other),
-      prop.other.wg = prop.other) %>% 
-    mutate(
-      sigmawg.other = case_when(
-        prop.other == 0 ~ 1,
-        TRUE ~ prop.other),
-      sigmaindiv.other = sigmawg.other) %>% 
-    select(-haul)
-  
-  # Combine clf files
-  clf <- bind_rows(clf, clf.lm.2022)
-  
-  # Plot replacement clusters, symbolized by sample type and whether or not adjusted
-  # ggplot(clf, aes(long, lat, colour = sample.type, fill = adjusted)) +
-  #   geom_point(shape = 21, alpha = 0.5) +
-  #   coord_map()
-}
+clf <- clf %>%
+  mutate(adjusted = as.logical(FALSE))
+# 
+# # Add adjusted seine catches from LM in 2022 here
+# if (survey.name == "2207RL") {
+#   clf.lm.2022 <- read_csv(here("Data/Seine/lm_clusters_2022_adjusted.csv")) %>% 
+#     # Remove duplicate Lasker clusters
+#     # Remove LM and LBC clusters S of Cape Mendocino
+#     filter(cluster > 32,
+#            lat >= 40.42) %>% 
+#     mutate(sample.type = "Purse seine",
+#            adjusted = as.logical(adjusted)) 
+#   
+#   # Replace NA's with 0's
+#   clf.lm.2022[is.na(clf.lm.2022)] <- 0
+#   
+#   
+#   clf.lm.2022 <- clf.lm.2022 %>% 
+#     ## Add prop and sigmas for "other" species
+#     mutate(
+#       prop.other = case_when(
+#         prop.sar != 0 & adjusted == TRUE ~ 1 - prop.sar,
+#         # prop.sar == 0 & adjusted == TRUE ~ 1,
+#         TRUE ~ prop.other),
+#       prop.other.wg = prop.other) %>% 
+#     mutate(
+#       sigmawg.other = case_when(
+#         prop.other == 0 ~ 1,
+#         TRUE ~ prop.other),
+#       sigmaindiv.other = sigmawg.other) %>% 
+#     select(-haul)
+#   
+#   # Combine clf files
+#   clf <- bind_rows(clf, clf.lm.2022)
+#   
+#   # Plot replacement clusters, symbolized by sample type and whether or not adjusted
+#   # ggplot(clf, aes(long, lat, colour = sample.type, fill = adjusted)) +
+#   #   geom_point(shape = 21, alpha = 0.5) +
+#   #   coord_map()
+# }
 
 # Save to file
 write_csv(clf, file = here("Output/clf_ts_proportions.csv"))
@@ -4084,6 +4072,8 @@ nasc <- nasc %>%
     mack.dens = cps.nasc*prop.mack / (4*pi*sigmawg.mack) / 1000,
     sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000,
     rher.dens = cps.nasc*prop.rher / (4*pi*sigmawg.rher) / 1000)
+
+# Add other.dens?
 
 # Format for plotting
 nasc.density <- nasc %>%
@@ -6230,7 +6220,7 @@ txPal    <- colorFactor(wpt.colors, wpt.types)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
 
-# Create color pallette for CTD casts
+# Create color palette for CTD casts
 ctdPal <- colorFactor(c("#FFA500", "#A020F0"), c("CTD", "UCTD"))
 
 # Select plot levels for backscatter data
