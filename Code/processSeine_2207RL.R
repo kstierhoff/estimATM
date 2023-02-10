@@ -211,6 +211,7 @@ if (!has_name(set.summ.wt, "Trachurus symmetricus")) {set.summ.wt$`Trachurus sym
 if (!has_name(set.summ.wt, "Clupea pallasii"))       {set.summ.wt$`Clupea pallasii`       <- 0}
 if (!has_name(set.summ.wt, "Etrumeus acuminatus"))   {set.summ.wt$`Etrumeus acuminatus`   <- 0}
 if (!has_name(set.summ.wt, "Atherinopsis californiensis")) {set.summ.wt$`Atherinopsis californiensis` <- 0}
+if (!has_name(set.summ.wt, "Other"))                 {set.summ.wt$`Other` <- 0}
 
 # Calculate total weight of all CPS species
 # set.summ.wt <- set.summ.wt %>%  
@@ -239,7 +240,8 @@ set.summ.wt <- set.summ.wt %>%
          "Sardine"    = "Sardinops sagax",
          "PacMack"    = "Scomber japonicus",
          "JackMack"   = "Trachurus symmetricus",
-         "RndHerring" = "Etrumeus acuminatus") %>% 
+         "RndHerring" = "Etrumeus acuminatus",
+         "Other"      = "Other") %>% 
   left_join(select(set.clusters, key.set, cluster, haul)) %>% 
   select(-vessel.name, -lat, -long, -AllCPS) %>%
   group_by(key.set, cluster, haul) %>% 
@@ -252,7 +254,7 @@ set.summ.wt <- set.summ.wt %>%
 set.pie <- set.summ.wt %>% 
   arrange(cluster) %>% 
   select(key.set, cluster, haul, vessel.name, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+         Jacksmelt, Other, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
   atm::project_df(to = 3310) %>% 
   mutate(
     sample.type = "Purse seine",
@@ -262,8 +264,9 @@ set.pie <- set.summ.wt %>%
                   'Sardine:', Sardine, 'kg<br/>',
                   'Jack Mackerel:', JackMack, 'kg<br/>',
                   'P. herring:', PacHerring, 'kg<br/>',
-                  'R. herring:', RndHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
+                  'R. herring:', RndHerring, 'kg<br/>',
+                  'Other:', Other, 'kg<br/>', 
                   'All CPS:', AllCPS, 'kg'))
 
 # Determine map bounds from set data
@@ -299,8 +302,7 @@ seine.summ <- set.summ.wt %>%
                    Latitude = lat, Longitude = long)) %>%
   select(Vessel, Set = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
          "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
-         "R. Herring" = RndHerring, 
-         Jacksmelt, "All CPS" = AllCPS) %>% 
+         "R. Herring" = RndHerring, "Other" = Other, Jacksmelt, "All CPS" = AllCPS) %>% 
   mutate(Date = format(Date, "%m/%d/%Y")) %>% 
   arrange(desc(Vessel), Set)
 
@@ -351,9 +353,9 @@ l.summ.set <- lengths.seine %>%
 
 # Create a data frame with abbreviations
 trawl.ts.names <- data.frame(
-  scientificName = c("Clupea pallasii","Engraulis mordax","Etrumeus acuminatus",
+  scientificName = c("Clupea pallasii","Engraulis mordax","Etrumeus acuminatus", "Other",
                      "Sardinops sagax","Scomber japonicus","Trachurus symmetricus"),
-  shortName      = c("her","anch","rher","sar",
+  shortName      = c("her","anch","rher","other","sar",
                      "mack","jack"))
 
 # Remove seine TS data
@@ -419,6 +421,10 @@ names(ts.sub.her.seine) <- paste(names(ts.sub.her.seine), "her", sep = ".")
 ts.sub.rher.seine <- filter(ts.summ.seine, scientificName == "Etrumeus acuminatus") %>% 
   select(-scientificName)
 names(ts.sub.rher.seine) <- paste(names(ts.sub.rher.seine), "rher", sep = ".") 
+# Subset "other" results
+ts.sub.other.seine <- filter(ts.summ.seine, scientificName == "Other") %>% 
+  select(-scientificName)
+names(ts.sub.other.seine) <- paste(names(ts.sub.other.seine), "other", sep = ".") 
 
 # Combine all TS estimates
 # Add sardine TS estimates to trawl clusters
@@ -434,7 +440,9 @@ clf.seine <- set.clusters %>%
   # Add herring TS estimates to clf
   left_join(ts.sub.her.seine, by  = c("cluster" = "cluster.her", "haul" = "haul.her")) %>%
   # Add round herring TS estimates to clf
-  left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher"))
+  left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher")) %>% 
+  # Add other TS estimates to clf
+  left_join(ts.sub.other.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher"))
 
 # if (nrow(ts.sub.rher.seine) > 0) {
 #   clf.seine <- clf.seine %>% 
@@ -451,7 +459,8 @@ clf.seine <- set.clusters %>%
 catch.summ.num.seine <- clf.seine %>% 
   group_by(cluster, haul) %>% 
   summarise(CPS.num = sum(num.sar, num.anch, num.mack, 
-                          num.jack, num.her, num.rher, na.rm = TRUE))
+                          num.jack, num.her, num.rher, num.other, 
+                          na.rm = TRUE))
 
 # Calculate total CPS weight in each cluster
 cluster.summ.wt.seine <- lengths.seine %>% 
@@ -475,14 +484,16 @@ ts.proportions.seine <- clf.seine %>%
                       num.her     * sigmaindiv.her  +
                       num.mack    * sigmaindiv.mack + 
                       num.jack    * sigmaindiv.jack +
-                      num.rher    * sigmaindiv.rher),
+                      num.rher    * sigmaindiv.rher + 
+                      num.other   * sigmaindiv.other),
     # Calculate the weighted weight of each species
     weighted.wg  = (meanwg.sar  * num.sar  * sigmawg.sar +
-                      meanwg.anch * num.anch * sigmawg.anch + 
-                      meanwg.her  * num.her  * sigmawg.her +
-                      meanwg.mack * num.mack * sigmawg.mack + 
-                      meanwg.jack * num.jack * sigmawg.jack +
-                      meanwg.rher * num.rher * sigmawg.rher),
+                      meanwg.anch  * num.anch  * sigmawg.anch + 
+                      meanwg.her   * num.her   * sigmawg.her +
+                      meanwg.mack  * num.mack  * sigmawg.mack + 
+                      meanwg.jack  * num.jack  * sigmawg.jack +
+                      meanwg.rher  * num.rher  * sigmawg.rher + 
+                      meanwg.other * num.other * signawg.other),
     # Calculate the proportion, by number and weight, for each species
     prop.sar     = (num.sar     * sigmaindiv.sar)  / weighted.num,
     prop.sar.wg  = (meanwg.sar  * sigmawg.sar  * num.sar) / weighted.wg,
@@ -495,7 +506,9 @@ ts.proportions.seine <- clf.seine %>%
     prop.her     = (num.her     * sigmaindiv.her)  / weighted.num,
     prop.her.wg  = (meanwg.her  * sigmawg.her  * num.her) / weighted.wg,
     prop.rher    = (num.rher    * sigmaindiv.rher)  / weighted.num,
-    prop.rher.wg = (meanwg.rher * sigmawg.rher  * num.rher) / weighted.wg) %>% 
+    prop.rher.wg = (meanwg.rher * sigmawg.rher  * num.rher) / weighted.wg,
+    prop.other   = (num.other   * sigmaindiv.other)  / weighted.num,
+    prop.other.wg = (meanwg.other * sigmawg.other  * num.other) / weighted.wg) %>% 
   replace(is.na(.), 0) 
 
 # Replace all NaNs with zeros
@@ -512,12 +525,13 @@ clf.seine <- clf.seine %>%
   mutate(sample.type = "Purse seine")
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
-clf.seine$sigmaindiv.anch[clf.seine$prop.anch == 0] <- 1
-clf.seine$sigmaindiv.her[clf.seine$prop.her   == 0] <- 1
-clf.seine$sigmaindiv.jack[clf.seine$prop.jack == 0] <- 1
-clf.seine$sigmaindiv.mack[clf.seine$prop.mack == 0] <- 1
-clf.seine$sigmaindiv.sar[clf.seine$prop.sar   == 0] <- 1
-clf.seine$sigmaindiv.rher[clf.seine$prop.rher == 0] <- 1
+clf.seine$sigmaindiv.anch[clf.seine$prop.anch == 0]   <- 1
+clf.seine$sigmaindiv.her[clf.seine$prop.her   == 0]   <- 1
+clf.seine$sigmaindiv.jack[clf.seine$prop.jack == 0]   <- 1
+clf.seine$sigmaindiv.mack[clf.seine$prop.mack == 0]   <- 1
+clf.seine$sigmaindiv.sar[clf.seine$prop.sar   == 0]   <- 1
+clf.seine$sigmaindiv.rher[clf.seine$prop.rher == 0]   <- 1
+clf.seine$sigmaindiv.other[clf.seine$prop.other == 0] <- 1
 
 clf.seine$sigmawg.anch[clf.seine$prop.anch    == 0] <- 1
 clf.seine$sigmawg.her[clf.seine$prop.her      == 0] <- 1
@@ -525,6 +539,7 @@ clf.seine$sigmawg.jack[clf.seine$prop.jack    == 0] <- 1
 clf.seine$sigmawg.mack[clf.seine$prop.mack    == 0] <- 1
 clf.seine$sigmawg.sar[clf.seine$prop.sar      == 0] <- 1
 clf.seine$sigmawg.rher[clf.seine$prop.rher    == 0] <- 1
+clf.seine$sigmawg.other[clf.seine$prop.other  == 0] <- 1
 
 # Save to file
 write_csv(clf.seine, file = here("Output/clf_ts_proportions_seine.csv"))
