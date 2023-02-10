@@ -588,22 +588,22 @@ stratify.manually.ns <- FALSE
 # Create a new data frame with each species, stratum, and vector containing transects
 # Using only sardine data N of Cape Mendocino
 strata.manual <- bind_rows(
-  data.frame(
-    scientificName = "Clupea pallasii",
-    stratum = 1,
-    transect = 54:65),
-  data.frame(
-    scientificName = "Clupea pallasii",
-    stratum = 2,
-    transect = 69:78),
-  data.frame(
-    scientificName = "Clupea pallasii",
-    stratum = 3,
-    transect = 82:89),
-  data.frame(
-    scientificName = "Clupea pallasii",
-    stratum = 4,
-    transect = 93:96),
+  # data.frame(
+  #   scientificName = "Clupea pallasii",
+  #   stratum = 1,
+  #   transect = 51:59),
+  # data.frame(
+  #   scientificName = "Clupea pallasii",
+  #   stratum = 2,
+  #   transect = 79:82),
+  # data.frame(
+  #   scientificName = "Clupea pallasii",
+  #   stratum = 3,
+  #   transect = 84:96),
+  # data.frame(
+  #   scientificName = "Clupea pallasii",
+  #   stratum = 4,
+  #   transect = 93:96),
   data.frame(
     scientificName = "Engraulis mordax",
     stratum = 1,
@@ -616,14 +616,14 @@ strata.manual <- bind_rows(
     scientificName = "Engraulis mordax",
     stratum = 3,
     transect = 25:40),
-  data.frame(
-    scientificName = "Engraulis mordax",
-    stratum = 4,
-    transect = 52:58),
-  data.frame(
-    scientificName = "Engraulis mordax",
-    stratum = 5,
-    transect = 72:89),
+  # data.frame(
+  #   scientificName = "Engraulis mordax",
+  #   stratum = 4,
+  #   transect = 66:73),
+  # data.frame(
+  #   scientificName = "Engraulis mordax",
+  #   stratum = 5,
+  #   transect = 80:92),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 1,
@@ -643,11 +643,11 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 5,
-    transect = 40:59),
+    transect = 40:54),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 6,
-    transect = 65:84),
+    transect = 57:92),
   data.frame(
     scientificName = "Scomber japonicus",
     stratum = 1,
@@ -660,14 +660,14 @@ strata.manual <- bind_rows(
     scientificName = "Scomber japonicus",
     stratum = 3,
     transect = 44:49),
-  data.frame(
-    scientificName = "Scomber japonicus",
-    stratum = 4,
-    transect = 57:70),
-  data.frame(
-    scientificName = "Scomber japonicus",
-    stratum = 5,
-    transect = 79:84),
+  # data.frame(
+  #   scientificName = "Scomber japonicus",
+  #   stratum = 4,
+  #   transect = 57:70),
+  # data.frame(
+  #   scientificName = "Scomber japonicus",
+  #   stratum = 5,
+  #   transect = 79:84),
   data.frame(
     scientificName = "Trachurus symmetricus",
     stratum = 1,
@@ -683,7 +683,11 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Trachurus symmetricus",
     stratum = 4,
-    transect = 34:94))
+    transect = 34:72),
+  data.frame(
+    scientificName = "Trachurus symmetricus",
+    stratum = 5,
+    transect = 75:82))
 
 # Using 2021 summer data N of Cape Mendocino
 # strata.manual <- bind_rows(

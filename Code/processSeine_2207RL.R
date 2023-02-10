@@ -442,7 +442,7 @@ clf.seine <- set.clusters %>%
   # Add round herring TS estimates to clf
   left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher")) %>% 
   # Add other TS estimates to clf
-  left_join(ts.sub.other.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher"))
+  left_join(ts.sub.other.seine, by = c("cluster" = "cluster.other", "haul" = "haul.other"))
 
 # if (nrow(ts.sub.rher.seine) > 0) {
 #   clf.seine <- clf.seine %>% 
@@ -493,7 +493,7 @@ ts.proportions.seine <- clf.seine %>%
                       meanwg.mack  * num.mack  * sigmawg.mack + 
                       meanwg.jack  * num.jack  * sigmawg.jack +
                       meanwg.rher  * num.rher  * sigmawg.rher + 
-                      meanwg.other * num.other * signawg.other),
+                      meanwg.other * num.other * sigmawg.other),
     # Calculate the proportion, by number and weight, for each species
     prop.sar     = (num.sar     * sigmaindiv.sar)  / weighted.num,
     prop.sar.wg  = (meanwg.sar  * sigmawg.sar  * num.sar) / weighted.wg,
@@ -663,4 +663,3 @@ save(haul.final.seine,
      file = here("Output/haul_length_frequency_all_seine.Rdata"))
 save(lf.final.seine,      
      file = here("Output/cluster_length_frequency_tables_seine.Rdata"))
-
