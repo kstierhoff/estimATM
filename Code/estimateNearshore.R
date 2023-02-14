@@ -76,26 +76,26 @@ if (process.nearshore) {
     source(here("Code", paste0("processSeine_", survey.name, ".R")))  
     
     if (use.seine.data) {
-      # Combine clf, hlf, and clf.seine
-      # clf <- filter(clf, sample.type == "Trawl")
+      # In 2207RL, seine data was included in the clf, so no need to combine with seine data
+      # Also, this correctly applies the "adjusted" proportions of sardine and jacks in that survey
+      if (survey.name == "2207RL") {
+        # Remove LM sets north of Cape Mendocino
+        clf.seine <- filter(clf.seine, lat <= 40.42)
+      }
+      
+      # Define variables if missing
+      if (!"sample.type" %in% names(clf)) clf$sample.type <- "Trawl"
+      if (!"sample.type" %in% names(hlf)) hlf$sample.type <- "Trawl"
+      if (!"cluster" %in% names(hlf)) hlf$cluster <- NA
+      
+      # Combine clf, hlf, and clf.seine 
       clf <- clf %>%
-        mutate(sample.type = "Trawl") %>% 
         bind_rows(clf.seine)
       
-      # hlf <- filter(hlf, sample.type == "Trawl")
       hlf <- hlf %>% 
         ungroup() %>% 
-        mutate(sample.type = "Trawl") %>% 
-        bind_rows(clf.seine)
-      
-      # hlf <- hlf %>% 
-      #   ungroup() %>% 
-      #   mutate(sample.type = "Trawl") %>% 
-      #   # project_df(to = 3310) %>%
-      #   bind_rows(clf.seine) %>% 
-      #   select(-cluster)
-      
-      # lf.final <- filter(lf.final, !cluster %in% lf.final.seine$cluster)
+        bind_rows(clf.seine)  
+    
       lf.final <- lf.final %>% 
         bind_rows(lf.final.seine)
       
@@ -282,8 +282,13 @@ if (save.figs) {
 }
 
 # Map trawl species proportions -------------------------------------------------------
-# Select and rename trawl data for pie charts
 if (use.seine.data) {
+  if (survey.name == "2207RL") {
+    # Remove LM data (which is uncorrected) from set.pie in 2022
+    set.pie <- filter(set.pie, vessel.name != "LM")
+  }
+  
+  # Combine pie chart data from trawls and seines
   cluster.pie <- bind_rows(cluster.pie, set.pie)
   
   haul.pie <- set.pie %>% 
@@ -381,13 +386,15 @@ if (save.figs) {
                                      nrow = 1, labels = c("a)", "b)"),
                                      align = "hv")
   
+  ggsave(nasc.trawl.haul.wt.ns,
+         filename = here("Figs/fig_nasc_trawl_haul_wt_ns.png"),
+         width = map.width*2, height = map.height)
+  
   ggsave(nasc.trawl.cluster.wt.ns,
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
   
-  ggsave(nasc.trawl.haul.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_haul_wt_ns.png"),
-         width = map.width*2, height = map.height)
+  
 }
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
@@ -437,12 +444,13 @@ nasc.prop.all.ns <- nasc.nearshore %>%
          `Sardinops sagax`       = cps.nasc*prop.sar,
          `Trachurus symmetricus` = cps.nasc*prop.jack,
          `Scomber japonicus`     = cps.nasc*prop.mack,
-         `Clupea pallasii`       = cps.nasc*prop.her) 
+         `Clupea pallasii`       = cps.nasc*prop.her,
+         `Etrumeus acuminatus`   = cps.nasc*prop.rher) 
 
 # Prepare nasc.prop.all for facet plotting
 nasc.prop.spp.ns <- nasc.prop.all.ns %>% 
   select(X, Y, `Engraulis mordax`, `Sardinops sagax`, `Trachurus symmetricus`,
-         `Scomber japonicus`, `Clupea pallasii`) %>% 
+         `Scomber japonicus`, `Clupea pallasii`, `Etrumeus acuminatus`) %>% 
   gather(scientificName, nasc, -X, -Y)
 
 if (save.figs) {
@@ -1711,7 +1719,8 @@ if (use.seine.data) {
       scientificName == "Sardinops sagax"  & lat >= stock.break.sar  ~ "Northern",
       scientificName == "Sardinops sagax"  & lat <  stock.break.sar  ~ "Southern",
       scientificName %in% c("Clupea pallasii","Scomber japonicus",
-                            "Trachurus symmetricus","Etrumeus acuminatus") ~ "All"))  
+                            "Trachurus symmetricus","Etrumeus acuminatus") ~ "All")) 
+  
 } else {
   pos.clusters.ns <- pos.clusters
 }
