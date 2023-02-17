@@ -31,7 +31,8 @@ lm.sets <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>%
          datetime = ymd_hms(paste(date, time), tz = "America/Los_Angeles"),
          vessel_name = "Lisa Marie",
          vessel.name = "LM",
-         key.set = paste(vessel.name, date, set)) %>% 
+         key.set = paste(vessel.name, date, set),
+         sample.type = "Purse seine") %>% 
   # Convert datetime to UTC
   mutate(datetime = with_tz(datetime, tzone = "UTC"))
 
@@ -41,22 +42,28 @@ lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
          datetime = ymd_hms(paste(date, time), tz = "America/Los_Angeles"),
          vessel_name = "Long Beach Carnage",
          vessel.name = "LBC",
-         key.set = paste(vessel.name, date, set)) %>% 
+         key.set = paste(vessel.name, date, set),
+         sample.type = "Purse seine") %>% 
   # Convert datetime to UTC
   mutate(datetime = with_tz(datetime, tzone = "UTC"))
 
 save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
 
-set.clusters <- select(lm.sets, key.set, date, datetime, vessel.name, lat, long) %>%
-  bind_rows(select(lbc.sets, key.set, date, datetime, vessel.name, lat, long)) %>%
-  filter(vessel.name %in% seine.vessels) %>%
+set.clusters <- select(lm.sets, key.set, date, datetime, vessel.name, lat, long, sample.type) %>%
+  bind_rows(select(lbc.sets, key.set, date, datetime, vessel.name, lat, long, sample.type)) %>%
+  filter(vessel.name %in% seine.vessels,
+         lat <= 40.42) %>% # Remove sets N of Cape Mendocino, but keep others
   # Use order of sets until Lasker data are available
   # mutate(cluster = as.numeric(as.factor(key.set)),
   #        haul    = as.numeric(as.factor(key.set))) %>%
   # Begin clustering after Lasker clusters; un-comment if processing after trawl clusters created
   mutate(cluster = max(cluster.mid$cluster) + as.numeric(as.factor(key.set)),
-         haul    = max(haul.mid$haul) + as.numeric(as.factor(key.set))) %>%
+         haul    = max(haul.mid$haul) + as.numeric(as.factor(key.set)),
+         sample.type = "Purse seine") %>%
   project_df(to = crs.proj)
+
+# Plot purse seine sets retained in the analysis
+# ggplot(set.clusters, aes(long, lat, colour = vessel.name)) + geom_point() + coord_map()
 
 save(lm.sets, lbc.sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
 
@@ -78,7 +85,9 @@ lm.catch <- read_csv(here("Data/Seine/lm_catch.csv")) %>%
            TRUE ~ NA_character_)) %>% 
   filter(!is.na(scientificName)) %>% 
   group_by(key.set, vessel.name, scientificName) %>% 
-  summarise(totalWeight = sum(weightkg))
+  summarise(totalWeight = sum(weightkg)) 
+  # Remove sets N of Cape Mendocino
+  # filter(key.set %in% unique(lm.sets$key.set))
 
 ## LBC
 lbc.catch <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
@@ -169,8 +178,8 @@ save(lm.lengths, lbc.lengths, file = here("Output/purse_seine_specimens.Rdata"))
 # After we receive LBC data
 lengths.ns <- bind_rows(lm.lengths, lbc.lengths)
 
-# ggplot(lengths.ns, aes(totalLength_mm, weightg, colour = vessel.name)) + 
-#   geom_point() + 
+# ggplot(lengths.ns, aes(totalLength_mm, weightg, colour = vessel.name)) +
+#   geom_point() +
 #   facet_wrap(~scientificName, scales = "free")
 
 saveRDS(lengths.ns, here("output/lw_data_nearshore.rds"))
@@ -248,13 +257,15 @@ set.summ.wt <- set.summ.wt %>%
   summarise_all(list(sum)) %>% 
   ungroup() %>% 
   mutate(AllCPS = rowSums(select(., -key.set, -cluster, -haul))) %>% 
-  right_join(select(set.clusters, key.set, vessel.name, datetime, long, lat)) %>%
-  replace(is.na(.), 0)
+  right_join(select(set.clusters, key.set, vessel.name, datetime, long, lat, sample.type)) %>%
+  replace(is.na(.), 0) %>% 
+  # Remove sets north of Cape Mendocino
+  filter(lat <= 40.42)
 
 set.pie <- set.summ.wt %>% 
   arrange(cluster) %>% 
   select(key.set, cluster, haul, vessel.name, long, lat, Anchovy, JackMack, 
-         Jacksmelt, Other, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+         Jacksmelt, Other, PacHerring, PacMack, RndHerring, Sardine, AllCPS, sample.type) %>% 
   atm::project_df(to = 3310) %>% 
   mutate(
     sample.type = "Purse seine",
@@ -270,8 +281,8 @@ set.pie <- set.summ.wt %>%
                   'All CPS:', AllCPS, 'kg'))
 
 # Determine map bounds from set data
-map.bounds.ns <- lbc.catch.summ.sf %>%
-  # bind_rows(lbc.catch.summ.sf) %>% 
+map.bounds.ns <- lm.catch.summ.sf %>%
+  bind_rows(lbc.catch.summ.sf) %>%
   st_transform(crs = 3310) %>%
   st_bbox()
 

@@ -15,21 +15,42 @@ if (process.nearshore) {
     } else {
       nasc.nearshore <- readRDS(nearshore.files[nn])
     }
-  }
+  }  
   
   # Remove vessels not to be included in the offshore biomass estimates
   nasc.nearshore <- nasc.nearshore %>% 
     filter(vessel.name %in% nasc.vessels.nearshore) %>%
     mutate(
       id            = seq_along(Interval),
-      transect      = str_replace(transect, "N", ""),
+      transect      = as.numeric(str_replace(transect, "N", "")),
       transect.name = paste(vessel.name, transect),
-      cps.nasc      = NASC.50,
       stratum       = 1,
       int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
                               nasc.summ.interval),
-                labels = FALSE, include.lowest = TRUE)) %>% 
-    mutate(transect = as.numeric(transect))
+                labels = FALSE, include.lowest = TRUE)) 
+  
+  # Plot data for 2022
+  # ggplot() + 
+  #   geom_point(data = nasc, aes(long, lat, colour = vessel.orig)) + 
+  #   geom_point(data = nasc.nearshore, aes(long, lat, fill = vessel.name), shape = 21) + 
+  #   geom_sf(data = bathy_20m_poly, fill = NA) +
+  #   coord_sf()
+  
+  # In 2022, LM sampled core transects between Cape Flattery and Bodega Bay spaced 20 nmi
+  # Transect numbers correspond to the core transect names, and will not be unique with other
+  # nearshore transects surveyed by LBC, so we must increment the transect numbers starting
+  # with the max. transect number from the LBC survey
+  # if (survey.name == "2207RL") {
+  #   max.tx.lbc <- 227 # Max transect sampled along the mainland coast (not incl. islands)
+  #   
+  #   # Extract LBC nasc
+  #   nasc.nearshore.lbc <- filter(nasc.nearshore, vessel.name == "LBC")
+  #   # Extract LM nasc and renumber transects
+  #   nasc.nearshore.lm <- filter(nasc.nearshore, vessel.name == "LM") %>% 
+  #     mutate(transect = as.numeric(as.factor(transect)) + max.tx.lbc)
+  #   # Combine nasc
+  #   nasc.nearshore <- bind_rows(nasc.nearshore.lbc, nasc.nearshore.lm)
+  # }
   
   # Combine nasc data for all NASC vessels
   if (merge.vessels["NS"]) {
@@ -78,15 +99,20 @@ if (process.nearshore) {
     if (use.seine.data) {
       # In 2207RL, seine data was included in the clf, so no need to combine with seine data
       # Also, this correctly applies the "adjusted" proportions of sardine and jacks in that survey
-      if (survey.name == "2207RL") {
-        # Remove LM sets north of Cape Mendocino
-        clf.seine <- filter(clf.seine, lat <= 40.42)
-      }
+      # if (survey.name == "2207RL") {
+      #   # Remove LM sets north of Cape Mendocino
+      #   clf.seine      <- filter(clf.seine, lat <= 40.42)
+      #   lf.final.seine <- filter(lf.final.seine, cluster %in% unique(clf.seine$cluster))
+      #   
+      #   # Remove LM sets north of Cape Mendocino, maybe
+      #   # set.pie   <- filter(set.pie, lat <= 40.42)
+      #   # set.zero   <- filter(set.pie, lat <= 40.42)
+      # }
       
       # Define variables if missing
       if (!"sample.type" %in% names(clf)) clf$sample.type <- "Trawl"
       if (!"sample.type" %in% names(hlf)) hlf$sample.type <- "Trawl"
-      if (!"cluster" %in% names(hlf)) hlf$cluster <- NA
+      if (!"cluster" %in% names(hlf)) hlf$cluster <- as.numeric(NA)
       
       # Combine clf, hlf, and clf.seine 
       clf <- clf %>%
@@ -102,6 +128,11 @@ if (process.nearshore) {
       # Combine super.clusters and super.clusters.ns
       super.clusters <- bind_rows(super.clusters, super.clusters.ns)
       super.hauls    <- bind_rows(super.hauls, super.clusters.ns)
+      
+      # ggplot() + 
+      #   geom_text(data = super.clusters, aes(long, lat, label = cluster, colour = sample.type)) +
+      #   geom_text(data = super.clusters.ns, aes(long, lat, label = cluster, colour = sample.type)) +
+      #   coord_map()
       
       # Save super clusters and hauls
       save(super.clusters, super.hauls,
@@ -165,6 +196,12 @@ if (process.nearshore) {
   # Add clusters and cluster distances to nasc
   nasc.nearshore <- nasc.nearshore %>% 
     bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance)) 
+  
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
+
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) +
+  #   geom_text(data = super.clusters, aes(long, lat, label = factor(cluster), colour = factor(cluster))) +
+  #   coord_map()
   
   # Save results of processing
   save(nasc.nearshore, file = here("Data/Backscatter/nasc_nearshore.Rdata"))
@@ -283,10 +320,10 @@ if (save.figs) {
 
 # Map trawl species proportions -------------------------------------------------------
 if (use.seine.data) {
-  if (survey.name == "2207RL") {
-    # Remove LM data (which is uncorrected) from set.pie in 2022
-    set.pie <- filter(set.pie, vessel.name != "LM")
-  }
+  # if (survey.name == "2207RL") {
+  #   # Remove LM data (which is uncorrected) from set.pie in 2022
+  #   set.pie <- filter(set.pie, vessel.name != "LM")
+  # }
   
   # Combine pie chart data from trawls and seines
   cluster.pie <- bind_rows(cluster.pie, set.pie)
@@ -294,14 +331,21 @@ if (use.seine.data) {
   haul.pie <- set.pie %>% 
     select(-cluster) %>% 
     bind_rows(haul.pie)
+  
+  # ggplot() + 
+  #   geom_text(data = cluster.pie, aes(long, lat, label = cluster, colour = factor(cluster))) + 
+  #   geom_text(data = set.pie, aes(long, lat, label = cluster, colour = factor(cluster))) + 
+  #   coord_map()
 }
 
+# Select only clusters assigned to nasc intervals
 cluster.pie.ns <- cluster.pie %>% 
   filter(cluster %in% unique(nasc.nearshore$cluster)) 
 
 cluster.pos.ns <- filter(cluster.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
+# Select only hauls assigned to nasc intervals
 haul.pie.ns <- haul.pie %>% 
   filter(haul %in% unique(nasc.nearshore$haul)) 
 
@@ -323,6 +367,10 @@ if (nrow(haul.pos.ns) > 0) {
 cluster.zero.ns <- filter(cluster.pie.ns, AllCPS == 0)
 haul.zero.ns    <- filter(haul.pie.ns, AllCPS == 0)
 
+## NOTE: These plots show proportion of catch by weight, NOT acoustic proportion
+## The acoustic proportions get plotted below
+## AFAIK, these figures are exploratory only, and do not appear in any reports
+## KLS 2023-02-16
 if (save.figs) {
   # Create trawl figure
   # Use clustered trawl data (clf)
@@ -331,11 +379,16 @@ if (save.figs) {
     geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
                size = 0.5, colour = "gray50", alpha = 0.5) +
     # Plot trawl pies
-    geom_scatterpie(data = cluster.pos.ns, 
+    geom_scatterpie(data = cluster.pos.ns,
                     aes(X, Y, group = cluster, r = pie.radius),
                     cols = c("Anchovy","JackMack","Jacksmelt",
                              "PacHerring","PacMack","Sardine"),
                     color = 'black', alpha = 0.8) +
+    # Configure pie outline colors
+    scale_colour_manual(name = "Sample type", 
+                        labels = c("Purse seine", "Trawl"),
+                        values = c(seine.color, trawl.color),
+                        guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
@@ -393,8 +446,6 @@ if (save.figs) {
   ggsave(nasc.trawl.cluster.wt.ns,
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
-  
-  
 }
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
@@ -1342,7 +1393,7 @@ nasc.stock.ns <- nasc.stock.ns %>%
 #   geom_sf() +
 #   facet_wrap(~scientificName) +
 #   theme_bw()
-# 
+
 # mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + 
 #   mapview(filter(transects.sf, Type == "Nearshore"))
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
@@ -2268,7 +2319,7 @@ if (save.figs) {
     acoustic.prop.indiv.ns <- clf %>%
       filter(cluster %in% unique(nasc.nearshore$cluster)) %>% 
       select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-             prop.mack, prop.sar, prop.rher) %>% 
+             prop.mack, prop.sar, prop.rher, sample.type) %>% 
       replace(. == 0, 0.0000001) %>% 
       # replace(is.na(.), 0) %>% 
       project_df(to = crs.proj)
@@ -2280,7 +2331,7 @@ if (save.figs) {
     acoustic.prop.indiv.ns <- hlf %>%
       filter(haul %in% unique(nasc.nearshore$haul)) %>% 
       select(haul, lat, long, prop.anch, prop.jack, prop.her,
-             prop.mack, prop.sar, prop.rher) %>% 
+             prop.mack, prop.sar, prop.rher, sample.type) %>% 
       replace(. == 0, 0.0000001) %>% 
       # replace(is.na(.), 0) %>% 
       project_df(to = crs.proj)
