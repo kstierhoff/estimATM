@@ -97,7 +97,7 @@ save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- T # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 
 ### Sometimes F
 do.imap           <- T # Create interactive Leaflet map
@@ -106,7 +106,7 @@ overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- F # Process krill backscatter data
-process.cal       <- T # Process calibration results
+process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
@@ -1582,7 +1582,8 @@ haul <- haul.all %>%
   filter(!trawlPerformance %in% trawl.performance) %>%
   filter(!haul %in% trawl.haul.exclude) %>%
   # Assign cluster based on yearday
-  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) 
+  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1,
+         sample.type = "Trawl") 
 
 if (survey.name %in% c("2107RL")) {
   # Get max haul and cluster for Lasker to increment Carranza data
@@ -1621,29 +1622,59 @@ if (survey.name %in% c("2107RL")) {
 }
 
 if (survey.name %in% c("2207RL")) {
-  # Get max haul and cluster for Lasker to increment 2021 Lasker data
+  # Get max haul and cluster for Lasker to increment Lisa Marie sets
   max.cluster.rl <- max(haul$cluster)
   max.haul.rl    <- max(haul$haul)
   
-  # Get Lasker data from  
-  haul.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/haul_info.rds") %>% 
-    # Remove hauls south of northernmost RL trawl from 2022
-    filter(startLatDecimal >= 40.42) %>%
-    mutate(haul = haul + max.haul.rl,
-           cluster = cluster + max.cluster.rl) %>% 
-    filter(cluster <=50)
+  ## Import LM set data and filter where it overlaps with Lasker
+  haul.lm.2022 <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>% 
+    mutate(date = mdy(date),
+           datetime = ymd_hms(paste(date, time), tz = "America/Los_Angeles"),
+           ship = "LM",
+           key.set = paste(ship, date, set),
+           haul    = seq_along(set) + max.haul.rl,
+           cluster = seq_along(set) + max.cluster.rl,
+           duration = as.difftime(45, units = "mins"),
+           trawlPerformance = "Good") %>% 
+    # Convert datetime to UTC
+    mutate(datetime = with_tz(datetime, tzone = "UTC")) %>% 
+    filter(lat >= 40.42) %>%
+    select(ship, haul, cluster, startLatDecimal = lat, startLongDecimal = long,
+           stopLatDecimal = lat, stopLongDecimal = long,
+           equilibriumTime = datetime, duration, trawlPerformance, key.set) %>% 
+    mutate(sample.type = "Purse seine")
   
+  # The two options that used catch data for 2019 or 2021 to represent catch N of Cape Mendocino
+  # was abandoned due to significant differences between results using those two data sets
+
+    # # Get Lasker data from 2021, to replace purse seine catch from Lisa Marie
+  # haul.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/haul_info.rds") %>%
+  #   # Remove hauls south of northernmost RL trawl from 2022
+  #   filter(startLatDecimal >= 40.42) %>%
+  #   mutate(haul = haul + max.haul.rl,
+  #          cluster = cluster + max.cluster.rl) %>%
+  #   filter(cluster <=50)
+  # 
+  # # Get Lasker data from 2019, to replace purse seine catch from Lisa Marie
+  # haul.2019 <- readRDS("C:/KLS/CODE/Github/estimATM/1907RL/Output/haul_info.rds") %>%
+  #   # Remove hauls south of northernmost RL trawl from 2022
+  #   filter(startLatDecimal >= 40.42) %>%
+  #   mutate(haul = haul + max.haul.rl,
+  #          cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1 + max.cluster.rl)
+
   # Combine haul data
-  haul <- bind_rows(haul, haul.2021)
-  
-  # ggplot(haul, aes(startLongDecimal, startLatDecimal, colour = cruise)) +
-  #   geom_text(aes(label = haul)) + 
-  #   coord_map() + facet_wrap(~cruise)
+  haul <- bind_rows(haul, select(haul.lm.2022, -key.set))
+  # haul <- bind_rows(haul, haul.2021)
+  # haul <- bind_rows(haul, haul.2019)
+
+  # ggplot(haul, aes(startLongDecimal, startLatDecimal, colour = ship)) +
+  #   geom_text(aes(label = cluster)) +
+  #   coord_map() 
 }
 
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
-  group_by(cluster, haul) %>% 
+  group_by(cluster, haul, sample.type) %>% 
   summarise(
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
     long = mean(c(startLongDecimal, stopLongDecimal)))
@@ -1665,10 +1696,11 @@ haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal)
 
 # Find midpoint of each haul cluster as the average of haul midpoints
 cluster.mid <- haul.mid %>% 
-  group_by(cluster) %>% 
+  group_by(cluster, sample.type) %>% 
   summarise(
     lat  = mean(lat),
     long = mean(long)) %>% 
+  ungroup() %>% 
   project_df(to = crs.proj)
 
 # Convert to sf for plotting
@@ -1709,7 +1741,7 @@ Trawl haul information is summarized by cluster. Those clusters where the differ
 ```{r check-trawl-clusters}
 # Summarize trawl clusters
 cluster.check <- haul %>% 
-  group_by(cluster) %>% 
+  group_by(cluster, sample.type) %>% 
   summarise(
     nHauls         = length(cluster),
     firstHaul      = min(haul),
@@ -1720,7 +1752,8 @@ cluster.check <- haul %>%
                                     firstHaulStart, 
                                     units = 'hours'), 1)) %>% 
   mutate(firstHaulStart = format(firstHaulStart,"%m/%d/%Y %H:%M"),
-         lastHaulEnd    = format(lastHaulEnd,"%m/%d/%Y %H:%M"))
+         lastHaulEnd    = format(lastHaulEnd,"%m/%d/%Y %H:%M")) %>% 
+  replace_na(list(duration = as.difftime(13, units = "hours")))
 
 # Print cluster check table
 cluster.check %>% 
@@ -1757,8 +1790,8 @@ if (save.figs) {
     # Plot cluster midpoint
     geom_point(data = cluster.mid, aes(X, Y), colour = "green", shape = 21) +
     geom_shadowtext(
-      data = cluster.mid, aes(X, Y, label = cluster),
-      colour = "black", bg.colour = "white", size = 2) +
+      data = cluster.mid, aes(X, Y, label = cluster, colour = sample.type),
+      bg.colour = "white", size = 2) +
     # Plot panel label
     ggtitle("Trawl clusters") +
     coord_sf(crs = crs.proj, 
@@ -1785,7 +1818,8 @@ catch <- catch.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
   inner_join(select(haul, haul, cluster)) %>% 
-  mutate(key = paste(haul, scientificName))
+  mutate(key = paste(haul, scientificName),
+         sample.type = "Trawl")
 
 if (survey.name %in% c("2107RL")) {
   # Read and process catch data from Carranza
@@ -1853,22 +1887,59 @@ if (survey.name %in% c("2107RL")) {
 }
 
 if (survey.name %in% c("2207RL")) {
-  # Get 2022 hauls to filter 2021 catch
-  hauls.2022 <- haul$haul
+  ## Import LM catch data and merge with set data
+  catch.lm.2022 <- read_csv(here("Data/Seine/lm_catch.csv")) %>% 
+    mutate(date = mdy(date),
+           ship = "LM",
+           key.set = paste(ship, date, set),
+           scientificName = case_when(
+             species_name == "Pacific Herring" ~ "Clupea pallasii",
+             species_name == "Pacific Sardine" ~ "Sardinops sagax",
+             species_name == "Chub Mackerel" ~ "Scomber japonicus",
+             species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
+             species_name == "Northern Anchovy" ~ "Engraulis mordax",
+             species_name == "Jacksmelt" ~ "Atherinopsis californiensis",
+             species_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
+             TRUE ~ NA_character_)) %>% 
+    filter(!is.na(scientificName)) %>% 
+    group_by(key.set, ship, scientificName) %>% 
+    summarise(totalWeight = sum(weightkg),
+              totalNum = sum(count)) %>% 
+    # Compute missing variables from catch table
+    mutate(subSampleWtkg = totalWeight,
+           subSampleCount = totalNum) %>% 
+    left_join(select(spp.codes, scientificName, commonName)) %>% 
+    left_join(select(haul.lm.2022, key.set, haul, cluster, sample.type)) %>% 
+    # Remove catch S of Cape Mendocino
+    filter(!is.na(haul), !is.na(cluster))
   
-  # Read and process catch data from Lasker in summer 2021
-  catch.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/catch_info.rds") %>% 
-    # filter(ship == "RL") %>% 
-    select(-cluster) %>% 
-    mutate(
-      haul    = haul + max.haul.rl,
-      # cluster = cluster + max.cluster.rl,
-      key     = paste(haul, scientificName)) %>% 
-    left_join(select(haul, haul, cluster)) %>% 
-    filter(haul %in% hauls.2022)
-  
+  # # Read and process catch data from Lasker in summer 2021
+  # catch.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/catch_info.rds") %>%
+  #   # filter(ship == "RL") %>%
+  #   select(-cluster) %>%
+  #   mutate(
+  #     haul    = haul + max.haul.rl,
+  #     # cluster = cluster + max.cluster.rl,
+  #     key     = paste(haul, scientificName)) %>%
+  #   left_join(select(haul, haul, cluster)) %>%
+  #   filter(haul %in% hauls.2022)
+  # 
+  #   # Read and process catch data from Lasker in summer 2021
+  # catch.2019 <- readRDS("C:/KLS/CODE/Github/estimATM/1907RL/Output/catch_info.rds") %>%
+  #   # filter(ship == "RL") %>%
+  #   select(-cluster) %>%
+  #   mutate(
+  #     totalNum = (subSampleCount/subSampleWtkg)*totalWeight,
+  #     haul     = haul + max.haul.rl,
+  #     # cluster = cluster + max.cluster.rl,
+  #     key      = paste(haul, scientificName)) %>%
+  #   left_join(select(haul, haul, cluster)) %>%
+  #   filter(haul %in% hauls.2022)
+
   # Combine catch data from each vessel
-  catch <- bind_rows(catch, catch.2021)
+  catch <- bind_rows(catch, catch.lm.2022)
+  # catch <- bind_rows(catch, catch.2021)
+  # catch <- bind_rows(catch, catch.2019)
 }
 
 # Save haul data
@@ -1876,7 +1947,7 @@ saveRDS(catch, file = here("Output/catch_info.rds"))
 
 if (nrow(catch) > 0) {
   haul.summ.wt <- catch %>%
-    select(haul, cluster, scientificName, totalWeight) %>%
+    select(haul, cluster, sample.type, scientificName, totalWeight) %>%
     tidyr::spread(scientificName, totalWeight)
   
   # Add species with zero total weight
@@ -1887,11 +1958,12 @@ if (nrow(catch) > 0) {
   if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
   if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
   if (!has_name(haul.summ.wt, "Etrumeus acuminatus"))   {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+  if (!has_name(haul.summ.wt, "Other"))                 {haul.summ.wt$`Other` <- 0}
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>%  
     replace(is.na(.), 0) %>% 
-    mutate(AllCPS = rowSums(select(., -haul, -cluster))) %>%
+    mutate(AllCPS = rowSums(select(., -haul, -cluster, -sample.type))) %>%
     # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
     rename("Jacksmelt"  = "Atherinopsis californiensis",
            "PacHerring" = "Clupea pallasii",
@@ -1899,11 +1971,12 @@ if (nrow(catch) > 0) {
            "Sardine"    = "Sardinops sagax",
            "PacMack"    = "Scomber japonicus",
            "JackMack"   = "Trachurus symmetricus",
-           "RndHerring" = "Etrumeus acuminatus") 
+           "RndHerring" = "Etrumeus acuminatus",
+           "Other"      = "Other") 
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
-    select(-haul, -AllCPS) %>% 
+    select(-haul, -AllCPS, -sample.type) %>% 
     group_by(cluster) %>% 
     summarise_all(list(sum)) %>% 
     mutate(AllCPS = rowSums(select(., -cluster))) %>% 
@@ -1926,6 +1999,7 @@ if (nrow(catch) > 0) {
                               "PacMack"    = rep(0, nrow(haul)),
                               "JackMack"   = rep(0, nrow(haul)),
                               "RndHerring" = rep(0, nrow(haul)),
+                              "Other"      = rep(0, nrow(haul)),  
                               "AllCPS"     = rep(0, nrow(haul)))) %>% 
     right_join(haul.mid)
   
@@ -1943,7 +2017,8 @@ if (nrow(catch) > 0) {
 # Select and rename trawl data for pie charts
 haul.pie <- haul.summ.wt %>% 
   select(haul, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+         Jacksmelt, Other, PacHerring, PacMack, 
+         RndHerring, Sardine, AllCPS, sample.type) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   arrange(haul) %>% 
@@ -1957,11 +2032,13 @@ haul.pie <- haul.summ.wt %>%
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
                   'R. herring:', RndHerring, 'kg<br/>',
+                  'Other:', Other, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 cluster.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+         Jacksmelt, Other, PacHerring, PacMack, 
+         RndHerring, Sardine, AllCPS, sample.type) %>% 
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   project_df(to = crs.proj) %>% 
@@ -1974,6 +2051,7 @@ cluster.pie <- cluster.summ.wt %>%
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
                   'R. herring:', RndHerring, 'kg<br/>',
+                  'Other:', Other, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 # Filter for empty trawls
@@ -2023,6 +2101,7 @@ haul.paths <- haul.paths %>%
                      'P. herring:', PacHerring, 'kg<br/>',
                      'P. mackerel:', PacMack, 'kg<br/>',
                      'R. herring:', RndHerring, 'kg<br/>',
+                     'Other:', Other, 'kg<br/>',
                      'All CPS:', AllCPS, 'kg')) 
 
 # Select positive clusters
@@ -2171,7 +2250,7 @@ if (save.figs) {
     geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) + 
     # Plot NASC data
     geom_path(data = nasc.plot, aes(X, Y, group = transect), 
-              size = 0.5, alpha = 0.75) +
+              linewidth = 0.5, alpha = 0.75) +
     # Plot acoustic transect labels
     geom_shadowtext(data = tx.labels, aes(X, Y, label = transect.name, angle = brg), 
                     size = 1, hjust = 1.5, fontface = 'bold.italic', 
@@ -2265,8 +2344,8 @@ if (save.figs) {
                     colour = 'gray20', bg.colour = "white", size = 2) +
     # Plot positive trawl cluster midpoints
     geom_shadowtext(data = filter(cluster.mid, cluster %in% super.clusters$cluster), 
-                    aes(X, Y, label = cluster), 
-                    size = 2, colour = "blue", bg.colour = "white", fontface = "bold") +
+                    aes(X, Y, label = cluster, colour = sample.type), 
+                    size = 2, bg.colour = "white", fontface = "bold") +
     # Plot panel label
     coord_sf(crs = crs.proj, 
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
@@ -2510,17 +2589,82 @@ if (survey.name %in% c("2107RL")) {
 }
 
 if (survey.name %in% c("2207RL")) {
-  # Read specimen data from Lasker in 2021
-  lengths.2021 <- read_csv("C:/KLS/CODE/Github/estimATM/2107RL/Output/lengths_final.csv") %>% 
-    # select(-cluster) %>% 
+  # Read specimen data from Lisa Marie in 2022
+  ## Code borrowed from Code/processSeine_2207RL.r; same as for nearshore sampling
+  lengths.lm.2022 <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>% 
+    mutate(date = mdy(date),
+           ship = "LM",
+           key.set = paste(ship, date, set),
+           label = paste("Date:", date, "Set:", set, "Fish num:", fish_number),
+           scientificName = case_when(
+             species_name == "Pacific Herring" ~ "Clupea pallasii",
+             species_name == "Pacific Sardine" ~ "Sardinops sagax",
+             species_name == "Chub Mackerel" ~ "Scomber japonicus",
+             species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
+             species_name == "Northern Anchovy" ~ "Engraulis mordax",
+             species_name == "Jacksmelt" ~ "Atherinopsis californiensis",
+             species_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
+             TRUE ~ NA_character_),
+           missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ FALSE),
+           missing.length = case_when(is.na(fish_length) ~ T, TRUE ~ FALSE),
+           sex = case_when(
+             sex_name == "Not Sexed" ~ "unknown",
+             TRUE ~ tolower(sex_name))) %>% 
     mutate(
-      cruise = as.character(cruise),
-      haul    = haul + max.haul.rl) %>% 
-    # left_join(select(haul, haul, cluster)) %>% 
-    filter(haul %in% hauls.2022)
+      forkLength_mm = case_when(
+        length_type == "Fork length" ~ fish_length,
+        TRUE ~ NA_real_),
+      standardLength_mm = case_when(
+        length_type == "Standard length" ~ fish_length,
+        TRUE ~ NA_real_)) %>% 
+    filter(scientificName %in% cps.spp, !is.na(set)) %>% 
+    mutate(
+      totalLength_mm = case_when(
+        scientificName == "Clupea pallasii" ~ 
+          convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+        scientificName == "Engraulis mordax" ~ 
+          convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+        scientificName == "Sardinops sagax" ~ 
+          convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+        scientificName == "Scomber japonicus" ~ 
+          convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+        scientificName == "Trachurus symmetricus" ~ 
+          convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"))) %>% 
+    mutate(
+      weightg = case_when(
+        is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
+        TRUE  ~ weightg),
+      totalLength_mm = case_when(
+        is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
+        TRUE ~ totalLength_mm),
+      K = round((weightg/totalLength_mm*10^3)*100)) %>% 
+    left_join(select(haul.lm.2022, key.set, haul, cluster)) %>% 
+    filter(!is.na(haul)) %>% 
+    select(ship, haul, scientificName, standardLength_mm, 
+           forkLength_mm, totalLength_mm, weightg, missing.length, sex, K)
   
+  # # Read specimen data from Lasker in 2021
+  # lengths.2021 <- read_csv("C:/KLS/CODE/Github/estimATM/2107RL/Output/lengths_final.csv") %>%
+  #   # select(-cluster) %>%
+  #   mutate(
+  #     cruise = as.character(cruise),
+  #     haul    = haul + max.haul.rl) %>%
+  #   # left_join(select(haul, haul, cluster)) %>%
+  #   filter(haul %in% hauls.2022)
+  # 
+  #   # Read specimen data from Lasker in 2021
+  # lengths.2019 <- read_csv("C:/KLS/CODE/Github/estimATM/1907RL/Output/lengths_final.csv") %>%
+  #   # select(-cluster) %>%
+  #   mutate(
+  #     cruise = as.character(cruise),
+  #     haul    = haul + max.haul.rl) %>%
+  #   # left_join(select(haul, haul, cluster)) %>%
+  #   filter(haul %in% hauls.2022)
+
   # Combine length data
-  lengths <- bind_rows(lengths, lengths.2021)
+  lengths <- bind_rows(lengths, lengths.lm.2022)
+  # lengths <- bind_rows(lengths, lengths.2021)
+  # lengths <- bind_rows(lengths, lengths.2019)
 }
 
 # Get max TL for plotting L/W models
@@ -3202,21 +3346,22 @@ First, total number from each haul is estimated from the subsample weight, subsa
 # Calculate numeric abundance by species and haul
 n.summ.haul <- catch %>% 
   group_by(scientificName, cluster, haul) %>%
-  filter(netSampleType == 'codend') %>% 
+  filter(netSampleType %in% c('codend', NA)) %>% 
   summarise(num = totalWeight/(subSampleWtkg/subSampleCount))
 
 # Summarise weights and sigmas by haul
 l.summ.haul <- lengths %>% 
-  group_by(scientificName,cluster,haul) %>% 
+  group_by(scientificName, cluster, haul) %>% 
   summarise(
     meanwg       = mean(estimated.wg),
     sigmaindiv   = mean(sigma.ind),
     sigmawg      = sum(estimated.wg*sigma.wg)/sum(estimated.wg)) %>% 
-  left_join(n.summ.haul)
+  left_join(n.summ.haul) %>% 
+  filter(!is.na(cluster))
 
 # Summarise weights and sigmas by cluster
 l.summ.cluster <- l.summ.haul %>% 
-  group_by(scientificName,cluster) %>% 
+  group_by(scientificName, cluster) %>% 
   summarise(
     num.tot    = sum(num),
     meanwg.c   = sum(meanwg*num)/sum(num),
@@ -3333,6 +3478,10 @@ names(ts.sub.her) <- paste(names(ts.sub.her), "her", sep = ".")
 ts.sub.rher <- filter(ts.summ, scientificName == "Etrumeus acuminatus") %>% 
   select(-scientificName)
 names(ts.sub.rher) <- paste(names(ts.sub.rher), "rher", sep = ".") 
+# Subset "other" results
+ts.sub.other <- filter(ts.summ, scientificName == "Other") %>% 
+  select(-scientificName)
+names(ts.sub.other) <- paste(names(ts.sub.other), "other", sep = ".") 
 ```  
 
 # Create final files for biomass estimation  
@@ -3354,13 +3503,15 @@ clf <- cluster.mid %>%
   # Add P. herring TS estimates to clf
   left_join(ts.sub.her,by  = c("cluster" = "cluster.her")) %>% 
   # Add round herring TS estimates to clf
-  left_join(ts.sub.rher,by  = c("cluster" = "cluster.rher"))
+  left_join(ts.sub.rher,by  = c("cluster" = "cluster.rher")) %>% 
+  # Add other TS estimates to clf
+  left_join(ts.sub.other,by  = c("cluster" = "cluster.other"))
 
 # Calculate total CPS number in each cluster
 catch.summ.num <- clf %>% 
   group_by(cluster) %>% 
-  summarise(CPS.num = sum(num.sar, num.anch, num.mack, 
-                          num.jack, num.her, num.rher, na.rm = TRUE))
+  summarise(CPS.num = sum(num.sar, num.anch, num.mack, num.jack, 
+                          num.her, num.rher, num.other, na.rm = TRUE))
 
 # Calculate total CPS weight in each cluster
 cluster.summ.wt <- catch %>% 
@@ -3372,15 +3523,14 @@ cluster.summ.wt <- catch %>%
 clf[is.na(clf)] <- 0
 
 # Save to file
-write.csv(clf, file = here("Output/clf_cluster_summary.csv"), 
-          quote = FALSE, row.names = FALSE)
+write_csv(clf, file = here("Output/clf_cluster_summary.csv"))
 ```  
 
 ## Calculate acoustic proportions  
 
 The acoustic proportion, by number, of each species in each trawl cluster is computed as the product of the number of fish and it's sigma divided by the weighted average number of all species present.
 
-The acoustic proportion, by weight, of each species in each trawl cluster is computed similarly, but with a nuance. TS per weight has embeded the length-weight relationship of each species, meaning that the cluster weight of a given species will not be the actual measured weight, but instead the product of the number of each species and their expected mean weight.
+The acoustic proportion, by weight, of each species in each trawl cluster is computed similarly, but with a nuance. TS per weight has embedded the length-weight relationship of each species, meaning that the cluster weight of a given species will not be the actual measured weight, but instead the product of the number of each species and their expected mean weight.
 
 ```{r calculate-acoustic-proportions}
 # Calculate species proportion (weighted average, by number and weight) in each trawl cluster  
@@ -3393,14 +3543,16 @@ ts.proportions <- clf %>%
                       num.her     * sigmaindiv.her  +
                       num.mack    * sigmaindiv.mack + 
                       num.jack    * sigmaindiv.jack + 
-                      num.rher    * sigmaindiv.rher),
+                      num.rher    * sigmaindiv.rher + 
+                      num.other   * sigmaindiv.other),
     # Calculate the weighted weight of each species
     weighted.wg  = (meanwg.sar  * num.sar  * sigmawg.sar +
                       meanwg.anch * num.anch * sigmawg.anch + 
                       meanwg.her  * num.her  * sigmawg.her +
                       meanwg.mack * num.mack * sigmawg.mack + 
                       meanwg.jack * num.jack * sigmawg.jack + 
-                      meanwg.rher * num.rher * sigmawg.rher),
+                      meanwg.rher * num.rher * sigmawg.rher + 
+                      meanwg.other* num.other* sigmawg.other),
     # Calculate the proportion, by number and weight, for each species
     prop.sar     = (num.sar     * sigmaindiv.sar)  / weighted.num,
     prop.sar.wg  = (meanwg.sar  * sigmawg.sar  * num.sar) / weighted.wg,
@@ -3413,15 +3565,16 @@ ts.proportions <- clf %>%
     prop.her     = (num.her     * sigmaindiv.her)  / weighted.num,
     prop.her.wg  = (meanwg.her  * sigmawg.her  * num.her) / weighted.wg,
     prop.rher    = (num.rher    * sigmaindiv.rher)  / weighted.num,
-    prop.rher.wg = (meanwg.rher * sigmawg.rher  * num.rher) / weighted.wg) %>% 
+    prop.rher.wg = (meanwg.rher * sigmawg.rher  * num.rher) / weighted.wg,
+    prop.other   = (num.other   * sigmaindiv.other)  / weighted.num,
+    prop.other.wg= (meanwg.other* sigmawg.other  * num.other) / weighted.wg) %>% 
   replace(is.na(.), 0) 
 
 # Replace all NaNs with zeros
 ts.proportions[atm:::is.nan.df(ts.proportions)] <- NA
 
 # Save to file
-write.csv(ts.proportions, file = here("Output/ts_proportions_raw.csv"), 
-          row.names = FALSE, quote = FALSE)
+write_csv(ts.proportions, file = here("Output/ts_proportions_raw.csv"))
 
 # Add cluster weights, numbers, and TS proportions
 clf <- clf %>% 
@@ -3430,25 +3583,79 @@ clf <- clf %>%
   left_join(ts.proportions,  by = 'cluster')
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
-clf$sigmaindiv.anch[clf$prop.anch == 0] <- 1
-clf$sigmaindiv.her[clf$prop.her   == 0] <- 1
-clf$sigmaindiv.jack[clf$prop.jack == 0] <- 1
-clf$sigmaindiv.mack[clf$prop.mack == 0] <- 1
-clf$sigmaindiv.sar[clf$prop.sar   == 0] <- 1
-clf$sigmaindiv.rher[clf$prop.rher == 0] <- 1
+clf$sigmaindiv.anch[clf$prop.anch == 0]   <- 1
+clf$sigmaindiv.her[clf$prop.her   == 0]   <- 1
+clf$sigmaindiv.jack[clf$prop.jack == 0]   <- 1
+clf$sigmaindiv.mack[clf$prop.mack == 0]   <- 1
+clf$sigmaindiv.sar[clf$prop.sar   == 0]   <- 1
+clf$sigmaindiv.rher[clf$prop.rher == 0]   <- 1
+clf$sigmaindiv.other[clf$prop.other == 0] <- 1
 
-clf$sigmawg.anch[clf$prop.anch    == 0] <- 1
-clf$sigmawg.her[clf$prop.her      == 0] <- 1
-clf$sigmawg.jack[clf$prop.jack    == 0] <- 1
-clf$sigmawg.mack[clf$prop.mack    == 0] <- 1
-clf$sigmawg.sar[clf$prop.sar      == 0] <- 1
-clf$sigmawg.rher[clf$prop.rher    == 0] <- 1
+clf$sigmawg.anch[clf$prop.anch    == 0]   <- 1
+clf$sigmawg.her[clf$prop.her      == 0]   <- 1
+clf$sigmawg.jack[clf$prop.jack    == 0]   <- 1
+clf$sigmawg.mack[clf$prop.mack    == 0]   <- 1
+clf$sigmawg.sar[clf$prop.sar      == 0]   <- 1
+clf$sigmawg.rher[clf$prop.rher    == 0]   <- 1
+clf$sigmawg.other[clf$prop.other  == 0]   <- 1
+
+# Add sample type and adjusted to clf, for combination with seine data and for
+# when species proportions must be adjusted (e.g., 2022, N of Cape Mendocino)
+clf <- clf %>%
+  mutate(adjusted = as.logical(FALSE))
+# 
+# # Add adjusted seine catches from LM in 2022 here
+# if (survey.name == "2207RL") {
+#   clf.lm.2022 <- read_csv(here("Data/Seine/lm_clusters_2022_adjusted.csv")) %>% 
+#     # Remove duplicate Lasker clusters
+#     # Remove LM and LBC clusters S of Cape Mendocino
+#     filter(cluster > 32,
+#            lat >= 40.42) %>% 
+#     mutate(sample.type = "Purse seine",
+#            adjusted = as.logical(adjusted)) 
+#   
+#   # Replace NA's with 0's
+#   clf.lm.2022[is.na(clf.lm.2022)] <- 0
+#   
+#   
+#   clf.lm.2022 <- clf.lm.2022 %>% 
+#     ## Add prop and sigmas for "other" species
+#     mutate(
+#       prop.other = case_when(
+#         prop.sar != 0 & adjusted == TRUE ~ 1 - prop.sar,
+#         # prop.sar == 0 & adjusted == TRUE ~ 1,
+#         TRUE ~ prop.other),
+#       prop.other.wg = prop.other) %>% 
+#     mutate(
+#       sigmawg.other = case_when(
+#         prop.other == 0 ~ 1,
+#         TRUE ~ prop.other),
+#       sigmaindiv.other = sigmawg.other) %>% 
+#     select(-haul)
+#   
+#   # Combine clf files
+#   clf <- bind_rows(clf, clf.lm.2022)
+#   
+#   # Plot replacement clusters, symbolized by sample type and whether or not adjusted
+#   # ggplot(clf, aes(long, lat, colour = sample.type, fill = adjusted)) +
+#   #   geom_point(shape = 21, alpha = 0.5) +
+#   #   coord_map()
+# }
 
 # Save to file
-write.csv(clf, file = here("Output/clf_ts_proportions.csv"),
-          row.names = FALSE, quote = FALSE)
+write_csv(clf, file = here("Output/clf_ts_proportions.csv"))
 
 save(clf, file = here("Output/clf_ts_proportions.Rdata"))
+
+# In summer 2022, sardine proportions were adjusted based on catches from 2018-2021
+# and for clusters with sardine present, jack mackerel were assumed to make up the remaining proportion
+if (survey.name == "2207RL") {
+  # Read file adjusted by Juan
+  clf.adjusted <- read_csv(here("Output/clf_ts_proportions_JPZ.csv"))
+  
+  # Replace existing clf file
+  clf <- clf.adjusted
+}
 
 # Calculate haul length frequencies, for use with nearshore sampling
 source(here("Code/calculate_haul_length_frequency.R"))
@@ -3461,16 +3668,16 @@ source(here("Code/calculate_haul_length_frequency.R"))
 ```{r map-acoustic-proportions,fig.cap='(ref:map-acoustic-proportions)'}
 # Get acoustic proportions for mapping
 acoustic.prop.indiv <- clf %>%
-  filter(!is.na(CPS.wg)) %>% 
+  filter(!is.na(CPS.wg), CPS.wg > 0) %>% 
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-         prop.mack, prop.sar, prop.rher) %>% 
+         prop.mack, prop.sar, prop.rher, prop.other, sample.type) %>% 
   replace(. == 0, 0.0000001) %>% 
   project_df(to = crs.proj)
 
 acoustic.prop.wg <- clf %>%
-  filter(!is.na(CPS.wg)) %>% 
+  filter(!is.na(CPS.wg), CPS.wg > 0) %>% 
   select(cluster, lat, long, prop.anch.wg, prop.jack.wg, prop.her.wg,
-         prop.mack.wg, prop.sar.wg, prop.rher.wg) %>% 
+         prop.mack.wg, prop.sar.wg, prop.rher.wg, prop.other.wg, sample.type) %>% 
   replace(. == 0, 0.0000001) %>% 
   project_df(to = crs.proj)
 
@@ -3484,19 +3691,25 @@ if (save.figs) {
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.indiv, 
-                    aes(X, Y, group = cluster, r = pie.radius),
+                    aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
                     cols = c("prop.anch","prop.her","prop.jack",
-                             "prop.mack", "prop.rher", "prop.sar"),
-                    color = 'black', alpha = 0.8) +
+                             "prop.mack", "prop.rher", "prop.sar", "prop.other"),
+                    alpha = 0.8) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
+        # Configure pie outline colors
+    scale_colour_manual(name = "Sample type", 
+                        labels = c("Purse seine", "Trawl"),
+                        values = c(seine.color, trawl.color),
+                        guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "P. herring", "J. mackerel",
-                                 "P. mackerel", "R. herring", "Sardine"),
+                                 "P. mackerel", "R. herring", "Sardine", "Other"),
                       values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                                 pac.mack.color, rnd.herring.color, sardine.color)) +
+                                 pac.mack.color, rnd.herring.color,
+                                 sardine.color, other.color)) +
     # Plot panel label
     ggtitle("Acoustic Proportions (Number) by Cluster") +
     coord_sf(crs = crs.proj, 
@@ -3512,19 +3725,25 @@ if (save.figs) {
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.wg, 
-                    aes(X, Y, group = cluster, r = pie.radius),
+                    aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
                     cols = c("prop.anch.wg","prop.her.wg","prop.jack.wg",
-                             "prop.mack.wg", "prop.rher.wg", "prop.sar.wg"),
-                    color = 'black', alpha = 0.8) +
+                             "prop.mack.wg", "prop.rher.wg", "prop.sar.wg", "prop.other.wg"),
+                    alpha = 0.8) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
+    # Configure pie outline colors
+    scale_colour_manual(name = "Sample type", 
+                        labels = c("Purse seine", "Trawl"),
+                        values = c(seine.color, trawl.color),
+                        guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
                       labels = c("Anchovy", "P. herring", "J. mackerel",
-                                 "P. mackerel", "R. herring", "Sardine"),
+                                 "P. mackerel", "R. herring", "Sardine", "Other"),
                       values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                                 pac.mack.color, rnd.herring.color, sardine.color)) +
+                                 pac.mack.color, rnd.herring.color,
+                                 sardine.color, other.color)) +
     # Plot panel label
     ggtitle("Acoustic Proportions (Weight) by Cluster") +
     coord_sf(crs = crs.proj, 
@@ -3532,7 +3751,8 @@ if (save.figs) {
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
   # Combine acoustic proportion maps
-  acoustic.prop.comparison <- plot_grid(acoustic.prop.cluster.indiv, acoustic.prop.cluster.wg,
+  acoustic.prop.comparison <- plot_grid(acoustic.prop.cluster.indiv, 
+                                        acoustic.prop.cluster.wg,
                                         nrow = 1, labels = c("a)", "b)"))
   
   # Save trawl species proportions plots
@@ -3564,19 +3784,24 @@ acoustic.prop.cluster.final <- base.map +
   geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
   # Plot trawl pies
   geom_scatterpie(data = acoustic.prop.indiv, 
-                  aes(X, Y, group = cluster, r = pie.radius),
+                  aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
                   cols = c("prop.anch","prop.her","prop.jack",
-                           "prop.mack", "prop.rher", "prop.sar"),
+                           "prop.mack", "prop.rher", "prop.sar","prop.other"),
                   color = 'black', alpha = 0.8) +
   # Plot empty trawl locations
   geom_point(data = cluster.zero, aes(X, Y),
              size = 3, shape = 21, fill = 'black', colour = 'white') +
+  # Configure pie outline colors
+  scale_colour_manual(name = "Sample type", 
+                      labels = c("Purse seine", "Trawl"),
+                      values = c(seine.color, trawl.color),
+                      guide = "none") +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "P. herring", "J. mackerel",
-                               "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                               pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = c("Anchovy", "P. herring", "J. mackerel", 
+                               "P. mackerel", "R. herring", "Sardine", "Other"),
+                    values = c(anchovy.color, pac.herring.color, jack.mack.color, 
+                               pac.mack.color, rnd.herring.color, sardine.color, other.color)) +
   coord_sf(crs = crs.proj, 
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
@@ -3739,6 +3964,17 @@ for (i in unique(lengths$scientificName)) {
          height = 7, width = 10)
 }
 
+# In summer 2022, the clf files for sardine and jack mackerel were adjusted N of Cape Mendocino
+  # Read adjusted files from 
+if (survey.name == "2207RL") {
+  cluster.final.sar.adj  <- read_csv(here("Output/cluster_length_frequency_Sardinops sagax_2207RL_JPZ.csv"))
+  cluster.final.jack.adj <- read_csv(here("Output/cluster_length_frequency_Trachurus symmetricus_2207RL_JPZ.csv"))
+  
+  # Replace cluster.final[[i]] for sardine and jack mackerel
+  cluster.final[["Sardinops sagax"]]       <- cluster.final.sar.adj
+  cluster.final[["Trachurus symmetricus"]] <- cluster.final.jack.adj
+}
+
 # Save results
 save(cluster.final, file = here("Output/cluster_length_frequency_all.Rdata"))
 save(haul.final,    file = here("Output/haul_length_frequency_all.Rdata"))
@@ -3857,6 +4093,8 @@ nasc <- nasc %>%
     mack.dens = cps.nasc*prop.mack / (4*pi*sigmawg.mack) / 1000,
     sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000,
     rher.dens = cps.nasc*prop.rher / (4*pi*sigmawg.rher) / 1000)
+
+# Add other.dens?
 
 # Format for plotting
 nasc.density <- nasc %>%
@@ -6003,7 +6241,7 @@ txPal    <- colorFactor(wpt.colors, wpt.types)
 trawlPal <- c('#00CD66', '#0000FF', '#A020F0',
               '#F5DEB3', '#00FFFF', '#FF0000')
 
-# Create color pallette for CTD casts
+# Create color palette for CTD casts
 ctdPal <- colorFactor(c("#FFA500", "#A020F0"), c("CTD", "UCTD"))
 
 # Select plot levels for backscatter data
