@@ -27,6 +27,7 @@ transects <- wpts %>%
       str_detect(name, "T+$") ~ "Transit",
       str_detect(name, "N+$") ~ "Nearshore",
       str_detect(name, "O+$") ~ "Offshore",
+      str_detect(name, "JCF+$") ~ "Carranza",
       TRUE ~ "Unknown"),
     Waypoint = as.numeric(str_extract(name,"\\d{1,3}\\.\\d{1,3}"))) %>% 
   arrange(type, Waypoint)
@@ -79,6 +80,7 @@ if (!exists("renumber.transects")|renumber.transects == FALSE) {
           str_detect(name, "T+$") ~ paste0(wpt.tmp, "T"),
           str_detect(name, "N+$") ~ paste0(wpt.tmp, "N"),
           str_detect(name, "O+$") ~ paste0(wpt.tmp, "O"),
+          str_detect(name, "JCF+$") ~ paste0(wpt.tmp, "JCF"),
           TRUE ~ "Unknown")) %>%
       mutate(group = paste(Transect, type)) %>% 
       arrange(type, Transect, Waypoint) %>% 
@@ -142,7 +144,7 @@ transect.regions <- transects %>%
   summarise(
     long = max(Longitude),
     lat = Latitude[which.max(Longitude)]) %>% 
-  filter(Type %in% c("Adaptive","Compulsory", "Nearshore", "Offshore", "Saildrone")) %>% 
+  filter(Type %in% c("Adaptive","Compulsory", "Nearshore", "Offshore", "Saildrone", "Carranza")) %>% 
   mutate(loc = cut(lat, region.vec, labels = FALSE),
          Region = as.factor(case_when(
            loc == 1 ~ "Mexico",
@@ -523,6 +525,10 @@ if (nrow(filter(wpt.export, Type == "Offshore")) > 0) {
 if (nrow(filter(wpt.export, Type == "Extra")) > 0) {
   write_csv(filter(wpt.export, Type == "Extra"),  here("Output/tables_updated/waypoints_extra.csv"))  
 }
+# Write Carranza waypoints
+if (nrow(filter(wpt.export, Type == "Carranza")) > 0) {
+  write_csv(filter(wpt.export, Type == "Carranza"),  here("Output/tables_updated/waypoints_carranza.csv"))  
+}
 
 # Export survey plan for survey report -----------------------------------------
 wpt.plan <- wpt.export %>% 
@@ -562,7 +568,7 @@ pairovets.sf <- st_as_sf(pairovets, coords = c("Longitude","Latitude"), crs = cr
 # Create the map with all transects --------------------------------------------
 survey.map <- base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", 
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Mammal", "Carranza",
                                                   "Nearshore","Offshore", "Transit", "Saildrone")),
           aes(linetype = Type, colour = Type), show.legend = "line") +
   scale_linetype_manual(name = "Type", values = wpt.linetypes) +
@@ -598,7 +604,8 @@ save(transects, tx.labels, wpts, uctds, wpt.export, pairovets,
 # Create the map with all transects --------------------------------------------
 survey.map.leg = base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit", "Saildrone")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", 
+                                                  "Carranza","Transit", "Saildrone")),
           aes(linetype = Type), colour = "grey50", show.legend = "line") +
   geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory"), !is.na(Leg)),
           aes(linetype = Type, colour = factor(Leg)), show.legend = "line") +
@@ -616,9 +623,11 @@ ggsave(survey.map.leg, filename = here("Figs/fig_survey_map_leg.png"),
 # Create the map with all transects
 survey.map.region = base.map +
   # geom_path(data = bathy, aes(long,lat), colour = "gray70", size = 0.25) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", "Transit", "Saildrone")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Offshore", "Nearshore", 
+                                                  "Carranza","Transit", "Saildrone")),
           aes(linetype = Type), colour = "grey50", show.legend = FALSE) +
-  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Nearshore", "Offshore", "Saildrone")),
+  geom_sf(data = filter(transects.sf, Type %in% c("Adaptive", "Compulsory", "Nearshore", 
+                                                  "Carranza","Offshore", "Saildrone")),
           aes(linetype = Type, colour = factor(Region)), show.legend = "line") +
   geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
   scale_linetype_manual(name = "Type", values = wpt.linetypes) +
@@ -649,7 +658,7 @@ if (update.routes) {
   
   # Create output directories
   dir_create(here("Output", c("waypoints_updated")))
-  dir_create(here("Output/routes_updated"), c("Adaptive","Compulsory","Nearshore","Saildrone"))
+  dir_create(here("Output/routes_updated"), c("Adaptive","Compulsory","Nearshore","Saildrone","Carranza"))
   
   # Delete existing CSV files
   rm.csv.routes <- dir_ls(here("Output/routes_updated"), regexp = "*.csv", recurse = TRUE)
@@ -712,6 +721,18 @@ if (update.routes) {
     
     if (nrow(wpts.sub) > 0) {
       write_csv(wpts.sub, here("Output/routes_updated/Saildrone", paste0(i, "S.csv")),
+                col_names = FALSE)
+    }
+  }
+  
+  # Carranza transects
+  for (i in unique(updated.route$transect.name)) {
+    wpts.sub <- updated.route %>%
+      filter(transect.name == i, Type == "Carranza") %>%
+      select(id = name, Latitude, Longitude)
+    
+    if (nrow(wpts.sub) > 0) {
+      write_csv(wpts.sub, here("Output/routes_updated/Carranza", paste0(i, "JCF.csv")),
                 col_names = FALSE)
     }
   }
