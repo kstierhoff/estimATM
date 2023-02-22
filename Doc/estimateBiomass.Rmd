@@ -696,7 +696,8 @@ if (process.csv) {
       nasc.vessel <- nasc.vessel %>% 
         mutate(datetime      = ymd_hms(paste(date, time), tz = "UTC"),
                leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE),
-               transect.orig = transect)
+               transect.orig = transect,
+               id = seq_along(datetime))
       
       if (i == "SD") {
         # Set Saildrone number as vessel name
@@ -763,9 +764,10 @@ if (process.csv) {
         }
       }
       
-      # Remove offshore transects data
+      # Remove inshore transects data (i.e., transects conducted between transects on the
+      # inshore portion of the survey area)
       if (rm.inshore[i]) {
-        # Filter based on offshore pattern
+        # Filter based on inshore pattern
         nasc.inshore <- nasc.vessel %>% 
           filter(str_detect(transect.orig, nasc.pattern.inshore[i])) 
         
@@ -791,6 +793,24 @@ if (process.csv) {
           filter(str_detect(transect.orig, nasc.pattern.nearshore[i]) |
                    str_detect(tolower(filename), "nearshore")) 
         
+        # Extract nearshore intervals that fall within the 20 m isobath
+        if (extract.nearshore[i]) {
+          nasc.nearshore.extract <- nasc.nearshore %>%
+            st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+            st_intersection(bathy_20m_poly)
+          
+          nasc.nearshore <- nasc.nearshore %>% 
+            filter(id %in% nasc.nearshore.extract$id)
+          
+          # ggplot() +
+          #   geom_point(data = nasc.vessel, aes(long, lat, group = transect.orig),
+          #             colour = "black") +
+          #   geom_point(data = nasc.nearshore, aes(long, lat),
+          #             colour = "red", shape = 21, fill = NA) +
+          #   geom_sf(data = bathy_20m_poly, fill = NA) +
+          #   coord_sf()
+        }
+        
         if (nrow(nasc.nearshore) > 0) {
           # Save processed CSV data from each survey vessel
           saveRDS(nasc.nearshore, 
@@ -801,6 +821,23 @@ if (process.csv) {
             filter(str_detect(transect.orig, nasc.pattern.nearshore[i], negate = TRUE)) %>% 
             filter(str_detect(tolower(filename), "nearshore", negate = TRUE))
         }
+      }
+      
+      # In 2022, Lisa Marie sampled compulsory transects to ~5m depth
+      # Remove core transect intervals that fall within the 20 m isobath
+      if (extract.nearshore[i]) {
+        nasc.vessel.extract <- nasc.vessel %>%
+          st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+          st_difference(bathy_20m_poly)
+        
+        nasc.vessel <- nasc.vessel %>% 
+          filter(id %in% nasc.vessel.extract$id)
+        
+        # ggplot() +
+        #   geom_point(data = nasc.vessel, aes(long, lat), colour = "red") +
+        #   geom_point(data = nasc.nearshore, aes(long, lat), colour = "black", fill = NA, shape = 21) +
+        #   geom_sf(data = bathy_20m_poly, fill = NA) +
+        #   coord_sf()
       }
       
       # Identify acoustic transects to include in processing, based on length
@@ -3698,7 +3735,7 @@ if (save.figs) {
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
-        # Configure pie outline colors
+    # Configure pie outline colors
     scale_colour_manual(name = "Sample type", 
                         labels = c("Purse seine", "Trawl"),
                         values = c(seine.color, trawl.color),

@@ -2,7 +2,7 @@
 acoustic.prop.indiv.combo <- clf %>%
   filter(!is.na(CPS.wg)) %>% 
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
-         prop.mack, prop.sar, sample.type) %>% 
+         prop.mack, prop.rher, prop.sar, sample.type) %>% 
   replace(. == 0, 0.0000001) %>%
   project_df(to = crs.proj) 
 
@@ -22,22 +22,17 @@ acoustic.prop.cluster.combo.final <- base.map +
                   aes(X, Y, group = cluster, r = pie.radius,
                       colour = sample.type),
                   cols = c("prop.anch","prop.her","prop.jack",
-                           "prop.mack","prop.sar"),
+                           "prop.mack","prop.rher","prop.sar"),
                   alpha = 0.8) +
-  # geom_scatterpie(data = acoustic.prop.indiv.combo, 
-  #                 aes(X, Y, group = cluster, r = pie.radius),
-  #                 cols = c("prop.anch","prop.her","prop.jack",
-  #                          "prop.mack","prop.sar"),
-  #                 color = 'black', alpha = 0.8) +
   # Plot empty trawl locations
   geom_point(data = cluster.zero.combo, aes(X, Y),
              size = 3, shape = 21, fill = 'black', colour = 'white') +
   # Configure pie fill colors
   scale_fill_manual(name = "Species",
                     labels = c("Anchovy", "P. herring", "J. mackerel",
-                               "P. mackerel", "Sardine"),
+                               "P. mackerel", "R. herring", "Sardine"),
                     values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                               pac.mack.color, sardine.color)) +
+                               pac.mack.color, rnd.herring.color, sardine.color)) +
   # Configure pie outline colors
   scale_colour_manual(name = "Sample type", 
                       labels = c("Purse seine", "Trawl"),

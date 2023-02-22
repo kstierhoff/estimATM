@@ -95,7 +95,7 @@ survey.start           <- "27 June"       # Survey start date
 survey.end             <- "30 September"  # Survey end date
 survey.year            <- "2022"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
-survey.das             <- 77              # Days at sea allocated
+survey.das             <- 75              # Days at sea allocated
 survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
 survey.landmark.s      <- "Punta Baja, Baja CA Norte" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
@@ -286,7 +286,7 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM","LBC","SD") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- c("LBC")
+nasc.vessels.nearshore <- c("LBC", "LM")
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -433,7 +433,13 @@ rm.inshore             <- c(RL  = TRUE,
 rm.nearshore           <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE) 
+                            SD  = TRUE)
+
+# If T, extracts nearshore intervals from vessels that sample close to shore
+extract.nearshore      <- c(RL  = FALSE,
+                            LM  = TRUE,
+                            LBC = FALSE,
+                            SD  = FALSE)
 
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
