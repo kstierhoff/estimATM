@@ -41,7 +41,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage4-s.nmfs.local/AST4/SURVEYS/20230703_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints.gpx" #"rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints_20230221.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -120,15 +120,15 @@ survey.long          <- c(-130,-113)
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2307RL.csv"
-wpt.types            <- c(Adaptive = "Adaptive", Compulsory = "Compulsory", 
-                          Nearshore = "Nearshore",Offshore = "Offshore",
-                          Saildrone = "Saildrone")
-wpt.colors           <- c(Adaptive = "#FF0000", Compulsory = "#000000",  
-                          Nearshore = "#FF33F5", Offshore = "#FFA500",
-                          Saildrone = "#00FFFF") 
-wpt.linetypes        <- c(Adaptive = "dashed", Compulsory = "solid",
-                          Nearshore = "solid", Offshore = "dashed", 
-                          Saildrone = "solid")
+wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
+                          Compulsory = "Compulsory", Nearshore = "Nearshore",
+                          Offshore = "Offshore", Saildrone = "Saildrone")
+wpt.colors           <- c(Adaptive = "#FF0000", Carranza = "green",
+                          Compulsory = "#000000", Nearshore = "#FF33F5", 
+                          Offshore = "#FFA500", Saildrone = "#00FFFF") 
+wpt.linetypes        <- c(Adaptive = "dashed", Carranza = "solid",
+                          Compulsory = "solid", Nearshore = "solid", 
+                          Offshore = "dashed", Saildrone = "solid")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
