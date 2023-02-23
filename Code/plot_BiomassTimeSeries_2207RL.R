@@ -190,3 +190,12 @@ biomass.ts.bar <- ggplot(biomass.ts,
 ggsave(biomass.ts.bar, 
        filename = here("Figs/fig_biomass_ts_bar.png"),
        width = 8, height = 4)
+
+# Combine plots into one using {patchwork}
+biomass.ts.combo <- biomass.ts.line/biomass.ts.bar +
+  plot_annotation(tag_levels = 'a', tag_suffix = ')')
+
+# Save figure
+ggsave(biomass.ts.combo, 
+       filename = here("Figs/fig_biomass_ts_combo.png"),
+       width = 8, height = 8)
