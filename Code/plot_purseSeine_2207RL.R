@@ -67,10 +67,12 @@ lbc.catch <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
   mutate(vessel_name = "Long Beach Carnage",
          vessel.name = "LBC",
          key.set = paste(vessel.name, date, set)) %>% 
-  pivot_longer(cols = 3:6, names_to = "scientificName", values_to = "weightkg") %>% 
-  replace_na(list(weightkg = 0)) %>% 
+  select(key.set, vessel.name, scientificName, weightg) %>% 
+  # pivot_longer(cols = 'Net in water':'Net on deck', names_to = "event", values_to = "time")
+  # pivot_longer(cols = c(-key.set, -vessel.name), names_to = "scientificName", values_to = "weightkg") %>% 
+  # replace_na(list(weightkg = 0)) %>% 
   group_by(key.set, vessel.name, scientificName) %>% 
-  summarise(totalWeight = sum(weightkg))
+  summarise(totalWeight = sum(weightg))
 
 ## Import specimen data ----------------------------------------------------
 ### LM
@@ -120,37 +122,37 @@ lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
       TRUE ~ totalLength_mm),
     K = round((weightg/totalLength_mm*10^3)*100))
 
-### LM
-# lbc.lengths <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
-#   left_join(select(lbc.sets, date, set, key.set)) %>%
-#   mutate(vessel.name = "LM",
-#          label = paste("Date:", date, "Set:", set, "Fish num:", specimen_number),
-#          totalLength_mm = case_when(
-#            scientificName == "Clupea pallasii" ~
-#              convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
-#            scientificName == "Engraulis mordax" ~
-#              convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
-#            scientificName == "Sardinops sagax" ~
-#              convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
-#            scientificName == "Scomber japonicus" ~
-#              convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
-#            scientificName == "Trachurus symmetricus" ~
-#              convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"))) %>%
-#   filter(scientificName %in% cps.spp, !is.na(set)) %>%
-#   # Estimate missing weights from lengths -------------------------------------------------------
-# mutate(
-#   weightg = case_when(
-#     is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
-#     TRUE  ~ weightg),
-#   totalLength_mm = case_when(
-#     is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
-#     TRUE ~ totalLength_mm),
-#   K = round((weightg/totalLength_mm*10^3)*100))
+### LBC
+lbc.lengths <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
+  left_join(select(lbc.sets, date, set, key.set)) %>%
+  mutate(vessel.name = "LM",
+         label = paste("Date:", date, "Set:", set, "Fish num:", specimen_number),
+         totalLength_mm = case_when(
+           scientificName == "Clupea pallasii" ~
+             convert_length("Clupea pallasii", .$forkLength_mm, "FL", "TL"),
+           scientificName == "Engraulis mordax" ~
+             convert_length("Engraulis mordax", .$standardLength_mm, "SL", "TL"),
+           scientificName == "Sardinops sagax" ~
+             convert_length("Sardinops sagax", .$standardLength_mm, "SL", "TL"),
+           scientificName == "Scomber japonicus" ~
+             convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
+           scientificName == "Trachurus symmetricus" ~
+             convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"))) %>%
+  filter(scientificName %in% cps.spp, !is.na(set)) %>%
+  # Estimate missing weights from lengths -------------------------------------------------------
+mutate(
+  weightg = case_when(
+    is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
+    TRUE  ~ weightg),
+  totalLength_mm = case_when(
+    is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
+    TRUE ~ totalLength_mm),
+  K = round((weightg/totalLength_mm*10^3)*100))
 
-# save(lm.lengths, lbc.lengths, file = here("Output/purse_seine_specimens.Rdata"))
+save(lm.lengths, lbc.lengths, file = here("Output/purse_seine_specimens.Rdata"))
 
 # Combine nearshore lengths from LM and LBC
-lengths.ns <- lm.lengths
+lengths.ns <- bind_rows(lbc.lengths, lm.lengths)
 
 saveRDS(lengths.ns, here("output/lw_data_nearshore.rds"))
 
@@ -214,7 +216,7 @@ lw.plot.ns <- ggplot() +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold.italic"))
 
-ggplotly(lw.plot.ns)
+# ggplotly(lw.plot.ns)
 
 # Save length/weight plot
 ggsave(lw.plot.ns, filename = here("Figs/fig_LW_plots_ns.png"),
@@ -240,7 +242,7 @@ lw.plot.comp <- ggplot() +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold.italic"))
 
-lw.plot.comp.lm <- ggplot() +
+lw.plot.comp.ns <- ggplot() +
   # Plot L/W data for current survey
   # geom_point(data = lengths.rl,
   #            aes(totalLength_mm, weightg), colour = "gray50", alpha = 0.75) +
@@ -253,7 +255,7 @@ lw.plot.comp.lm <- ggplot() +
   facet_wrap(~scientificName, scales = "free", nrow = 1) +
   # Format plot
   xlab("Total length (mm)") + ylab("Mass (g)") +
-  ggtitle("Lisa Marie") +
+  ggtitle("Nearshore") +
   theme_bw() +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold.italic"))
@@ -276,13 +278,13 @@ lw.plot.comp.rl <- ggplot() +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold.italic"))
 
-lw.plot.comp.grid <-cowplot::plot_grid(lw.plot.comp.lm, lw.plot.comp.rl,
+lw.plot.comp.grid <- cowplot::plot_grid(lw.plot.comp.ns, lw.plot.comp.rl,
           nrow = 2)
 
-ggsave(lw.plot.comp, filename = here("Figs/fig_LW_plots_LM-RL.pdf"),
+ggsave(lw.plot.comp, filename = here("Figs/fig_LW_plots_NS-RL.png"),
        width = 10, height = 6)
 
-ggsave(lw.plot.comp.grid, filename = here("Figs/fig_LW_plots_grid_LM-RL.pdf"),
+ggsave(lw.plot.comp.grid, filename = here("Figs/fig_LW_plots_grid_NS-RL.png"),
        width = 10, height = 6)
 
 # Summarize specimen data ------------------------------------------------
@@ -299,13 +301,13 @@ lbc.catch.summ <- lbc.catch %>%
   right_join(select(lbc.sets, key.set, vessel.name, lat, long)) %>% # Add all sets, incl. empty hauls
   arrange(key.set)
 
-# lm.spec.summ <- lm.lengths %>%
-#   group_by(key.set, scientificName) %>% 
-#   summarise(totalWeight = sum(weightg, na.rm = TRUE)) %>% 
-#   tidyr::spread(scientificName, totalWeight) %>% 
-#   right_join(select(lm.sets, key.set, vessel.name, lat, long)) %>% # Add all sets, incl. empty hauls
-#   arrange(key.set) %>% 
-#   ungroup()
+lm.spec.summ <- lm.lengths %>%
+  group_by(key.set, scientificName) %>%
+  summarise(totalWeight = sum(weightg, na.rm = TRUE)) %>%
+  tidyr::spread(scientificName, totalWeight) %>%
+  right_join(select(lm.sets, key.set, vessel.name, lat, long)) %>% # Add all sets, incl. empty hauls
+  arrange(key.set) %>%
+  ungroup()
 
 # Make specimen summaries spatial -----------------------------------------
 lm.catch.summ.sf <- lm.catch.summ %>% 
@@ -361,45 +363,45 @@ set.pie <- set.summ.wt %>%
                   'All CPS:', AllCPS, 'kg'))
 
 # Load nearshore backscatter data -----------------------------------------
-# load(here("Output/cps_nasc_prop_ns.Rdata"))
+load(here("Output/cps_nasc_prop_ns.Rdata"))
 
 # Summarize transects -----------------------------------------------------
 # Summarize nasc data
-# nasc.summ.ns <- nasc.nearshore %>% 
-#   group_by(vessel.name, transect.name, transect) %>% 
-#   summarise(
-#     start     = min(datetime),
-#     end       = max(datetime),
-#     duration  = difftime(end, start, units = "hours"),
-#     n_int     = length(Interval),
-#     distance  = length(Interval)*nasc.interval/1852,
-#     lat       = lat[which.min(long)],
-#     long      = long[which.min(long)],
-#     mean_nasc = mean(cps.nasc)) %>% 
-#   arrange(vessel.name, start)
-# 
-# save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
+nasc.summ.ns <- nasc.nearshore %>%
+  group_by(vessel.name, transect.name, transect) %>%
+  summarise(
+    start     = min(datetime),
+    end       = max(datetime),
+    duration  = difftime(end, start, units = "hours"),
+    n_int     = length(Interval),
+    distance  = length(Interval)*nasc.interval/1852,
+    lat       = lat[which.min(long)],
+    long      = long[which.min(long)],
+    mean_nasc = mean(cps.nasc)) %>%
+  arrange(vessel.name, start)
+
+save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
 # 
 # # Summarize nasc for plotting
-# nasc.plot.ns <- nasc.nearshore %>%
-#   select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
-#   group_by(filename, transect, transect.name, int) %>%
-#   summarise(
-#     lat  = lat[1],
-#     long = long[1],
-#     NASC = mean(cps.nasc)) %>%
-#   # Create bins for defining point size in NASC plots%>%
-#   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
-#          bin.level =  as.numeric(bin)) %>%
-#   ungroup() %>%
-#   project_df(to = crs.proj)
-# 
-# nasc.paths.ns <- nasc.plot.ns %>%
-#   st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
-#   group_by(transect.name) %>%
-#   summarise(do_union = F) %>%
-#   st_cast("LINESTRING") %>%
-#   ungroup()
+nasc.plot.ns <- nasc.nearshore %>%
+  select(filename, transect, transect.name, int, lat, long, cps.nasc) %>%
+  group_by(filename, transect, transect.name, int) %>%
+  summarise(
+    lat  = lat[1],
+    long = long[1],
+    NASC = mean(cps.nasc)) %>%
+  # Create bins for defining point size in NASC plots%>%
+  mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
+         bin.level =  as.numeric(bin)) %>%
+  ungroup() %>%
+  project_df(to = crs.proj)
+
+nasc.paths.ns <- nasc.plot.ns %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326) %>%
+  group_by(transect.name) %>%
+  summarise(do_union = F) %>%
+  st_cast("LINESTRING") %>%
+  ungroup()
 
 
 # Read GPX file
@@ -433,7 +435,12 @@ map.bounds.ns <- wpts.sf %>%
   st_transform(crs = 3310) %>%
   st_bbox()
 
-map.bounds.lm <- lm.catch.summ.sf %>%
+# map.bounds.lm <- lm.catch.summ.sf %>%
+#   st_transform(crs = 3310) %>%
+#   st_bbox()
+
+map.bounds.lm <- lm.path %>%
+  # filter(str_detect(transect.name, "LM")) %>%
   st_transform(crs = 3310) %>%
   st_bbox()
 
@@ -475,17 +482,20 @@ set.pos <- filter(set.pie, AllCPS > 0) %>%
 save(set.pie, set.zero, set.pos, 
      file = here("Output/purse_set_pies.Rdata"))
 
-# Select plot levels for backscatter data
-# nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(transect.name, "LM"))
-# 
-# nasc.levels.all <- sort(unique(nasc.plot.ns.sub$bin.level))
-# nasc.labels.all <- nasc.labels[nasc.levels.all]
-# nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
-# nasc.colors.all <- nasc.colors[nasc.levels.all]
+# Select plot levels for LM backscatter data
+nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(transect.name, "LM"))
 
+nasc.levels.all <- sort(unique(nasc.plot.ns.sub$bin.level))
+nasc.labels.all <- nasc.labels[nasc.levels.all]
+nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
+nasc.colors.all <- nasc.colors[nasc.levels.all]
+
+# Load basemap
 load(here("Data/Map/basemap.Rdata"))
-
+# Load trawl pie data
 load(here("Output/trawl_pie_plotBio.Rdata"))
+# Load planned transects
+transects.sf <- st_read(here::here("Output/planned_transects.shp"))
 
 set.pies.lm <- base.map + 
   # Plot NASC data
@@ -503,10 +513,14 @@ set.pies.lm <- base.map +
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = filter(set.zero, vessel.name == "LM"), aes(X, Y)) +
-  ggtitle("Lisa Marie") +
+  # # ggtitle("Lisa Marie") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
+           xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]),
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]))
+  # ggtitle("Lisa Marie") +
+  # coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+  #          xlim = c(map.bounds.lm["xmin"], map.bounds.lm["xmax"]), 
+  #          ylim = c(map.bounds.lm["ymin"], map.bounds.lm["ymax"]))
 
 ggsave(set.pies.lm, filename = here("Figs/fig_seine_proportion_set_wt_LisaMarie.png"),
        height = 10, width = 6)
@@ -527,7 +541,7 @@ set.pies.lbc <- base.map +
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = filter(set.zero, vessel.name == "LBC"), aes(X, Y)) +
-  ggtitle("Long Beach Carnage") +
+  # ggtitle("Long Beach Carnage") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"])) 
@@ -551,7 +565,7 @@ haul.pies <- base.map +
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
   geom_point(data = haul.zero, aes(X, Y)) +
-  ggtitle("Reuben Lasker") +
+  # ggtitle("Reuben Lasker") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]))
@@ -560,20 +574,20 @@ ggsave(haul.pies, filename = here("Figs/fig_seine_proportion_set_wt_Lasker.png")
        height = 10, width = 6)
 
 set.haul.combo <- cowplot::plot_grid(set.pies.lm, set.pies.lbc, haul.pies, 
-                                     nrow = 1, align = "hv")
+                                     nrow = 1, align = "hv", labels = c("a)","b)","c)"))
 
 ggsave(set.haul.combo, filename = here("Figs/fig_seine_proportion_set_wt_LM-LBC-RL.png"),
-       height = 10, width = 12)
+       height = 8, width = 12)
 
 # Map backscatter
 nasc.map.ns.lm <- base.map +
   # Plot transects data
-  geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
-          size = 0.5, colour = "gray70", 
-          alpha = 0.75, linetype = "dashed") +
+  # geom_sf(data = filter(transects.sf, Type == "Nearshore"),
+  #         size = 0.5, colour = "gray70",
+  #         alpha = 0.75, linetype = "dashed") +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name),
-            colour = "gray50", size = 0.5, alpha = 0.5) +
+            colour = "gray50", linewidth = 0.5, alpha = 0.5) +
   # Plot NASC data
   geom_point(data = nasc.plot.ns.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
@@ -593,7 +607,7 @@ nasc.map.ns.lm <- base.map +
 ggsave(nasc.map.ns.lm, filename = here("Figs/fig_backscatter_cps_LisaMarie.png"),
        height = 10, width = 6)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns.lm, set.pies, nrow = 1,
+nasc.set.wt.combo <- cowplot::plot_grid(nasc.map.ns.lm, set.pies.lm, nrow = 1, align = "hv",
                                labels = c("a)", "b)"))
 
 # Save combo map
@@ -637,7 +651,7 @@ set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "Long Beach Carnage")), 
+  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
                               aes(X, Y, group = key.set, r = r*2.5),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "Sardine"),
@@ -666,8 +680,8 @@ ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LongBeachCarn
 # Map backscatter
 nasc.map.ns.lbc <- base.map +
   # Plot transects data
-  geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
-          size = 0.5, colour = "gray70", 
+  geom_sf(data = filter(transects.sf, Type == "Nearshore"),
+          size = 0.5, colour = "gray70",
           alpha = 0.75, linetype = "dashed") +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name),
@@ -691,12 +705,12 @@ nasc.map.ns.lbc <- base.map +
 ggsave(nasc.map.ns.lbc, filename = here("Figs/fig_backscatter_cps_LongBeachCarnage.png"),
        height = 6, width = 10)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, nrow = 2,
+nasc.set.wt.combo <- cowplot::plot_grid(nasc.map.ns.lbc, set.pies, nrow = 1,
                                labels = c("a)", "b)"))
 
 # Save combo map
 ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
-       height = 10, width = 8)
+       height = 6, width = 10)
 
 # # Plot Saildrone data ----------------------------------------------------
 # # Assign backscatter to trawl hauls ------------------------------------
@@ -823,7 +837,7 @@ ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt
 
 
 # Combine all backscatter figures -----------------------------------------
-nasc.ns.combo <- plot_grid(nasc.map.ns.lm, nasc.map.ns.lbc,
+nasc.ns.combo <- cowplot::plot_grid(nasc.map.ns.lm, nasc.map.ns.lbc,
                            align = "v", nrow = 1, 
                            labels = c("a)", "b)"))
 

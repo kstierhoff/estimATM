@@ -483,7 +483,7 @@ limit.cluster.dist     <- c(OS  = FALSE,
 # Define source of species proportions and length frequency data (either clf or hlf)
 # Uses either haul or cluster data for a given region (NS or OS)
 cluster.source <- c(OS = "cluster",
-                    NS = "haul")
+                    NS = "cluster")
 
 # Manually exclude hauls from the analysis
 # List hauls (e.g., c(1, 2...n)), else NA
