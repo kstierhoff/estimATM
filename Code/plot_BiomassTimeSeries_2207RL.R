@@ -86,10 +86,12 @@ save(biomass.ts, biomass.comm.summ, biomass.spp.summ,
 # Create plot ------------------------------------------------------------------
 # Create line plot - single
 biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0), 
-                          aes(x = date_start, y = biomass, colour = group, group = group)) +
-  geom_path() +
-  geom_point() +
+                          aes(x = date_start, y = biomass, 
+                              colour = group, shape = group,
+                              group = group)) +
   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
+  geom_path() +
+  geom_point(size = 2, fill = "white") +
   scale_colour_manual(name = 'Species',
                     labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Engraulis mordax (Northern)",
                                "Etrumeus acuminatus", "Sardinops sagax (Northern)", "Sardinops sagax (Southern)",
@@ -97,45 +99,51 @@ biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0),
                     values = c(pac.herring.color, anchovy.color, "#93F09F",
                                rnd.herring.color, sardine.color, "#FF7256",
                                pac.mack.color, jack.mack.color)) +
+  scale_shape_manual(name = 'Species',
+                      labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Engraulis mordax (Northern)",
+                                 "Etrumeus acuminatus", "Sardinops sagax (Northern)", "Sardinops sagax (Southern)",
+                                 "Scomber japonicus", "Trachurus symmetricus"),
+                      values = c(21, 22, 23,
+                                 21, 22, 23,
+                                 21, 22)) +
   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
   theme_bw() +
   theme(legend.text = element_text(face = "italic"))
 
-# biomass.ts.line <- ggplot(filter(biomass.ts, biomass != 0), 
-#                           aes(x = date_start, y = biomass, colour = group, group = group)) +
-#   geom_path() +
-#   geom_point() +
-#   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
-#   scale_colour_manual(name = 'Species',
-#                       labels = c("Clupea pallasii", "Engraulis mordax-Central", "Etrumeus acuminatus",
-#                                  "Sardinops sagax-Northern", "Scomber japonicus", "Trachurus symmetricus"),
-#                       values = c(pac.herring.color, anchovy.color, rnd.herring.color, 
-#                                  sardine.color, pac.mack.color, jack.mack.color)) +
-#   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
-#   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
-#   theme_bw() +
-#   theme(legend.text = element_text(face = "italic"))
-
 # Save figure
 ggsave(biomass.ts.line, 
        filename = here("Figs/fig_biomass_ts_line.png"),
-       width = 7, height = 3)
+       width = 8, height = 4)
 
 # Create line plot - faceted
 biomass.ts.line.facet <- ggplot(biomass.ts,
-                                aes(x = date_start, y = biomass, group = group)) +
-  geom_path() +
-  geom_point() +
+                                aes(x = date_start, y = biomass, 
+                                    shape = group, colour = group, group = group)) +
   geom_errorbar(aes(ymin = biomass_ci_lower, ymax = biomass_ci_upper), width = 5000000) +
+  geom_path() +
+  geom_point(fill = "white") +
   facet_wrap(~group) + 
   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
+  scale_colour_manual(name = 'Species',
+                      labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Engraulis mordax (Northern)",
+                                 "Etrumeus acuminatus", "Sardinops sagax (Northern)", "Sardinops sagax (Southern)",
+                                 "Scomber japonicus", "Trachurus symmetricus"),
+                      values = c(pac.herring.color, anchovy.color, "#93F09F",
+                                 rnd.herring.color, sardine.color, "#FF7256",
+                                 pac.mack.color, jack.mack.color)) +
+  scale_shape_manual(name = 'Species',
+                     labels = c("Clupea pallasii", "Engraulis mordax (Central)", "Engraulis mordax (Northern)",
+                                "Etrumeus acuminatus", "Sardinops sagax (Northern)", "Sardinops sagax (Southern)",
+                                "Scomber japonicus", "Trachurus symmetricus"),
+                     values = c(21, 22, 23,
+                                21, 22, 23,
+                                21, 22)) +
   theme_bw() +
   theme(strip.background.x   = element_blank(),
         strip.text.x         = element_text(face = "italic"),
-        legend.position      = c(0.95,0.05),
-        legend.justification = c(1,0))
+        legend.position      = "none")
 
 # Save figure
 ggsave(biomass.ts.line.facet, 
@@ -182,3 +190,12 @@ biomass.ts.bar <- ggplot(biomass.ts,
 ggsave(biomass.ts.bar, 
        filename = here("Figs/fig_biomass_ts_bar.png"),
        width = 8, height = 4)
+
+# Combine plots into one using {patchwork}
+biomass.ts.combo <- biomass.ts.line/biomass.ts.bar +
+  plot_annotation(tag_levels = 'a', tag_suffix = ')')
+
+# Save figure
+ggsave(biomass.ts.combo, 
+       filename = here("Figs/fig_biomass_ts_combo.png"),
+       width = 8, height = 8)
