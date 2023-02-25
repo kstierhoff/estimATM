@@ -638,11 +638,11 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 3,
-    transect = 20:24),
+    transect = 20:23),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 4,
-    transect = 25:34),
+    transect = 24:34),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 5,
@@ -880,7 +880,7 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- c("Cape Mendocino" = 40.50)  # Latitude of Cape Mendocino
-stock.break.sar  <- c("Avila Beach" = 35.17) # Latitude of Morro Bay (based on revised sardine model)
+stock.break.sar  <- c("Big Sur" = 36.153) # Latitude of Morro Bay (based on revised sardine model)
 # stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
 # stock.break.sar  <- c("Pt. Conception" = 34.46) # Latitude of Pt. Conception (or change based on SST)
 
