@@ -2383,10 +2383,10 @@ if (save.figs) {
     geom_sf(data = nav.paths.ns, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.indiv.ns, 
-                    aes(X, Y, group = cluster, r = pie.radius),
+                    aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
                     cols = c("prop.anch","prop.jack","prop.her",
                              "prop.mack","prop.rher","prop.sar"),
-                    color = 'black', alpha = 0.8) +
+                    alpha = 0.8) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero.ns, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
@@ -2396,6 +2396,11 @@ if (save.figs) {
                                  "P. mackerel", "R. herring", "Sardine"),
                       values = c(anchovy.color, jack.mack.color, pac.herring.color,   
                                  pac.mack.color, rnd.herring.color, sardine.color)) +
+    # Configure pie outline colors
+    scale_colour_manual(name = "Sample type", 
+                        labels = c("Purse seine", "Trawl"),
+                        values = c(seine.color, trawl.color),
+                        guide = "none") +
     # Configure legend guides
     guides(fill = guide_legend(), size = guide_legend()) +
     coord_sf(crs = crs.proj, 
@@ -2411,10 +2416,10 @@ if (save.figs) {
       geom_sf(data = nav.paths.ns, colour = "gray50", size = 0.5, alpha = 0.5) +
       # Plot trawl pies
       geom_scatterpie(data = acoustic.prop.indiv.ns, 
-                      aes(X, Y, group = haul, r = pie.radius),
+                      aes(X, Y, group = haul, r = pie.radius, colour = sample.type),
                       cols = c("prop.anch","prop.jack","prop.her",
                                "prop.mack","prop.rher","prop.sar"),
-                      color = 'black', alpha = 0.8) +
+                      alpha = 0.8) +
       # Plot empty trawl locations
       geom_point(data = haul.zero.ns, aes(X, Y),
                  size = 3, shape = 21, fill = 'black', colour = 'white') +
@@ -2424,6 +2429,11 @@ if (save.figs) {
                                    "P. mackerel", "R. herring", "Sardine"),
                         values = c(anchovy.color, jack.mack.color, pac.herring.color,   
                                    pac.mack.color, rnd.herring.color, sardine.color)) +
+      # Configure pie outline colors
+      scale_colour_manual(name = "Sample type", 
+                          labels = c("Purse seine", "Trawl"),
+                          values = c(seine.color, trawl.color),
+                          guide = "none") +
       # Configure legend guides
       guides(fill = guide_legend(), size = guide_legend()) +
       coord_sf(crs = crs.proj, 

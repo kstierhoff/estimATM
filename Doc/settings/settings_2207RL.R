@@ -483,7 +483,7 @@ limit.cluster.dist     <- c(OS  = FALSE,
 # Define source of species proportions and length frequency data (either clf or hlf)
 # Uses either haul or cluster data for a given region (NS or OS)
 cluster.source <- c(OS = "cluster",
-                    NS = "haul")
+                    NS = "cluster")
 
 # Manually exclude hauls from the analysis
 # List hauls (e.g., c(1, 2...n)), else NA
@@ -568,7 +568,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 5 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -638,11 +638,11 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 3,
-    transect = 20:24),
+    transect = 20:23),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 4,
-    transect = 25:34),
+    transect = 24:34),
   data.frame(
     scientificName = "Sardinops sagax",
     stratum = 5,
@@ -880,7 +880,7 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- c("Cape Mendocino" = 40.50)  # Latitude of Cape Mendocino
-stock.break.sar  <- c("Avila Beach" = 35.17) # Latitude of Morro Bay (based on revised sardine model)
+stock.break.sar  <- c("Big Sur" = 36.153) # Latitude of Morro Bay (based on revised sardine model)
 # stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
 # stock.break.sar  <- c("Pt. Conception" = 34.46) # Latitude of Pt. Conception (or change based on SST)
 
