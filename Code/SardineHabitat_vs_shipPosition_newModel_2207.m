@@ -41,11 +41,11 @@ addpath 'C:\Users\josiah.renfree\Documents\MATLAB\borders'
 timespan = hours(6);
 
 % Define animated gif name
-surveyName = 'summer2022';
+surveyName = '2207RL';
 
 %% Create sardine habitat model predictor
 
-MDL = readtable("..\Data\Habitat\sardineHabitat.csv");
+MDL = readtable("..\Data\Habitat\sardineHabitatModel_20230223.csv");
 % F = scatteredInterpolant(MDL.temp, MDL.log_chl, MDL.sardine_presence);
 
 MDL_sst = unique(MDL.temp);
@@ -411,12 +411,25 @@ for i = 1:length(timeBin)
     
     % Set colorbar options
     set(hcb, 'Position', [0.76 0.1 0.0476 0.85])        % Colorbar size and position
-%     set(hcb, 'YAxisLocation', 'left')                   % Set colorbar y-axis to left side
+    set(hcb, 'YAxisLocation', 'left')                   % Set colorbar y-axis to left side
     set(hcb, 'YTick', [0 .18 .29 1])               % Define colorbar y-axis tick locations
-%     set(hcb, 'YtickLabel', {'0' '1' '10' '20' '100'})   % Set the colorbar y-axis tick labels
+    set(hcb, 'YtickLabel', {'0' '5' '18' '100'})   % Set the colorbar y-axis tick labels
 %     set(hcb, 'YTick', '')
-    set(hcb, 'YtickLabel', {'0%' '18%' '29%' '100%'})
-%     ylabel(hcb, 'Cumulative sardine biomass (%)')       % Set colorbar y-axis label
+%     set(hcb, 'YtickLabel', {'0%' '18%' '29%' '100%'})
+    ylabel(hcb, 'Cumulative sardine biomass (%)')       % Set colorbar y-axis label
+
+    annotation(gcf, 'textbox', [0.805 0.06 0.049 0.054], ...
+        'String', {'0'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+    annotation(gcf, 'textbox', [0.805 0.213 0.049 0.054], ...
+        'String', {'0.18'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+    annotation(gcf, 'textbox', [0.805 0.306 0.049 0.054], ...
+        'String', {'0.29'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+    temp = annotation(gcf, 'textbox', [0.805 0.909 0.049 0.054], ...
+        'String', {'1.0'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
 
 %     % Add colorbar labels
 %     annotation(gcf, 'textbox', [0.81 0.67 0.049 0.054], ...
@@ -428,11 +441,11 @@ for i = 1:length(timeBin)
 %     annotation(gcf, 'textbox', [0.81 0.08 0.049 0.054], ...
 %         'String', {'Unsuitable'}, 'FitBoxToText', 'off', 'EdgeColor','none');
 
-%     % Create new invisible axis for displaying colorbar label text
-%     axes('position', [0 0 1 1], 'Visible', 'off');
+    % Create new invisible axis for displaying colorbar label text
+    axes('position', [0 0 1 1], 'Visible', 'off');
 % 
-%     % Add label to colorbar
-%     text(.91, .45, 'Potential habitat', 'Rotation', 90)
+    % Add label to colorbar
+    text(.87, .45, 'Habitat probability', 'Rotation', 90)
 
 %     % Write to animated gif
 %     frame = getframe(gcf);          % Get current frame

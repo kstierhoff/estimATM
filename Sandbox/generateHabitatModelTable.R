@@ -8,7 +8,7 @@ library(mgcv)   # Needed for the predict() function
 library(here)   # Needed for saving to relative path
 
 # Load habitat GAM model
-mdl <- readRDS("habitat.full.update.2022.rds")
+mdl <- readRDS(here("Sandbox/habitat.full.update.2022.rds"))
                                         
 # Cycle through all iterations of SST and CHL and generate table of predictions
 SST <- seq(min(mdl$model$temp), max(mdl$model$temp), length.out = 1000)
