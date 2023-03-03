@@ -1,0 +1,53 @@
+---
+title: "Survey Scheduler"
+editor: visual
+format:
+  html:
+    toc: true
+    html-math-method: katex
+    embed-resources: true
+
+execute: 
+  echo: false
+  warning: false
+  error: false
+---
+
+```{r setup}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,lubridate,here,mapview,gt)
+
+# Install and load required packages from Github -------------------------------
+# atm
+pacman::p_load_gh("kstierhoff/atm")
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+
+source(here("Doc/settings", prj.settings))
+```
+
+```{r}
+# Survey dates
+leg.end <- leg.ends[seq(2, length(leg.ends),2)]
+leg.start <- leg.ends[seq(1, length(leg.ends)-1,2)]
+
+# Leg durations
+leg.duration <- difftime(leg.end, leg.start) + 1
+
+# Leg midpoint
+leg.mid <- leg.start + leg.duration/2
+
+gt(data.frame(leg.start, leg.mid, leg.end, leg.duration))
+```
