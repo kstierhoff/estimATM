@@ -539,15 +539,19 @@ if (nrow(haul.or) > 0) {
 Catch for all trawl samples in  are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
 
 ```{r catch-summary}
-catch.summary %>% 
-  replace_na(list(`Total weight (kg)` = "-",
-                  `Total number (n)` = "-")) %>%
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  column_spec(1, italic = T) %>% 
-  scroll_box(height = "500px")
+if (nrow(catch.or) > 0) {
+  catch.summary %>% 
+    replace_na(list(`Total weight (kg)` = "-",
+                    `Total number (n)` = "-")) %>%
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    column_spec(1, italic = T) %>% 
+    scroll_box(height = "500px")  
+} else {
+  cat("No catch in Oregon.")
+}
 ```
 
 ## By haul
@@ -555,27 +559,31 @@ catch.summary %>%
 Catch for each trawl sample by species.
 
 ```{r catch-hauls}
-catch.all <- catch.or %>% 
-  select(Haul = haul,
-         "Scientific Name" = scientificName,
-         "Common Name" = commonName,
-         "Total weight (kg)" = totalWeight, 
-         "Total number (n)" = totalNum) %>% 
-  arrange(Haul, desc(`Total weight (kg)`))
-
-catch.all %>% 
-  replace_na(list(`Total weight (kg)` = "-",
-                  `Total number (n)` = "-")) %>%
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  column_spec(2, italic = T) %>% 
-  scroll_box(height = "500px")
-
-write_csv(catch.all,
-          here("Output/catch_table_ODFW.csv"),
-          na = "")
+if (nrow(catch.or) > 0) {
+  catch.all <- catch.or %>% 
+    select(Haul = haul,
+           "Scientific Name" = scientificName,
+           "Common Name" = commonName,
+           "Total weight (kg)" = totalWeight, 
+           "Total number (n)" = totalNum) %>% 
+    arrange(Haul, desc(`Total weight (kg)`))
+  
+  catch.all %>% 
+    replace_na(list(`Total weight (kg)` = "-",
+                    `Total number (n)` = "-")) %>%
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    column_spec(2, italic = T) %>% 
+    scroll_box(height = "500px")
+  
+  write_csv(catch.all,
+            here("Output/catch_table_ODFW.csv"),
+            na = "")
+} else {
+  cat("No catch in Oregon.")
+}
 ```
 
 For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
