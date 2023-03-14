@@ -28,7 +28,7 @@ uctd.spacing   <- 15
 ### Transect removal and renumbering
 rm.n.transects     <- 37 # Number of transects to remove from the start (if near Mexico)
 rm.i.transects     <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
-renumber.transects <- TRUE # Renumber transects to start at zero if transect are removed
+renumber.transects <- FALSE # Renumber transects to start at zero if transect are removed
 
 # Locations to remove from planning (e.g., north, central, south, and mexico)
 rm.location <- NA # c("mexico")
@@ -41,7 +41,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage4-s.nmfs.local/AST4/SURVEYS/20230703_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints_20230223.gpx" #"rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints_20230314.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
