@@ -1,6 +1,6 @@
 ---
-title:  "Distribution, biomass, and demography of coastal pelagic fishes in the California Current Ecosystem during summer 2019 based on acoustic-trawl sampling"
-author: "Kevin L. Stierhoff, Juan P. Zwolinski, and David A. Demer"
+title:  "Distribution, biomass, and demography of coastal pelagic fishes in the California Current Ecosystem during summer 2022 based on acoustic-trawl sampling"
+author: "Kevin L. Stierhoff, Josiah S. Renfree, Juan P. Zwolinski, and David A. Demer"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output: 
   powerpoint_presentation:
@@ -14,7 +14,7 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
                png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
-               mapview)
+               mapview,gt)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -53,8 +53,6 @@ png.res       <- 150 # dpi for saved PNG images (to reduce file size while at se
 
 ```{r user-input}
 # Combine survey regions? -----------------------------------------------------
-# combine.regions <- TRUE
-
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(),"/")))
 
@@ -269,163 +267,91 @@ where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.
 
 # All CPS
 
-```{r biomass-table-all,results='asis'}
-# Configure bootstrap estimate tables
-be.table <- be  %>%
-  rename(Name = Species,
-         Number           = Stratum,
-         Transects        = nTransects,
-         Clusters         = nClusters,
-         Individuals      = nIndiv,
-         Mean             = Biomass,
-         SD               = biomass.sd,
-         CV               = biomass.cv,
-         "CI(Upper)"     = lower.ci.B,
-         "CI(Lower)"     = upper.ci.B) %>% 
-  mutate(Region = "Core") %>%
-  select(Name, Stock, Region, everything(), -SD)
+```{r be-all-format}
+# Combine stratum-level biomass estimates for core and nearshore regions (combo)
+be <- be %>% mutate(Region = "Core")
 
-# be.table.os <- be.os  %>%
-#   rename(Name = Species,
-#          Number           = Stratum,
-#          Transects        = nTransects,
-#          Clusters         = nClusters,
-#          Individuals      = nIndiv,
-#          Mean             = Biomass,
-#          SD               = biomass.sd,
-#          CV               = biomass.cv,
-#          "CI(Upper)"     = lower.ci.B,
-#          "CI(Lower)"     = upper.ci.B) %>% 
-#   mutate(Region = "Offshore") %>%
-#   select(Name, Stock, Region, everything(), -SD) 
+be.ns <- be.ns %>% mutate(Region = "Nearshore")
 
-# be.table.ns <- be.ns  %>%
-#   rename(Name = Species,
-#          Number           = Stratum,
-#          Transects        = nTransects,
-#          Clusters         = nClusters,
-#          Individuals      = nIndiv,
-#          Mean             = Biomass,
-#          SD               = biomass.sd,
-#          CV               = biomass.cv,
-#          "CI(Upper)"     = lower.ci.B,
-#          "CI(Lower)"     = upper.ci.B) %>%
-#   mutate(Region = "Nearshore") %>%
-#   select(Name, Stock, Region, everything(), -SD)
+be.combo <- bind_rows(be, be.ns) %>% 
+  arrange(Species, Stock, Region, Stratum) %>% 
+  select(Species, Stock, Region, Stratum, everything(), -biomass.sd)
 
-be.table.nse <- be.nse  %>%
-  rename(Name = Species,
-         Number           = Stratum,
-         Transects        = nTransects,
-         Clusters         = nClusters,
-         Individuals      = nIndiv,
-         Mean             = Biomass,
-         SD               = biomass.sd,
-         CV               = biomass.cv,
-         "CI(Upper)"     = lower.ci.B,
-         "CI(Lower)"     = upper.ci.B) %>% 
-  mutate(Region = "NSE") %>%
-  select(Name, Stock, Region, everything(), -SD)
+be.all.summ <- be.all.summ %>% 
+  mutate(Region = "All", .before = Area) %>% 
+  select(-biomass.sd)
 
-if (combine.regions) {
-  be.table.all <- be.table %>% 
-    # bind_rows(be.table.ns) %>% 
-    arrange(Name, Stock, Region)
-    
-} else {
-  be.table.all <- be.table
-}
-```  
+# Rename columns for flextable objects
+names(be.combo) <- c("Species","Stock","Region","Number","Area","Transects","Distance","Clusters",
+                      "Individuals","Mean","CI(Lower)","CI(Upper)","CV")
+
+names(be.all.summ) <- c("Species","Stock","Region","Area","Transects","Distance","Clusters",
+                        "Individuals","Mean","CI(Lower)","CI(Upper)","CV")
+```
 
 ## All CPS | All Strata (Core)
 
 ```{r biomass-all-strata}
-num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)")
+num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)","CV")
 
-regulartable(filter(be.table.all, Region == "Core")) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Region == "Core") %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species")) %>%
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Number == "All", bold = TRUE) %>%
+  add_header(Species  = "",
              Stock    = "",
-             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
-             CV       = "Biomass") %>% 
+             CV       = "Biomass") %>%  
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
 ## All CPS | All Strata (Nearshore)
 
-```{r biomass-all-strata-ns, eval=FALSE}
-num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)")
+```{r biomass-all-strata-ns}
+num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)", "CV")
 
-regulartable(filter(be.table.all, Region == "Nearshore")) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Region == "Nearshore") %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species")) %>%
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Number == "All", bold = TRUE) %>%
+  add_header(Species  = "",
              Stock    = "",
-             Region   = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
-             CV       = "Biomass") %>% 
+             CV       = "Biomass") %>%  
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
 ## All CPS | Summary
 
 ```{r biomass-summary}
-be.table.sub <- be.table.all %>% 
-  filter(Number == "All") %>% 
-  select(-Number)
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+regulartable(be.all.summ) %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species")) %>% 
   italic(j = 1) %>%
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  add_header(Species  = "",
              Stock    = "",
-             Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
@@ -435,7 +361,6 @@ regulartable(be.table.sub) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
@@ -443,35 +368,28 @@ regulartable(be.table.sub) %>%
 ## N. Anchovy | Northern stock - Biomass
 
 ```{r biomass-anch-n}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Engraulis mordax", Stock == "Northern") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Engraulis mordax", Stock == "Northern", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Engraulis mordax", Stock == "Northern")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
@@ -523,35 +441,28 @@ if (combine.regions) {
 ## N. Anchovy | Central stock - Biomass
 
 ```{r biomass-anch-c}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Engraulis mordax", Stock == "Central") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Engraulis mordax", Stock == "Central", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Engraulis mordax", Stock == "Central")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
@@ -608,35 +519,28 @@ if (combine.regions) {
 ## P. Sardine | Northern stock - Biomass
 
 ```{r biomass-sar-n}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Sardinops sagax", Stock == "Northern") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Sardinops sagax", Stock == "Northern", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Sardinops sagax", Stock == "Northern")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
@@ -688,35 +592,28 @@ if (combine.regions) {
 ## P. Sardine | Southern stock - Biomass
 
 ```{r biomass-sar-s}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Sardinops sagax", Stock == "Southern") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Sardinops sagax", Stock == "Southern", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Sardinops sagax", Stock == "Southern")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
@@ -775,35 +672,28 @@ if (combine.regions) {
 ## Pacific Mackerel - Biomass
 
 ```{r biomass-mack}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Scomber japonicus", Stock == "All") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Scomber japonicus", Stock == "All", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Scomber japonicus", Stock == "All")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
   autofit()
 ```
 
@@ -861,35 +751,28 @@ if (combine.regions) {
 ## Jack Mackerel - Biomass
 
 ```{r biomass-jack}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Trachurus symmetricus", Stock == "All") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Trachurus symmetricus", Stock == "All", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Trachurus symmetricus", Stock == "All")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
-  align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  align(align = "center", part = "header")%>%
   autofit()
 ```
 
@@ -947,35 +830,28 @@ if (combine.regions) {
 ## Pacific Herring - Biomass
 
 ```{r biomass-her}
-be.table.sub <- be.table.all %>% 
-  filter(Name == "Clupea pallasii", Stock == "All") 
-
-regulartable(be.table.sub) %>% 
-  merge_v(j = c("Name")) %>% 
+be.combo %>% 
+  filter(Species == "Clupea pallasii", Stock == "All", Number == "All") %>% 
+  bind_rows(filter(be.all.summ, Species == "Clupea pallasii", Stock == "All")) %>% 
+  select(-Number) %>% 
+  regulartable() %>% 
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>% 
-  set_formatter(Area         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                Individuals  = function(x) sprintf("%.0f", x),
-                Mean         = function(x) sprintf("%.0f", x),
-                Distance     = function(x) sprintf("%.0f", x),
-                "CI(Lower)"  = function(x) sprintf("%.0f", x),
-                "CI(Upper)"  = function(x) sprintf("%.0f", x),
-                CV           = function(x) sprintf("%.0f", x)) %>%
-  add_header(Name  = "",
+  bold(~ Region == "All", bold = TRUE) %>% 
+  add_header(Species  = "",
              Stock    = "",
              Region   = "",
-             Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
+             Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
              Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
   theme_box() %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
-  bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
+  bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
-  align(align = "center", part = "header") %>%
-  colformat_num(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  align(align = "center", part = "header")%>%
   autofit()
 ```
 
