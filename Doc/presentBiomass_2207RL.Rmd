@@ -269,9 +269,9 @@ where the units for total length ($L_T$) is cm and $TS$ is dB re 1 m^2^ kg^-1^.
 
 ```{r be-all-format}
 # Combine stratum-level biomass estimates for core and nearshore regions (combo)
-be <- be %>% mutate(Region = "Core")
+be <- be %>% mutate(Region = "Core") 
 
-be.ns <- be.ns %>% mutate(Region = "Nearshore")
+be.ns <- be.ns %>% mutate(Region = "Nearshore") 
 
 be.combo <- bind_rows(be, be.ns) %>% 
   arrange(Species, Stock, Region, Stratum) %>% 
@@ -279,36 +279,39 @@ be.combo <- bind_rows(be, be.ns) %>%
 
 be.all.summ <- be.all.summ %>% 
   mutate(Region = "All", .before = Area) %>% 
-  select(-biomass.sd)
+  select(-biomass.sd) 
 
 # Rename columns for flextable objects
 names(be.combo) <- c("Species","Stock","Region","Number","Area","Transects","Distance","Clusters",
-                      "Individuals","Mean","CI(Lower)","CI(Upper)","CV")
+                      "Individuals","Mean","CI (Lower)","CI (Upper)","CV")
 
 names(be.all.summ) <- c("Species","Stock","Region","Area","Transects","Distance","Clusters",
-                        "Individuals","Mean","CI(Lower)","CI(Upper)","CV")
+                        "Individuals","Mean","CI (Lower)","CI (Upper)","CV")
 ```
 
 ## All CPS | All Strata (Core)
 
 ```{r biomass-all-strata}
-num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)","CV")
+num_keys <- c("Area","Distance","Individuals","Mean","CI (Lower)","CI (Upper)","CV")
 
 be.combo %>% 
   filter(Region == "Core") %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species")) %>%
-  italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>%
   add_header(Species  = "",
              Stock    = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV       = "Biomass") %>%  
   merge_h(part = "header") %>%
+  merge_v(j = c("Species")) %>%
   theme_box() %>%
+  # Format cells
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  italic(j = "Species") %>%
+  bold(~ Number == "All", bold = TRUE) %>%
+  bold(j = c("Mean", "CV")) %>%
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -319,23 +322,26 @@ be.combo %>%
 ## All CPS | All Strata (Nearshore)
 
 ```{r biomass-all-strata-ns}
-num_keys <- c("Area","Distance","Individuals","Mean","CI(Lower)","CI(Upper)", "CV")
+num_keys <- c("Area","Distance","Individuals","Mean","CI (Lower)","CI (Upper)", "CV")
 
 be.combo %>% 
   filter(Region == "Nearshore") %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species")) %>%
-  italic(j = 1) %>%
-  bold(~ Number == "All", bold = TRUE) %>%
   add_header(Species  = "",
              Stock    = "",
              Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV       = "Biomass") %>%  
   merge_h(part = "header") %>%
+  merge_v(j = c("Species")) %>%
   theme_box() %>%
+  # Format cells
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  italic(j = "Species") %>%
+  bold(~ Number == "All", bold = TRUE) %>%
+  bold(j = c("Mean", "CV")) %>%
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Number == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -343,21 +349,24 @@ be.combo %>%
   autofit()
 ```
 
-## All CPS | Summary
+## All CPS | Summary (Core + Nearshore)
 
 ```{r biomass-summary}
-regulartable(be.all.summ) %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species")) %>% 
-  italic(j = 1) %>%
+regulartable(be.all.summ) %>%
   add_header(Species  = "",
              Stock    = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species")) %>%
   theme_box() %>%
+  # Format cells
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
+  italic(j = "Species") %>%
+  bold(j = c("Mean", "CV")) %>%
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   color(color = "white", part = "header") %>% 
   align(align = "center", part = "header") %>%
@@ -373,19 +382,20 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Engraulis mordax", Stock == "Northern")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -446,19 +456,20 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Engraulis mordax", Stock == "Central")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -524,19 +535,20 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Sardinops sagax", Stock == "Northern")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -597,19 +609,20 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Sardinops sagax", Stock == "Southern")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -677,19 +690,20 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Scomber japonicus", Stock == "All")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
@@ -756,23 +770,24 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Trachurus symmetricus", Stock == "All")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
-  align(align = "center", part = "header")%>%
+  align(align = "center", part = "header") %>%
   autofit()
 ```
 
@@ -835,23 +850,24 @@ be.combo %>%
   bind_rows(filter(be.all.summ, Species == "Clupea pallasii", Stock == "All")) %>% 
   select(-Number) %>% 
   regulartable() %>% 
-  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>%
-  merge_v(j = c("Species", "Stock")) %>% 
-  italic(j = 1) %>%
-  bold(~ Region == "All", bold = TRUE) %>% 
   add_header(Species  = "",
              Stock    = "",
              Region   = "",
              Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
              Clusters = "Trawl", Individuals = "Trawl",
-             Mean     = "Biomass", "CI(Lower)" = "Biomass", "CI(Upper)" = "Biomass",
+             Mean     = "Biomass", "CI (Lower)" = "Biomass", "CI (Upper)" = "Biomass",
              CV = "Biomass") %>% 
   merge_h(part = "header") %>%
+  merge_v(j = c("Species", "Stock")) %>% 
   theme_box() %>%
+  colformat_double(j = num_keys, big.mark = ",", digits = 0, na_str = "-") %>% 
+  italic(j = "Species") %>%
+  bold(~ Region == "All", bold = TRUE) %>% 
+  bg(j = "Mean", bg = c("yellow")) %>%
   bg(bg = c("#0691C9"), part = "header") %>% 
   bg(bg = c("#D0ECFA"), ~ Region == "All") %>%
   color(color = "white", part = "header") %>% 
-  align(align = "center", part = "header")%>%
+  align(align = "center", part = "header") %>%
   autofit()
 ```
 
