@@ -77,7 +77,7 @@ lm.catch <- read_csv(here("Data/Seine/lm_catch.csv")) %>%
          scientificName = case_when(
            species_name == "Pacific Herring" ~ "Clupea pallasii",
            species_name == "Pacific Sardine" ~ "Sardinops sagax",
-           species_name == "Chub Mackerel" ~ "Scomber japonicus",
+           species_name == "Pacific Mackerel" ~ "Scomber japonicus",
            species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
            species_name == "Northern Anchovy" ~ "Engraulis mordax",
            species_name == "Jacksmelt" ~ "Atherinopsis californiensis",
@@ -109,7 +109,7 @@ lm.lengths <- read_csv(here("Data/Seine/lm_specimens.csv"), lazy = FALSE) %>%
          scientificName = case_when(
            species_name == "Pacific Herring" ~ "Clupea pallasii",
            species_name == "Pacific Sardine" ~ "Sardinops sagax",
-           species_name == "Chub Mackerel" ~ "Scomber japonicus",
+           species_name == "Pacific Mackerel" ~ "Scomber japonicus",
            species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
            species_name == "Northern Anchovy" ~ "Engraulis mordax",
            species_name == "Jacksmelt" ~ "Atherinopsis californiensis",

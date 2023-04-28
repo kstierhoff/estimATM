@@ -62,14 +62,14 @@ nasc.plot.min    <- 1
 ```{r processing-controls}
 # Control script behavior (usually T)
 save.figs          <- T # Save figures
-get.nav            <- T # Download nav data from ERDDAP
+get.nav            <- F # Download nav data from ERDDAP
 get.nav.sd         <- T # Download nav data from ERDDAP
-copy.files         <- T # Copy data files from data to plotBio directory
+copy.files         <- F # Copy data files from data to plotBio directory
 overwrite.files    <- T # Overwrite existing files when copying (not CSV, see below)copy.files
 process.csv        <- T # Process acoustic backscatter files
 process.csv.krill  <- T # Process krill backscatter files
 process.csv.all    <- F # Process all CSV files (F = new files only)
-get.db             <- T # Import trawl database
+get.db             <- F # Import trawl database
 
 # Are we sampling? If no, F. Skips data processing steps.
 sampling.acoustics <- T 
@@ -135,19 +135,16 @@ wpts.sf <- wpts %>%
     popup = paste('<b>Transect:</b>', Transect, Type)
   )
 
-transects.sf <- st_read(here("Output/shapefiles/transects.shp"))
-
-# transects.sf <- wpts.sf %>% 
-#   group_by(Type, Transect, Region) %>% 
-#   summarise(do_union = FALSE) %>% 
-#   st_cast("LINESTRING") %>% 
-#   ungroup() %>% 
-#   mutate(
-#     distance = round(as.numeric(st_length(.))/1852,1),
-#     label    = paste("Transect", Transect),
-#     popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
-#                      'Distance:', distance, 'nmi<br/>')
-#   )
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.),
+         label    = paste("Transect", Transect),
+         popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                          'Distance:', distance, 'nmi<br/>')) 
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
@@ -411,6 +408,7 @@ if (sampling.trawl) {
     if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
     if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
     if (!has_name(haul.summ.wt, "Etrumeus acuminatus")) {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+    if (!has_name(haul.summ.wt, "Other"))                 {haul.summ.wt$`Other` <- 0}
     
     # Calculate total weight of all CPS species
     haul.summ.wt <- haul.summ.wt %>%  
@@ -423,7 +421,8 @@ if (sampling.trawl) {
              "Sardine"    = "Sardinops sagax",
              "PacMack"    = "Scomber japonicus",
              "JackMack"   = "Trachurus symmetricus",
-             "RndHerring" = "Etrumeus acuminatus") 
+             "RndHerring" = "Etrumeus acuminatus",
+             "Other"      = "Other") 
     
     # Summarise catch by cluster
     cluster.summ.wt <- haul.summ.wt %>% 
@@ -450,6 +449,7 @@ if (sampling.trawl) {
                                 "PacMack"    = rep(0, nrow(haul)),
                                 "JackMack"   = rep(0, nrow(haul)),
                                 "RndHerring" = rep(0, nrow(haul)),
+                                "Other"      = rep(0, nrow(haul)),
                                 "AllCPS"     = rep(0, nrow(haul)))) %>% 
       right_join(haul.mid)
     
@@ -466,20 +466,24 @@ if (sampling.trawl) {
   # Prepare catch data for plotting ----------------------------------------------
   # Select and rename trawl data for pie charts
   haul.pie <- haul.summ.wt %>% 
-    select(haul, long, lat, Anchovy, JackMack, 
-           Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>%
+    select(haul, long, lat, Anchovy, JackMack, Jacksmelt, Other,
+           PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>%
     # Create bins for defining point size in NASC plots
     mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin)) %>% 
     project_df(to = crs.proj)
   
   cluster.pie <- cluster.summ.wt %>% 
-    select(cluster, long, lat, Anchovy, JackMack, 
-           Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+    select(cluster, long, lat, Anchovy, JackMack, Jacksmelt, Other,
+           PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
     # Create bins for defining point size in NASC plots
     mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
            bin.level =  as.numeric(bin)) %>% 
     project_df(to = crs.proj)
+  
+  # Add missing sample.type variable
+  if(is.null(haul.pie$sample.type)) haul.pie$sample.type <- "Trawl"
+  if(is.null(cluster.pie$sample.type)) cluster.pie$sample.type <- "Trawl"
   
   # Filter for empty trawls
   haul.zero    <- filter(haul.pie, AllCPS == 0)
@@ -617,8 +621,9 @@ if (sampling.cufes) {
   # Project CUFES data from other fish eggs (mostly P. mackerel)
   cufes.plot.ofe <- cufes %>% 
     filter(Density > 0, Species == "OtherFishEggs") %>%
-    filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
-                                  "S. japonicus"))) %>% 
+    filter(str_detect(Comments, "Scomber japonicus")|
+             str_detect(Comments, "scomber japonicus")|
+             str_detect(Comments, "S. japonicus")) %>%
     arrange(desc(Density))  
 }
 ```  
@@ -972,7 +977,7 @@ sd.1077.colour <- "blue"
 rl.colour <- "purple"
 
 # Import LM sets
-lm.sets <- read_csv(here("Data/Seine/lm_sets_20220804.csv")) %>% 
+lm.sets <- read_csv(here("Data/Seine/lm_sets.csv")) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
 # Read GPX file
@@ -1059,38 +1064,6 @@ ggsave(sd.map,
        filename = here("Figs/fig_survey_update_2207RL-SD.png"),
        width = map.width, height = map.height) 
 ```
-
-
-```{r update-map-composite}
-composite.map <- base.map + 
-  # Add planned transects
-  geom_sf(data = transects.sf, colour = "gray50", linetype = "dotted") +
-  # Add Saildrone data
-  geom_sf(data = nav.sd.paths.sf, aes(colour = factor(saildrone)), show.legend = FALSE) +
-  scale_colour_manual(values = c("1076" = sd.1076.colour, "1077" = sd.1077.colour)) +
-  # Add RL data
-  geom_sf(data = nav.paths.sf, colour = rl.colour) +
-  # Add LM data
-  geom_sf(data = filter(lm.transects, Transect < 136), colour = lm.colour) +
-  geom_sf(data = lm.path, colour = lm.colour) +
-  # Add LBC data
-  geom_sf(data = lbc.transects, colour = "gray50") +
-  geom_sf(data = lbc.path, colour = lbc.colour) +
-  geom_sf(data = lbc.sets, shape = 23, fill = "white") +
-  # Add sets and hauls
-  geom_sf(data = haul.locs.sf, shape = 21, fill = "white") +
-  geom_sf(data = lm.sets, shape = 24, fill = "white") +
-  # Format axes and titles
-  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-
-# Save composite map
-ggsave(composite.map,
-       filename = here("Figs/fig_survey_update_2207RL.png"),
-       width = map.width, height = map.height) 
-```
-
 
 ```{r create-static-maps}
 if (save.figs) {
@@ -1233,8 +1206,9 @@ if (sampling.cufes) {
   
   cufes.ofe.sf <- cufes %>% 
     filter(Density > 0, Species == "OtherFishEggs") %>%
-    filter(str_detect(Comments, c("Scomber japonicus","scomber japonicus",
-                                  "S. japonicus"))) %>%
+    filter(str_detect(Comments, "Scomber japonicus")|
+             str_detect(Comments, "scomber japonicus")|
+             str_detect(Comments, "S. japonicus")) %>%
     mutate(
       spp.label = case_when(
         Species == "OtherFishEggs" ~ "Other fish",
@@ -1251,6 +1225,36 @@ if (sampling.cufes) {
     select(SampleNumber, bin.level)    
 }
 
+```
+
+```{r update-map-composite}
+composite.map <- base.map + 
+  # Add planned transects
+  geom_sf(data = transects.sf, colour = "gray50", linetype = "dotted") +
+  # Add Saildrone data
+  geom_sf(data = nav.sd.paths.sf, aes(colour = factor(saildrone)), show.legend = FALSE) +
+  scale_colour_manual(values = c("1076" = sd.1076.colour, "1077" = sd.1077.colour)) +
+  # Add RL data
+  geom_sf(data = nav.paths.sf, colour = rl.colour) +
+  # Add LM data
+  geom_sf(data = filter(lm.transects, Transect < 136), colour = lm.colour) +
+  geom_sf(data = lm.path, colour = lm.colour) +
+  # Add LBC data
+  geom_sf(data = lbc.transects, colour = "gray50") +
+  geom_sf(data = lbc.path, colour = lbc.colour) +
+  geom_sf(data = lbc.sets, shape = 23, fill = "white") +
+  # Add sets and hauls
+  geom_sf(data = haul.locs.sf, shape = 21, fill = "white") +
+  geom_sf(data = lm.sets, shape = 24, fill = "white") +
+  # Format axes and titles
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+
+# Save composite map
+ggsave(composite.map,
+       filename = here("Figs/fig_survey_update_2207RL.png"),
+       width = map.width, height = map.height) 
 ```
 
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}
