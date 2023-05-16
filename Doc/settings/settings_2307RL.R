@@ -322,15 +322,15 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCPS",
-                            LBC = "//swc-storage3-s/AST3/SURVEYS/20220627_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage3-s/AST3/SURVEYS/20220627_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20220627_SAILDRONE_SummerCPS")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
+                            LBC = "//swc-storage3-s/AST3/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage3-s/AST3/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20220627_LASKER_SummerCPS",
-                            LBC = "//swc-storage3-s/AST3/SURVEYS/20220627_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage3-s/AST3/SURVEYS/20220627_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20220627_SAILDRONE_SummerCPS")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
+                            LBC = "//swc-storage3-s/AST3/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage3-s/AST3/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
