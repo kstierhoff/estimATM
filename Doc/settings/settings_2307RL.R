@@ -41,7 +41,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- "//swc-storage4-s.nmfs.local/AST4/SURVEYS/20230703_LASKER_SummerCPS/PLANNING/Rose Point/GPX"
-gpx.file         <- "rosepoint_waypoints_20230424.gpx" #"rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints_20230516.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -109,7 +109,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-01", "2023-08-01",
 
 # Define ERDDAP data variables
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2023-07-01" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2023-10-01" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
@@ -323,13 +323,13 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
-                            LBC = "//swc-storage3-s/AST3/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage3-s/AST3/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
-                            LBC = "//swc-storage3-s/AST3/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage3-s/AST3/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
 }
 
@@ -340,7 +340,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
                             SD  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
                             SD  = "Final 38 kHz CPS.csv")
@@ -385,7 +385,7 @@ source.cps.nasc        <- c(RL  = FALSE,
                             NS  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
-data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2207RL.csv")) # in the nearshore strata 
+data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2307RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
@@ -449,14 +449,13 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
-tx.rm                  <- list(RL  = c("076-078","074-076","080-078",
-                                       "072","074","076-1","076-2","078-1","078-2","080"),
+tx.rm                  <- list(RL  = NA,
                                LM  = NA,
                                LBC = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 20,
+min.tx.length          <- c(RL  = 15,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
@@ -492,7 +491,7 @@ scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
-scs.nav.path           <- "C:/SURVEY/2207RL/DATA/SCS" # Local
+scs.nav.path           <- "C:/SURVEY/2307RL/DATA/SCS" # Local
 scs.nav.dir            <- "SAMOS"
 scs.nav.pattern        <- "SAMOS-OBS.*.elg"
 scs.nav.recurse        <- TRUE
@@ -500,7 +499,7 @@ scs.nav.recurse        <- TRUE
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes202207RL.sqlite" # CUFES SQLite database
+cufes.db.sqlite        <- "cufes202307RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 cufes.vessels          <- c("RL")
 
@@ -508,7 +507,7 @@ cufes.vessels          <- c("RL")
 trawl.source           <- "SQL" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
-trawl.db.access        <- "TrawlDataEntry2207RL.accdb"
+trawl.db.access        <- "TrawlDataEntry2307RL.accdb"
 trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
@@ -526,7 +525,7 @@ uctd.cast.pattern      <- ".*_processed.asc"
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
-tdr.pattern            <- "2207RL*.*rsk"
+tdr.pattern            <- "2307RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
 # Time offset, in hours (usually -1, diff between PDT and PST in summer)
@@ -666,7 +665,7 @@ stock.break.source <- "primary"
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
-raw.prefix    <- "2207RL_EK80"
+raw.prefix    <- "2307RL_EK80"
 raw.size      <-  50   # file size in megabytes (MB)
 raw.log.range <- 350  # depth of ER60 logging (m)
 
@@ -696,9 +695,9 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
 cal.vessels        <- c("RL") # ,"LBC","LM"
-cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20220627_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
-cal.datetime       <- "23 June"     # Date/time of calibration
-cal.plot.date      <- "2022-06-23" # Date of the calibration, used to plot cal time series
+cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
+cal.datetime       <- "26 June"     # Date/time of calibration
+cal.plot.date      <- "2023-06-23" # Date of the calibration, used to plot cal time series
 cal.window         <- 50           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
 cal.personnel      <- "J. Renfree, D. Murfin, and S. Sessions" # Calibration participants
