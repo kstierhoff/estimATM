@@ -132,7 +132,7 @@ wpt.linetypes        <- c(Adaptive = "dashed", Carranza = "solid",
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
-sd.numbers <- c("1055", "1059", "1036")
+sd.numbers <- c("1048", "1060", "1096")
 
 # Set Saildrone filter method
 sd.buffer.type   <- c("saildrone")
