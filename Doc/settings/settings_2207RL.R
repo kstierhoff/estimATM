@@ -275,7 +275,10 @@ catch.breaks       <- c(0, 10, 100, 500, 1000)
 catch.labels       <- c("0-10", "10-100", "100-500", "500-1000")
 catch.pie.sizes    <- c(1, 2, 3, 4, 5, 6)
 
-annotation.size <-  2.5    # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
+annotation.size <-  2.5 # Font size for annotations; try 4 for spring surveys, 2.5 for summer surveys
+
+# Combining length-disaggregated abundance/biomass across regions ---------------
+L.disagg.scales <- "fixed" # "fixed" or "free" scales?
 
 # Cluster relative length frequency
 # Set number of columns in facet plot

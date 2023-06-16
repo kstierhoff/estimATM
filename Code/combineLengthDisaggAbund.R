@@ -1,17 +1,20 @@
 # Combine length-disaggregated abundance/biomass across regions ---------------
-# Fixed or free scales?
-L.disagg.scales <- "fixed" # or "free"
-
 abund.summ.all <- abund.summ %>% 
   mutate(Region = "Core") %>% 
   bind_rows(abund.summ.ns)
 
-# Create plots of length-disaggregated abundance and biomass
+# Replace missing stock for some species during summer
+if (survey.name == "2207RL") {
+  abund.summ.all <- abund.summ.all %>% 
+    replace_na(list(Stock = "All"))
+}
+
+# Create plots of length-disaggregated abundance and biomass ------------------
 # Create list for storing plots
 L.disagg.plots.all <- list()
 
 if (L.disagg.scales == "fixed") {
-  # Plot length-disaggrated abundance and biomass by length class for each species
+  # Plot length-disaggregated abundance and biomass by length class for each species with fixed y-axis scale
   for (i in unique(abund.summ.all$Species)) {
     for (j in unique(abund.summ.all$Stock[abund.summ.all$Species == i])) {
       # Get y-axis limits for abundance and biomass plots
@@ -28,12 +31,6 @@ if (L.disagg.scales == "fixed") {
           geom_bar(data = filter(abund.summ.all, Species == i, Stock == j),
                    aes(TL, abundance),
                    stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Core"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Nearshore"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray70',colour = 'gray20') +
           facet_wrap(~Region, nrow = 1) +
           scale_x_continuous("Length (cm)", breaks = x.breaks) + 
           scale_y_continuous('Abundance (n)', limits = c(0, y.max.abund),
@@ -47,17 +44,10 @@ if (L.disagg.scales == "fixed") {
           geom_bar(data = filter(abund.summ.all, Species == i, Stock == j),
                    aes(TL, biomass),
                    stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Core"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Nearshore"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray70',colour = 'gray20') +
           facet_wrap(~Region, nrow = 1) +
           scale_x_continuous("Length (cm)", breaks = x.breaks) +
           scale_y_continuous('Biomass (t)', limits = c(0, y.max.biomass),
                              expand = c(0,0), labels = fancy_sci) +
-          # facet_wrap(~Stock, nrow = 1) +
           theme_bw() +
           theme(strip.background.x = element_blank(),
                 strip.text.x = element_text(face = "bold"))
@@ -77,8 +67,7 @@ if (L.disagg.scales == "fixed") {
   }
   
 } else {
-  
-  # Plot length-disaggrated abundance and biomass by length class for each species
+  # Plot length-disaggregated abundance and biomass by length class for each species with free y-axis scale
   for (i in unique(abund.summ.all$Species)) {
     for (j in unique(abund.summ.all$Stock[abund.summ.all$Species == i])) {
       # Get y-axis limits for abundance and biomass plots
@@ -95,15 +84,10 @@ if (L.disagg.scales == "fixed") {
           geom_bar(data = filter(abund.summ.all, Species == i, Stock == j),
                    aes(TL, abundance),
                    stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Core"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Nearshore"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray70',colour = 'gray20') +
           facet_wrap(~Region, nrow = 1, scales = "free_y") +
           scale_x_continuous("Length (cm)", breaks = x.breaks) + 
-          scale_y_continuous('Abundance (n)', labels = fancy_sci) +
+          scale_y_continuous('Abundance (n)', 
+                             expand = c(0, 0), labels = fancy_sci) +
           theme_bw() +
           theme(strip.background.x = element_blank(),
                 strip.text.x = element_text(face = "bold"))
@@ -113,15 +97,10 @@ if (L.disagg.scales == "fixed") {
           geom_bar(data = filter(abund.summ.all, Species == i, Stock == j),
                    aes(TL, biomass),
                    stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Core"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray50',colour = 'gray20') +
-          # geom_bar(data = filter(abund.summ.all, Species == i, Stock == j, Region == "Nearshore"),
-          #          aes(TL, abundance),
-          #          stat = 'identity',fill = 'gray70',colour = 'gray20') +
           facet_wrap(~Region, nrow = 1, scales = "free_y") +
           scale_x_continuous("Length (cm)", breaks = x.breaks) +
-          scale_y_continuous('Biomass (t)', labels = fancy_sci) +
+          scale_y_continuous('Biomass (t)', 
+                             expand = c(0, 0), labels = fancy_sci) +
           theme_bw() +
           theme(strip.background.x = element_blank(),
                 strip.text.x = element_text(face = "bold"))
