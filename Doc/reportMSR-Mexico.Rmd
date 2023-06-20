@@ -62,6 +62,10 @@ do.spatial <- T
 ```
 
 ```{r get-data}
+# Load Mexican EEZ shapefile
+eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
+  st_transform(4326)
+
 # Copy trawl Access database
 haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
                   regexp = trawl.db.access)
@@ -142,7 +146,6 @@ if (get.nav) {
   nav$nav_id <- seq_along(nav$ID)
   
   # Convert nav to spatial
-  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
     st_intersection(eez_mex)
   
@@ -258,9 +261,6 @@ wa_waters <- wa %>%
 
 # Read EEZ shapefiles -----------------------------------------
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
-  st_transform(4326)
-
-eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
   st_transform(4326)
 
 # Set padding around data  
@@ -472,7 +472,6 @@ lengths.mex <- lengths.all %>%
   left_join(spp.codes) 
 ```
 
-
 # Interactive trawl plot
 
 A map showing all trawl hauls (white points), trawls in the Mexican EEZ waters Hovering over points will show the trawl number, which includes the cruise, ship, haul, and collection.  
@@ -620,7 +619,8 @@ if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
 
 ```{r process-backscatter}
 # Load processed backscatter data
-nasc <- readRDS(here("Data/Backscatter/RL/nasc_vessel_RL.rds"))
+nasc <- readRDS(here("Data/Backscatter/RL/nasc_vessel_RL.rds")) %>% 
+  mutate(id  = seq_along(Interval))
 
 # Convert NASC to sf and extract only data in Mexico
 nasc.sf <- nasc %>% 
@@ -643,16 +643,20 @@ write_csv(catch.mex, file = here("Output/MSR", "trawl_catch_data.csv"))
 write_csv(lengths.mex, file = here("Output/MSR", "trawl_specimen_data.csv"))
 
 # CTD data
-write_csv(ctd.summary, file = here("Output/MSR", "ctd_cast_summary.csv"))
-write_csv(ctd.casts,   file = here("Output/MSR", "ctd_cast_data.csv"))
+if (exists("ctd.summary")) {
+  write_csv(ctd.summary, file = here("Output/MSR", "ctd_cast_summary.csv"))
+  write_csv(ctd.casts,   file = here("Output/MSR", "ctd_cast_data.csv"))  
+}
+
 
 # UCTD data
-write_csv(uctd.summary, file = here("Output/MSR", "uctd_cast_summary.csv"))
-write_csv(uctd.casts,   file = here("Output/MSR", "uctd_cast_data.csv"))
+if (exists("uctd.summary")) {
+  write_csv(uctd.summary, file = here("Output/MSR", "uctd_cast_summary.csv"))
+  write_csv(uctd.casts,   file = here("Output/MSR", "uctd_cast_data.csv"))
+}
 
 # Backscatter data
 write_csv(nasc.mex,   file = here("Output/MSR", "backscatter_data.csv"))
 ```
-
 
 For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
