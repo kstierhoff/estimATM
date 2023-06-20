@@ -1,0 +1,658 @@
+---
+title: "MSR Compliance for Mexican Survey"
+author: "Kevin Stierhoff"
+output: html_document
+---
+
+```{r set-up, error=FALSE, message=FALSE, warning=FALSE, echo=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,swfscMisc,lubridate,sp,rgeos,mapview,RODBC,leafem,
+               knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# Set global knitr chunk options
+if (.Platform$OS.type == "unix") {
+  # Do not specify Cairo device for MacOS
+  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', out.width = '100%', dev = "png", dpi = 150)
+} else {
+  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', out.width = '100%', dev = "png", dpi = 150,
+                        dev.args = list(type = "cairo"))
+}
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+```
+
+```{r project-info,include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r user-controls}
+get.nav    <- F
+save.figs  <- F
+resize.map <- T # Resize map during survey; if T, uses anticipated bounds of survey area
+do.spatial <- T
+```
+
+```{r get-data}
+# Copy trawl Access database
+haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+                  regexp = trawl.db.access)
+
+file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+
+if (trawl.source == "SQL") {
+  # Configure ODBC connection to TRAWL database
+  trawl.con  <- dbConnect(odbc(), 
+                          Driver = "SQL Server", 
+                          Server = "161.55.235.187", 
+                          Database = "Trawl", 
+                          Trusted_Connection = "True")
+} else if (trawl.source == "Access") {
+  trawl.con  <- dbConnect(odbc(), 
+                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                          DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+}
+
+# Import trawl database tables
+catch.all	     <- tbl(trawl.con,"Catch") %>% collect() %>% filter(cruise == cruise.name)
+haul.all       <- tbl(trawl.con,"Haul") %>% collect() %>% filter(cruise == cruise.name)
+lengths.all    <- tbl(trawl.con,"Specimen") %>% collect() %>% filter(cruise == cruise.name)
+lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect() %>% filter(cruise == cruise.name)
+spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+
+# Close database channel
+dbDisconnect(trawl.con)
+```
+
+```{r process-nav,include=FALSE}
+if (get.nav) {
+  # Load existing nav data
+  if (file.exists(here("Data/Nav/nav_data_msr.Rdata"))) {
+    load(here("Data/Nav/nav_data_msr.Rdata"))
+    
+    # Calculate difference between max nav time and now
+    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    
+    # Get new erddap start date from max date
+    erddap.survey.start <- max(date(nav$time)) - days(1)
+  }
+  
+  if (nav.lag > 24) {
+    # Generate ERDDAP URL
+    dataURL <- URLencode(paste0(
+      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+      erddap.vessel, ".csvp?",
+      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end))
+    
+    # Download and parse ERDDAP nav data
+    nav.temp <- data.frame(read.csv(dataURL, header = TRUE,  
+                                    row.names = NULL, skip = 0)) 
+    # names(nav.temp) <- erddap.headers
+    
+    # Filter to remove bad SST values
+    nav.temp <- nav.temp %>% 
+      mutate(long     = longitude..degrees_east. - 360,
+             lat      = latitude..degrees_north.,
+             SOG      = platformSpeed..meter.second.1. * 1.94384,
+             datetime = ymd_hms(time..UTC.),
+             leg      = paste("Leg", cut(as.numeric(date(time..UTC.)), 
+                                         leg.breaks, labels = F))) %>%
+      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
+             between(latitude..degrees_north., min(survey.lat), max(survey.lat)), 
+             between(long, min(survey.long), max(survey.long)))
+    
+    # Append new nav data
+    if (exists("nav")) {
+      nav <- bind_rows(nav, nav.temp) %>% 
+        distinct()
+    } else {
+      nav <- nav.temp
+    }
+  }
+  
+  # Add ID to nav data, to facilitate filtering of data in Mexico
+  nav$nav_id <- seq_along(nav$ID)
+  
+  # Convert nav to spatial
+  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) %>% 
+    st_intersection(eez_mex)
+  
+  nav.paths.sf <- nav.sf %>% 
+    group_by(leg) %>% 
+    summarise(do_union = F) %>% 
+    st_cast("LINESTRING")
+  
+  # Remove nav data outside of Mexico
+  nav <- filter(nav, nav_id %in% nav.sf$nav_id)
+  
+  # Save results
+  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data_msr.Rdata"))
+} else {
+  # Load nav data
+  load(here("Data/NAV/nav_data_msr.Rdata"))
+}
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename)) %>% 
+  rename(lat = Latitude, long = Longitude) %>% 
+  project_df(to = crs.proj)
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  mutate(
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+# Create transect lines from waypoint files and add line bearing
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(distance = round(as.numeric(st_length(.))/1852,1),
+         brg      = 360 + stplanr::line_bearing(.),
+         label    = paste("Transect", Transect),
+         popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                          'Distance:', distance, 'nmi<br/>')) 
+
+st_write(transects.sf, here("Output/planned_transects.shp"), 
+         delete_layer = TRUE)
+
+# Get most recent vessel position for plotting
+nav.now <- tail(nav, 1) %>%
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  mutate(label = paste("Last position:", time..UTC., "UTC"))
+```
+
+```{r configure-base-map,include=F}
+# Get map data -------------------------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
+  project_df(to = crs.proj)
+
+# Get land features --------------------------
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+wa     <- filter(states, name == "Washington")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Read isoline
+bathy_5m_line <- st_read(here("Data/GIS/bathy_us_wc_5m.shp")) %>% 
+  st_transform(4326) %>% 
+  rename(Depth = CONTOUR)
+
+# Read 5m bathymetry points shapefile
+bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
+
+# Read 5m bathymetry polygon
+bathy_5m_poly <- bathy_5m_points %>% 
+  summarise(do_union = F) %>% 
+  st_cast("POLYGON")
+
+# Create a reduced coastline for nearshore point estimation
+bathy_5m_df <- bathy_5m_points %>%
+  mutate(
+    long = as.data.frame(st_coordinates(.))$X,
+    lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL)
+
+write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
+
+# Read State Waters shapefiles -------------------------------
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>%
+  st_transform(4326)
+
+# Read CA MPAs shapefile --------------------------------------
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>%
+  st_transform(4326) %>%
+  mutate(MPA = paste(NAME, Type))
+
+# Create State Waters shapefile -------------------------------
+wa_waters <- wa %>% 
+  # Convert to meters for accurate buffer
+  st_transform(crs = 3310) %>% 
+  st_buffer(dist = 1852*12) %>% 
+  # Transform back to WGS84 for mapping
+  st_transform(4326)
+
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(4326)
+
+eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
+  st_transform(4326)
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox() 
+} else {
+  # Use nav data to resize map to survey progress
+  map.bounds <- eez_mex %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+
+# Create base map for inset maps
+base.map.bw <- ggplot() +
+  # Plot bathymetry contours
+  geom_sf(data = bathy, colour = "gray90") +
+  # Plot high-res land polygons
+  geom_sf(data = countries, fill = "gray90", color = "gray50") +
+  geom_sf(data = states, fill = "gray90", colour = "gray50") +
+  # Format axes and titles
+  xlab("Longitude") + ylab("Latitude") + 
+  coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"])) +
+  theme_bw() + 
+  theme(axis.text.x  = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank())
+
+# Save the basemap
+ggsave(base.map,file = here("Figs/fig_basemap_mex.png"), 
+       height = map.height, width = map.width)
+
+ggsave(base.map.bw,
+       file = here("Figs/fig_basemap_mex_bw.png"), 
+       height = map.height, width = map.width)
+```
+
+```{r mex-waters-map, eval=F}
+# Add CA state waters layer
+base.map + geom_sf(data = eez_mex, colour = "red", fill = NA) +
+  coord_sf(crs = crs.proj, 
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+```
+
+```{r modify-data}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  # Reformat haul data to match SQL
+  haul.all <- haul.all %>% 
+    mutate(
+      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)),
+      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$EquilibriumTime, 
+                                                format = "%H:%M:%S"))),
+      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                         format(haul.all$haulbackTime,
+                                                format = "%H:%M:%S")))) %>% 
+    mutate(haulBackTime = case_when(
+      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+      TRUE ~ haulBackTime)) %>%
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, notes = Notes,
+           totalWeight = TotalWtKg, totalNum = TotalNum)
+  
+  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
+  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
+  
+  # Correct equilibriumTime or haulBackTime
+  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  
+  # Reformat length frequency data to match SQL
+  lengths.all <- lengths.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, 
+           collection = Collection, species = Species)
+  
+  # Reformat length frequency data to match SQL
+  lengthFreq.all <- lengthFreq.all %>% 
+    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
+           species = Species, length = Length, lengthType = LengthType, 
+           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
+           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
+           subSampleNumber = SubSampleNumber)
+  
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    mutate(
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime))
+  
+  # Compute totalWeight and totalNum, which only exist in the Access database
+  catch.all <- catch.all %>% 
+    mutate(
+      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
+}
+
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>% 
+  mutate(season = case_when(
+    month(equilibriumTime) < 6 ~ "spring",
+    TRUE ~ "summer"),
+    duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+    cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul.all %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Create haul paths from starts and ends
+haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+```
+
+```{r filter-trawl-data}
+if (do.spatial) {
+  # Find hauls in WA waters
+  haul.mex <- haul.mid %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    # Find hauls in the US EEZ
+    st_intersection(eez_mex)
+  
+  save(haul.mex, file = here("Output/haul_data_reportMSR-Mexico.Rdata"))
+} else {
+  load(here("Output/haul_data_reportMSR-Mexico.Rdata"))
+}
+
+# Filter hauls in Mexican waters
+haul <- filter(haul.all, haul %in% haul.mex$haul)
+haul.paths <- filter(haul.paths, haul %in% haul.mex$haul)
+```
+
+```{r mex-hauls-map, eval=F}
+# Add Mexican EEZ and map hauls
+base.map + 
+  geom_sf(data = eez_mex, colour = "red", fill = NA) +
+  geom_sf(data = nav.paths.sf, colour = "gray50") +
+  geom_sf(data = haul.paths, size = 2) +
+  geom_sf(data = haul.mex, colour = "blue", fill = "white", shape = 21) +
+  coord_sf(crs = crs.proj, 
+           xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+           ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+```
+
+```{r extract-catch}
+catch.mex <- catch.all %>% 
+  filter(haul %in% haul.mex$haul) %>% 
+  left_join(spp.codes) %>% 
+  filter(!subSampleWtkg == 0) 
+```
+
+```{r process-catch}
+# Summarize species catch by weight and number
+catch.summary <- catch.mex %>% 
+  mutate(totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum = totalWeight/(subSampleWtkg/subSampleCount)) %>%
+  group_by("Scientific Name" = scientificName, 
+           "Common Name" = commonName) %>% 
+  summarise("Total weight (kg)" = round(sum(totalWeight), 2),
+            "Total number (n)"  = round(sum(totalNum), 0)) %>% 
+  arrange(desc(`Total weight (kg)`)) 
+
+write_csv(catch.summary,
+          here("Output/catch_summary_MSR-Mexico.csv"),
+          na = "")
+```
+
+```{r extract-specimens}
+lengths.mex <- lengths.all %>% 
+  filter(haul %in% haul.mex$haul) %>% 
+  left_join(spp.codes) 
+```
+
+
+# Interactive trawl plot
+
+A map showing all trawl hauls (white points), trawls in the Mexican EEZ waters Hovering over points will show the trawl number, which includes the cruise, ship, haul, and collection.  
+
+```{r catch-map-leaflet}
+# Configure palette for MPAs
+# factpal <- colorFactor(topo.colors(10), ca_mpas$MPA)
+imap.bounds <- st_bbox(nav.sf) 
+imap.bounds1 <- map_bounds(nav$lat, nav$long, 0.1)
+
+# Create leaflet map
+if (nrow(haul.mex) > 0) {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.WorldPhysical) %>%
+    # Add EEZs
+    addPolylines(data = eez_mex, color = "#000414", weight = 3, 
+                 label = "EEZ-Mexico") %>% 
+    # addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    # addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+    #                  opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+    #                  label = ~paste("Haul:", haul),
+    #                  popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.mex, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft") %>% 
+    setView(mean(imap.bounds$xmin, imap.bounds$xmax), 
+            mean(imap.bounds$ymin, imap.bounds$ymax), 
+            zoom = 7)
+} else {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
+    # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.") %>% 
+    addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+                 popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.wa, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul))  %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft")
+}
+
+```
+
+# Catch summary
+## By species
+
+Catch for all trawl samples in Mexico are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.  
+
+```{r catch-summary}
+if (nrow(catch.mex) > 0) {
+  catch.summary %>% 
+    # replace_na(list(`Total weight (kg)` = "-",
+    #                 `Total number (n)` = "-")) %>%
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    column_spec(1, italic = T) %>% 
+    scroll_box(height = "500px") 
+} else {
+  cat("No catch in Mexico")
+}
+```
+
+## By haul
+
+Catch for each trawl sample by species.  
+
+```{r catch-hauls}
+if (nrow(catch.mex) > 0) {
+  catch.all <- catch.mex %>% 
+    select(Haul = haul,
+           "Scientific Name" = scientificName,
+           "Common Name" = commonName,
+           "Total weight (kg)" = totalWeight, 
+           "Total number (n)" = totalNum) %>% 
+    arrange(Haul, desc(`Total weight (kg)`))
+  
+  catch.all %>% 
+    # replace_na(list(`Total weight (kg)` = "-",
+    #                 `Total number (n)` = "-")) %>%
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    column_spec(2, italic = T) %>% 
+    scroll_box(height = "500px")
+  
+  write_csv(catch.all,
+            here("Output/catch_table_MSR-Mexico.csv"),
+            na = "") 
+} else {
+  cat("No catch in Mexico")
+}
+```
+
+```{r process-ctds}
+# CTD casts
+if (file.exists(here("Data/CTD/ctd_data.Rdata"))) {
+  # Load cast data
+  load(here("Data/CTD/ctd_data.Rdata"))
+  # Load summaries, which contain date/time and spatial info
+  ctd.summary <- read_csv(here("Output/cast_summary_ctd.csv"))
+  # Add date/time and spatial info to cast data
+  ctd.casts <- all.ctd.casts %>% 
+    left_join(select(ctd.summary, cast, cast.date, lat, long))
+}
+
+# UCTD casts
+if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
+  # Load cast data
+  load(here("Data/UCTD/uctd_data.Rdata"))
+  # Load summaries, which contain date/time and spatial info
+  uctd.summary <- read_csv(here("Output/cast_summary_uctd.csv"))
+  # Add date/time and spatial info to cast data
+  uctd.casts <- all.uctd.casts %>% 
+    left_join(select(uctd.summary, cast, cast.date, lat, long))
+}
+```
+
+```{r process-backscatter}
+# Load processed backscatter data
+nasc <- readRDS(here("Data/Backscatter/RL/nasc_vessel_RL.rds"))
+
+# Convert NASC to sf and extract only data in Mexico
+nasc.sf <- nasc %>% 
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog) %>% 
+  st_intersection(eez_mex)
+
+# Filter NASC to include only Mexico data
+nasc.mex <- filter(nasc, id %in% nasc.sf$id)
+```
+
+```{r export-data}
+fs::dir_create(here("Output/MSR"))
+
+# Meteorological data
+write_csv(nav, file = here("Output/MSR", "meteorological_data.csv"))
+
+# Trawl data
+write_csv(haul, file = here("Output/MSR", "trawl_haul_data.csv"))
+write_csv(catch.mex, file = here("Output/MSR", "trawl_catch_data.csv"))
+write_csv(lengths.mex, file = here("Output/MSR", "trawl_specimen_data.csv"))
+
+# CTD data
+write_csv(ctd.summary, file = here("Output/MSR", "ctd_cast_summary.csv"))
+write_csv(ctd.casts,   file = here("Output/MSR", "ctd_cast_data.csv"))
+
+# UCTD data
+write_csv(uctd.summary, file = here("Output/MSR", "uctd_cast_summary.csv"))
+write_csv(uctd.casts,   file = here("Output/MSR", "uctd_cast_data.csv"))
+
+# Backscatter data
+write_csv(nasc.mex,   file = here("Output/MSR", "backscatter_data.csv"))
+```
+
+
+For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
