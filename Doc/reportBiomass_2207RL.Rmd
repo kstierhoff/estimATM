@@ -1,10 +1,6 @@
 ---
 # title: "DISTRIBUTION, BIOMASS, AND DEMOGRAPHICS OF COASTAL PELAGIC FISHES IN THE CALIFORNIA CURRENT ECOSYSTEM DURING SUMMER 2022 BASED ON ACOUSTIC-TRAWL SAMPLING"
 # author:
-#   - K.L. Stierhoff, NOAA Fisheries-Southwest Fisheries Science Center (NMFS-SWFSC)
-#   - J.P. Zwolinski, UCSC, Coop. Inst. for Mar., Earth, & Atm. Sys. and NMFS-SWFSC
-#   - J.S. Renfree, NMFS-SWFSC
-#   - D.A. Demer, NMFS-SWFSC
 # date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
   bookdown::pdf_document2:
@@ -18,7 +14,7 @@ output:
     toc_float: yes
   bookdown::word_document2:
     reference_docx: template/report_template_Rmarkdown.docx
-    toc: yes
+    toc: false
     toc_depth: 3
     pandoc_args:
     - --filter
@@ -42,18 +38,21 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate,knitr,here,
-               png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
-               odbc,cowplot,mapview,fs,beepr,reshape2,patchwork)
+               png,devtools,forcats,jpeg,bookdown,bookdownplus,magick,
+               odbc,cowplot,mapview,fs,beepr,reshape2,patchwork,gt)
 
 # Install and load required packages from Github -------------------------------
-# surveyR
+# AST packages
 pacman::p_load_gh("kstierhoff/surveyR")
 pacman::p_load_gh("kstierhoff/atm")
+
+# kableExtra - for R >= 4.3.0
+pacman::p_load_gh("kupietz/kableExtra")
 
 # set system time zone to UTC
 Sys.setenv(tz = "UTC")
 
-# determines method of table generation (whether kable or xtable) for best formatting
+# determines method of table generation (whether kable or flextable) for best formatting
 doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
 if (is.null(doc.type)) {doc.type <- "html"}
 
@@ -1466,12 +1465,6 @@ be.table.sub.all <- be.table.summ %>%
   filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
   mutate(Region = "All")
 
-# be.table.sub <- be.table %>% 
-#   filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
-#   mutate(Region = "Core") %>% 
-#   bind_rows(be.table.sub.ns) %>% 
-#   select(Name, Stock, Region, everything())
-
 be.table.sub <- be.table %>% 
   filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
   mutate(Region = "Core") %>% 
@@ -1482,27 +1475,26 @@ be.table.sub <- be.table %>%
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
-    regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+    regulartable(be.table.sub) %>%
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>% 
-      merge_h(part = "header") %>% 
-      align(align = "center",part = "header") %>% 
+                 CV = "Biomass") %>%
+      merge_h(part = "header") %>%
+      align(align = "center",part = "header") %>%
       autofit()
   } else {
     kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
           align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
           digits          = c(0),
           format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-anch-n)') %>% 
+          caption = '(ref:biomass-anch-n)') %>%
       kable_styling(latex_options = c("hold_position","scale_down"),
                     position = "center",
-                    font_size = 8) %>% 
+                    font_size = 8) %>%
       row_spec(nrow(be.table.sub), bold = T) %>%
       collapse_rows(columns = 1, valign = "top") %>%
       add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
@@ -1622,10 +1614,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
@@ -1762,10 +1753,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
@@ -1901,10 +1891,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
@@ -2040,10 +2029,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
@@ -2179,10 +2167,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
@@ -2331,10 +2318,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
@@ -2465,10 +2451,9 @@ be.table.sub <- be.table %>%
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
     regulartable(be.table.sub) %>% 
-      merge_v(j = c("Name")) %>% 
-      italic(j = 1) %>%
-      add_header(Name  = "",
-                 Stock    = "",
+      merge_v(j = c("Region")) %>%
+      add_header(Region  = "",
+                 # Stock    = "",
                  Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
                  Clusters = "Trawl", Individuals = "Trawl",
                  "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
