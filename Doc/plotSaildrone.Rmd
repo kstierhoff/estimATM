@@ -22,21 +22,16 @@ pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 
 # Get nav from ERDDAP
-get.nav    <- F
+get.nav    <- T
 get.nav.sd <- T
 
 # Other settings
 resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
-
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 ```
 
 ```{r user-input,echo=FALSE}
-# Saildrone numbers to include
-saildrone.list <- c(1045, 1046, 1047)
-type.list <- c("Offshore", "Nearshore")
-
 # Get project name from directory
 prj.name <- last(unlist(str_split(here(), "/")))
 
@@ -46,6 +41,10 @@ settings.files <- dir(here("Doc/settings"))
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
+
+# Saildrone numbers to include
+# saildrone.list <- c(1045, 1046, 1047)
+type.list <- c("Offshore", "Nearshore")
 ```
 
 # Load Lasker NASC data  
@@ -279,7 +278,7 @@ for (i in unique(nav.sd$saildrone)) {
 # Select only Saildrones in our analysis and restrict data to date range 
 # to eliminate transits
 nav.sd <- nav.sd %>% 
-  filter(saildrone %in% saildrone.list) %>% 
+  filter(saildrone %in% sd.numbers) %>% 
   mutate(datetime = datetime + hours(sd.time.offset), # Apply time adjustment, if necessary
          date     = date(datetime)) %>% 
   left_join(sd.date.range) %>% 
@@ -376,7 +375,7 @@ sd.intersection <- sd.sf %>%
 
 # Summarise resulting data
 sd.summary <- sd.intersection %>% 
-  filter(saildrone %in% saildrone.list) %>% 
+  filter(saildrone %in% sd.numbers) %>% 
   group_by(saildrone, label) %>% 
   summarise(
     n = n(),
@@ -406,7 +405,7 @@ DT::datatable(sd.final)
 # Intersect filtered Saildrone with planned transect buffers
 
 ```{r intersect-nav-final,out.height='10in',out.width='100%'}
-sd.int.final <- filter(sd.intersection, saildrone %in% saildrone.list)
+sd.int.final <- filter(sd.intersection, saildrone %in% sd.numbers)
 
 mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
   # mapview(sd.lines, zcol = "saildrone") +
@@ -419,7 +418,7 @@ mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0
 shimadaCTD_raw <- read.csv("Q:/SURVEYS/20220627_LISA-MARIE_SummerCPS/DATA/CTD/NWFSC Cruise SH22-08/2022_all_ctd_meta.csv")
 shimadaCTD<- st_as_sf(shimadaCTD_raw, coords = c("Longitude", "Latitude"), crs = 4326)
 
-sd.int.final <- filter(sd.intersection, saildrone %in% saildrone.list) %>% 
+sd.int.final <- filter(sd.intersection, saildrone %in% sd.numbers) %>% 
   mutate(saildrone = as.character(saildrone))
 
 mapview(sd.lines, zcol = "saildrone") + 
