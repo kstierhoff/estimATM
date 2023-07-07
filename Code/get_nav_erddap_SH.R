@@ -1,29 +1,29 @@
-if (get.nav) {
+if (get.nav.sh) {
   
   # Load existing nav data
-  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
-    load(here("Data/Nav/nav_data.Rdata"))
+  if (file.exists(here("Data/Nav/nav_data_sh.Rdata"))) {
+    load(here("Data/Nav/nav_data_sh.Rdata"))
     
     # Calculate difference between max nav time and now
-    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
+    nav.lag.sh <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sh$time)), units = "hours")
     
     # Get new ERDDAP start date from max date
-    erddap.survey.start.new <- date(tail(nav$time,1))
+    erddap.survey.start.sh.new <- date(tail(nav.sh$time,1))
   } else {
-    nav.lag <- 24
+    nav.lag.sh <- 24
     # Set new ERDDAP start date equal to original
-    erddap.survey.start.new <- erddap.survey.start
+    erddap.survey.start.sh.new <- erddap.survey.start.sh
   }
   
-  if (nav.lag >= 24) {
+  if (nav.lag.sh >= 24) {
     # Generate ERDDAP URL
     dataURL <- URLencode(paste0(
       "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-      erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start.new, "&time<=", erddap.survey.end))
+      erddap.vessel.sh, ".csv0?", erddap.vars,
+      "&time>=", erddap.survey.start.sh.new, "&time<=", erddap.survey.end.sh))
     
     # Download and parse ERDDAP nav data
-    nav.temp <- read_csv(dataURL, lazy = FALSE,
+    nav.temp.sh <- read_csv(dataURL, lazy = FALSE,
                          col_names = erddap.headers) %>% 
       mutate(long     = long - 360,
              SOG      = SOG * 1.94384,
@@ -34,44 +34,44 @@ if (get.nav) {
              wind_angle = (wind_dir/360)*2*pi,
              leg      = paste("Leg", 
                               cut(as.numeric(date(time)), 
-                                  leg.breaks, 
+                                  leg.breaks.sh, 
                                   labels = FALSE))) 
     
     # Append new nav data
-    if (exists("nav")) {
-      nav <- bind_rows(nav, nav.temp) %>% 
+    if (exists("nav.sh")) {
+      nav.sh <- bind_rows(nav.sh, nav.temp.sh) %>% 
         distinct()
     } else {
-      nav <- nav.temp
+      nav.sh <- nav.temp.sh
     }
   }
   
   # Save unfiltered nav data
-  saveRDS(nav, here("Data/Nav/nav_data_raw.rds"))
+  saveRDS(nav.sh, here("Data/Nav/nav_data_raw_sh.rds"))
   
   # Filter nav data
-  nav <- nav %>%
+  nav.sh <- nav.sh %>%
     filter(is.na(ymd_hms(time)) == FALSE,
            is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
            between(long, min(survey.long), max(survey.long)))
   
   # Convert nav to spatial
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
+  nav.sh.sf <- st_as_sf(nav.sh, coords = c("long","lat"), crs = crs.geog) 
   
   # Cast nav to transects
-  nav.paths.sf <- nav.sf %>% 
+  nav.paths.sh.sf <- nav.sh.sf %>% 
     group_by(leg) %>% 
     summarise(do_union = FALSE) %>% 
     st_cast("LINESTRING") %>% 
     mutate(distance_nmi = as.numeric(st_length(.)*0.000539957))
   
   # Save results
-  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
+  save(nav.sh, nav.sh.sf, nav.paths.sh.sf, file = here("Data/Nav/nav_data_sh.Rdata"))
   
 } else {
-  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
+  if (file.exists(here("Data/Nav/nav_data_sh.Rdata"))) {
     # Load nav data
-    load(here("Data/Nav/nav_data.Rdata")) 
+    load(here("Data/Nav/nav_data_sh.Rdata")) 
   }
 }

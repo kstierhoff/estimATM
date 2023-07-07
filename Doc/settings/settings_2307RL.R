@@ -107,7 +107,7 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-01", "2023-08-01", 
                                           "2023-09-01", "2023-10-01")))
 
-# Define ERDDAP data variables
+# Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2023-07-01" # Start of survey for ERDDAP vessel data query
@@ -117,6 +117,18 @@ erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric"
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
 survey.lat           <- c(27,51)
 survey.long          <- c(-130,-113)
+
+# Inport dates for classifying data by cruise leg (if desired) -----------------
+# Use start dates of each leg + end date of last leg
+leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05", 
+                                          "2023-07-23", "2023-08-09", 
+                                          "2023-08-27", "2023-09-12",
+                                          "2023-09-16")))
+
+# Define ERDDAP data variables for Shimada
+erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.survey.start.sh  <- "2023-06-18" # Start of survey for ERDDAP vessel data query
+erddap.survey.end.sh    <- "2023-10-01" # End of survey for ERDDAP vessel data query
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2307RL.csv"
