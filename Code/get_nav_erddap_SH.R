@@ -75,3 +75,9 @@ if (get.nav.sh) {
     load(here("Data/Nav/nav_data_sh.Rdata")) 
   }
 }
+
+# Get most recent vessel position for plotting
+nav.now.sh <- tail(nav.sh.sf, 1) %>% 
+  mutate(label = paste("Last position:", time, "UTC"),
+         popup = paste0('<b>Vessel name: </b>', 'Shimada', '<br/>',
+                        '<b>Last position: </b>', time, ' UTC<br/>'))

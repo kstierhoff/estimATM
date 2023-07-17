@@ -529,11 +529,11 @@ if (sampling.trawl) {
     st_as_sf(coords = c("long", "lat"), crs = crs.geog) 
   
   haul.catch <- project_sf(haul.catch, crs = crs.proj) 
+  
+  # Save haul and cluster data
+  save(haul.pie, cluster.pie, haul.pos, cluster.pos, haul.zero, cluster.zero,
+       file = here("Output/trawl_pie_plotBio.Rdata"))  
 }
-
-# Save haul and cluster data
-save(haul.pie, cluster.pie, haul.pos, cluster.pos, haul.zero, cluster.zero,
-     file = here("Output/trawl_pie_plotBio.Rdata"))
 ```
 
 ```{r process-cufes}
@@ -639,7 +639,6 @@ if (sampling.cufes) {
 
 ```{r process-csv-cps}
 if (sampling.acoustics) {
-  
   # Get fileSnapshot at the beginning of the knit, to compare with the end of the last knit
   csv.snapshot.start <- fileSnapshot(here("Data/Backscatter", survey.vessel.primary),
                                      full.names = FALSE)
@@ -1411,6 +1410,16 @@ if (exists("nav.now.sd"))
   i.map <- i.map %>% 
   addMarkers(data = nav.now.sd, label = ~label, popup = ~popup, 
              group = "Saildrone Positions")
+
+# Add Shimada data
+if (exists("nav.paths.sh.sf"))
+  i.map <- i.map %>% 
+  addPolylines(data = nav.paths.sh.sf, color = c("#000414"), weight = 3,
+               label = ~paste("Leg", leg), group = "Vessel Track")
+if (exists("nav.now.sh"))
+  i.map <- i.map %>% 
+  addMarkers(data = nav.now.sh, label = ~label, popup = ~popup, 
+             group = "Vessel Positions")
 
 # Set visible layers
 i.map <- i.map %>%  
