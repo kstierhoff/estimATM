@@ -11,13 +11,14 @@ library(readr)    # For reading and writing plain text files
 
 # Directory of CTD files to process
 # dir.CTD <- 'C:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\'
-dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\_CTD_to_Process\\'
+dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
 dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
-dir.PSA <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PSA\\'
+# dir.PSA <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PSA\\'
+dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 
 # CTD configuration file
 file.con <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\UCTD.con'
@@ -33,7 +34,6 @@ dir.ECS <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
 pause <- 2
-
 
 # Process CTD data --------------------------------------------------------
 
