@@ -11,10 +11,10 @@ library(readr)    # For reading and writing plain text files
 
 # Directory of CTD files to process
 # dir.CTD <- 'C:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\'
-dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\CTD_to_Process\\'
+dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\_CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\CTD_to_Process\\PROCESSED\\'
+dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PSA\\'
