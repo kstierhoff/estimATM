@@ -360,7 +360,7 @@ nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
                             SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*Krill-Juan Krill Final 120.csv",
+nasc.pattern.krill     <- c(RL  = "*KRILL-Juan Krill Final 120.csv",
                             LM  = "*Krill-Juan Krill Final 120.csv",
                             LBC = "*Krill-Juan Krill Final 120.csv",
                             SD  = "*Krill-Juan Krill Final 120.csv")
@@ -519,7 +519,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "SQL" # "SQL" or "Access"
+trawl.source           <- "Access" # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2307RL.accdb"
