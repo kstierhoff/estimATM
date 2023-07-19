@@ -282,15 +282,22 @@ if (sampling.trawl) {
     catch.all	     <- tbl(trawl.channel,"Catch") %>% collect()
     haul.all       <- tbl(trawl.channel,"Haul") %>% collect()
     lengths.all    <- tbl(trawl.channel,"Specimen") %>% collect()
-    lengthFreq.all <- tbl(trawl.channel,"LengthFrequency") %>% collect()
+    if (dbExistsTable(trawl.channel, "LengthFrequency"))
+      lengthFreq.all <- tbl(trawl.channel,"LengthFrequency") %>% collect()
     spp.codes      <- tbl(trawl.channel,"SpeciesCodes") %>% collect()
     
     # Close database channel
     dbDisconnect(trawl.channel)
     
     # Save imported database data to .Rdata file
-    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+    if (exists("lengthFreq.all")) {
+      save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
          file = here("Data/Trawl/trawl_data.Rdata"))
+    } else {
+      save(catch.all, haul.all, lengths.all, spp.codes,  
+         file = here("Data/Trawl/trawl_data.Rdata"))
+    }
+    
   } else {
     # Load data
     load(here("Data/Trawl/trawl_data.Rdata"))
@@ -375,18 +382,19 @@ if (sampling.trawl) {
     filter(!trawlPerformance %in% trawl.performance) %>% 
     arrange(haul) %>% 
     mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-           cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1)  
+           cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1,
+           sample.type = "Trawl")  
   
   # Find midpoint of each haul as the mean lat/long
   haul.mid <- haul %>% 
-    group_by(cluster, haul) %>% 
+    group_by(cluster, haul, sample.type) %>% 
     summarise(
       lat  = mean(c(startLatDecimal, stopLatDecimal)),
       long = mean(c(startLongDecimal, stopLongDecimal))) 
   
   # Find midpoint of each haul cluster as the average of haul midpoints
   cluster.mid <- haul.mid %>% 
-    group_by(cluster) %>% 
+    group_by(cluster, sample.type) %>% 
     summarise(
       lat  = mean(lat),
       long = mean(long))
@@ -420,7 +428,8 @@ if (sampling.trawl) {
     if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
     if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
     if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
-    if (!has_name(haul.summ.wt, "Etrumeus acuminatus")) {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+    if (!has_name(haul.summ.wt, "Etrumeus acuminatus"))   {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+    if (!has_name(haul.summ.wt, "Other"))                 {haul.summ.wt$`Other` <- 0}
     
     # Calculate total weight of all CPS species
     haul.summ.wt <- haul.summ.wt %>%  
@@ -433,7 +442,8 @@ if (sampling.trawl) {
              "Sardine"    = "Sardinops sagax",
              "PacMack"    = "Scomber japonicus",
              "JackMack"   = "Trachurus symmetricus",
-             "RndHerring" = "Etrumeus acuminatus") 
+             "RndHerring" = "Etrumeus acuminatus",
+             "Other"      = "Other") 
     
     # Summarise catch by cluster
     cluster.summ.wt <- haul.summ.wt %>% 
@@ -460,6 +470,7 @@ if (sampling.trawl) {
                                 "PacMack"    = rep(0, nrow(haul)),
                                 "JackMack"   = rep(0, nrow(haul)),
                                 "RndHerring" = rep(0, nrow(haul)),
+                                "Other"      = rep(0, nrow(haul)),
                                 "AllCPS"     = rep(0, nrow(haul)))) %>% 
       right_join(haul.mid)
     
@@ -477,7 +488,8 @@ if (sampling.trawl) {
   # Select and rename trawl data for pie charts
   haul.pie <- haul.summ.wt %>% 
     select(haul, long, lat, Anchovy, JackMack, 
-           Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>%
+           Jacksmelt, Other, PacHerring, PacMack, 
+           RndHerring, Sardine, AllCPS, sample.type) %>%
     # Create bins for defining point size in NASC plots
     mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
            bin.level = as.numeric(bin)) %>% 
@@ -485,7 +497,8 @@ if (sampling.trawl) {
   
   cluster.pie <- cluster.summ.wt %>% 
     select(cluster, long, lat, Anchovy, JackMack, 
-           Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+           Jacksmelt, Other, PacHerring, PacMack, 
+           RndHerring, Sardine, AllCPS, sample.type) %>% 
     # Create bins for defining point size in NASC plots
     mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
            bin.level =  as.numeric(bin)) %>% 
@@ -887,7 +900,8 @@ if (sampling.acoustics) {
                        'Distance: ', round(min(dist_m)), "-", round(max(dist_m)), ' m'),
         popup = paste0('<b>Transect: </b>', transect[1], '<br/>',
                        '<b>Time: </b>', min(datetime), " - ", max(datetime), ' UTC<br/>',
-                       '<b>Latitude: </b>', round(lat,4), ", ", '<b>Longitude: </b>', round(long,4), '<br/>',
+                       '<b>Latitude: </b>', round(lat,4), ", ", 
+                       '<b>Longitude: </b>', round(long,4), '<br/>',
                        '<b>Distance: </b>', round(min(dist_m)), "-", round(max(dist_m)), ' m<br/>',
                        '<b>NASC: </b>', round(mean(NASC)), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>%
       # Create bins for defining point size in NASC plots%>% 
