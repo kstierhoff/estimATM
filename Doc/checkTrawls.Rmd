@@ -62,7 +62,7 @@ dir_create(here(c("Figs", "Output")))
 # User-specified settings
 get.db     <- T # Extract data from trawl database (F for testing)
 get.nav    <- T # Download NOAA Ship nav data
-nav.source <- "SCS" # Navigation data source: ERDDAP or SCS
+nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 ```
 
 ```{r get-nav}
@@ -85,7 +85,8 @@ if (get.db) {
                             Trusted_Connection = "True")
   } else if (trawl.source == "Access") {
     # Copy trawl Access database
-    haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
+    haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary],
+                                "DATA/BIOLOGICAL/HAUL"),
                       regexp = trawl.db.access)
     
     file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
@@ -99,16 +100,21 @@ if (get.db) {
   catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
   haul.all       <- tbl(trawl.con,"Haul") %>% collect()
   lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-  lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+  if (dbExistsTable(trawl.con, "LengthFrequency"))
+      lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
   spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
   
   # Close database channel
   dbDisconnect(trawl.con)
   
-  # Save trawl data
-  save(catch.all, haul.all, lengths.all, lengthFreq.all, spp.codes,
-       file = here("Data/Trawl/checkTrawl_data.Rdata"))
-  
+  # Save imported database data to .Rdata file
+    if (exists("lengthFreq.all")) {
+      save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+         file = here("Data/Trawl/checkTrawl_data.Rdata"))
+    } else {
+      save(catch.all, haul.all, lengths.all, spp.codes,  
+         file = here("Data/Trawl/checkTrawl_data.Rdata"))
+    }
 } else {
   # Load trawl data
   load(here("Data/Trawl/checkTrawl_data.Rdata"))
@@ -140,12 +146,13 @@ if (trawl.source == "Access") {
   haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
   
   # Reformat length frequency data to match SQL
-  lengthFreq.all <- lengthFreq.all %>% 
+  if (exists("lengthFreq.all")) {
+    lengthFreq.all <- lengthFreq.all %>% 
     rename(length = Length, lengthType = LengthType, 
            sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
            inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
            subSampleNumber = SubSampleNumber)
-  
+  }
 } else if (trawl.source == "SQL") {
   haul.all <- haul.all %>% 
     arrange(haul) %>% 
@@ -351,47 +358,49 @@ saveRDS(haul.paths, file = here("Output/haul_paths.rds"))
 
 ```{r process-trawl-length-data}
 # Process trawl length data -------------------------------------------------------
-if (nrow(lengthFreq.all) > 0) {
-  # Process binned length data from all surveys
-  lengths.expanded.all <- lengthFreq.all %>%
-    left_join(select(spp.codes, species, scientificName, commonName)) %>%
-    # Remove samples from 4meshnet
-    filter(netSampleType == 'codend') %>%
-    select(cruise, ship, haul, collection, species, scientificName, length,
-           lengthType, sexUnknown, male, totalFemale) %>% 
-    gather(sex, count, -cruise, -ship, -haul, -collection, -species, 
-           -scientificName, -lengthType, -length) %>%
-    filter(count != 0) %>% 
-    droplevels() %>% 
-    # Expand data frame by counts
-    uncount(weights = count)
-  
-  if (nrow(lengths.expanded.all) > 0) {
-    # Extract data by length type (SL, FL, and TL) and combine
-    lengths.expanded.final <- data.frame()
+if (exists("lengthFreq.all")) {
+  if (nrow(lengthFreq.all) > 0) {
+    # Process binned length data from all surveys
+    lengths.expanded.all <- lengthFreq.all %>%
+      left_join(select(spp.codes, species, scientificName, commonName)) %>%
+      # Remove samples from 4meshnet
+      filter(netSampleType == 'codend') %>%
+      select(cruise, ship, haul, collection, species, scientificName, length,
+             lengthType, sexUnknown, male, totalFemale) %>% 
+      gather(sex, count, -cruise, -ship, -haul, -collection, -species, 
+             -scientificName, -lengthType, -length) %>%
+      filter(count != 0) %>% 
+      droplevels() %>% 
+      # Expand data frame by counts
+      uncount(weights = count)
     
-    for (i in unique(lengths.expanded.all$lengthType)) {
-      l.temp <- filter(lengths.expanded.all, lengthType == i)
-      names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
-      lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
+    if (nrow(lengths.expanded.all) > 0) {
+      # Extract data by length type (SL, FL, and TL) and combine
+      lengths.expanded.final <- data.frame()
+      
+      for (i in unique(lengths.expanded.all$lengthType)) {
+        l.temp <- filter(lengths.expanded.all, lengthType == i)
+        names(l.temp)[names(l.temp) == 'length'] <- as.character(i)
+        lengths.expanded.final <- bind_rows(lengths.expanded.final, l.temp)
+      }
+      
+      # Add missing length columns
+      if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
+      if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
+      if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
+      if (is.null(lengths.expanded.final$ML)) {lengths.expanded.final$ML <- NA}
+      
+      # Remove unwanted columns and rename length columns  
+      lengths.expanded.final <- lengths.expanded.final %>% 
+        rename(forkLength_mm     = FL,
+               standardLength_mm = SL,
+               totalLength_mm    = TL,
+               mantleLength_mm   = ML) %>% 
+        mutate(
+          flaggedData = "N",
+          isRandomSample = "Y",
+          binned = TRUE)
     }
-    
-    # Add missing length columns
-    if (is.null(lengths.expanded.final$FL)) {lengths.expanded.final$FL <- NA}
-    if (is.null(lengths.expanded.final$SL)) {lengths.expanded.final$SL <- NA}
-    if (is.null(lengths.expanded.final$TL)) {lengths.expanded.final$TL <- NA}
-    if (is.null(lengths.expanded.final$ML)) {lengths.expanded.final$ML <- NA}
-    
-    # Remove unwanted columns and rename length columns  
-    lengths.expanded.final <- lengths.expanded.final %>% 
-      rename(forkLength_mm     = FL,
-             standardLength_mm = SL,
-             totalLength_mm    = TL,
-             mantleLength_mm   = ML) %>% 
-      mutate(
-        flaggedData = "N",
-        isRandomSample = "Y",
-        binned = TRUE)
   }
 }
 
