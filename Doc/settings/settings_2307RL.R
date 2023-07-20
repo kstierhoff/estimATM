@@ -112,18 +112,18 @@ erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaa
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2023-07-16" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2023-10-01" # End of survey for ERDDAP vessel data query
-erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed")
-erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric")
-erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed")
+erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
+erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
+erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed","flag")
 survey.lat           <- c(27,51)
 survey.long          <- c(-130,-113)
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
 leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05", 
-                                          "2023-07-23", "2023-08-09", 
-                                          "2023-08-27", "2023-09-12",
-                                          "2023-09-16")))
+                                             "2023-07-23", "2023-08-09", 
+                                             "2023-08-27", "2023-09-12",
+                                             "2023-09-16")))
 
 # Define ERDDAP data variables for Shimada
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
@@ -742,7 +742,7 @@ cal.sal            <-   35.0   # enter salinity at sphere depth
 cal.c              <- 1530.6   # enter sound speed (m/s)
 cal.min.z          <-    5     # enter minimum water depth below transducers
 cal.max.z          <-   10     # enter maximum water depth below transducers
- 
+
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
 cal.noise          <- list(RL  = NA,

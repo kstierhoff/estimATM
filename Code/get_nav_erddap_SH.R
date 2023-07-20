@@ -34,8 +34,28 @@ if (get.nav.sh) {
              wind_angle = (wind_dir/360)*2*pi,
              leg      = paste("Leg", 
                               cut(as.numeric(date(time)), 
-                                  leg.breaks.sh, 
-                                  labels = FALSE))) 
+                                  leg.breaks, 
+                                  labels = FALSE)),
+             id       = seq_along(time)) %>%
+      # Identify flags not equal to "Z"
+      mutate(flag_sum = nchar(str_replace_all(flag, "Z", ""))) %>% 
+      # Remove data with bad flags
+      filter(flag_sum == 0)
+    
+    # Compute distance between each point, and remove points with unrealistic distances
+    nav.temp.sh.sf <- nav.temp.sh %>% 
+      st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
+      st_transform(crs = 3310) %>%
+      mutate(distance_to_next = as.numeric(
+        na.omit(c(0, st_distance(geometry,
+                                 lead(geometry, 
+                                      default = NA),
+                                 by_element = TRUE))))/1852) %>% 
+      filter(distance_to_next < 20)
+    
+    # Subset nav data that are in nav.temp.sf
+    nav.temp.sh <- nav.temp.sh %>% 
+      filter(id %in% nav.temp.sh.sf$id)
     
     # Append new nav data
     if (exists("nav.sh")) {
@@ -54,7 +74,8 @@ if (get.nav.sh) {
     filter(is.na(ymd_hms(time)) == FALSE,
            is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
-           between(long, min(survey.long), max(survey.long)))
+           between(long, min(survey.long), max(survey.long)),
+           flag_sum == 0)
   
   # Convert nav to spatial
   nav.sh.sf <- st_as_sf(nav.sh, coords = c("long","lat"), crs = crs.geog) 
