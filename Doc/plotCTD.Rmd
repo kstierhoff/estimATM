@@ -62,7 +62,7 @@ process.files   <- T # process CTD/UCTD files
 copy.files      <- T # copy data files from data to plotCTD directory
 overwrite.files <- T # overwrite existing files
 get.nav         <- T # Download NOAA Ship nav data
-nav.source      <- "SCS" # Navigation data source: ERDDAP or SCS
+nav.source      <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 
 save.figs       <- T # create new figures
 get.map         <- F # download map from rnaturalearth
@@ -76,7 +76,7 @@ if (copy.files) {
   
   # Copy UCTD data ------------------------------------
   # Location of header files on survey directory
-  uctd.hdr <- dir_ls(uctd.dir, regexp = uctd.hdr.pattern) %>% 
+  uctd.hdr <- dir_ls(uctd.dir, regexp = uctd.hdr.pattern, recurse = TRUE) %>% 
     path_filter(regexp = "_processed", invert = TRUE)
   
   # Copy files to plotCTD directory
@@ -84,7 +84,7 @@ if (copy.files) {
             overwrite = overwrite.files)
   
   # Location of processed UCTD files on survey directory
-  uctd.proc <- dir_ls(uctd.dir, regexp = uctd.cast.pattern) %>% 
+  uctd.proc <- dir_ls(uctd.dir, regexp = uctd.cast.pattern, recurse = TRUE) %>% 
     path_filter(regexp = "_processed")
   
   # Copy files to plotCTD directory
@@ -93,7 +93,7 @@ if (copy.files) {
   
   # Copy CTD data -------------------------------------
   # List raw CTD ASCII files
-  ctd.hdr <- dir_ls(ctd.dir, regexp = ctd.hdr.pattern) %>% 
+  ctd.hdr <- dir_ls(ctd.dir, regexp = ctd.hdr.pattern, recurse = TRUE) %>% 
     path_filter(regexp = "_processed", invert = TRUE)
   
   # Copy files to plotCTD directory
@@ -101,7 +101,7 @@ if (copy.files) {
             overwrite = overwrite.files)
   
   # Location of processed CTD files on survey directory
-  ctd.proc <- dir_ls(ctd.dir, regexp = ctd.cast.pattern) %>% 
+  ctd.proc <- dir_ls(ctd.dir, regexp = ctd.cast.pattern, recurse = TRUE) %>% 
     path_filter(regexp = "_processed")
   
   # Copy files to plotCTD directory
@@ -158,7 +158,7 @@ nav.now <- tail(nav.sf, 1) %>%
 ```{r process-uctd}
 # Process UCTD header files #####
 # List raw UCTD ASCII files
-uctd.hdr <- dir_ls(here("Data/UCTD"), regexp = uctd.hdr.pattern) %>% 
+uctd.hdr <- dir_ls(here("Data/UCTD"), regexp = uctd.hdr.pattern, recurse = TRUE) %>% 
   path_filter(regexp = "_processed", invert = TRUE)
 
 # Plot UCTD casts
@@ -289,7 +289,7 @@ if (length(uctd.hdr) == 0) {
 
 ```{r process-ctd}
 # List raw CTD ASCII files
-ctd.hdr <- dir_ls(here("Data/CTD"), regexp = ctd.hdr.pattern) %>% 
+ctd.hdr <- dir_ls(here("Data/CTD"), regexp = ctd.hdr.pattern, recurse = TRUE) %>% 
   path_filter(regexp = "_processed", invert = TRUE)
 
 # Create empty figure if no CTD casts present
@@ -494,7 +494,7 @@ i.map <- leaflet() %>%
   # Enable tile caching
   enableTileCaching() %>%
   # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-  addProviderTiles(providers$Esri.OceanBasemap,
+  addProviderTiles(providers$Esri.NatGeoWorldMap,
                    options = tileOptions(useCache = useCachedTile,
                                          crossOrigin = useCrossOrigin)) %>% 
   # Add scale bar
@@ -542,6 +542,7 @@ if (length(uctd.hdr) > 0) {
 ```  
 
 ## Unprocessed UCTD casts  
+
 List of UCTD casts not yet processed. 
 
 ```{r uctd-missing, include=TRUE}
@@ -564,6 +565,7 @@ if (exists("uctd.missing")) {
 ```  
 
 ## Cast locations
+
 Location of underway UCTD (red numbers) casts. Gray numbers indicate acoustic transect line numbers from the survey instructions. UCTD cast numbers correspond to those in the previous table. Casts with a **<span style="color:red">red</span>** border have not yet been processed. 
 
 ```{r create-map-data}
@@ -707,6 +709,7 @@ if (exists("all.uctd.casts")) {
 ```
 
 ## Depth v. Time plot
+
 The dashed line represent the Loess-smoothed depth profiles.  
 
 ```{r uctd-depth-time-plot,out.width="100%",out.height="10in"}
@@ -1024,6 +1027,7 @@ i.map.ctd
 ```
 
 ## Unprocessed CTD casts  
+
 List of CTD casts not yet processed. 
 
 ```{r ctd-missing, include=TRUE}

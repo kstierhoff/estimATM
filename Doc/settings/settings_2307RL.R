@@ -121,9 +121,9 @@ survey.long          <- c(-130,-113)
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
 leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05", 
-                                             "2023-07-23", "2023-08-09", 
-                                             "2023-08-27", "2023-09-12",
-                                             "2023-09-16")))
+                                          "2023-07-23", "2023-08-09", 
+                                          "2023-08-27", "2023-09-12",
+                                          "2023-09-16")))
 
 # Define ERDDAP data variables for Shimada
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
@@ -539,7 +539,7 @@ ctd.depth              <- 350
 
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
-uctd.hdr.pattern       <- ".*UCTD_\\d{3}.*asc"
+uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
 # TDR data
@@ -742,7 +742,7 @@ cal.sal            <-   35.0   # enter salinity at sphere depth
 cal.c              <- 1530.6   # enter sound speed (m/s)
 cal.min.z          <-    5     # enter minimum water depth below transducers
 cal.max.z          <-   10     # enter maximum water depth below transducers
-
+ 
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
 cal.noise          <- list(RL  = NA,
