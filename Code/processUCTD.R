@@ -223,11 +223,11 @@ for (i in files.CTD) {
                      ".*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(BW_minor_0[j] + 10*log10(avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
+                  sprintf(BW_minor_0[j] * (avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
                   str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
     ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
-                      sprintf(BW_minor_0[j] + 10*log10(avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
+                      sprintf(BW_minor_0[j] * (avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
                       str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Athwarthip (Major) Beamwidth
@@ -235,11 +235,11 @@ for (i in files.CTD) {
                      ".*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(BW_major_0[j] + 10*log10(avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
+                  sprintf(BW_major_0[j] * (avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
                   str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
     ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
-                      sprintf(BW_major_0[j] + 10*log10(avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
+                      sprintf(BW_major_0[j] * (avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
                       str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
   }
 
