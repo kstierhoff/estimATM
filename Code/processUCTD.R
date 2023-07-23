@@ -6,6 +6,7 @@
 #-----------------------------------
 
 library(readr)    # For reading and writing plain text files
+library(stringr)  # For processing strings
 
 # User Settings -----------------------------------------------------------
 
