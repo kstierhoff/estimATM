@@ -23,11 +23,11 @@ source(here::here("Code/estimate_CPS_NASC.R"))
 # Extract only CPS backscatter -------------------------------------------------
 extractNASC(
   # Most used options ----------------------------------------------------------
-  path.in     = "U:\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\REPROCESSING\\CSV\\TO_FIX", # CSV file source                                                                                                 e
+  path.in     = "C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER", # CSV file source                                                                                                 e
   pattern.in  = "_CPS-Final 38 kHz CPS.csv", # CSV file regex
-  path.out    = "U:\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\REPROCESSING\\CSV\\CPS_MASK", # Processed file destination
+  path.out    = "C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER", # Processed file destination
   suffix.out  = "_nasc_cps.csv",             # Suffix applied to processed CSV files
-  path.img    = "U:\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\EV\\Exported_Images", # Location of exported image files, or NULL
+  path.img    = "C:\\SURVEY\\2307RL\\PROCESSED\\EV\\Exported_Images", # Location of exported image files, or NULL
   pattern.img = "_CPS-38 kHz CPS for Image Export.png", # Exported image regex
   # Lesser used options --------------------------------------------------------
   expansion   = 2,     # Constant for expanding axes
