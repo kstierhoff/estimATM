@@ -4,8 +4,10 @@
 # If a path to Exported Images is provided (path.img), corresponding
 # echograms will be displayed to assist echo scrutiny
 
-# To specify file paths by copy/paste from Windows Explorer, put path in r"(PATH)"
+# Clear workspace to avoid any issues with process
 rm(list = ls())
+
+# To specify file paths by copy/paste from Windows Explorer, put path in r"(PATH)"
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
 
