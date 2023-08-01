@@ -5,7 +5,7 @@
 # echograms will be displayed to assist echo scrutiny
 
 # To specify file paths by copy/paste from Windows Explorer, put path in r"(PATH)"
-
+rm(list = ls())
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
 

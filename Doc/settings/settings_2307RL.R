@@ -360,7 +360,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             SD  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
                             SD  = "Final 38 kHz CPS.csv")
