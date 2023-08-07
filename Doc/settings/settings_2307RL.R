@@ -166,9 +166,9 @@ erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
 erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"character")
 
 # Define date range for each Saildrone to remove overlapping transits
-sd.date.range    <- data.frame(saildrone  = c(1055, 1059),
-                               start.date = ymd(c("2021-07-06", "2021-10-15")),
-                               end.date   = ymd(c("2021-07-06", "2021-10-15")))
+sd.date.range    <- data.frame(saildrone  = c(1048, 1060,1096),
+                               start.date = ymd(c("2023-07-08", "2023-07-08", "2023-07-08")),
+                               end.date   = ymd(c("2023-10-15", "2023-10-15", "2023-10-15")))
 
 # Adjust time in Saildrone gps.csv files, if problems with Mission Planner (e.g., 1907RL)
 sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
@@ -360,7 +360,7 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             SD  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
+nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
                             SD  = "Final 38 kHz CPS.csv")
