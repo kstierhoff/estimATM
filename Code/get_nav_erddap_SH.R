@@ -5,7 +5,9 @@ if (get.nav.sh) {
     load(here("Data/Nav/nav_data_sh.Rdata"))
     
     # Calculate difference between max nav time and now
-    nav.lag.sh <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sh$time)), units = "hours")
+    nav.lag.sh <- difftime(now(tzone = "UTC"), 
+                           max(ymd_hms(nav.sh$time), na.rm = TRUE), 
+                           units = "hours")
     
     # Get new ERDDAP start date from max date
     erddap.survey.start.sh.new <- date(tail(nav.sh$time,1))
