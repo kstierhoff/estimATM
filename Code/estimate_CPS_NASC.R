@@ -1,6 +1,7 @@
 extractNASC <- function(path.in, pattern.in, path.out, suffix.out, 
                         x11.w = 1600, x11.h = 600, jpeg = TRUE,
                         path.img = NULL, pattern.img = NULL, 
+                        dist.bin = 2000,
                         max.range = 350, transparency = 0.2, 
                         root = 1.5, scaling = 0.1, expansion = 2) {
   
@@ -386,7 +387,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
     # Plot GPS status
     geom_point(data = gps.status, aes(Dist_M, 5, colour = gps.good), size = 1) +
     # Configure axes and scales
-    scale_x_continuous(position = "top", breaks = seq(0, max(new.masked.file$Dist_M), 2000), expand = c(0,0)) +
+    scale_x_continuous(position = "top", breaks = seq(0, max(new.masked.file$Dist_M), dist.bin), expand = c(0,0)) +
     scale_y_continuous(breaks = -rev(seq(0, signif(max(new.masked.file$Depth_mean), 1), 50))) +
     scale_size_area(breaks = c(0,100,1000,10000,50000,100000,1000000),
                     guide = guide_legend(reverse = TRUE)) +

@@ -34,6 +34,7 @@ extractNASC(
   # Lesser used options --------------------------------------------------------
   expansion   = 2,     # Constant for expanding axes
   max.range   = 500,   # Depth range for bubble plots
+  dist.bin    = 2000,  # Distance bins for results plot (2000 default, smaller for short transects)
   root        = 2,     # Constant for controlling bubble size (2)
   scaling     = 0.1,   # Constant for controlling bubble size (0.1)
   jpeg        = FALSE, # Save intermediate plots from line picks
