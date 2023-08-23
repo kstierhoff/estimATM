@@ -19,7 +19,7 @@ dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\PROCESSED\\'
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\SH.XMLCON'
+file.con <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\_2307SH.XMLCON'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
