@@ -25,7 +25,7 @@ file.con <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\_2307SH.XMLCON'
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\_2307RL_Template.ecs'
+ECS.template <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\SH\\_Summer2023_5freq_EK80_SH.ecs'
 
 # ECS output directory
 dir.ECS <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\SH\\'
