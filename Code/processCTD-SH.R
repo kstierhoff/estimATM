@@ -174,10 +174,11 @@ for (i in files.CTD) {
   
   # For both CPS and Krill, replace the calibration parameters by compensating
   # for changes in sound speed
+  T_vars = c(1,2,3,4,6)
   for (j in 1:length(g_0)){
     
     # Compensate gain
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T", T_vars[j], 
                      ".*?TransducerGain\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -189,7 +190,7 @@ for (i in files.CTD) {
                         str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate EBA
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T", T_vars[j], 
                      ".*?TwoWayBeamAngle\\s*=\\s*(-\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -201,7 +202,7 @@ for (i in files.CTD) {
                         str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Alongship (Minor) Beamwidth
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T", T_vars[j], 
                      ".*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -213,7 +214,7 @@ for (i in files.CTD) {
                         str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Athwarthip (Major) Beamwidth
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T", T_vars[j], 
                      ".*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
