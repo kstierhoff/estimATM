@@ -10,28 +10,28 @@ library(stringr)  # For processing strings
 # User Settings -----------------------------------------------------------
 
 # Directory of CTD files to process
-dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\CTD_to_Process\\'
+dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\PROCESSED\\'
+dir.output <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2307RL\\DATA\\CTD\\SH\\_2307SH.XMLCON'
+file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\SH\\_Summer2023_5freq_EK80_SH.ecs'
+ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
 
 # ECS output directory
-dir.ECS <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\SH\\'
+dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
-pause <- 0.5
+pause <- 5
 
 # Process CTD data --------------------------------------------------------
 
@@ -53,7 +53,7 @@ for (i in files.CTD) {
                  paste(file.name, '.cnv', sep = ''),
                  paste(dir.PSA, 'DatCnv.psa', sep = ''))
   system("cmd.exe", input = cmd)
-  Sys.sleep(5)
+  Sys.sleep(10)
   
   # Perform Filter
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
@@ -152,42 +152,113 @@ for (i in files.CTD) {
   avgSalinity.Krill <- mean(data$Sal00[idx], na.rm = T)
   avgDepth.Krill <- mean(data$DepSM[idx], na.rm = T)
   
+  
+  
+  # Create ECS file ---------------------------------------------------------
+  
   # Read template ECS file
   ECS <- read_file(ECS.template)
   
+  # Get sound speed from template
+  c_0 <- as.numeric(str_match(ECS, "SoundSpeed\\s*=\\s*([^\\s]+)")[,2])
+  
+  # Get calibration parameters that can be adjusted with sound speed
+  g_0 <- as.numeric(str_match_all(ECS, "TransducerGain\\s*=\\s*([^\\s]+)")[[1]][,2])
+  EBA_0 <- as.numeric(str_match_all(ECS, "TwoWayBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+  BW_minor_0 <- as.numeric(str_match_all(ECS, "MinorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+  BW_major_0 <- as.numeric(str_match_all(ECS, "MajorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+  
+  # Create CPS and Krill-specific ECS files
+  ECS.CPS <- ECS
+  ECS.Krill <- ECS
+  
+  # For both CPS and Krill, replace the calibration parameters by compensating
+  # for changes in sound speed
+  for (j in 1:length(g_0)){
+    
+    # Compensate gain
+    pattern <- paste("(?s)SourceCal T", j, 
+                     ".*?TransducerGain\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
+    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(g_0[j] + 20*log10(c_0 / avgSoundSpeed.CPS), fmt = '%#.4f'),
+                      str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
+    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
+                        sprintf(g_0[j] + 20*log10(c_0 / avgSoundSpeed.Krill), fmt = '%#.4f'),
+                        str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    
+    # Compensate EBA
+    pattern <- paste("(?s)SourceCal T", j, 
+                     ".*?TwoWayBeamAngle\\s*=\\s*(-\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
+    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(EBA_0[j] + 20*log10(avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
+                      str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
+    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
+                        sprintf(EBA_0[j] + 20*log10(avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
+                        str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    
+    # Compensate Alongship (Minor) Beamwidth
+    pattern <- paste("(?s)SourceCal T", j, 
+                     ".*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
+    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(BW_minor_0[j] * (avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
+                      str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
+    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
+                        sprintf(BW_minor_0[j] * (avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
+                        str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    
+    # Compensate Athwarthip (Major) Beamwidth
+    pattern <- paste("(?s)SourceCal T", j, 
+                     ".*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
+    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(BW_major_0[j] * (avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
+                      str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
+    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
+                        sprintf(BW_major_0[j] * (avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
+                        str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+  }
+  
   # Replace the sound speed
-  ECS.CPS <- gsub('SoundSpeed = [^#]*', 
+  ECS.CPS <- gsub('SoundSpeed\\s*=\\s*[^#]*', 
                   sprintf('SoundSpeed = %.2f ', avgSoundSpeed.CPS),
-                  ECS)
-  ECS.Krill <- gsub('SoundSpeed = [^#]*', 
-                  sprintf('SoundSpeed = %.2f ', avgSoundSpeed.Krill),
-                  ECS)
+                  ECS.CPS)
+  ECS.Krill <- gsub('SoundSpeed\\s*=\\s*[^#]*', 
+                    sprintf('SoundSpeed = %.2f ', avgSoundSpeed.Krill),
+                    ECS.Krill)
   
   # Replace the temperature
-  ECS.CPS <- gsub('Temperature = [^#]*', 
+  ECS.CPS <- gsub('Temperature\\s*=\\s*[^#]*', 
                   sprintf('Temperature = %.3f ', avgTemperature.CPS),
                   ECS.CPS)
-  ECS.Krill <- gsub('Temperature = [^#]*', 
+  ECS.Krill <- gsub('Temperature\\s*=\\s*[^#]*', 
                     sprintf('Temperature = %.3f ', avgTemperature.Krill),
                     ECS.Krill)
   
   # Replace the salinity
-  ECS.CPS <- gsub('Salinity = [^#]*', 
+  ECS.CPS <- gsub('Salinity\\s*=\\s*[^#]*', 
                   sprintf('Salinity = %.3f ', avgSalinity.CPS),
                   ECS.CPS)
-  ECS.Krill <- gsub('Salinity = [^#]*', 
+  ECS.Krill <- gsub('Salinity\\s*=\\s*[^#]*', 
                     sprintf('Salinity = %.3f ', avgSalinity.Krill),
                     ECS.Krill)
   
   # Replace the average absorption depth
-  ECS.CPS <- gsub('AbsorptionDepth = [^#]*', 
+  ECS.CPS <- gsub('AbsorptionDepth\\s*=\\s*[^#]*', 
                   sprintf('AbsorptionDepth = %.3f ', avgDepth.CPS),
                   ECS.CPS)
-  ECS.Krill <- gsub('AbsorptionDepth = [^#]*', 
+  ECS.Krill <- gsub('AbsorptionDepth\\s*=\\s*[^#]*', 
                     sprintf('AbsorptionDepth = %.3f ', avgDepth.Krill),
                     ECS.Krill)
   
   # Write new ECS files
+  # write_file(ECS, paste(dir.ECS, file.name, "_CPS.ecs", sep = ''))
   write_file(ECS.CPS, paste(dir.ECS, file.name, "_CPS.ecs", sep = ''))
   write_file(ECS.Krill, paste(dir.ECS, file.name, "_Krill.ecs", sep = ''))
   
