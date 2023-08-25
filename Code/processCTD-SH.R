@@ -8,30 +8,41 @@ library(readr)    # For reading and writing plain text files
 library(stringr)  # For processing strings
 
 # User Settings -----------------------------------------------------------
+# # On AST4----------------------------------------------------------------
+# # Directory of CTD files to process
+# dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\CTD_to_Process\\'
+# # Directory to store processed data results
+# dir.output <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\PROCESSED\\'
+# # Directory containing SBEDataProcessing Program Setup (.psa) files
+# dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
+# # # CTD configuration file
+# # file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
+# # Directory of Seabird SBEDataProcessing programs
+# dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
+# # Template ECS file
+# ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
+# # ECS output directory
+# dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\'
+# # Time to pause between SBADataProcessing programs, in seconds
+# pause <- 5
 
+# Local-------------------------------------------
 # Directory of CTD files to process
-dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\CTD_to_Process\\'
-
+dir.CTD <- 'C:\\SURVEY\\2307SH\\DATA\\CTD\\CTD_to_Process\\'
 # Directory to store processed data results
-dir.output <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\PROCESSED\\'
-
+dir.output <- 'C:\\SURVEY\\2307SH\\DATA\\CTD\\PROCESSED\\'
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
-
-# CTD configuration file
-file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
-
+# # CTD configuration file
+# file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
-
 # Template ECS file
-ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
-
+ECS.template <- 'C:\\SURVEY\\2307SH\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
 # ECS output directory
-dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\'
-
+dir.ECS <- 'C:\\SURVEY\\2307SH\\PROCESSED\\EV\\ECS\\'
 # Time to pause between SBADataProcessing programs, in seconds
-pause <- 5
+pause <- 2
 
 # Process CTD data --------------------------------------------------------
 
@@ -53,7 +64,7 @@ for (i in files.CTD) {
                  paste(file.name, '.cnv', sep = ''),
                  paste(dir.PSA, 'DatCnv.psa', sep = ''))
   system("cmd.exe", input = cmd)
-  Sys.sleep(10)
+  Sys.sleep(pause + 5)
   
   # Perform Filter
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
