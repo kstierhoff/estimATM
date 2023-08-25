@@ -86,17 +86,17 @@ nav.vessels.ns <- c("LM","LBC")
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
 survey.name.long       <- "Summer 2023 California Current Ecosystem Survey (CCES)"
-survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
-survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
-survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
-survey.name            <- "2307RL"        # SWFSC/AST survey name
+survey.vessel.long     <- "Bell M. Shimada" # Full vessel name: e.g., Bell M. Shimada
+survey.vessel          <- "Shimada"        # Short vessel name; e.g., Shimada
+survey.vessel.primary  <- "SH"            # Primary vessel abbreviation 
+survey.name            <- "2307SH"        # SWFSC/AST survey name
 survey.start           <- "17 July"       # Survey start date
 survey.end             <- "30 September"  # Survey end date
 survey.year            <- "2023"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 81              # Days at sea allocated
 survey.landmark.n      <- "Cape Scott, BC" # Landmark - N extent of survey
-survey.landmark.s      <- "Punta Baja, Baja CA" # Landmark - S extent of survey
+survey.landmark.s      <- "Pt. Conception" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -104,19 +104,22 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
-leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-16", "2023-08-01", 
-                                          "2023-09-01", "2023-10-01")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05", 
+                                          "2023-07-23", "2023-08-09", 
+                                          "2023-08-27", "2023-09-12",
+                                          "2023-09-16")))
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2023-07-16" # Start of survey for ERDDAP vessel data query
+erddap.vessel        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.survey.start  <- "2023-06-18" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2023-10-01" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed","flag")
 survey.lat           <- c(27,51)
 survey.long          <- c(-130,-113)
+filter.nav           <- FALSE  # Remove bad nav data points? Removes flagged values and unusual distances
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
@@ -129,6 +132,7 @@ leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05",
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start.sh  <- "2023-06-18" # Start of survey for ERDDAP vessel data query
 erddap.survey.end.sh    <- "2023-10-01" # End of survey for ERDDAP vessel data query
+filter.nav.sh           <- FALSE  # Remove bad nav data points? Removes flagged values and unusual distances
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2307RL.csv"
@@ -342,30 +346,35 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2307RL",
+  survey.dir           <- c(SH  = "C:/SURVEY/2307SH",
+                            RL  = "C:/SURVEY/2307RL",
                             LBC = "C:/SURVEY/2307RL",
                             LM  = "C:/SURVEY/2307RL",
                             SD  = "C:/SURVEY/2307RL")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
+  survey.dir           <- c(SH  = "//swc-storage4-s/AST4/SURVEYS/20230703_SHIMADA_SummerHake",
+                            RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+nasc.dir               <- c(SH  = "PROCESSED/EV/CSV/SHIMADA",
+                            RL  = "PROCESSED/EV/CSV/LASKER",
                             LM  = "PROCESSED/EV/CSV",
                             LBC = "PROCESSED/EV/CSV",
                             SD  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
-nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
+nasc.pattern.cps       <- c(SH  = "Final 38 kHz CPS.csv",
+                            RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final CPS.csv",
                             LBC = "Final 38 kHz CPS.csv",
                             SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*KRILL-Juan Krill Final 120.csv",
+nasc.pattern.krill     <- c(SH  = "*KRILL-Juan Krill Final 120.csv",
+                            RL  = "*KRILL-Juan Krill Final 120.csv",
                             LM  = "*Krill-Juan Krill Final 120.csv",
                             LBC = "*Krill-Juan Krill Final 120.csv",
                             SD  = "*Krill-Juan Krill Final 120.csv")
@@ -390,7 +399,8 @@ nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LBC = "\\d{3}T",
                             SD  = "\\d{3}T")
 # Recursively search NASC directories
-nasc.recurse           <- c(RL  = FALSE,
+nasc.recurse           <- c(SH  = FALSE,
+                            RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = TRUE)
@@ -398,7 +408,8 @@ nasc.recurse           <- c(RL  = FALSE,
 nasc.max               <- NA
 
 # If T, read cps.nasc from file; else use NASC.50 
-source.cps.nasc        <- c(RL  = FALSE,
+source.cps.nasc        <- c(SH  = FALSE,
+                            RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE,
@@ -408,60 +419,70 @@ source.cps.nasc        <- c(RL  = FALSE,
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2307RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
-tx.char.pattern        <- c(RL  = "[^0-9]",
+tx.char.pattern        <- c(SH  = "[^0-9]",
+                            RL  = "[^0-9]",
                             LM  = "[^0-9]",
                             LBC = "[^0-9]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
-strip.tx.nums          <- c(RL  = TRUE,
+strip.tx.nums          <- c(SH  = TRUE,
+                            RL  = TRUE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = TRUE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
-strip.tx.chars         <- c(RL  = TRUE,
+strip.tx.chars         <- c(SH  = TRUE,
+                            RL  = TRUE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE) 
 
 # If T, removes transects with names including "transit"
-rm.transit             <- c(RL  = FALSE,
+rm.transit             <- c(SH  = TRUE,
+                            RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE)  
 
 # If T, removes transects with names including "offshore"
-rm.offshore            <- c(RL  = TRUE,
+rm.offshore            <- c(SH  = TRUE,
+                            RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE) 
 
 # If T, removes transects with names including "inshore"
-rm.inshore             <- c(RL  = TRUE,
+rm.inshore             <- c(SH  = TRUE,
+                            RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE)
 
 # If T, removes transects with names including "nearshore"
-rm.nearshore           <- c(RL  = TRUE,
+rm.nearshore           <- c(SH  = TRUE,
+                            RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE) 
 
 # If T, subtracts NASC.5 from cps.nasc
-rm.surface             <- c(RL  = FALSE,
+rm.surface             <- c(SH  = FALSE,
+                            RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE) 
 
 # regex for matching number pattern
-tx.num.pattern         <- c(RL  = "-\\d{1}",
+tx.num.pattern         <- c(SH  = "-\\d{1}",
+                            RL  = "-\\d{1}",
                             LM  = "-\\d{1}",
                             LBC = "-\\d{1}",
                             SD  = "-\\d{1}")
 
 # Use transect names for transect numbers
-use.tx.number          <- c(RL  = TRUE,
+use.tx.number          <- c(SH  = TRUE,
+                            RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE)
@@ -469,13 +490,15 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
-tx.rm                  <- list(RL  = NA,
+tx.rm                  <- list(SH  = NA,
+                               RL  = NA,
                                LM  = NA,
                                LBC = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 15,
+min.tx.length          <- c(SH  = 15,
+                            RL  = 15,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
@@ -532,13 +555,13 @@ trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl perform
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
 # CTD data
-ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD/PROCESSED")
-ctd.hdr.pattern        <- "RL2203*.*hdr"
+ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
+ctd.hdr.pattern        <- ".*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
 
 # UCTD data   
-uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
+uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD")
 uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
