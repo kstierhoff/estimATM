@@ -40,20 +40,28 @@ if (get.nav) {
                                   labels = FALSE)),
              id       = seq_along(time)) %>%
       # Identify flags not equal to "Z"
-      mutate(flag_sum = nchar(str_replace_all(flag, "Z", ""))) %>% 
+      mutate(flag_sum = nchar(str_replace_all(flag, "Z", ""))) 
+    
+    # Remove bad values
+    if (filter.nav) {
       # Remove data with bad flags
-      filter(flag_sum == 0)
+      nav.temp <- filter(nav.temp, flag_sum == 0)
+    }
     
     # Compute distance between each point, and remove points with unrealistic distances
     nav.temp.sf <- nav.temp %>% 
       st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
-      st_transform(crs = 3310) %>%
-      mutate(distance_to_next = as.numeric(
-        na.omit(c(0, st_distance(geometry,
-                                 lead(geometry, 
-                                      default = NA),
-                                 by_element = TRUE))))/1852) %>% 
-      filter(distance_to_next < 20)
+      st_transform(crs = 3310) 
+    
+    if (filter.nav) {
+      nav.temp.sf <- nav.temp.sf %>% 
+        mutate(distance_to_next = as.numeric(
+          na.omit(c(0, st_distance(geometry,
+                                   lead(geometry, 
+                                        default = NA),
+                                   by_element = TRUE))))/1852) %>% 
+        filter(distance_to_next < 20)
+    }
     
     # Subset nav data that are in nav.temp.sf
     nav.temp <- nav.temp %>% 
@@ -76,8 +84,12 @@ if (get.nav) {
     filter(is.na(ymd_hms(time)) == FALSE,
            is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
-           between(long, min(survey.long), max(survey.long)),
-           flag_sum == 0)
+           between(long, min(survey.long), max(survey.long)))
+  
+  if (filter.nav) {
+    nav <- nav %>%
+      filter(flag_sum == 0)
+  }
   
   # Convert nav to spatial
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
