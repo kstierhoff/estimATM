@@ -53,6 +53,7 @@ if (get.nav) {
       st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
       st_transform(crs = 3310) 
     
+    # Remove points that are too far apart
     if (filter.nav) {
       nav.temp.sf <- nav.temp.sf %>% 
         mutate(distance_to_next = as.numeric(
