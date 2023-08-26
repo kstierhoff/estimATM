@@ -40,20 +40,29 @@ if (get.nav.sh) {
                                   labels = FALSE)),
              id       = seq_along(time)) %>%
       # Identify flags not equal to "Z"
-      mutate(flag_sum = nchar(str_replace_all(flag, "Z", ""))) %>% 
-      # Remove data with bad flags
-      filter(flag_sum == 0)
+      mutate(flag_sum = nchar(str_replace_all(flag, "Z", ""))) 
     
+    # Remove bad values
+    if (filter.nav.sh) {
+      # Remove data with bad flags
+      nav.temp.sh <- filter(nav.temp.sh, flag_sum == 0)
+    }
+
     # Compute distance between each point, and remove points with unrealistic distances
     nav.temp.sh.sf <- nav.temp.sh %>% 
       st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
-      st_transform(crs = 3310) %>%
-      mutate(distance_to_next = as.numeric(
-        na.omit(c(0, st_distance(geometry,
-                                 lead(geometry, 
-                                      default = NA),
-                                 by_element = TRUE))))/1852) %>% 
-      filter(distance_to_next < 20)
+      st_transform(crs = 3310) 
+    
+    # Remove points that are too far apart
+    if (filter.nav.sh) {
+      nav.temp.sh.sf <- nav.temp.sh.sf %>% 
+        mutate(distance_to_next = as.numeric(
+          na.omit(c(0, st_distance(geometry,
+                                   lead(geometry, 
+                                        default = NA),
+                                   by_element = TRUE))))/1852) %>% 
+        filter(distance_to_next < 20)
+    }
     
     # Subset nav data that are in nav.temp.sf
     nav.temp.sh <- nav.temp.sh %>% 
@@ -76,8 +85,13 @@ if (get.nav.sh) {
     filter(is.na(ymd_hms(time)) == FALSE,
            is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
-           between(long, min(survey.long), max(survey.long)),
-           flag_sum == 0)
+           between(long, min(survey.long), max(survey.long)))
+  
+  # Remove flagged data
+  if (filter.nav.sh) {
+    nav.sh <- nav.sh %>%
+      filter(flag_sum == 0)
+  }
   
   # Convert nav to spatial
   nav.sh.sf <- st_as_sf(nav.sh, coords = c("long","lat"), crs = crs.geog) 
