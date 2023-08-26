@@ -131,7 +131,7 @@ erddap.survey.start.sh  <- "2023-06-18" # Start of survey for ERDDAP vessel data
 erddap.survey.end.sh    <- "2023-10-01" # End of survey for ERDDAP vessel data query
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2307RL.csv"
+wpt.filename         <- "waypoints_2307SH.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
                           Compulsory = "Compulsory", Nearshore = "Nearshore",
                           Offshore = "Offshore", Saildrone = "Saildrone")
