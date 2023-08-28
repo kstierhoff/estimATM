@@ -135,7 +135,7 @@ erddap.survey.end.sh    <- "2023-10-01" # End of survey for ERDDAP vessel data q
 filter.nav.sh           <- FALSE  # Remove bad nav data points? Removes flagged values and unusual distances
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2307RL.csv"
+wpt.filename         <- "waypoints_2307SH.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
                           Compulsory = "Compulsory", Nearshore = "Nearshore",
                           Offshore = "Offshore", Saildrone = "Saildrone")
