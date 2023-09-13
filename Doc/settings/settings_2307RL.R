@@ -356,7 +356,7 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
 }
 
 # Backscatter data (within survey.dir, typically)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
                             LM  = "PROCESSED/EV/CSV",
                             LBC = "PROCESSED/EV/CSV",
                             SD  = "PROCESSED/EV/CSV") 
