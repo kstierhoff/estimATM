@@ -399,7 +399,9 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
          y = "Mean depth (m)") + 
     # Set themes
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2)) 
+    theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 1.2),
+          legend.position = c(0.95,0.1),
+          legend.justification = c(1,0.1)) 
   
   # Save the plot
   ggsave(cps.nasc.bubble,
@@ -408,9 +410,29 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
                                      gsub(".csv",".png", suffix.out))),
          width = 15, height = 7)
   
-  # Open the newly created plot
+  # Read echogram image and create ggplot2 object
+  ev.image <- magick::image_read(echogram.img) %>% magick::image_ggplot()
+  
+  # Combine bubble plot and echogram image
+  bubble.ev.combo <- cps.nasc.bubble / ev.image + 
+     plot_layout(heights = c(1, 1)) 
+  
+  # Save bubble plot and echogram image
+  ggsave(bubble.ev.combo,
+         filename = file.path(path.out, 
+                              paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], "_combo",
+                                     gsub(".csv",".png", suffix.out))),
+         width = 15, height = 7)
+  
+  # Open the newly created plots
+  ## Open bubble plot
   shell.exec(file.path(path.out, 
                        paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], 
+                              gsub(".csv",".png", suffix.out))))
+  
+  # Open bubble plot and echogram image combo
+  shell.exec(file.path(path.out, 
+                       paste0(unlist(strsplit(acoustic.file.name, "[.]"))[1], "_combo",
                               gsub(".csv",".png", suffix.out))))
   
   # Print message at the end of processing
