@@ -719,7 +719,7 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL") # ,"LBC","LM"
+cal.vessels        <- c("RL","LBC","LM")
 cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
 cal.datetime       <- "26 June"     # Date/time of calibration
 cal.plot.date      <- "2023-06-23" # Date of the calibration, used to plot cal time series
