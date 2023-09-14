@@ -43,8 +43,8 @@ Files listed below are processed and plotted at any time, but ideally prior to b
 process.csv <- TRUE
 
 # List full file paths
-csv.paths <- c(dir_ls("\\\\swc-storage4-s\\AST4\\SURVEYS\\20230708_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV", 
-                      regexp = "_CPS-Final 38 kHz CPS.csv"))
+csv.paths <- c(dir_ls("\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\CSV", 
+                      regexp = "-Final 38 kHz CPS.csv"))
 ```
 
 ```{r user-input}
@@ -98,6 +98,11 @@ bad.nasc <- filter(nasc, lat == 999, long == 999)
 nasc <- nasc %>%
   filter(lat != 999, long != 999)
 
+# Define cps.nasc
+nasc <- nasc %>% 
+  mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
+               cps.nasc.source = nasc.depth.cps)
+
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ <- nasc %>%
   group_by(transect, int) %>%
@@ -106,13 +111,13 @@ nasc.summ <- nasc %>%
     bin.mid = as.integer(round(bins / 2)),
     lat     = lat[1],
     long    = long[1],
-    NASC    = mean(NASC.70)
+    NASC    = mean(cps.nasc)
   )
 
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
 nasc.sf <- nasc %>%
-  select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc = NASC.70) %>% 
+  select(filename, transect, int, dist_m, datetime, lat, long, cps.nasc) %>% 
   group_by(filename, transect, int) %>% 
   summarise(
     lat   = lat[1],

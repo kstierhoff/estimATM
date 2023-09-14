@@ -1,0 +1,80 @@
+---
+title: "LM CTD/Nav 2307RL"
+author: "Kevin L. Stierhoff"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+
+library(tidyverse)
+library(plotKML)
+library(sf)
+library(mapview)
+library(lubridate)
+library(here)
+```
+
+```{r process-data}
+# Read gpx file
+tracks <- readGPX(here::here("Data/Nav/lm_tracks_20230906.gpx"))
+ctds <- read_csv(here::here("Data/CTD/LM/lm_ctd_casts.csv")) %>% 
+  st_as_sf(coords = c("long","lat"), crs = 4326)
+# events <- readGPX(here::here("Data/Nav/lm_events_20230906.gpx"))
+
+transects <- tracks$tracks %>% 
+  map_dfr(bind_rows,.id="id") %>% 
+  st_as_sf(coords = c("lon","lat"), crs = 4326) %>% 
+  mutate(datetime = ymd_hms(time)) 
+
+transects.sub <- transects %>% 
+  group_by(id) %>% 
+  arrange(datetime) %>% 
+  # slice(c(which.min(datetime),which.max(datetime))) %>% 
+  slice(c(seq(1, n(), 360), n()))
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", "waypoints_2307RL.csv"))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  # filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = 4326) %>% 
+  mutate(
+    label = paste("Transect", Transect),
+    popup = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                     'Distance:', distance, 'nmi<br/>')
+  ) %>% 
+  filter(Type == "Nearshore")
+  
+# 
+# events <- route$waypoints 
+# 
+# write_csv(events, here::here("Output/lm_events_20230906.csv"))
+# write_csv(nav, here::here("Output/lm_tracks_20230906.csv"))
+# 
+# lm.df <- do.call(rbind, lm.nav)
+# 
+# write_csv(wpts3, here::here("route_points_final.csv"))
+```
+
+## Map results
+
+```{r mapview, echo=FALSE, out.width="100%", out.height="10in"}
+mapview(transects.sf, zcol = "Type", legend = FALSE, cex = 1, alpha = 0.5) + 
+  # mapview(transects, legend = FALSE, cex = 2, alpha = 0.5) + 
+  mapview(transects.sub, legend = FALSE, cex = 2, alpha = 0.5) + 
+  mapview(ctds, zcol = "cast", legend = FALSE, alpha = 1, cex = 8)
+```
