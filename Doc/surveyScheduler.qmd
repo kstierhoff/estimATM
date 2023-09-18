@@ -18,7 +18,7 @@ execute:
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,lubridate,here,mapview,gt)
+pacman::p_load(tidyverse,lubridate,here,mapview,gt,janitor)
 
 # Install and load required packages from Github -------------------------------
 # atm
@@ -40,18 +40,52 @@ source(here("Doc/settings", prj.settings))
 
 For now, this is a quick utility to summarize sea days and leg midpoints based on published ship schedules, specified in the settings file for a given project, in this case: `r prj.settings`.
 
-```{r}
+```{r estimate-sea-days}
 # Survey dates
 leg.end <- leg.ends[seq(2, length(leg.ends),2)]
 leg.start <- leg.ends[seq(1, length(leg.ends)-1,2)]
 
 # Leg durations
-leg.duration <- difftime(leg.end, leg.start) + 1
+leg.duration <- as.numeric(difftime(leg.end, leg.start) + 1)
 
 # Leg midpoint
 leg.mid <- leg.start + leg.duration/2
 
-gt(data.frame(leg = seq_along(leg.start), leg.start, leg.mid, leg.end, leg.duration))
+survey.plan <- data.frame(leg = seq_along(leg.start), leg.start, leg.mid, 
+                          leg.end, leg.duration) %>% 
+    adorn_totals() 
+
+gt(survey.plan)
 ```
 
-Total days at sea (DAS) is `r sum(leg.duration)`.
+Total planned days at sea (DAS) is `r sum(leg.duration)`.
+
+```{r calculate-sea-days}
+if(file.exists(here::here("Data/Nav/nav_data.Rdata"))){
+  load(here::here("Data/Nav/nav_data.Rdata"))
+  
+  # Break nav by leg dates
+  nav <- nav %>% 
+    mutate(leg = cut(as.numeric(date(time)), leg.breaks, 
+                   include.lowest = TRUE, labels = FALSE))
+  # Summarize nav data by leg
+  nav.summ <- nav %>% 
+    group_by(leg) %>% 
+    summarise(
+      sea.days = n_distinct(date(time))
+    )
+  
+  survey.progress <- data.frame(leg = seq_along(leg.start), leg.start, 
+                                leg.mid, leg.end, leg.duration) %>% 
+    left_join(nav.summ) %>% 
+    adorn_totals()
+  
+  # Combine with leg table
+  gt(survey.progress)
+  
+} else {
+  cat("No nav data to process")
+}
+```
+
+To date, we have executed `r sum(nav.summ$sea.days)` DAS, or `r round(sum(nav.summ$sea.days)/sum(leg.duration), 1)*100`% of the `r sum(leg.duration)` total DAS allocated.
