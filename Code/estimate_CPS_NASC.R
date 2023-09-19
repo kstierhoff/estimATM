@@ -414,8 +414,8 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   ev.image <- magick::image_read(echogram.img) %>% magick::image_ggplot()
   
   # Combine bubble plot and echogram image
-  bubble.ev.combo <- cps.nasc.bubble / ev.image + 
-     plot_layout(heights = c(1, 1)) 
+  bubble.ev.combo <- patchwork::wrap_plots(cps.nasc.bubble, ev.image, ncol = 1) +
+    patchwork::plot_layout(heights = c(1, 1))
   
   # Save bubble plot and echogram image
   ggsave(bubble.ev.combo,
