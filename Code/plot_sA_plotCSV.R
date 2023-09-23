@@ -30,5 +30,5 @@ nasc.map <- base.map +
 
 # Save backscatter plot
 ggsave(nasc.map,
-       filename = here("Figs/fig_backscatter_plotCSV.png"),
+       filename = here("Figs", img.filename),
        width = map.width, height = map.height)
