@@ -16,9 +16,12 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,lubridate,here,sf,knitr,fs,leaflet,leaflet.extras,bookdown,
-               leafem,mapview,htmltools)
+               leafem,mapview,htmltools,rnaturalearth)
 
 # Install and load required packages from Github -------------------------------
+# rnaturalearth data
+pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
+pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 # atm
 pacman::p_load_gh("kstierhoff/atm")
 pacman::p_load_gh("kstierhoff/surveyR")
@@ -43,8 +46,8 @@ Files listed below are processed and plotted at any time, but ideally prior to b
 process.csv <- TRUE
 
 # List full file paths
-csv.paths <- c(dir_ls("\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\CSV", 
-                      regexp = "-Final 38 kHz CPS.csv"))
+csv.paths <- c(dir_ls("C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER", 
+                      regexp = "-Final 38 kHz CPS_nasc_cps.csv"))
 ```
 
 ```{r user-input}
@@ -308,4 +311,56 @@ i.map <- leaflet() %>%
 ```{r plot-leaflet-map, echo=F, out.height="8in", out.width="100%"}
 # Display map
 i.map
+```
+
+```{r create-basemap,include=F}
+# Configure base map options -----------------
+# Convert backscatter data to sf
+nasc.sf <- nasc.plot %>%
+  st_as_sf(coords = c("X", "Y"), crs = crs.proj)
+
+# Use backscatter data to determine map bounds
+map.bounds <- nasc.sf %>% 
+  st_bbox()  
+
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
+  project_df(to = crs.proj)
+
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.height <- 10
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nasc.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) 
+
+# Save the basemap
+ggsave(base.map, file = here("Figs/fig_basemap_plotCSV.png"), 
+       height = map.height, width = map.width)
+```
+
+```{r plot-sA-cps}
+# Plot CPS backscatter
+source(here("Code/plot_sA_plotCSV.R"))
+```
+
+```{r plot-backscatter,fig.cap='(ref:backscatter-map-cps)',out.width="100%"}
+if (file.exists(here("Figs/fig_backscatter_plotCSV.png"))) {
+  include_graphics(here("Figs/fig_backscatter_plotCSV.png"))
+} else {
+  print("No backscatter plot.")
+}
 ```
