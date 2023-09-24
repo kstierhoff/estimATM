@@ -7,11 +7,9 @@ nasc.colors.all <- nasc.colors[sort(nasc.levels.all)]
 
 # Map backscatter
 nasc.map <- base.map +
-  # # Plot transects data
-  # geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
-  #         alpha = 0.75, linetype = "dashed") +
-  # # plot ship track data
-  # geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
+  # Plot transects data
+  geom_sf(data = transects.sf, size = 0.5, colour = "gray70",
+          alpha = 0.75, linetype = "dashed") +
   # # Plot NASC data
   geom_point(data = nasc.plot, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +

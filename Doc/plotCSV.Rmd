@@ -48,9 +48,25 @@ process.csv <- TRUE
 # Platform name, used to name resulting image file
 platform.name <- "Lasker"
 
-  # List full file paths
+# List full file paths
 csv.paths <- c(dir_ls("C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER", 
                       regexp = "-Final 38 kHz CPS_nasc_cps.csv"))
+```
+
+```{r other-paths, eval=FALSE, echo=FALSE}
+# Paths
+# 2023 Lasker CCE
+"C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER"
+"-Final 38 kHz CPS_nasc_cps.csv"
+# 2023 Shimada hake survey
+"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\CSV"
+"-Final 38 kHz CPS_nasc_cps.csv"
+# 2023 Long Beach Carnage
+"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230708_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV"
+"-Final 38 kHz CPS_nasc_cps.csv"
+# 2023 Lisa Marie
+"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV"
+"-Final 38 kHz CPS_nasc_cps.csv"
 ```
 
 ```{r user-input}
@@ -318,14 +334,30 @@ i.map
 
 ```{r create-basemap,include=F}
 # Configure base map options -----------------
-# Convert backscatter data to sf
-nasc.sf <- nasc.plot %>%
-  st_as_sf(coords = c("X", "Y"), crs = crs.proj)
+# Import waypoints
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
 
-# Use backscatter data to determine map bounds
-map.bounds <- nasc.sf %>% 
-  st_bbox()  
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  mutate(
+    label = paste("Transect", Transect),
+    popup = paste('<b>Transect:</b>', Transect, Type)
+  )
 
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                     'Distance:', distance, 'nmi<br/>')
+  )
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
   project_df(to = crs.proj)
@@ -341,6 +373,11 @@ countries <- ne_countries(scale = "large", returnclass = "sf") %>%
 bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
   st_transform(crs.geog) %>% 
   rename(Depth = Contour)
+
+# Use nav data to resize map to survey progress
+map.bounds <- transects.sf %>%
+  st_transform(crs = crs.proj) %>%
+  st_bbox()  
 
 # Determine map aspect ratio and set height and width
 map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
