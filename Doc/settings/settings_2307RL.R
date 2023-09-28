@@ -186,7 +186,7 @@ model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 # Mapping preferences -----------------------------------------------------
 # Turn off S2 processing in sf
 sf::sf_use_s2(FALSE)
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
+mapviewOptions(basemaps = c("CartoDB.Positron","Esri.WorldImagery","Esri.OceanBasemap"))
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
@@ -719,7 +719,7 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL") # ,"LBC","LM"
+cal.vessels        <- c("RL","LBC","LM")
 cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
 cal.datetime       <- "26 June"     # Date/time of calibration
 cal.plot.date      <- "2023-06-23" # Date of the calibration, used to plot cal time series

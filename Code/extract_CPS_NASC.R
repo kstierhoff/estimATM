@@ -23,7 +23,7 @@ graphics.off()
 source(here::here("Code/estimate_CPS_NASC.R"))
 
 # Extract only CPS backscatter -------------------------------------------------
-extractNASC(
+atm::extract_cps_nasc(
   # Most used options ----------------------------------------------------------
   path.in     = "C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER", # CSV file source                                                                                                 e
   pattern.in  = "_CPS-Final 38 kHz CPS.csv", # CSV file regex
@@ -33,7 +33,7 @@ extractNASC(
   pattern.img = "_CPS-38 kHz CPS for Image Export.png", # Exported image regex
   # Lesser used options --------------------------------------------------------
   expansion   = 2,     # Constant for expanding axes
-  max.range   = 500,   # Depth range for bubble plots
+  max.range   = 350,   # Depth range for bubble plots
   dist.bin    = 2000,  # Distance bins for results plot (2000 default, smaller for short transects)
   root        = 2,     # Constant for controlling bubble size (2)
   scaling     = 0.1,   # Constant for controlling bubble size (0.1)

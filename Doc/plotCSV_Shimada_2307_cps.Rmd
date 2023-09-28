@@ -16,12 +16,9 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,lubridate,here,sf,knitr,fs,leaflet,leaflet.extras,bookdown,
-               leafem,mapview,htmltools,rnaturalearth)
+               leafem,mapview,htmltools)
 
 # Install and load required packages from Github -------------------------------
-# rnaturalearth data
-pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
-pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
 # atm
 pacman::p_load_gh("kstierhoff/atm")
 pacman::p_load_gh("kstierhoff/surveyR")
@@ -30,7 +27,7 @@ pacman::p_load_gh("kstierhoff/surveyR")
 doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
 doc.name <- knitr::current_input()
 if (is.null(doc.type)) {doc.type <- "html"}
-if (is.null(doc.name)) {doc.name <- "plotCSV.Rmd"}
+if (is.null(doc.name)) {doc.name <- "plotCSV_Shimada_2307_cps.Rmd"}
 
 # global knitr chunk options
 knitr::opts_chunk$set(
@@ -43,30 +40,11 @@ Files listed below are processed and plotted at any time, but ideally prior to b
 
 ```{r list-files, echo=TRUE}
 # Controls
-process.csv <- TRUE
-
-# Platform name, used to name resulting image file
-platform.name <- "LisaMarie"
+process.csv <- FALSE
 
 # List full file paths
-csv.paths <- c(dir_ls("C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LISAMARIE", 
+csv.paths <- c(dir_ls("C:\\Users\\josiah.renfree\\Documents\\EstimATM\\2307RL\\Data\\Backscatter\\SH", 
                       regexp = "-Final 38 kHz CPS_nasc_cps.csv"))
-```
-
-```{r other-paths, eval=FALSE, echo=FALSE}
-# Paths
-# 2023 Lasker CCE
-"C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Shimada hake survey
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Long Beach Carnage
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230708_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Lisa Marie
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
 ```
 
 ```{r user-input}
@@ -79,21 +57,30 @@ settings.files <- dir(here("Doc/settings"))
 # Source survey settings file
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 source(here("Doc/settings", prj.settings))
+
+nasc.depth.cps <- "cps.nasc"
 ```
 
 ```{r process-csv-cps, include=FALSE}
 if (process.csv) {
+  
   # Create data frame for results
   nasc <- data.frame()
-  
+
   # Configure progress bar
   pb <- winProgressBar(title = "CSV File Processing Progress - CPS", 
                        label = "0% done", min = 0, max = 100, initial = 0)
   
   # Process all .CSV files
   for (i in 1:length(csv.paths)) {
-    # Process i-th file
+    
+    # Process i-th file. In the _cps_nasc file, the NASC column will be the
+    # summed NASC up to 250 m of all scatterers, while the cps.nasc column will
+    # be the sum of all cps.nasc values for that interval. So the proper way to
+    # estimate hake scatterer would be to sum all of the NASC depth cells (goes
+    # to 350 m) then subtract the cps.nasc
     nasc <- bind_rows(nasc, extract_csv(csv.paths[i]))
+    # nasc.raw <- bind_rows(nasc.raw, extract_csv(csv.paths.raw[i]))
     
     # Update the progress bar
     info <- sprintf("%d%% done", round((i / length(csv.paths)) * 100))
@@ -121,7 +108,7 @@ nasc <- nasc %>%
   filter(lat != 999, long != 999)
 
 # Define cps.nasc
-nasc <- nasc %>% 
+nasc <- nasc %>%
   mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
                cps.nasc.source = nasc.depth.cps)
 
@@ -330,80 +317,4 @@ i.map <- leaflet() %>%
 ```{r plot-leaflet-map, echo=F, out.height="8in", out.width="100%"}
 # Display map
 i.map
-```
-
-```{r create-basemap,include=F}
-# Configure base map options -----------------
-# Import waypoints
-# Read transect waypoints
-wpts <- read_csv(here("Data/Nav", wpt.filename))
-
-# Convert planned transects to sf; CRS = crs.geog
-wpts.sf <- wpts %>% 
-  filter(Type %in% wpt.types) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
-  mutate(
-    label = paste("Transect", Transect),
-    popup = paste('<b>Transect:</b>', Transect, Type)
-  )
-
-transects.sf <- wpts.sf %>% 
-  group_by(Type, Transect, Region) %>% 
-  summarise(do_union = FALSE) %>% 
-  st_cast("LINESTRING") %>% 
-  ungroup() %>% 
-  mutate(
-    distance = round(as.numeric(st_length(.))/1852,1),
-    label    = paste("Transect", Transect),
-    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
-                     'Distance:', distance, 'nmi<br/>')
-  )
-# Import landmarks
-locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
-  project_df(to = crs.proj)
-
-# Get state data
-states <- ne_states(country = 'United States of America', returnclass = 'sf')
-
-# Get countries
-countries <- ne_countries(scale = "large", returnclass = "sf") %>%
-  filter(subregion %in% c("Northern America","Central America"))
-
-# Read bathy contours shapefile 
-bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
-  st_transform(crs.geog) %>% 
-  rename(Depth = Contour)
-
-# Use nav data to resize map to survey progress
-map.bounds <- transects.sf %>%
-  st_transform(crs = crs.proj) %>%
-  st_bbox()  
-
-# Determine map aspect ratio and set height and width
-map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
-map.height <- 10
-map.width  <- map.height*map.aspect
-
-# Create base map
-base.map <- get_basemap(nasc.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) 
-
-# Save the base map
-ggsave(base.map, file = here("Figs/fig_basemap_plotCSV.png"), 
-       height = map.height, width = map.width)
-```
-
-```{r plot-sA-cps}
-# Image path and file name
-img.filename <- paste0("fig_backscatter_", platform.name, ".png")
-
-# Plot CPS backscatter
-source(here("Code/plot_sA_plotCSV.R"))
-```
-
-```{r plot-backscatter,fig.cap='(ref:backscatter-map-cps)',out.width="100%"}
-if (file.exists(here("Figs", img.filename))) {
-  include_graphics(here("Figs", img.filename))
-} else {
-  print("No backscatter plot.")
-}
 ```

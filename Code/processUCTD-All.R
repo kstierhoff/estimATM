@@ -73,7 +73,7 @@ if (length(uctd.hdr) > 0) {
   
   for (i in seq_along(all.uctd.hdr$cast)) {
     min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], uctd.nav$time)))
-    nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
+    nav.match.uctd <- bind_rows(nav.match.uctd, uctd.nav[min.diff, ])
   }
   
   # Combine header and nav data

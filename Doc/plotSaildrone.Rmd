@@ -28,7 +28,7 @@ get.nav.sd <- T
 # Other settings
 resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 ```{r user-input,echo=FALSE}
@@ -44,84 +44,28 @@ source(here("Doc/settings", prj.settings))
 
 # Saildrone numbers to include
 # saildrone.list <- c(1045, 1046, 1047)
-type.list <- c("Offshore", "Nearshore")
+type.list <- c("Saildrone")
+nav.source <- "ERDDAP"
 ```
 
 # Load Lasker NASC data  
 
 ```{r load-nasc,include=FALSE,message=FALSE}
 # Load backscatter data
-load(here("Data/Backscatter/nasc_all.Rdata"))
+load(here("Output/nasc_cps.Rdata"))
 
 # Remove bad intervals
-nasc <- nasc %>% 
+nasc <- nasc.cps %>% 
   filter(lat != 999, long != 999)
 ```
 
 
 ```{r process-nav,include=FALSE,message=FALSE}
-if (get.nav) {
-  # Load existing nav data
-  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
-    load(here("Data/Nav/nav_data.Rdata"))
-    
-    # Calculate difference between max nav time and now
-    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
-    
-    # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time))
-  } else {
-    nav.lag <- 24
-  }
-  
-  if (nav.lag >= 24) {
-    # Generate ERDDAP URL
-    dataURL <- URLencode(paste(
-      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-      erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
-      sep = ""))
-    
-    # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                                    row.names = NULL, skip = 0))
-    names(nav.temp) <- erddap.headers
-    
-    # Filter to remove bad SST values
-    nav.temp <- nav.temp %>% 
-      mutate(long     = long - 360,
-             SOG      = SOG * 1.94384,
-             datetime = ymd_hms(time),
-             SST      = na_if(SST, NaN),
-             leg      = paste("Leg", cut(as.numeric(date(datetime)), 
-                                         leg.breaks, labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
-             between(lat, min(survey.lat), max(survey.lat)), 
-             between(long, min(survey.long), max(survey.long)))
-    
-    # Append new nav data
-    if (exists("nav")) {
-      nav <- bind_rows(nav, nav.temp) %>% 
-        distinct()
-    } else {
-      nav <- nav.temp
-    }
-  }
-  
-  # Convert nav to spatial
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  
-  # Cast nav to transects
-  nav.paths.sf <- nav.sf %>% 
-    group_by(leg) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("LINESTRING")
-  
-  # Save results
-  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
-} else {
-  # Load nav data
-  load(here::here("Data/Nav/nav_data.Rdata"))
+# Source code to get nav data from ERDDAP or SCS
+if (nav.source == "ERDDAP") {
+  source(here("Code/get_nav_erddap.R"))
+} else if (nav.source == "SCS") {
+  source(here("Code/get_nav_scs.R"))
 }
 
 # Read transect waypoints
@@ -150,17 +94,17 @@ transects.sf <- wpts.sf %>%
 
 # Create gps.csv file from nav to replace missing data in Echoview
 nav.gps <- nav %>% 
-      mutate(GPS_date = format(datetime, format = "%F"),
-             GPS_time = format(datetime, format = "%T")) %>% 
+      mutate(GPS_date = format(time, format = "%F"),
+             GPS_time = format(time, format = "%T")) %>% 
       select(GPS_date, GPS_time, latitude = lat, longitude = long)
 
 write_csv(nav.gps, here("Output/nav.gps.csv"))
 
 # Get most recent vessel position for plotting
 nav.now <- tail(nav.sf, 1) %>% 
-  mutate(label = paste("Last position:", datetime, "UTC"),
+  mutate(label = paste("Last position:", time, "UTC"),
          popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
-                        '<b>Last position: </b>', datetime, ' UTC<br/>'))
+                        '<b>Last position: </b>', time, ' UTC<br/>'))
 
 # Set padding around data  
 if (resize.map) {
@@ -186,7 +130,7 @@ if (get.nav.sd) {
     load(here("Data/Nav/nav_data_saildrone.Rdata"))
     
     # Calculate difference between max nav time and now
-    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime)), units = "hours")
+    nav.lag.sd <- difftime(now(tzone = "UTC"), max(ymd_hms(nav.sd$datetime), na.rm = TRUE), units = "hours")
     
     # Get new erddap start date from max date
     erddap.survey.start.sd <- paste0(format(max(date(nav.sd$time)), ""), "T00%3A00%3A00Z")
@@ -239,7 +183,8 @@ if (get.nav.sd) {
       group_by(saildrone) %>% 
       summarise(do_union = F) %>% 
       st_cast("LINESTRING") %>% 
-      mutate(tracklength = st_length(.))
+      mutate(tracklength = st_length(.),
+             saildrone = as.character(saildrone))
 
     # Save nav data
     save(nav.sd, nav.sd.sf, nav.sd.paths.sf, nav.now.sd, 
@@ -290,12 +235,11 @@ nav.sd <- nav.sd %>%
 ```{r process-lasker,message=FALSE}
 # Convert Lasker transects to lines
 tx.lines <- nasc %>% 
-  arrange(vessel.name, long) %>% 
+  arrange(long) %>% 
   st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
-  group_by(transect.name) %>% 
+  group_by(transect) %>% 
   summarise(do_union = F) %>% 
-  st_cast("LINESTRING") %>% 
-  filter(str_detect(transect.name, "RL"))
+  st_cast("LINESTRING") 
 
 # Buffer lines by 3 nmi
 tx.buffer <- transects.sf %>% 
@@ -308,29 +252,29 @@ tx.buffer <- transects.sf %>%
 
 # Downsample Saildrone nav and convert to spatial
 
-```{r process-saildrone}
+```{r process-saildrone, out.width="100%", out.height="10in"}
 # Create saildrone lines
 sd.lines <- nav.sd %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
   group_by(saildrone) %>% 
   summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
+  st_cast("LINESTRING") %>% 
+  mutate(saildrone = as.character(saildrone))
   
 
 # Convert Saildrone points to sf and downsample
 sd.sf <- nav.sd %>% 
   mutate(date = date(datetime),
-         hour = hour(datetime)) %>% 
-  # mutate(datetime = ymd_hms(time),
-  #        date = date(datetime),
-  #        hour = hour(datetime)) %>% 
+         hour = hour(datetime),
+         saildrone = as.character(saildrone)) %>% 
   group_by(saildrone, date, hour) %>% 
   slice(1) %>% 
   st_as_sf(coords = c("long","lat"), crs = 4326)
 
 # View Saildrone transects relative to transect buffers
-mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) +
-  mapview(sd.lines)
+# mapview(tx.buffer, zcol = "Type", alpha.regions = 0.1) +
+#   mapview(sd.lines) + 
+#   mapview(sd.sf, zcol = "saildrone")
 ```
 
 # Plot all Saildrone transects
@@ -356,27 +300,10 @@ sd.intersection <- sd.sf %>%
 # Summarize intersecting Saildrone data
 
 ```{r summarize-saildrone}
-# sd.int.summary <- sd.intersection %>% 
-#   group_by(saildrone, label) %>% 
-#   summarise(
-#     n = n(),
-#     min.date = min(datetime),
-#     max.date = max(datetime),
-#     duration = difftime(max.date, min.date, units = "hours")
-#   ) %>% 
-#   st_set_geometry(NULL)
-# 
-# sd.intersection <- sd.intersection %>% 
-#   left_join(select(sd.int.summary, saildrone, label, min.date)) %>% 
-#   mutate(time.diff = difftime(datetime, min.date, units = "hours")) %>% 
-#   filter(as.numeric(time.diff) <= 100) %>% 
-#   arrange(saildrone, datetime)
-
-
 # Summarise resulting data
 sd.summary <- sd.intersection %>% 
   filter(saildrone %in% sd.numbers) %>% 
-  group_by(saildrone, label) %>% 
+  group_by(saildrone, label, Transect) %>% 
   summarise(
     n = n(),
     min.date = min(datetime),
@@ -385,7 +312,7 @@ sd.summary <- sd.intersection %>%
   ) %>% 
   mutate(min.date = format(min.date, "%F %T", tz = "UTC"),
          max.date = format(max.date, "%F %T", tz = "UTC")) %>% 
-  arrange(desc(label)) %>% 
+  arrange(desc(Transect)) %>% 
   st_set_geometry(NULL)
 
 # View all data
@@ -396,7 +323,7 @@ sd.summary <- sd.intersection %>%
 
 ```{r filter-saildrone}
 sd.final <- sd.summary %>% 
-  arrange(saildrone, min.date) %>% 
+  arrange(saildrone, desc(Transect)) %>% 
   filter(n > 3)
 
 DT::datatable(sd.final)
@@ -405,27 +332,21 @@ DT::datatable(sd.final)
 # Intersect filtered Saildrone with planned transect buffers
 
 ```{r intersect-nav-final,out.height='10in',out.width='100%'}
-sd.int.final <- filter(sd.intersection, saildrone %in% sd.numbers)
+# Add ctd casts from Shimada
+shimadaCTD <- read.csv("C:/KLS/CODE/Github/estimATM/2307SH/Output/cast_summary_ctd.csv") %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326)
 
-mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
-  # mapview(sd.lines, zcol = "saildrone") +
-  mapview(sd.int.final, zcol = "saildrone")
-```
+# Add ctd casts from Lisa Marie
+lisamarieCTD <- read.csv(here("Data/CTD/LM/lm_ctd_casts.csv")) %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326)
 
-# Intersect filtered Saildrone with planned transect buffers
-
-```{r intersect-nav-final,out.height='10in',out.width='100%'}
-shimadaCTD_raw <- read.csv("Q:/SURVEYS/20220627_LISA-MARIE_SummerCPS/DATA/CTD/NWFSC Cruise SH22-08/2022_all_ctd_meta.csv")
-shimadaCTD<- st_as_sf(shimadaCTD_raw, coords = c("Longitude", "Latitude"), crs = 4326)
-
+# Filter intersecting data
 sd.int.final <- filter(sd.intersection, saildrone %in% sd.numbers) %>% 
   mutate(saildrone = as.character(saildrone))
 
-mapview(sd.lines, zcol = "saildrone") + 
-  mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
-   mapview(sd.lines, zcol = "saildrone") +
-  mapview(sd.int.final, zcol = "saildrone") +
-  mapview(shimadaCTD, xcol = "Longitude", ycol = "Latitude")
+mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
+  mapview(sd.lines, zcol = "saildrone") +
+  mapview(sd.int.final, zcol = "saildrone") + 
+  mapview(shimadaCTD, col.regions = "red") + 
+  mapview(lisamarieCTD, col.regions = "green")
 ```
-
-
