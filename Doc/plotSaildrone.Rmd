@@ -300,23 +300,6 @@ sd.intersection <- sd.sf %>%
 # Summarize intersecting Saildrone data
 
 ```{r summarize-saildrone}
-# sd.int.summary <- sd.intersection %>% 
-#   group_by(saildrone, label) %>% 
-#   summarise(
-#     n = n(),
-#     min.date = min(datetime),
-#     max.date = max(datetime),
-#     duration = difftime(max.date, min.date, units = "hours")
-#   ) %>% 
-#   st_set_geometry(NULL)
-# 
-# sd.intersection <- sd.intersection %>% 
-#   left_join(select(sd.int.summary, saildrone, label, min.date)) %>% 
-#   mutate(time.diff = difftime(datetime, min.date, units = "hours")) %>% 
-#   filter(as.numeric(time.diff) <= 100) %>% 
-#   arrange(saildrone, datetime)
-
-
 # Summarise resulting data
 sd.summary <- sd.intersection %>% 
   filter(saildrone %in% sd.numbers) %>% 
@@ -348,23 +331,22 @@ DT::datatable(sd.final)
 
 # Intersect filtered Saildrone with planned transect buffers
 
-```{r intersect-nav-final-sh,out.height='10in',out.width='100%'}
-# shimadaCTD_raw <- read.csv("Q:/SURVEYS/20220627_LISA-MARIE_SummerCPS/DATA/CTD/NWFSC Cruise SH22-08/2022_all_ctd_meta.csv")
-# shimadaCTD     <- st_as_sf(shimadaCTD_raw, coords = c("Longitude", "Latitude"), crs = 4326)
+```{r intersect-nav-final,out.height='10in',out.width='100%'}
+# Add ctd casts from Shimada
+shimadaCTD <- read.csv("C:/KLS/CODE/Github/estimATM/2307SH/Output/cast_summary_ctd.csv") %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326)
 
+# Add ctd casts from Lisa Marie
+lisamarieCTD <- read.csv(here("Data/CTD/LM/lm_ctd_casts.csv")) %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326)
+
+# Filter intersecting data
 sd.int.final <- filter(sd.intersection, saildrone %in% sd.numbers) %>% 
   mutate(saildrone = as.character(saildrone))
 
 mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
   mapview(sd.lines, zcol = "saildrone") +
-  mapview(sd.int.final, zcol = "saildrone")# + mapview(shimadaCTD, xcol = "Longitude", ycol = "Latitude")
-```
-
-```{r intersect-nav-final,out.height='10in',out.width='100%',eval=FALSE}
-# Old version of the code above.
-# sd.int.final <- filter(sd.intersection, saildrone %in% sd.numbers)
-# 
-# mapview(filter(tx.buffer, Type %in% type.list), zcol = "Type", alpha.regions = 0.1) + 
-#   # mapview(sd.lines, zcol = "saildrone") +
-#   mapview(sd.int.final, zcol = "saildrone")
+  mapview(sd.int.final, zcol = "saildrone") + 
+  mapview(shimadaCTD, col.regions = "red") + 
+  mapview(lisamarieCTD, col.regions = "green")
 ```
