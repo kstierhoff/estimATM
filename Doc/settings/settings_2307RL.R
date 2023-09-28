@@ -186,7 +186,7 @@ model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 # Mapping preferences -----------------------------------------------------
 # Turn off S2 processing in sf
 sf::sf_use_s2(FALSE)
-mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldImagery","CartoDB.Positron"))
+mapviewOptions(basemaps = c("CartoDB.Positron","Esri.WorldImagery","Esri.OceanBasemap"))
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
