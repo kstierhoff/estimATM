@@ -11,7 +11,8 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,sp,rgeos,mapview,RODBC,
                knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
-               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial)
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,
+               ggspatial,janitor,DT)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -89,7 +90,8 @@ if (trawl.source == "SQL") {
 catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
 haul.all       <- tbl(trawl.con,"Haul") %>% collect()
 lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-# lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+  if (dbExistsTable(trawl.con, "LengthFrequency"))
+      lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
 spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
 
 # Close database channel
@@ -433,6 +435,30 @@ catch.table <- catch.ca %>%
 write_csv(catch.table, here("Output/catch_table_Project8.csv"), na = "")
 ```
 
+```{r extract-specimens}
+# Extract specimens from hauls in CA waters
+specimens.ca <- lengths.all %>% 
+  filter(haul %in% haul.ca$haul) %>% 
+  # left_join(select(haul.ca, key, date_time)) %>% 
+  left_join(spp.codes)
+
+# Summarize specimens
+specimen.summ <- specimens.ca %>% 
+  # Select specimens where weights, otoliths, and/or DNA were taken
+  filter(!is.na(otolithNumber) | !is.na(DNAvialNumber) | 
+           !is.na(weightg)) %>% 
+  select(commonName, scientificName, weightg, otolithNumber, DNAvialNumber, otolithNumber) %>% 
+  group_by(commonName, scientificName) %>% 
+  # !is.na(var) converts to logical then sum gives the total counts
+  summarise(measured = sum(!is.na(weightg)), 
+            otoliths = sum(!is.na(otolithNumber)),
+            DNA      = sum(!is.na(DNAvialNumber))) %>% 
+  adorn_totals()
+
+# Save to CSV
+write_csv(specimen.summ, here("Output/specimen_table_Project8.csv"), na = "")
+```
+
 # Interactive trawl plot
 
 A map showing all trawl hauls (black points), trawls in CA State waters (red points), and trawls occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the trawl "key", which includes the cruise, ship, haul, and collection.  
@@ -478,6 +504,28 @@ if (nrow(haul.mpa) > 0) {
 }
 
 ```
+
+# Catch summary
+
+A summary of catches from trawls conducted in CA.
+
+```{r catch-summary}
+catch.table %>% 
+  select(commonName, scientificName, MPA, long, lat, totalCt, disposition) %>% 
+  mutate(lat  = round(lat, 4),
+         long = round(long, 4)) %>% 
+  datatable(rownames = FALSE)
+```
+
+# Specimen summary
+
+A summary of samples taken from specimens collected in CA.
+
+```{r specimen-summary}
+datatable(specimen.summ, rownames = FALSE)
+```
+
+
 
 ```{r extract-ca-net-tows,eval=FALSE}
 if (get.db) {
