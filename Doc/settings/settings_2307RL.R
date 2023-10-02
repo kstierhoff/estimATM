@@ -299,9 +299,9 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL", "LBC", "LM") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- NA # c("LBC","LM")
+nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -344,10 +344,10 @@ sounder.type           <- c(RL  = "EK80")
 if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L", 
                                   "SWC-JRENFREE1-D","SWC-KSTIERH1-L",
                                   "SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2307RL",
-                            LBC = "C:/SURVEY/2307RL",
-                            LM  = "C:/SURVEY/2307RL",
-                            SD  = "C:/SURVEY/2307RL")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
@@ -356,21 +356,21 @@ if (Sys.info()['nodename'] %in% c("SWC-KSTIERHOF-D", "SWC-STIERHOFF-L",
 }
 
 # Backscatter data (within survey.dir, typically)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
                             LM  = "PROCESSED/EV/CSV",
                             LBC = "PROCESSED/EV/CSV",
                             SD  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
-                            LM  = "Final CPS.csv",
-                            LBC = "Final 38 kHz CPS.csv",
+                            LM  = "Final 38 kHz CPS_nasc_cps.csv",
+                            LBC = "Final 38 kHz CPS_nasc_cps.csv",
                             SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*KRILL-Juan Krill Final 120.csv",
-                            LM  = "*Krill-Juan Krill Final 120.csv",
-                            LBC = "*Krill-Juan Krill Final 120.csv",
-                            SD  = "*Krill-Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "KRILL-Juan Krill Final 120.csv",
+                            LM  = "Krill-Juan Krill Final 120.csv",
+                            LBC = "Krill-Juan Krill Final 120.csv",
+                            SD  = "Krill-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
@@ -399,7 +399,15 @@ nasc.recurse           <- c(RL  = FALSE,
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
-# If T, read cps.nasc from file; else use NASC.50 
+# source.cps.nasc determines whether to use cps.nasc values from a separate file
+# Since 2022, Code/extract_CPS_NASC.R is used to remove non-CPS backscatter and compute cps.nasc
+# Prior to that, cps.nasc was produced using the CTDapp and supplied (usually by Juan) in an external file
+
+# If F (typical, since 2002), the code will extract the CPS backscatter from the specified CSV files
+# If cps.nasc is present in the specified CSV file, the values in that column are used
+# If not, cps.nasc is set to a fixed depth manually defined by nasc.depth.cps
+
+# If T, read cps.nasc from file defined in data.cps.nasc (below)
 source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
