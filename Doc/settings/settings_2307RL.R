@@ -129,7 +129,7 @@ leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05",
 # Define ERDDAP data variables for Shimada
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start.sh  <- "2023-06-18" # Start of survey for ERDDAP vessel data query
-erddap.survey.end.sh    <- "2023-10-01" # End of survey for ERDDAP vessel data query
+erddap.survey.end.sh    <- "2023-11-15" # End of survey for ERDDAP vessel data query
 filter.nav.sh           <- FALSE  # Remove bad nav data points? Removes flagged values and unusual distances
 
 # Survey plan info --------------------------------------------------------
