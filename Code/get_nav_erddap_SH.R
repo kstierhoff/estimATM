@@ -36,7 +36,7 @@ if (get.nav.sh) {
              wind_angle = (wind_dir/360)*2*pi,
              leg      = paste("Leg", 
                               cut(as.numeric(date(time)), 
-                                  leg.breaks, 
+                                  leg.breaks.sh, 
                                   labels = FALSE)),
              id       = seq_along(time)) %>%
       # Identify flags not equal to "Z"
