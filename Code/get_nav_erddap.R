@@ -22,7 +22,9 @@ if (get.nav) {
     dataURL <- URLencode(paste0(
       "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
       erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start.new, "&time<=", erddap.survey.end))
+      "&time>=", erddap.survey.start.new, 
+      "&time<=", erddap.survey.end,
+      "&flag=~", erddap.flags))
 
     # Download and parse ERDDAP nav data
     nav.temp <- read_csv(dataURL, lazy = FALSE,
@@ -38,35 +40,9 @@ if (get.nav) {
                               cut(as.numeric(date(time)), 
                                   leg.breaks, 
                                   labels = FALSE)),
-             id       = seq_along(time)) %>%
-      # Identify flags not equal to "Z"
-      mutate(flag_sum = nchar(str_replace_all(flag, "Z", ""))) 
+             id       = seq_along(time)) 
     
-    # Remove bad values
-    if (filter.nav) {
-      # Remove data with bad flags
-      nav.temp <- filter(nav.temp, flag_sum == 0)
-    }
-    
-    # Compute distance between each point, and remove points with unrealistic distances
-    nav.temp.sf <- nav.temp %>% 
-      st_as_sf(coords = c("long","lat"),crs = 4326) %>% 
-      st_transform(crs = 3310) 
-    
-    # Remove points that are too far apart
-    if (filter.nav) {
-      nav.temp.sf <- nav.temp.sf %>% 
-        mutate(distance_to_next = as.numeric(
-          na.omit(c(0, st_distance(geometry,
-                                   lead(geometry, 
-                                        default = NA),
-                                   by_element = TRUE))))/1852) %>% 
-        filter(distance_to_next < 20)
-    }
-    
-    # Subset nav data that are in nav.temp.sf
-    nav.temp <- nav.temp %>% 
-      filter(id %in% nav.temp.sf$id)
+    # ggplot(nav.temp, aes(long, lat, colour = SST)) + geom_path() + coord_map()
 
     # Append new nav data
     if (exists("nav")) {
@@ -83,14 +59,10 @@ if (get.nav) {
   # Filter nav data
   nav <- nav %>%
     filter(is.na(ymd_hms(time)) == FALSE,
+           SST > 0, SST < 35,
            is.nan(SOG) == FALSE, SOG > 0, SOG < 15,
            between(lat, min(survey.lat), max(survey.lat)), 
            between(long, min(survey.long), max(survey.long)))
-  
-  if (filter.nav) {
-    nav <- nav %>%
-      filter(flag_sum == 0)
-  }
   
   # Convert nav to spatial
   nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 

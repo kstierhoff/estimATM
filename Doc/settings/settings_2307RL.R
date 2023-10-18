@@ -115,9 +115,9 @@ erddap.survey.end    <- "2023-10-01" # End of survey for ERDDAP vessel data quer
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed","flag")
+erddap.flags         <- c('"ZZZZ.Z.Z..Z.*"')
 survey.lat           <- c(27,51)
 survey.long          <- c(-130,-113)
-filter.nav           <- TRUE  # Remove bad nav data points? Removes flagged values and unusual distances
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
@@ -128,7 +128,7 @@ leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-10-08", "2023-10-19",
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start.sh  <- "2023-10-09" # Start of survey for ERDDAP vessel data query
 erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data query
-filter.nav.sh           <- FALSE  # Remove bad nav data points? Removes flagged values and unusual distances
+erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2307RL.csv"
