@@ -104,34 +104,31 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
-leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-16", "2023-08-01", 
-                                          "2023-09-01", "2023-10-01",
-                                          "2023-11-03")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-15", "2023-08-01", 
+                                          "2023-09-01", "2023-10-01")))
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2023-07-16" # Start of survey for ERDDAP vessel data query
+erddap.survey.start  <- "2023-07-17" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2023-10-01" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed","flag")
+erddap.flags         <- c('"ZZZZ.Z.Z..Z.*"')
 survey.lat           <- c(27,51)
 survey.long          <- c(-130,-113)
-filter.nav           <- TRUE  # Remove bad nav data points? Removes flagged values and unusual distances
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
-leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-06-18", "2023-07-05", 
-                                          "2023-07-23", "2023-08-09", 
-                                          "2023-08-27", "2023-09-12",
-                                          "2023-09-16")))
+leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-10-08", "2023-10-19",
+                                             "2023-11-04")))
 
 # Define ERDDAP data variables for Shimada
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start.sh  <- "2023-06-18" # Start of survey for ERDDAP vessel data query
-erddap.survey.end.sh    <- "2023-11-15" # End of survey for ERDDAP vessel data query
-filter.nav.sh           <- FALSE  # Remove bad nav data points? Removes flagged values and unusual distances
+erddap.survey.start.sh  <- "2023-10-09" # Start of survey for ERDDAP vessel data query
+erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data query
+erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
 
 # Survey plan info --------------------------------------------------------
 wpt.filename         <- "waypoints_2307RL.csv"
@@ -541,7 +538,7 @@ trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl perform
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
 # CTD data
-ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD/PROCESSED")
+ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
 ctd.hdr.pattern        <- "RL2203*.*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.depth              <- 350
