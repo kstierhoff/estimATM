@@ -162,7 +162,7 @@ ggplot() +
   # # Configure pie outline colors
   # scale_colour_manual(name = "Sample type", 
   #                     labels = c("Purse seine", "Trawl"),
-  #                     values = c(seine.color, trawl.color),
+  #                     values = c("Seine" = seine.color, "Trawl" = trawl.color),
   #                     guide = "none") +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',

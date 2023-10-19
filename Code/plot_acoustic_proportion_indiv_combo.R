@@ -36,7 +36,7 @@ acoustic.prop.cluster.combo.final <- base.map +
   # Configure pie outline colors
   scale_colour_manual(name = "Sample type", 
                       labels = c("Purse seine", "Trawl"),
-                      values = c(seine.color, trawl.color),
+                      values = c("Seine" = seine.color, "Trawl" = trawl.color),
                       guide = "none") +
   coord_sf(crs = crs.proj, 
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 

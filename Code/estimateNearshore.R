@@ -387,7 +387,7 @@ if (save.figs) {
     # Configure pie outline colors
     scale_colour_manual(name = "Sample type", 
                         labels = c("Purse seine", "Trawl"),
-                        values = c(seine.color, trawl.color),
+                        values = c("Seine" = seine.color, "Trawl" = trawl.color),
                         guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
@@ -2399,7 +2399,7 @@ if (save.figs) {
     # Configure pie outline colors
     scale_colour_manual(name = "Sample type", 
                         labels = c("Purse seine", "Trawl"),
-                        values = c(seine.color, trawl.color),
+                        values = c("Seine" = seine.color, "Trawl" = trawl.color),
                         guide = "none") +
     # Configure legend guides
     guides(fill = guide_legend(), size = guide_legend()) +
@@ -2432,7 +2432,7 @@ if (save.figs) {
       # Configure pie outline colors
       scale_colour_manual(name = "Sample type", 
                           labels = c("Purse seine", "Trawl"),
-                          values = c(seine.color, trawl.color),
+                          values = c("Seine" = seine.color, "Trawl" = trawl.color),
                           guide = "none") +
       # Configure legend guides
       guides(fill = guide_legend(), size = guide_legend()) +
