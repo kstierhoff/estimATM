@@ -91,7 +91,7 @@ survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2307RL"        # SWFSC/AST survey name
 survey.start           <- "17 July"       # Survey start date
-survey.end             <- "30 September"  # Survey end date
+survey.end             <- "3 November"    # Survey end date
 survey.year            <- "2023"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 81              # Days at sea allocated
@@ -105,7 +105,8 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
 leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-15", "2023-08-01", 
-                                          "2023-09-01", "2023-10-01")))
+                                          "2023-09-01", "2023-10-01",
+                                          "2023-11-04")))
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
@@ -140,7 +141,7 @@ wpt.colors           <- c(Adaptive = "#FF0000", Carranza = "green",
                           Offshore = "#FFA500", Saildrone = "#00FFFF") 
 wpt.linetypes        <- c(Adaptive = "dashed", Carranza = "solid",
                           Compulsory = "solid", Nearshore = "solid", 
-                          Offshore = "dashed", Saildrone = "solid")
+                          Offshore = "dashed", Saildrone = "dashed")
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
