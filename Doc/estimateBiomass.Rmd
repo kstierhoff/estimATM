@@ -535,7 +535,6 @@ include_graphics(here("Figs/fig_survey_plan.png"))
 For each .CSV file produced during Echoview processing, data within each `r bin.length`-m long interval are vertically integrated every `r bin.depth` m (down to 100 m, then at 150 and 250 m) for each vessel. If the CTD.app has been used to define the stop integration depth, it is added, else `r nasc.depth.cps`` is used. Transect names are extracted from .CSV file names, short transects are excluded, and transect numbers are assigned.
 
 ```{r process-backscatter}
-# RESUME HERE
 if (process.csv) {
   if (!process.csv.all) {
     # Load already processed CSV files 
@@ -1442,7 +1441,8 @@ if (get.db) {
   catch.all	     <- tbl(trawl.con, "Catch") %>% collect()
   haul.all       <- tbl(trawl.con, "Haul") %>% collect()
   lengths.all    <- tbl(trawl.con, "Specimen") %>% collect()
-  lengthFreq.all <- tbl(trawl.con, "LengthFrequency") %>% collect()
+  if (dbExistsTable(trawl.con, "LengthFrequency"))
+      lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
   spp.codes      <- tbl(trawl.con, "SpeciesCodes") %>% collect()
   
   # Close database channel
@@ -1452,8 +1452,13 @@ if (get.db) {
   spp.codes$scientificName[spp.codes$species == 161743] <- "Etrumeus teres"
   
   # Save imported database data to .Rdata file
-  save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
-       file = here("Data/Trawl/trawl_data.Rdata"))
+    if (exists("lengthFreq.all")) {
+      save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+         file = here("Data/Trawl/trawl_data.Rdata"))
+    } else {
+      save(catch.all, haul.all, lengths.all, spp.codes,  
+         file = here("Data/Trawl/trawl_data.Rdata"))
+    }
   
   # Save species codes
   save(spp.codes, file = here("Output/species_codes.Rdata"))
@@ -1534,7 +1539,7 @@ haul.all <- haul.all %>%
 haul <- haul.all %>% 
   select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 
          stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
-         trawlPerformance, season, notes) %>% 
+         trawlPerformance, season, Notes) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
   # Manually remove hauls
   filter(!haul %in% haul.rm) %>% 
@@ -1681,7 +1686,7 @@ Data for each trawl are summarized to identify trawl hauls with potential proble
 # Create and format haul summary table
 haul %>% 
   replace_na(list(trawlPerformance = "Unknown")) %>% 
-  select(-notes, -stopLatDecimal, -stopLongDecimal, -haulBackTime) %>% 
+  select(-stopLatDecimal, -stopLongDecimal, -haulBackTime) %>% 
   mutate(equilibriumTime = format(equilibriumTime, "%m/%d/%Y %H:%M"),
          duration = cell_spec(
            duration, knitr.format, color = "black",
@@ -1909,7 +1914,7 @@ saveRDS(catch, file = here("Output/catch_info.rds"))
 
 if (nrow(catch) > 0) {
   haul.summ.wt <- catch %>%
-    select(haul, cluster, sample.type, scientificName, totalWeight) %>%
+    select(haul, cluster, sample.type, scientificName, totalWeight = TotalWtKg) %>%
     tidyr::spread(scientificName, totalWeight)
   
   # Add species with zero total weight
@@ -2356,6 +2361,8 @@ include_graphics(here("Figs/fig_nasc_trawl_cluster_wt.png"))
 ## Process trawl length data  
 
 ```{r process-trawl-length-data}
+## RESUME HERE
+
 # Process trawl length data -------------------------------------------------------
 if (nrow(lengthFreq.all) > 0) {
   # Process binned length data from all surveys

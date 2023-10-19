@@ -453,7 +453,13 @@ rm.inshore             <- c(RL  = TRUE,
 rm.nearshore           <- c(RL  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
-                            SD  = TRUE) 
+                            SD  = TRUE)
+
+# If T, extracts nearshore intervals from vessels that sample close to shore
+extract.nearshore      <- c(RL  = FALSE,
+                            LM  = FALSE,
+                            LBC = FALSE,
+                            SD  = FALSE)
 
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
