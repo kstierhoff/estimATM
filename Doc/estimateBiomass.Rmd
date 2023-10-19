@@ -93,7 +93,7 @@ get.nav           <- T # Download primary vessel nav data from ERDDAP
 nav.source        <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
 get.nav.sh        <- T # Download NOAA Ship nav data
-copy.files        <- T # Copy data files to local directory 
+copy.files        <- F # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
@@ -275,7 +275,7 @@ if (download.hab) {
   source(here("Code/plot_sardine_habitat.R"))
 }
 
-if(exists(here("Figs/fig_habitat_map.png"))) {
+if(file.exists(here("Figs/fig_habitat_map.png"))) {
   include_graphics(here("Figs/fig_habitat_map.png"))
 } else {
   cat("No sardine habitat map available.")
@@ -287,17 +287,21 @@ if(exists(here("Figs/fig_habitat_map.png"))) {
 Vessel (e.g., lat/long, speed-over-ground, heading, etc.) and underway oceanographic data are available for all NOAA FSVs from ERDDAP in "near real time" during surveys (generally with a ~1 d lag, assuming an internet connection is available) or quality-assured (generally after the completion of survey legs). These data are logged continuously and averaged over 1-minute intervals. These data are relatively error-free and adhere to a strict format and are, therefore, more reliably and easily processed than the SCS event log (.elg) files provided to the Chief Scientist following a survey. Date ranges and desired variables are configured in the **`settings*.R`** files, and are used to assemble the URL used to download the data from ERDDAP.
 
 ```{r process-nav, message=FALSE, warning=FALSE, include=FALSE}
-# Source code to get nav data from ERDDAP or SCS
+# Source code to get nav data for the primary survey vessel from ERDDAP or SCS
 if (nav.source == "ERDDAP") {
   source(here("Code/get_nav_erddap.R"))
 } else if (nav.source == "SCS") {
   source(here("Code/get_nav_scs.R"))
 }
 
+# Source Carranza nav data for summer 2021
 if (survey.name %in% c("2107RL")) {
   source(here("Code/get_nav_carranza.R"))
-  # mapview(nav.paths.jcv.sf) + mapview(transects.jcf, zcol = "Type")
 }
+
+# Source code to get nav data for Shimada from ERDDAP
+# TRUE for 
+source(here("Code/get_nav_saildrone.R"))
 
 if (get.nav.sh) {
   source(here("Code/get_nav_erddap_SH.R"))
@@ -347,10 +351,6 @@ nav.now <- tail(nav, 1) %>%
   mutate(label = paste("Last position:", time, "UTC"),
          popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
                         '<b>Last position: </b>', time, ' UTC<br/>'))
-```
-
-```{r process-nav-saildrone}
-source(here("Code/get_nav_saildrone.R"))
 ```
 
 ```{r configure-base-map, include=FALSE}
