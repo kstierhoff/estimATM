@@ -106,7 +106,7 @@ do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
@@ -1484,6 +1484,10 @@ if (trawl.source == "Access") {
         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
         stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
     
+    catch.all <- catch.all %>% 
+      rename(totalWeight = TotalWtKg,
+             totalNum    = TotalNum)
+    
   } else {
     haul.all <- haul.all %>% 
       arrange(haul) %>% 
@@ -1914,7 +1918,7 @@ saveRDS(catch, file = here("Output/catch_info.rds"))
 
 if (nrow(catch) > 0) {
   haul.summ.wt <- catch %>%
-    select(haul, cluster, sample.type, scientificName, totalWeight = TotalWtKg) %>%
+    select(haul, cluster, sample.type, scientificName, totalWeight) %>%
     tidyr::spread(scientificName, totalWeight)
   
   # Add species with zero total weight
