@@ -605,7 +605,7 @@ nIndiv.min    <- 1
 nClusters.min <- 1
 
 # Use manually defined strata?
-stratify.manually    <- FALSE
+stratify.manually    <- TRUE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
@@ -615,84 +615,52 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 46:53),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 2,
-    transect = 55:66),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 3,
-    transect = 70:78),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 4,
-    transect = 82:88),
-  data.frame(
-    scientificName = "Clupea pallasii", 
-    stratum = 5,
-    transect = 94:99),
+    transect = 32:37),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:51),
+    transect = 1:31),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 52:58),
-  data.frame(
-    scientificName = "Engraulis mordax", 
-    stratum = 3,
-    transect = 72:88),
+    transect = 32:37),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
-    transect = 1:13),
+    transect = 1:7),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 14:20),
+    transect = 9:12),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 23:28),
+    transect = 16:22),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 47:60),
-  data.frame(
-    scientificName = "Sardinops sagax", 
-    stratum = 5,
-    transect = 66:84),
+    transect = 32:37),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
-    transect = 1:14),
+    transect = 2:5),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 41:46),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 3,
-    transect = 58:71),
-  data.frame(
-    scientificName = "Scomber japonicus", 
-    stratum = 4,
-    transect = 79:83),
+    transect = 34:37),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:35),
+    transect = 1:31),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 41:97))
+    transect = 34:37))
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino
 # stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
-stock.break.sar  <- 34.46 # Latitude of Pt. Conception (or change based on SST)
+stock.break.sar  <- 34.3 # Latitude of Pt. Conception (or change based on SST)
 
 # Transects used to define stock boundaries (primary or other)
 

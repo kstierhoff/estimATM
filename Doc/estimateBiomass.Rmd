@@ -93,7 +93,7 @@ get.nav           <- T # Download primary vessel nav data from ERDDAP
 nav.source        <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sd        <- T # Download Saildrone nav data from ERDDAP
 get.nav.sh        <- T # Download NOAA Ship nav data
-copy.files        <- F # Copy data files to local directory 
+copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
@@ -2476,7 +2476,6 @@ if (survey.name == "1807RL") {
 # Save length data to file
 save(lengths.all, file = here("Output/lengths_all.Rdata"))
 
-# Resume here
 # Convert lengths to totalLength_mm for TS estimates ---------------------------
 lengths.all  <- lengths.all %>%
   mutate(
@@ -2492,9 +2491,20 @@ lengths.all  <- lengths.all %>%
       scientificName == "Trachurus symmetricus" ~ 
         convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Etrumeus acuminatus" ~ 
-        convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
-    missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
+        convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL")))
+    
+if ("mantleLength_mm" %in% names(lengths.all)) {
+  lengths.all <- lengths.all %>% 
+    mutate(totalLength_mm = case_when(
+      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm),
+      TRUE ~ totalLength_mm))
+}
+
+# Flag missing lengths and filter CPS specimens
+lengths.all <- lengths.all %>% 
+  mutate(missing.length = case_when(
+    is.na(totalLength_mm) ~ TRUE, 
+    TRUE ~ FALSE)) %>% 
   filter(scientificName %in% cps.spp)
 
 # Estimate missing weights from lengths -------------------------------------------------------
@@ -2676,8 +2686,8 @@ save(lengths.all, lengths, lw.df,
 K.summ <- lengths %>%
   group_by(scientificName) %>%
   summarise(
-    K.lower = quantile(K, probs = 0.001),
-    K.upper = quantile(K, probs = 0.999))
+    K.lower = quantile(K, probs = 0.001, na.rm = TRUE),
+    K.upper = quantile(K, probs = 0.999, na.rm = TRUE))
 
 # Select outliers
 length.outliers.all <- lengths %>% 
@@ -2754,7 +2764,7 @@ save(length.summ, file = here("Output/length_summary_all.Rdata"))
 
 # Save trawl data-final
 save(catch, haul, lengths,
-     file = here("Data/Trawl/all_trawl_data-final.Rdata") )
+     file = here("Data/Trawl/all_trawl_data-final.Rdata"))
 ```  
 
 ## QA/QC of trawl data
@@ -3584,44 +3594,6 @@ clf$sigmawg.other[clf$prop.other  == 0]   <- 1
 # when species proportions must be adjusted (e.g., 2022, N of Cape Mendocino)
 clf <- clf %>%
   mutate(adjusted = as.logical(FALSE))
-# 
-# # Add adjusted seine catches from LM in 2022 here
-# if (survey.name == "2207RL") {
-#   clf.lm.2022 <- read_csv(here("Data/Seine/lm_clusters_2022_adjusted.csv")) %>% 
-#     # Remove duplicate Lasker clusters
-#     # Remove LM and LBC clusters S of Cape Mendocino
-#     filter(cluster > 32,
-#            lat >= 40.42) %>% 
-#     mutate(sample.type = "Purse seine",
-#            adjusted = as.logical(adjusted)) 
-#   
-#   # Replace NA's with 0's
-#   clf.lm.2022[is.na(clf.lm.2022)] <- 0
-#   
-#   
-#   clf.lm.2022 <- clf.lm.2022 %>% 
-#     ## Add prop and sigmas for "other" species
-#     mutate(
-#       prop.other = case_when(
-#         prop.sar != 0 & adjusted == TRUE ~ 1 - prop.sar,
-#         # prop.sar == 0 & adjusted == TRUE ~ 1,
-#         TRUE ~ prop.other),
-#       prop.other.wg = prop.other) %>% 
-#     mutate(
-#       sigmawg.other = case_when(
-#         prop.other == 0 ~ 1,
-#         TRUE ~ prop.other),
-#       sigmaindiv.other = sigmawg.other) %>% 
-#     select(-haul)
-#   
-#   # Combine clf files
-#   clf <- bind_rows(clf, clf.lm.2022)
-#   
-#   # Plot replacement clusters, symbolized by sample type and whether or not adjusted
-#   # ggplot(clf, aes(long, lat, colour = sample.type, fill = adjusted)) +
-#   #   geom_point(shape = 21, alpha = 0.5) +
-#   #   coord_map()
-# }
 
 # Save to file
 write_csv(clf, file = here("Output/clf_ts_proportions.csv"))
@@ -4270,27 +4242,49 @@ tx.mid <- nasc %>%
   group_by(vessel.name, transect, transect.name) %>% 
   summarise(
     lat  = mean(lat, na.rm = TRUE),
-    long = mean(long, na.rm = TRUE))
+    long = mean(long, na.rm = TRUE)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Create a data frame for results
-tx.nn <- data.frame()
+# tx.nn <- data.frame()
 
 for (i in unique(tx.mid$transect)) {
   # Get the mid lat/long for each transect
   tx.i      <- filter(tx.mid, transect == i)
-  # Get NASC data for all other transects
-  nasc.temp <- filter(tx.mid, transect != i, vessel.name %in% tx.i$vessel.name)
-  # Calculate distance between transect midpoint and all other NASC values
-  nn.dist   <- swfscMisc::distance(tx.i$lat, tx.i$long,
-                                   nasc.temp$lat, nasc.temp$long)
+  # Get midpoint data for all other transects
+  tx.others <- filter(tx.mid, transect != i, vessel.name %in% tx.i$vessel.name)
   # Get the transect info and spacing based on shortest distance
-  nn.tx     <- nasc.temp$transect[which.min(nn.dist)]
-  min.dist  <- nn.dist[which.min(nn.dist)]
-  nn.lat    <- nasc.temp$lat[which.min(nn.dist)]
-  nn.long   <- nasc.temp$long[which.min(nn.dist)]
+  # Find nearest feature
+  nn.tx <- st_nearest_feature(tx.i, tx.others)
+  # Calculate distance between nearest transect
+  min.dist <- distGeo(as_Spatial(tx.i), as_Spatial(tx.others[nn.tx,]))*0.000539957
+  
+  # Add results to sf object
+  tx.i <- tx.i %>% 
+    mutate(nn.tx = nn.tx,
+           min.dist = min.dist)
+  
   # Add to results
-  tx.nn     <- bind_rows(tx.nn, 
-                         data.frame(tx.i, nn.tx, min.dist, nn.lat, nn.long))
+  if (exists("tx.nn")) {
+    tx.nn <- bind_rows(tx.nn, tx.i)
+  } else {
+    tx.nn <- tx.i
+  }
+  
+  
+  # # Get NASC data for all other transects
+  # nasc.temp <- filter(tx.mid, transect != i, vessel.name %in% tx.i$vessel.name)
+  # # Calculate distance between transect midpoint and all other NASC values
+  # nn.dist   <- swfscMisc::distance(tx.i$lat, tx.i$long,
+  #                                  nasc.temp$lat, nasc.temp$long)
+  # # Get the transect info and spacing based on shortest distance
+  # nn.tx     <- nasc.temp$transect[which.min(nn.dist)]
+  # min.dist  <- nn.dist[which.min(nn.dist)]
+  # nn.lat    <- nasc.temp$lat[which.min(nn.dist)]
+  # nn.long   <- nasc.temp$long[which.min(nn.dist)]
+  # # Add to results
+  # tx.nn     <- bind_rows(tx.nn, 
+  #                        data.frame(tx.i, nn.tx, min.dist, nn.lat, nn.long))
 }
 
 # Bin transects by spacing
@@ -4811,8 +4805,6 @@ tx.o.s <- tx.ends %>%
     loc = "offshore",
     order = 1)
 
-tx.o.final <- data.frame()
-
 for (v in unique(tx.o$vessel.name)) {
   if (v == "SD1024") {
     tx.o.tmp <- filter(tx.o, vessel.name == v)
@@ -4821,16 +4813,16 @@ for (v in unique(tx.o$vessel.name)) {
       bind_rows(filter(tx.o.n, vessel.name == v)) %>% 
       bind_rows(filter(tx.o.s, vessel.name == v))
   }
-  tx.o.final <- bind_rows(tx.o.final, tx.o.tmp)
+  
+  if (exists("tx.o.final")) {
+    tx.o.final <- bind_rows(tx.o.final, tx.o.tmp)
+  } else {
+    tx.o.final <- tx.o.tmp
+  }
 }
 
 tx.o <- tx.o.final %>% 
   arrange(desc(transect), desc(order))
-
-# tx.o <- tx.o %>% 
-#   bind_rows(tx.o.n) %>% 
-#   bind_rows(tx.o.s) %>% 
-#   arrange(desc(transect), desc(order))
 
 # Assemble the final data frame with all waypoints -----------------------------
 strata.points <- tx.i %>% 
@@ -6247,8 +6239,8 @@ if (do.imap) {
     # Enable tile caching
     enableTileCaching() %>% 
     # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-    addProviderTiles(providers$Esri.OceanBasemap, 
-                     group = "Esri.OceanBasemap",
+    addProviderTiles(providers$Esri.NatGeoWorldMap, 
+                     group = "Esri.NatGeoWorldMap",
                      options = tileOptions(useCache = useCachedTile,
                                            crossOrigin = useCrossOrigin)) %>%
     # Add EEZs
