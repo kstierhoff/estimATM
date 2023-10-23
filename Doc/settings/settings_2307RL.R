@@ -218,7 +218,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
 spp.common.ns <- "Northern Anchovy"
 spp.ns        <- "Engraulis mordax"
 stock.ns      <- "Central"
-stratum.ns    <- 3
+stratum.ns    <- 1
 
 # Figure preferences ------------------------------------------------------
 # Set species colors
