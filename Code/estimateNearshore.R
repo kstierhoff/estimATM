@@ -30,12 +30,12 @@ if (process.nearshore) {
                 labels = FALSE, include.lowest = TRUE)) 
   
   # Plot data for 2022
-  # ggplot() + 
-  #   geom_point(data = nasc, aes(long, lat, colour = vessel.orig)) + 
-  #   geom_point(data = nasc.nearshore, aes(long, lat, fill = vessel.name), shape = 21) + 
+  # ggplot() +
+  #   geom_point(data = nasc, aes(long, lat, colour = vessel.orig)) +
+  #   geom_point(data = nasc.nearshore, aes(long, lat, fill = vessel.name), shape = 21) +
   #   geom_sf(data = bathy_20m_poly, fill = NA) +
   #   coord_sf()
-  
+  # 
   # In 2022, LM sampled core transects between Cape Flattery and Bodega Bay spaced 20 nmi
   # Transect numbers correspond to the core transect names, and will not be unique with other
   # nearshore transects surveyed by LBC, so we must increment the transect numbers starting
@@ -129,7 +129,7 @@ if (process.nearshore) {
       super.clusters <- bind_rows(super.clusters, super.clusters.ns)
       super.hauls    <- bind_rows(super.hauls, super.clusters.ns)
       
-      # ggplot() + 
+      # ggplot() +
       #   geom_text(data = super.clusters, aes(long, lat, label = cluster, colour = sample.type)) +
       #   geom_text(data = super.clusters.ns, aes(long, lat, label = cluster, colour = sample.type)) +
       #   coord_map()
@@ -332,9 +332,9 @@ if (use.seine.data) {
     select(-cluster) %>% 
     bind_rows(haul.pie)
   
-  # ggplot() + 
-  #   geom_text(data = cluster.pie, aes(long, lat, label = cluster, colour = factor(cluster))) + 
-  #   geom_text(data = set.pie, aes(long, lat, label = cluster, colour = factor(cluster))) + 
+  # ggplot() +
+  #   geom_text(data = cluster.pie, aes(long, lat, label = cluster, colour = factor(cluster))) +
+  #   geom_text(data = set.pie, aes(long, lat, label = cluster, colour = factor(cluster))) +
   #   coord_map()
 }
 
@@ -447,6 +447,8 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
 }
+
+# RESUME HERE
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
 if (cluster.source["NS"] == "cluster") {

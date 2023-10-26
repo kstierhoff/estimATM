@@ -313,7 +313,7 @@ nasc.depth.krill <- "NASC.350"
 # Survey vessels that collected purse seine data
 seine.vessels          <- c("LBC","LM")
 # Use seine data to apportion backscatter
-use.seine.data         <- FALSE
+use.seine.data         <- TRUE
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
