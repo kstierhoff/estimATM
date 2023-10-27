@@ -96,7 +96,7 @@ survey.year            <- "2023"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 81              # Days at sea allocated
 survey.landmark.n      <- "Cape Scott, BC" # Landmark - N extent of survey
-survey.landmark.s      <- "Punta Baja, Baja CA" # Landmark - S extent of survey
+survey.landmark.s      <- "Punta Eugenia, Baja CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -298,7 +298,11 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
+<<<<<<< Updated upstream
 nasc.vessels           <- c("RL", "LBC", "LM") #c("RL","LBC","LM","SD") 
+=======
+nasc.vessels           <- c("RL","LBC","LM") # ,"SD")
+>>>>>>> Stashed changes
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
@@ -353,7 +357,7 @@ if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
 }
 
 # Backscatter data (within survey.dir, typically)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
                             LM  = "PROCESSED/EV/CSV",
                             LBC = "PROCESSED/EV/CSV",
                             SD  = "PROCESSED/EV/CSV") 
@@ -362,12 +366,23 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final 38 kHz CPS_nasc_cps.csv",
                             LBC = "Final 38 kHz CPS_nasc_cps.csv",
+<<<<<<< Updated upstream
                             SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "KRILL-Juan Krill Final 120.csv",
                             LM  = "Krill-Juan Krill Final 120.csv",
                             LBC = "Krill-Juan Krill Final 120.csv",
                             SD  = "Krill-Juan Krill Final 120.csv")
+=======
+                            SD  = "Final 38 kHz CPS_nasc_cps.csv")
+
+# Regex pattern for identifying krill CSV files
+nasc.pattern.krill     <- c(RL  = "*KRILL-Juan Krill Final 120.csv",
+                            LM  = "*Krill-Juan Krill Final 120.csv",
+                            LBC = "*Krill-Juan Krill Final 120.csv",
+                            SD  = "*Krill-Juan Krill Final 120.csv")
+
+>>>>>>> Stashed changes
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
@@ -378,7 +393,7 @@ nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
                             LM  = "\\d{3}O",
                             LBC = "\\d{3}O",
                             SD  = "\\d{3}O")
-# Regex pattern for identifying offshore transects
+# Regex pattern for identifying inshore transits between transects
 nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
                             LM  = "\\d{3}I",
                             LBC = "\\d{3}I",
@@ -396,6 +411,7 @@ nasc.recurse           <- c(RL  = FALSE,
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
+<<<<<<< Updated upstream
 # source.cps.nasc determines whether to use cps.nasc values from a separate file
 # Since 2022, Code/extract_CPS_NASC.R is used to remove non-CPS backscatter and compute cps.nasc
 # Prior to that, cps.nasc was produced using the CTDapp and supplied (usually by Juan) in an external file
@@ -405,6 +421,11 @@ nasc.max               <- NA
 # If not, cps.nasc is set to a fixed depth manually defined by nasc.depth.cps
 
 # If T, read cps.nasc from file defined in data.cps.nasc (below)
+=======
+# If T, read cps.nasc from file; else use NASC.50 
+# THIS IS OUTDATED CODE FROM PREVIOUS SURVEYS. SETTINGS VALUES TO FALSE WILL 
+# NOT PRECLUDE THE CODE FROM USING CPS.NASC FROM THE CSV FILES.
+>>>>>>> Stashed changes
 source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
@@ -520,7 +541,7 @@ tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculatin
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
-scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
+scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
@@ -552,7 +573,7 @@ ctd.depth              <- 350
 
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
-uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.asc"
+uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.*.asc"
 uctd.cast.pattern      <- ".*_processed.asc"
 
 # TDR data
@@ -670,13 +691,13 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2307RL_EK80"
-raw.size      <-  50   # file size in megabytes (MB)
+raw.size      <-  1000   # file size in megabytes (MB)
 raw.log.range <- 350  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
-ek80.version  <- "v1.12.2" # EK80 version
-ev.version    <- "v12.1" # Echoview version
+ek80.version  <- "v21.15.1" # EK80 version
+ev.version    <- "v13.1" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <-  350  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
@@ -700,11 +721,11 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 # # Calibration information ------------------------------------------------
 cal.vessels        <- c("RL","LBC","LM")
 cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
-cal.datetime       <- "26 June"     # Date/time of calibration
-cal.plot.date      <- "2023-06-23" # Date of the calibration, used to plot cal time series
-cal.window         <- 50           # Number of days around calibration date to look for results
+cal.datetime       <- "27 June"     # Date/time of calibration
+cal.plot.date      <- "2023-06-27" # Date of the calibration, used to plot cal time series
+cal.window         <- 75           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
-cal.personnel      <- "J. Renfree, D. Murfin, and S. Sessions" # Calibration participants
+cal.personnel      <- "A. Beittel, D. Murfin, J. Renfree, and S. Sessions" # Calibration participants
 cal.loc            <- "10th Avenue Marine Terminal, San Diego Bay" # Location name
 cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
@@ -718,10 +739,10 @@ cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about 
 cal.notes          <- "Lasker calibration sphere #1"
 
 # Physical conditions during calibration
-cal.temp           <-   23.42   # enter water temperature at sphere depth
-cal.sal            <-   35.0   # enter salinity at sphere depth
-cal.c              <- 1530.6   # enter sound speed (m/s)
-cal.min.z          <-    5     # enter minimum water depth below transducers
+cal.temp           <-   20.16   # enter water temperature at sphere depth
+cal.sal            <-   34.11   # enter salinity at sphere depth
+cal.c              <- 1520.8   # enter sound speed (m/s)
+cal.min.z          <-    6     # enter minimum water depth below transducers
 cal.max.z          <-   10     # enter maximum water depth below transducers
  
 # Enter ambient noise estimates (dB re 1 W) for each vessel
@@ -778,11 +799,13 @@ trawl.start.button <- "Begin Fishing (EQ)"
 trawl.end.button   <- "Haul Back"
 bongo.button       <- "Bongo IN"
 pairovet.button    <- "Pairovet IN"
-cb.flush.button    <- "CB Flush"
-cb.int.button      <- "CB Interm"
-cb.ext.button      <- "CB Extended"
+cb.flush.button    <- "Centerboard Flush"
+cb.int.button      <- "Centerboard Interm"
+cb.ext.button      <- "Centerboard Extended"
 gps.lat.hdr        <- "SAMOS-Lat-VALUE"
 gps.lon.hdr        <- "SAMOS-Lon-VALUE"
+gps.lat.moa        <- "GP170-Lat"
+gps.lon.moa        <- "GP170-Lon"
 sst.hdr            <- "SAMOS-TSGT-VALUE"
 sog.hdr            <- "SAMOS-SOG-VALUE"
 wind.dir.hdr       <- "SAMOS-TrueWind-Dir-VALUE"
