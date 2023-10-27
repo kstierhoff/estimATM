@@ -298,11 +298,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-<<<<<<< Updated upstream
 nasc.vessels           <- c("RL", "LBC", "LM") #c("RL","LBC","LM","SD") 
-=======
-nasc.vessels           <- c("RL","LBC","LM") # ,"SD")
->>>>>>> Stashed changes
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL")
@@ -357,7 +353,7 @@ if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
 }
 
 # Backscatter data (within survey.dir, typically)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
                             LM  = "PROCESSED/EV/CSV",
                             LBC = "PROCESSED/EV/CSV",
                             SD  = "PROCESSED/EV/CSV") 
@@ -366,23 +362,12 @@ nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final 38 kHz CPS_nasc_cps.csv",
                             LBC = "Final 38 kHz CPS_nasc_cps.csv",
-<<<<<<< Updated upstream
                             SD  = "Final 38 kHz CPS.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "KRILL-Juan Krill Final 120.csv",
                             LM  = "Krill-Juan Krill Final 120.csv",
                             LBC = "Krill-Juan Krill Final 120.csv",
                             SD  = "Krill-Juan Krill Final 120.csv")
-=======
-                            SD  = "Final 38 kHz CPS_nasc_cps.csv")
-
-# Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "*KRILL-Juan Krill Final 120.csv",
-                            LM  = "*Krill-Juan Krill Final 120.csv",
-                            LBC = "*Krill-Juan Krill Final 120.csv",
-                            SD  = "*Krill-Juan Krill Final 120.csv")
-
->>>>>>> Stashed changes
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
@@ -411,7 +396,6 @@ nasc.recurse           <- c(RL  = FALSE,
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
-<<<<<<< Updated upstream
 # source.cps.nasc determines whether to use cps.nasc values from a separate file
 # Since 2022, Code/extract_CPS_NASC.R is used to remove non-CPS backscatter and compute cps.nasc
 # Prior to that, cps.nasc was produced using the CTDapp and supplied (usually by Juan) in an external file
@@ -421,11 +405,6 @@ nasc.max               <- NA
 # If not, cps.nasc is set to a fixed depth manually defined by nasc.depth.cps
 
 # If T, read cps.nasc from file defined in data.cps.nasc (below)
-=======
-# If T, read cps.nasc from file; else use NASC.50 
-# THIS IS OUTDATED CODE FROM PREVIOUS SURVEYS. SETTINGS VALUES TO FALSE WILL 
-# NOT PRECLUDE THE CODE FROM USING CPS.NASC FROM THE CSV FILES.
->>>>>>> Stashed changes
 source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
@@ -541,7 +520,7 @@ tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculatin
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
-scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
+scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
@@ -691,8 +670,8 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2307RL_EK80"
-raw.size      <-  1000   # file size in megabytes (MB)
-raw.log.range <- 350  # depth of ER60 logging (m)
+raw.size      <- 1000  # file size in megabytes (MB)
+raw.log.range <-  350  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
@@ -739,12 +718,12 @@ cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about 
 cal.notes          <- "Lasker calibration sphere #1"
 
 # Physical conditions during calibration
-cal.temp           <-   20.16   # enter water temperature at sphere depth
-cal.sal            <-   34.11   # enter salinity at sphere depth
+cal.temp           <-   20.16  # enter water temperature at sphere depth
+cal.sal            <-   34.11  # enter salinity at sphere depth
 cal.c              <- 1520.8   # enter sound speed (m/s)
 cal.min.z          <-    6     # enter minimum water depth below transducers
 cal.max.z          <-   10     # enter maximum water depth below transducers
- 
+
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
 cal.noise          <- list(RL  = NA,
