@@ -1,7 +1,7 @@
 library(tidyverse)
 nav.scs <- read_csv("C:/SURVEY/2107RL/MOA Continuous_001.elg") %>% 
-  mutate(lat = surveyR::scs2dd(`GP170-Lat`),
-         long = surveyR::scs2dd(`GP170-Lon`),
+  mutate(lat = atm::scs2dd(`GP170-Lat`),
+         long = atm::scs2dd(`GP170-Lon`),
          datetime = lubridate::mdy_hms(paste(Date, Time)))
 
 nav.scs.sf <- sf::st_as_sf(nav.scs, coords = c("long","lat"),crs = 4326) %>% 
