@@ -12,31 +12,31 @@ library(stringr)  # For processing strings
 
 # Directory of CTD files to process
 # dir.CTD <- 'C:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\'
-dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\LBC\\CTD_to_Process\\'
+dir.CTD <- 'U:\\SURVEYS\\20230708_CARNAGE_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\LBC\\PROCESSED\\'
+dir.output <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 # dir.PSA <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PSA\\'
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\UCTD.con'
+file.con <- 'U:\\SURVEYS\\20230708_CARNAGE_SummerCPS\\DATA\\UCTD\\UCTD.con'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\LBC\\_2307LBC_Template.ecs'
+ECS.template <- 'U:\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1096\\_2307SD_1096_Template.ecs'
 
 # ECS output directory
-dir.ECS <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\LBC\\'
+dir.ECS <- 'U:\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1096\\LongBeachCarnage_Casts\\'
 
 # Time to pause between SBADataProcessing programs, in seconds. If this time is
 # set too short, the current processing step will not finish before the next one
 # begins.
-pause <- 2
+pause <- 1
 
 # Process CTD data --------------------------------------------------------
 
@@ -196,7 +196,7 @@ for (i in files.CTD) {
   for (j in 1:length(g_0)){
     
     # Compensate gain
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?TransducerGain\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -208,7 +208,7 @@ for (i in files.CTD) {
                       str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate EBA
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?TwoWayBeamAngle\\s*=\\s*(-\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -220,7 +220,7 @@ for (i in files.CTD) {
                   str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Alongship (Minor) Beamwidth
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -232,7 +232,7 @@ for (i in files.CTD) {
                       str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Athwarthip (Major) Beamwidth
-    pattern <- paste("(?s)SourceCal T", j, 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value

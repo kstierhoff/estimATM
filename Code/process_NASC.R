@@ -151,8 +151,9 @@ if (process.csv) {
         }
       }
       
-      # Remove offshore transects data
+      # Remove nearshore transects data
       if (rm.inshore[i]) {
+        
         # Filter based on offshore pattern
         nasc.inshore <- nasc.vessel %>% 
           filter(str_detect(transect.orig, nasc.pattern.inshore[i])) 

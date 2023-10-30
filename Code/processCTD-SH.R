@@ -8,29 +8,11 @@ library(readr)    # For reading and writing plain text files
 library(stringr)  # For processing strings
 
 # User Settings -----------------------------------------------------------
-# # On AST4----------------------------------------------------------------
-# # Directory of CTD files to process
-# dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\CTD_to_Process\\'
-# # Directory to store processed data results
-# dir.output <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\PROCESSED\\'
-# # Directory containing SBEDataProcessing Program Setup (.psa) files
-# dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
-# # # CTD configuration file
-# # file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
-# # Directory of Seabird SBEDataProcessing programs
-# dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
-# # Template ECS file
-# ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
-# # ECS output directory
-# dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\ECS\\'
-# # Time to pause between SBADataProcessing programs, in seconds
-# pause <- 5
-
-# Local-------------------------------------------
+# On AST4----------------------------------------------------------------
 # Directory of CTD files to process
-dir.CTD <- 'C:\\SURVEY\\2307SH\\DATA\\CTD\\CTD_to_Process\\'
+dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\CTD_to_Process\\'
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2307SH\\DATA\\CTD\\PROCESSED\\'
+dir.output <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\'
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 # # CTD configuration file
@@ -38,11 +20,29 @@ dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2307SH\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
+ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\_2307SD_1096_Template.ecs'
 # ECS output directory
-dir.ECS <- 'C:\\SURVEY\\2307SH\\PROCESSED\\EV\\ECS\\'
+dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1096\\'
 # Time to pause between SBADataProcessing programs, in seconds
-pause <- 2
+pause <- 1
+
+# Local-------------------------------------------
+# # Directory of CTD files to process
+# dir.CTD <- 'C:\\SURVEY\\2307SH\\DATA\\CTD\\CTD_to_Process\\'
+# # Directory to store processed data results
+# dir.output <- 'C:\\SURVEY\\2307SH\\DATA\\CTD\\PROCESSED\\'
+# # Directory containing SBEDataProcessing Program Setup (.psa) files
+# dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
+# # # CTD configuration file
+# # file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
+# # Directory of Seabird SBEDataProcessing programs
+# dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
+# # Template ECS file
+# ECS.template <- 'C:\\SURVEY\\2307SH\\PROCESSED\\EV\\ECS\\_2307SH_Template.ecs'
+# # ECS output directory
+# dir.ECS <- 'C:\\SURVEY\\2307SH\\PROCESSED\\EV\\ECS\\'
+# # Time to pause between SBADataProcessing programs, in seconds
+# pause <- 2
 
 # Process CTD data --------------------------------------------------------
 
@@ -64,7 +64,7 @@ for (i in files.CTD) {
                  paste(file.name, '.cnv', sep = ''),
                  paste(dir.PSA, 'DatCnv.psa', sep = ''))
   system("cmd.exe", input = cmd)
-  Sys.sleep(pause + 5)
+  Sys.sleep(pause + 2)
   
   # Perform Filter
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
@@ -185,11 +185,11 @@ for (i in files.CTD) {
   
   # For both CPS and Krill, replace the calibration parameters by compensating
   # for changes in sound speed
-  T_vars = c(1,2,3,4,6)
+  T_vars = c(1,2)
   for (j in 1:length(g_0)){
     
     # Compensate gain
-    pattern <- paste("(?s)SourceCal T", T_vars[j], 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?TransducerGain\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -201,7 +201,7 @@ for (i in files.CTD) {
                         str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate EBA
-    pattern <- paste("(?s)SourceCal T", T_vars[j], 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?TwoWayBeamAngle\\s*=\\s*(-\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -213,7 +213,7 @@ for (i in files.CTD) {
                         str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Alongship (Minor) Beamwidth
-    pattern <- paste("(?s)SourceCal T", T_vars[j], 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
@@ -225,7 +225,7 @@ for (i in files.CTD) {
                         str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Athwarthip (Major) Beamwidth
-    pattern <- paste("(?s)SourceCal T", T_vars[j], 
+    pattern <- paste("(?s)SourceCal T1 \\(channel ", T_vars[j], 
                      ".*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
     temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
     ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value

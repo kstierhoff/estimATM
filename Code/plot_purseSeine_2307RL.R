@@ -24,22 +24,26 @@ prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", pr
 source(here("Doc/settings", prj.settings))
 
 # Import data ------------------------------------------------------------------
+
 ## Import set data 
-### LM
-lm.sets <- read_csv(here("Data/Seine/lm_sets.csv"), lazy = FALSE) %>% 
+
+### LM (update after receiving QA/QC'd data)
+lm.sets <- read_csv(here("Data/Seine/lm_sets_noQAQC.xlsx"), lazy = FALSE) %>% 
   mutate(date = mdy(date),
          vessel_name = "Lisa Marie",
          vessel.name = "LM",
          key.set = paste(vessel.name, date, set))
 
-### LBC
-lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
-  mutate(date = mdy(date),
-         vessel_name = "Long Beach Carnage",
-         vessel.name = "LBC",
-         key.set = paste(vessel.name, date, set))
+### LBC (uncomment once data is available)
+# lbc.sets <- read_csv(here("Data/Seine/lbc_sets.csv"), lazy = FALSE) %>%
+#   mutate(date = mdy(date),
+#          vessel_name = "Long Beach Carnage",
+#          vessel.name = "LBC",
+#          key.set = paste(vessel.name, date, set))
 
-save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
+# Save results (change to line that also saves LBC data after it is available)
+save(lm.sets, file = here("Output/purse_seine_sets.Rdata"))
+# save(lm.sets, lbc.sets, file = here("Output/purse_seine_sets.Rdata"))
 
 ## Import catch data -----------------------------------------------------------
 ### LM
