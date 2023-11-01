@@ -16,8 +16,8 @@ dir.CTD <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\CTD_to_Process\\'
 # Directory to store processed data results
 dir.output <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PROCESSED\\'
 
-# Directory containing SBEDataProcessing Program Setup (.psa) files
-# dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
+# Directory containing SBEDataProcessing Program Setup (.psa) files. These files
+# should be specific to the type of instrument used (e.g., UCTD vs. rosette).
 dir.PSA <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PSA_CTD\\'
 
 # CTD configuration file. If left blank (i.e., ''), the script will assume that
@@ -37,7 +37,9 @@ dir.ECS <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\ECS\\'
 # Time to pause between SBADataProcessing programs, in seconds
 pause <- 1
 
-# Define depth of transducer, in meters
+# Define depth of transducer, in meters. This is used to obtain the sound speed
+# at the transducer depth in order to compensate the calibration parameters from
+# the ECS template by the change in sound speed.
 txducerDepth <- 6
 
 
