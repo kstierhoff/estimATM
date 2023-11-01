@@ -1,42 +1,50 @@
-# This script is used to batch process uCTD raw data files, then use the results
-# from the CTD cast to create Echoview-calibration files (.ecs) containing the
-# appropriate temperature, salinity, absorption depths, and sound speed.
+# Batch process (U)CTD data, then use the results to create Echoview-calibration
+# files (.ecs) containing the sound speed profile as well as compensating the
+# calibration parameters for the change in sound speed at the transducer
 
 # Load required packages --------------------------------------------------
 
 library(readr)    # For reading and writing plain text files
+library(stringr)  # For processing strings
+
 
 # User Settings -----------------------------------------------------------
 
 # Directory of CTD files to process
-dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\CTD\\CTD_to_Process\\'
+dir.CTD <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\CTD\\PROCESSED\\REPROCESSED\\'
+dir.output <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
-dir.PSA <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\CTD\\PSA\\'
+# dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
+dir.PSA <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PSA_CTD\\'
 
-# CTD configuration file
-# file.con <- 'C:\\SURVEY\\2207RL\\DATA\\CTD\\test.XMLCON'
+# CTD configuration file. If left blank (i.e., ''), the script will assume that
+# the configuration file has the same name as the CTD input file, which is
+# typically the case for CTD (not UCTD) casts.
+file.con <- ''#C:\\Users\\josiah.renfree\\Desktop\\TEMP\\CTD_to_Process\\UCTD.con'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\EV\\ECS\\_2207RL_Template_20221012.ecs'
+ECS.template <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\ECS\\_2307RL_Template.ecs'
 
 # ECS output directory
-dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20220627_LASKER_SummerCPS\\PROCESSED\\REPROCESSING\\ECS\\CTD\\'
+dir.ECS <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\ECS\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
-pause <- 0.5
+pause <- 1
+
+# Define depth of transducer, in meters
+txducerDepth <- 6
 
 
 # Process CTD data --------------------------------------------------------
 
 # Find all raw data files in CTD directory
-files.CTD <- list.files(path = dir.CTD, pattern = "*.hex")
+files.CTD <- list.files(path = dir.CTD, pattern = ".*\\.(hex|asc)")
 
 # Loop through each file
 for (i in files.CTD) {
@@ -44,18 +52,44 @@ for (i in files.CTD) {
   # Retain just the file name (i.e., remove extension)
   file.name <- tools::file_path_sans_ext(i)
   
-  # Use DatCnv to convert from .hex to .cnv
-  cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
-                 paste(dir.SBE, 'DatCnvW.exe', sep = ''),
-                 paste(dir.CTD, file.name, '.XMLCON', sep = ''),
-                 paste(dir.CTD, file.name, '.hex', sep = ''),
-                 dir.output,
-                 paste(file.name, '.cnv', sep = ''),
-                 paste(dir.PSA, 'DatCnv.psa', sep = ''))
-  system("cmd.exe", input = cmd)
-  Sys.sleep(5)
+  # Retain extension
+  file.ext <- tools::file_ext(i)
   
-  # Perform Filter
+  # If file.con is empty, set it to the filename using extension .xmlcon
+  if (file.con == '') {
+    file.con.ctd <- paste(dir.CTD, file.name, '.XMLCON', sep = '')
+  } else {
+    file.con.ctd <- file.con
+  }
+  
+  # Convert to .cnv depending on if it's a .hex (CTD) or .asc (UCTD) file
+  if (file.ext == "hex") {
+    
+    # Use DatCnv to convert from .hex to .cnv
+    cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
+                   paste(dir.SBE, 'DatCnvW.exe', sep = ''),
+                   paste(file.con.ctd, sep = ''),
+                   paste(dir.CTD, file.name, '.hex', sep = ''),
+                   dir.output,
+                   paste(file.name, '.cnv', sep = ''),
+                   paste(dir.PSA, 'DatCnv.psa', sep = ''))
+    system("cmd.exe", input = cmd)
+    Sys.sleep(pause)
+  
+  } else {
+    
+    # Use ASCII In to convert from .asc to .cnv
+    cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
+                   paste(dir.SBE, 'ASCII_InW.exe', sep = ''),
+                   paste(dir.CTD, file.name, '.asc', sep = ''),
+                   dir.output,
+                   paste(file.name, '.cnv', sep = ''),
+                   paste(dir.PSA, 'ASCII_In.psa', sep = ''))
+    system("cmd.exe", input = cmd)
+    Sys.sleep(pause)
+  }
+  
+  # Perform Filter to low-pass filter the data (i.e., remove jitter)
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'FilterW.exe', sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
@@ -65,7 +99,20 @@ for (i in files.CTD) {
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
-  # Perform Loop Edit
+  # Perform Align CTD to align the temperature and conductivity sensors. For the
+  # Lasker rosette CTD, the alignment is typically done in real-time, however we
+  # will still run this program, albeit perhaps with a 0 s time offset.
+  cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
+                 paste(dir.SBE, 'AlignCTDW.exe', sep = ''),
+                 paste(dir.output, file.name, '.cnv', sep = ''),
+                 dir.output,
+                 paste(file.name, '.cnv', sep = ''),
+                 paste(dir.PSA, 'AlignCTD.psa', sep = ''))
+  system("cmd.exe", input = cmd)
+  Sys.sleep(pause)
+  
+  # Perform Loop Edit to flag bad scans and remove a surface soak. Scans are
+  # marked bad if they don't meet some minimum velocity threshold
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'LoopEditW.exe', sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
@@ -75,10 +122,10 @@ for (i in files.CTD) {
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
-  # Perform Derive to obtain depth
+  # Perform Derive to obtain depth (from pressure)
   cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'DeriveW.exe', sep = ''),
-                 paste(dir.CTD, file.name, '.XMLCON', sep = ''),
+                 paste(file.con.ctd, sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
@@ -96,11 +143,11 @@ for (i in files.CTD) {
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
-  # Perform Derive to obtain salinity, sound speed, average sound speed, and
-  # density
+  # Perform Derive again to obtain salinity, sound speed, average (harmonic)
+  # sound speed, and density
   cmd <- sprintf('"%s" /c"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'DeriveW.exe', sep = ''),
-                 paste(dir.CTD, file.name, '.XMLCON', sep = ''),
+                 paste(file.con.ctd, sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
@@ -108,7 +155,7 @@ for (i in files.CTD) {
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
-  # Perform ASCII Out
+  # Perform ASCII Out to output to a cleanly formatted .asc file
   cmd <- sprintf('"%s" /i"%s" /o"%s" /f"%s" /p"%s" /s',
                  paste(dir.SBE, 'ASCII_OutW.exe', sep = ''),
                  paste(dir.output, file.name, '.cnv', sep = ''),
@@ -128,79 +175,113 @@ for (i in files.CTD) {
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
   
-  
   # Load results from processed CTD data
   data <- read.csv(paste(dir.output, file.name, '_processed.asc', sep = ''), 
                    header = T, sep = "\t")
   
-  # Perform basic data error checks
-  idx <- data$DepSM < 0 | data$T090C <= 0 | data$Sal00 < 0
+  # Rename temperature column based on instrument used
+  if (file.ext == "hex") {
+    colnames(data)[colnames(data) == "T090C"] <- "Temperature"    # If CTD
+  } else {
+    colnames(data)[colnames(data) == "Tnc90C"] <- "Temperature"   # If UCTD
+  }
+  
+  # Perform basic data error checks. Remove any rows that have a depth,
+  # temperature, or salinity that is less than 0
+  idx <- data$DepSM < 0 | data$Temperature <= 0 | data$Sal00 < 0
   data[idx,] <- NA
   
-  # For CPS, take the average sound velocity at 70 m then calculate the average
-  # temperature, salinity, and depth
-  idx <- data$DepSM <= 70
-  avgSoundSpeed.CPS <- tail(data$AvgsvCM[idx], n = 1)
-  avgTemperature.CPS <- mean(data$T090C[idx], na.rm = T)
-  avgSalinity.CPS <- mean(data$Sal00[idx], na.rm = T)
-  avgDepth.CPS <- mean(data$DepSM[idx], na.rm = T)
+  # Obtain sound speed at transducer depth
+  soundspeed.txducer <- data$SvCM[which.min(abs(data$DepSM-txducerDepth))]
   
-  # For krill, take the average sound velocity at 350 m then calculate the
-  # average temperature, salinity, and depth
-  idx <- data$DepSM <= 350
-  avgSoundSpeed.Krill <- tail(data$AvgsvCM[idx], n = 1)
-  avgTemperature.Krill <- mean(data$T090C[idx], na.rm = T)
-  avgSalinity.Krill <- mean(data$Sal00[idx], na.rm = T)
-  avgDepth.Krill <- mean(data$DepSM[idx], na.rm = T)
-  
+
+  # Create ECS file ---------------------------------------------------------
   
   # Read template ECS file
   ECS <- read_file(ECS.template)
   
-  # Replace the sound speed
-  ECS.CPS <- gsub('SoundSpeed = [^#]*', 
-                  sprintf('SoundSpeed = %.2f ', avgSoundSpeed.CPS),
-                  ECS)
-  ECS.Krill <- gsub('SoundSpeed = [^#]*', 
-                  sprintf('SoundSpeed = %.2f ', avgSoundSpeed.Krill),
-                  ECS)
+  # Get sound speed from template
+  c_0 <- as.numeric(str_match(ECS, "SoundSpeed\\s*=\\s*([^\\s]+)")[,2])
   
+  # Get calibration parameters that can be adjusted with sound speed
+  g_0 <- as.numeric(str_match_all(ECS, "TransducerGain\\s*=\\s*([^\\s]+)")[[1]][,2])
+  EBA_0 <- as.numeric(str_match_all(ECS, "TwoWayBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+  BW_minor_0 <- as.numeric(str_match_all(ECS, "MinorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+  BW_major_0 <- as.numeric(str_match_all(ECS, "MajorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+  
+  # Get list of Tx variables
+  # matches <- str_locate_all(ECS, '.*?TransducerGain\\s*=\\s*(\\d*\\.*\\d*)')[[1]]
+  
+  # Compensate calibration parameters by changes in sound speed
+  for (j in 1:length(g_0)){
+    
+    # Compensate gain
+    pattern <- paste("^(?:(?s).*?TransducerGain){", j-1, "}(?s).*?TransducerGain\\s*=\\s*([^\\s]+)", sep = '')
+    temp <- regexec(pattern, ECS, perl = TRUE) 
+    ECS <- paste0(str_sub(ECS, 1, temp[[1]][2]-1),
+                      sprintf(g_0[j] + 20*log10(c_0 / soundspeed.txducer), fmt = '%#.4f'),
+                      str_sub(ECS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+
+    # Compensate EBA
+    pattern <- paste("^(?:(?s).*?TwoWayBeamAngle){", j-1, "}(?s).*?TwoWayBeamAngle\\s*=\\s*(-\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS, perl = TRUE) 
+    ECS <- paste0(str_sub(ECS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(EBA_0[j] + 20*log10(soundspeed.txducer / c_0), fmt = '%#.4f'),
+                      str_sub(ECS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+
+    # Compensate Alongship (Minor) Beamwidth
+    pattern <- paste("^(?:(?s).*?MinorAxis3dbBeamAngle){", j-1, "}(?s).*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS, perl = TRUE) 
+    ECS <- paste0(str_sub(ECS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(BW_minor_0[j] * (soundspeed.txducer / c_0), fmt = '%#.4f'),
+                      str_sub(ECS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+
+    # Compensate Athwarthip (Major) Beamwidth
+    pattern <- paste("^(?:(?s).*?MajorAxis3dbBeamAngle){", j-1, "}(?s).*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
+    temp <- regexec(pattern, ECS, perl = TRUE) 
+    ECS <- paste0(str_sub(ECS, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(BW_major_0[j] * (soundspeed.txducer / c_0), fmt = '%#.4f'),
+                      str_sub(ECS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+  }
+  
+  # Insert the sound speed profile
+  ECS <- gsub('CtdDepthProfile\\s*=\\s*[^\n]*', 
+              paste("CtdDepthProfile =", paste(sprintf("%.2f", data$DepSM), collapse = "; ")),
+              ECS)
+  ECS <- gsub('SoundSpeedProfile\\s*=\\s*[^\n]*', 
+              paste("SoundSpeedProfile =", paste(sprintf("%.2f", data$SvCM), collapse = "; ")),
+              ECS)
+  
+  # Values of temperature, salinity, and sound speed are still used to derive an
+  # average value of absorption, so insert values averaged over the entire
+  # available range
+  
+  # Replace the sound speed. We want the average sound speed over the mean
+  # depth, in which case we should use the harmonic sound speed at that depth.
+  ECS <- gsub('SoundSpeed\\s*=\\s*[^#]*', 
+              sprintf('SoundSpeed = %.2f ', 
+                      # data$AvgsvCM[which.min(abs(data$DepSM-mean(data$DepSM)))]),
+                      tail(data$AvgsvCM, 1)),
+              ECS)
+
   # Replace the temperature
-  ECS.CPS <- gsub('Temperature = [^#]*', 
-                  sprintf('Temperature = %.3f ', avgTemperature.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('Temperature = [^#]*', 
-                    sprintf('Temperature = %.3f ', avgTemperature.Krill),
-                    ECS.Krill)
-  
+  ECS <- gsub('Temperature\\s*=\\s*[^#]*', 
+                  sprintf('Temperature = %.3f ', mean(data$Temperature)),
+                  ECS)
+
   # Replace the salinity
-  ECS.CPS <- gsub('Salinity = [^#]*', 
-                  sprintf('Salinity = %.3f ', avgSalinity.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('Salinity = [^#]*', 
-                    sprintf('Salinity = %.3f ', avgSalinity.Krill),
-                    ECS.Krill)
-  
+  ECS <- gsub('Salinity\\s*=\\s*[^#]*', 
+                  sprintf('Salinity = %.3f ', mean(data$Sal00)),
+                  ECS)
+
   # Replace the average absorption depth
-  ECS.CPS <- gsub('AbsorptionDepth = [^#]*', 
-                  sprintf('AbsorptionDepth = %.3f ', avgDepth.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('AbsorptionDepth = [^#]*', 
-                    sprintf('AbsorptionDepth = %.3f ', avgDepth.Krill),
-                    ECS.Krill)
-  
+  ECS <- gsub('AbsorptionDepth\\s*=\\s*[^#]*', 
+                  sprintf('AbsorptionDepth = %.3f ', mean(data$DepSM)),
+                  ECS)
+
   # Write new ECS files
-  write_file(ECS.CPS, paste(dir.ECS, file.name, "_CPS.ecs", sep = ''))
-  write_file(ECS.Krill, paste(dir.ECS, file.name, "_Krill.ecs", sep = ''))
-  
-  # Write simple text file describing differences in CPS and Krill sound speeds
-  # and the ratio to use for adjusting the Integration Stop line in Echoview
-  tmp <- paste(sprintf('CPS average sound speed = %.2f m/s\n', avgSoundSpeed.CPS),
-               sprintf('Krill average sound speed = %.2f m/s\n', avgSoundSpeed.Krill),
-               sprintf('Krill/CPS sound speed ratio = %.6f', avgSoundSpeed.Krill/avgSoundSpeed.CPS),
-               sep = '')
-  write_file(tmp, paste(dir.output, file.name, '_SoundSpeedRatio.txt', sep = ''))
-  
+  write_file(ECS, paste(dir.ECS, file.name, ".ecs", sep = ''))
+
   # Copy CTD file to the PROCESSED directory
   file.copy(file.path(dir.CTD, i), dir.output)
 }
