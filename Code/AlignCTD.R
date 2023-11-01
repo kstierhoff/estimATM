@@ -11,12 +11,12 @@ dir.output <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 # dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
-dir.PSA <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PSA_CTD\\'
+dir.PSA <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\PSA_UCTD\\'
 
 # CTD configuration file. If left blank (i.e., ''), the script will assume that
 # the configuration file has the same name as the CTD input file, which is
 # typically the case for CTD (not UCTD) casts.
-file.con <- ''#C:\\Users\\josiah.renfree\\Desktop\\TEMP\\CTD_to_Process\\UCTD.con'
+file.con <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\CTD_to_Process\\UCTD.con'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
@@ -65,7 +65,7 @@ if (file.ext == "hex") {
                  paste(dir.CTD, file.name, '.asc', sep = ''),
                  dir.output,
                  paste(file.name, '.cnv', sep = ''),
-                 paste(dir.PSA, 'ASCII_In_uCTD.psa', sep = ''))
+                 paste(dir.PSA, 'ASCII_In.psa', sep = ''))
   system("cmd.exe", input = cmd)
   Sys.sleep(pause)
 }
