@@ -419,7 +419,9 @@ lengths.all <- lengths.all %>%
   select(cruise, ship, haul, collection, species, individual_ID, 
          scientificName, commonName, specimenNumber, 
          standardLength_mm, forkLength_mm, totalLength_mm, mantleLength_mm,
-         sex, weightg, otolithNumber, isRandomSample, flaggedData) %>%
+         sex, weightg, otolithNumber, 
+         DNAtrayNumber, DNAvialNumber,
+         isRandomSample, flaggedData) %>%
   # Standardize sex values
   mutate(sex = tolower(trimws(sex)),
          binned = FALSE) %>% 
@@ -455,8 +457,9 @@ lengths.all <- lengths.all %>%
          sex = str_replace(sex,"totalFemale","female"),
          sex = str_replace(sex,"sexUnknown","unknown"),
          sex = replace_na(sex, "missing"),
-         label = paste("Haul: ", haul, ", Collection: ", collection,
-                       ", Specimen: ", specimenNumber), sep = "") %>%
+         label = paste0("Haul: ", haul, ", Collection: ", collection,
+                        ", Specimen: ", specimenNumber, 
+                        ", Flag: ", flaggedData)) %>%
   # Add season from haul
   left_join(select(haul.all, cruise, ship, haul, season)) %>%
   filter(scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens"))
@@ -1099,7 +1102,8 @@ lw.df.sub <- lw.df %>%
 lw.plot.leg <- ggplot() +
   # Plot L/W data for current survey
   geom_point(data = lengths,
-             aes(nativeLength_mm, weightg, group = sex, fill = factor(leg)),
+             aes(nativeLength_mm, weightg, group = sex, 
+                 fill = factor(leg), label = label),
              shape = 21, alpha = 0.75) +
   scale_fill_viridis_d(name = "Leg") +
   # Plot individuals with missing lengths and weights
@@ -1505,6 +1509,8 @@ if (length(duplicate.ids) > 0) {
 
 ## Otolith samples
 
+Length distributions of all target CPS specimens (gray bars) vs. specimens from which otoliths were collected (colored bars). Ideally, the length distributions of specimens from which otoliths were collected reflect the length distribution of all specimens collected. The dashed line represents a general aim (n = 50) for the number of otoliths collected per length bin. Focus should be given to ensuring otoliths from the tail ends of the distribution are collected.
+
 ```{r summarize-otolith-samples}
 # Plot lengths for specimens with collected otoliths
 
@@ -1574,6 +1580,39 @@ ggsave(otoliths.all,
 include_graphics(here("Figs/fig_otolith_sample_distribution.png"))
 ```
 
+## DNA Samples
+
+Tally the total number of DNA samples collected for each of the target CPS species. **<span style="color:red">Red</span>** values indicate that the number of vials is not equal to the number of trays.  
+
+```{r summarize-dna-samples}
+# Summarize specimens from which DNA samples were collected, and compare DNAtrayNumber to DNAvialNumber
+# Tray summary
+dna.tray.summ <- lengths %>% 
+  filter(!is.na(DNAtrayNumber)) %>% 
+  group_by(scientificName) %>% 
+  summarise(nTrays = n())
+
+# Vial summary
+dna.vial.summ <- lengths %>% 
+  filter(!is.na(DNAvialNumber)) %>% 
+  group_by(scientificName) %>% 
+  summarise(nVials = n())
+
+# Combined summary
+dna.summ <- dna.tray.summ %>% 
+  left_join(select(dna.vial.summ, scientificName, nVials))
+
+# Format and print table
+dna.summ %>% 
+  mutate(
+    nVials = cell_spec(round(nVials, digits = 4),
+                                 knitr.format, color = "black",
+                                 background = ifelse(!nVials == nTrays, "red", "white"))) %>% 
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+        align = c("c","c","c")) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+  column_spec(1, italic = TRUE) 
+```
 
 # References
 
