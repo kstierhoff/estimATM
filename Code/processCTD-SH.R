@@ -8,23 +8,32 @@ library(readr)    # For reading and writing plain text files
 library(stringr)  # For processing strings
 
 # User Settings -----------------------------------------------------------
+
 # On AST4----------------------------------------------------------------
+
 # Directory of CTD files to process
 dir.CTD <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\CTD_to_Process\\'
+
 # Directory to store processed data results
 dir.output <- 'C:\\Users\\josiah.renfree\\Desktop\\TEMP\\'
+
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
+
 # # CTD configuration file
 # file.con <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\DATA\\CTD\\_2307SH.XMLCON'
+
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
+
 # Template ECS file
-ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\_2307SD_1096_Template.ecs'
+ECS.template <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1048\\_2307SD_1048_Template.ecs'
+
 # ECS output directory
-dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1096\\'
+dir.ECS <- '\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\ECS\\1048\\Shimada_Casts\\TEMP\\'
+
 # Time to pause between SBADataProcessing programs, in seconds
-pause <- 1
+pause <- 5
 
 # Local-------------------------------------------
 # # Directory of CTD files to process
