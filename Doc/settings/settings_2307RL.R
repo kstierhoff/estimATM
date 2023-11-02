@@ -176,7 +176,7 @@ sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
 cruise.name <- 202307 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
-cruise.ship <- "RL"   # May be a character or character vector (e.g., c("RL",",...))
+cruise.ship <- c("RL", "SH") # May be a character or character vector (e.g., c("RL",",...))
 
 # Growth model parameters ------------------------------------------------------
 model.season  <- "summer" # spring or summer; for selecting growth model parameters
