@@ -309,17 +309,6 @@ nasc.vessels.krill     <- c("RL")
 nasc.depth.cps   <- "NASC.250"
 nasc.depth.krill <- "NASC.350"
 
-# Purse seine data info
-# Survey vessels that collected purse seine data
-seine.vessels          <- c("LBC","LM")
-seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
-                            "LM"  = "Lisa Marie")
-# Use seine data to apportion backscatter
-use.seine.data         <- TRUE
-# Define path to seine data directories for each vessel
-seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2307RL.xlsx"),
-                      "LM" = file.path(survey.dir["LM"],  "DATA/SEINE/lm_data_2307RL.xlsx"))
-
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata? Or, in 2023, Lasker and Shimada when additional sea days were provided
@@ -400,6 +389,17 @@ nasc.recurse           <- c(RL  = FALSE,
                             SD  = TRUE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
+
+# Purse seine data info
+# Survey vessels that collected purse seine data
+seine.vessels          <- c("LBC","LM")
+seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
+                            "LM"  = "Lisa Marie")
+# Use seine data to apportion backscatter
+use.seine.data         <- TRUE
+# Define path to seine data directories for each vessel
+seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2307RL.xlsx"),
+                      "LM" = file.path(survey.dir["LM"],  "DATA/SEINE/lm_data_2307RL.xlsx"))
 
 # source.cps.nasc determines whether to use cps.nasc values from a separate file
 # Since 2022, Code/extract_CPS_NASC.R is used to remove non-CPS backscatter and compute cps.nasc
