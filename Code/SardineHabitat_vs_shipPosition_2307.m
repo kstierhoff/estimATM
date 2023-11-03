@@ -12,7 +12,7 @@ clear; close all;
 %% User Settings
 
 % Define vessels for which there are NASC CSVs
-vessels = {'RL' 'LM' 'LBC' 'SH_hake' 'SH_cps'};%'SD\1076' 'SD\1077'};
+vessels = {'RL' 'LM' 'LBC' 'SH_cps'};%'SD\1076' 'SD\1077'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
 colors = 'rycgm';
