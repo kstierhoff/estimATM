@@ -615,7 +615,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 32:37),
+    transect = 32:45),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
@@ -623,7 +623,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 32:37),
+    transect = 32:44),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
@@ -639,7 +639,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 32:37),
+    transect = 32:45),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
@@ -647,7 +647,7 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 2,
-    transect = 34:37),
+    transect = 35:38),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
@@ -655,12 +655,12 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 34:37))
+    transect = 35:45))
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino
 # stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
-stock.break.sar  <- 34.3 # Latitude of Pt. Conception (or change based on SST)
+stock.break.sar  <- 34.3 # Latitude of ~Pt. Conception, base off 2023 habitat map
 
 # Transects used to define stock boundaries (primary or other)
 
