@@ -27,7 +27,7 @@ editor_options:
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
+pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,readxl,
                knitr,maps,geosphere,Hmisc,ggrepel,png,cowplot,forecast,xts,
                RSQLite,geoR,kableExtra,devtools,scatterpie,marmap,magick,
                beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
@@ -5385,10 +5385,18 @@ for (i in unique(strata.primary$scientificName)) {
 Assemble together latitude and longitude data from NASC and ERDDAP for matching with CTD and UCTD casts based on time.  
 
 ```{r get-ctd-nav}
-# Assemble lat/long data from nav and nasc
-ctd.nav <- select(nav, datetime = time, long, lat) %>% 
-  bind_rows(select(nasc, datetime, long, lat)) %>% 
-  arrange(datetime)
+# Assemble lat/long data from nav
+ctd.nav <- select(nav, time, long, lat, SOG, leg) %>% 
+  # bind_rows(select(nasc, datetime, long, lat)) %>% 
+  arrange(time)
+
+# Add nav data from Shimada
+if (survey.name %in% c("2307RL")) {
+  if (exists("nav.sh")) {
+    ctd.nav <- ctd.nav %>% 
+      bind_rows(select(nav.sh, time, long, lat, SOG, leg)) 
+  }
+}
 ```  
 
 ## Process UCTD cast files  
@@ -5456,8 +5464,8 @@ if (process.ctd) {
     nav.match.uctd <- data.frame()
     
     for (i in seq_along(all.uctd.hdr$cast)) {
-      min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], nav$time)))
-      nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
+      min.diff       <- which.min(abs(difftime(all.uctd.hdr$cast.date[i], ctd.nav$time)))
+      nav.match.uctd <- bind_rows(nav.match.uctd, ctd.nav[min.diff, ])
     }
     
     # Combine header and nav data
@@ -5545,7 +5553,7 @@ if (exists("uctd.summ")) {
   uctd.table %>% 
     filter(!is.na(Lag)) %>% 
     mutate(Lag = cell_spec(Lag, knitr.format, color = "black",
-                           background = ifelse(Lag <= 30,"white","orange"))) %>% 
+                           background = ifelse(abs(Lag) <= 30,"white","orange"))) %>% 
     kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
           digits = c(0,0,0,4,4,0,0,0,0),
           align = c("c","l","c","r","r","r","r","c","r")) %>% 

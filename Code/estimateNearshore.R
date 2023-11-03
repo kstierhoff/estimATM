@@ -94,7 +94,7 @@ if (process.nearshore) {
   
   # Process purse seine data
   if (process.seine) {
-    source(here("Code", paste0("processSeine_", survey.name, ".R")))  
+    source(here("Code/processSeine.R"))
     
     if (use.seine.data) {
       # In 2207RL, seine data was included in the clf, so no need to combine with seine data
