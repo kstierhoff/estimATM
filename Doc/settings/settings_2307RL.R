@@ -1,8 +1,8 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
-process.seine     <- F # Process purse seine data, if present
-process.nearshore <- F # Process near backscatter data; typically TRUE
+process.seine     <- T # Process purse seine data, if present
+process.nearshore <- T # Process near backscatter data; typically TRUE
 estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
@@ -158,13 +158,13 @@ survey.start.sd  <- NA_character_ # Start of Saildrone survey
 survey.end.sd    <- NA_character_ # End of Saildrone survey
 
 # Set date range
-erddap.url.sd <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2023"
+erddap.url.sd          <- "https://data.pmel.noaa.gov/pmel/erddap/tabledap/all_swfsc_2023"
 erddap.survey.start.sd <- "2023-07-08T00%3A00%3A00Z"
 erddap.survey.end.sd   <- "2023-10-15T23%3A59%3A00Z"
 # Configure columns and classes
-erddap.vars.sd       <- c("trajectory,latitude,longitude,SOG,time")
-erddap.headers.sd    <- c("saildrone", "lat", "long", "SOG", "time")
-erddap.classes.sd    <- c(rep("numeric", length(erddap.headers.sd) - 1),"character")
+erddap.vars.sd         <- c("trajectory,latitude,longitude,SOG,time")
+erddap.headers.sd      <- c("saildrone", "lat", "long", "SOG", "time")
+erddap.classes.sd      <- c(rep("numeric", length(erddap.headers.sd) - 1),"character")
 
 # Define date range for each Saildrone to remove overlapping transits
 sd.date.range    <- data.frame(saildrone  = c(1048, 1060,1096),
@@ -301,7 +301,7 @@ lf.ncols <- 5
 nasc.vessels           <- c("RL", "LBC", "LM", "SH") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
-nasc.vessels.krill     <- c("RL")
+nasc.vessels.krill     <- c("RL", "SH")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
 # Options include 0-100 (by 5), 100, 150, 250, and 350 m.
@@ -312,7 +312,7 @@ nasc.depth.krill <- "NASC.350"
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata? Or, in 2023, Lasker and Shimada when additional sea days were provided
-merge.vessels <- c(Core = FALSE,
+merge.vessels <- c(Core = TRUE, # To combine RL and SH in 2307RL; perhaps SD too
                    OS = FALSE,
                    NS = FALSE)
 
@@ -330,63 +330,74 @@ nasc.interval          <-  100
 nasc.summ.interval     <- 2000/nasc.interval 
 
 # Echosounder type; e.g., EK60, EK80, other
-sounder.type           <- c(RL  = "EK80") 
+sounder.type           <- c(RL  = "EK80",
+                            SH  = "EK80") 
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
+if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2307RL",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
+                            SH  = "//swc-storage4-s/AST4/SURVEYS/20230708_SHIMADA_SummerCPS")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS")   
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
+                            SH  = "//swc-storage4-s/AST4/SURVEYS/20230708_SHIMADA_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
-nasc.dir               <- c(RL  = "PROCESSED/EV/CSV/LASKER",
+nasc.dir               <- c(RL  = "PROCESSED/EV/CSV",
                             LM  = "PROCESSED/EV/CSV",
                             LBC = "PROCESSED/EV/CSV",
-                            SD  = "PROCESSED/EV/CSV") 
+                            SD  = "PROCESSED/EV/CSV",
+                            SH  = "PROCESSED/EV/CSV") 
 
 # Regex pattern for identifying CPS CSV files
 nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             LM  = "Final 38 kHz CPS_nasc_cps.csv",
                             LBC = "Final 38 kHz CPS_nasc_cps.csv",
-                            SD  = "Final 38 kHz CPS.csv")
+                            SD  = "Final 38 kHz CPS_nasc_cps.csv",
+                            SH  = "Final 38 kHz CPS_nasc_cps.csv")
 # Regex pattern for identifying krill CSV files
 nasc.pattern.krill     <- c(RL  = "KRILL-Juan Krill Final 120.csv",
                             LM  = "Krill-Juan Krill Final 120.csv",
                             LBC = "Krill-Juan Krill Final 120.csv",
-                            SD  = "Krill-Juan Krill Final 120.csv")
+                            SD  = "Krill-Juan Krill Final 120.csv",
+                            SH  = "KRILL-Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
                             LBC = "\\d{3}N",
-                            SD  = "\\d{3}N")
+                            SD  = "\\d{3}N",
+                            SH  = "\\d{3}N")
 # Regex pattern for identifying offshore transects
 nasc.pattern.offshore  <- c(RL  = "\\d{3}O",
                             LM  = "\\d{3}O",
                             LBC = "\\d{3}O",
-                            SD  = "\\d{3}O")
+                            SD  = "\\d{3}O",
+                            SH  = "\\d{3}O")
 # Regex pattern for identifying inshore transits between transects
 nasc.pattern.inshore   <- c(RL  = "\\d{3}I",
                             LM  = "\\d{3}I",
                             LBC = "\\d{3}I",
-                            SD  = "\\d{3}I")
+                            SD  = "\\d{3}I",
+                            SH  = "\\d{3}I")
 # Regex pattern for identifying transits
 nasc.pattern.transit   <- c(RL  = "\\d{3}T",
                             LM  = "\\d{3}T",
                             LBC = "\\d{3}T",
-                            SD  = "\\d{3}T")
+                            SD  = "\\d{3}T",
+                            SH  = "\\d{3}T")
 # Recursively search NASC directories
 nasc.recurse           <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
-                            SD  = TRUE)
+                            SD  = TRUE,
+                            SH  = FALSE)
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
@@ -395,8 +406,15 @@ nasc.max               <- NA
 seine.vessels          <- c("LBC","LM")
 seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
                             "LM"  = "Lisa Marie")
-# Use seine data to apportion backscatter
-use.seine.data         <- TRUE
+# Use seine data to apportion nearshore backscatter
+# If seine catches were believed to be representative, TRUE
+# Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
+use.seine.data  <- TRUE
+
+# Which net data should be used to apportion nearshore backscatter?
+# "Trawl" and/or "Seine"
+catch.source.ns <- c("Purse seine")
+
 # Define path to seine data directories for each vessel
 seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2307RL.xlsx"),
                       "LM" = file.path(survey.dir["LM"],  "DATA/SEINE/lm_data_2307RL.xlsx"))
@@ -414,72 +432,85 @@ source.cps.nasc        <- c(RL  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE,
-                            NS  = FALSE) # in the nearshore strata
+                            NS  = FALSE,
+                            SH  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
 data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2307RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
+                            SH  = "[^0-9]",
                             LM  = "[^0-9]",
-                            LBC = "[^0-9]") 
+                            LBC = "[^0-9]",
+                            SD  = "[^0-9]") 
 
 # If T, strips numbers from transect names (i.e., would combine 105-1 and 105-2 to 105)
 strip.tx.nums          <- c(RL  = TRUE,
+                            SH  = TRUE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = TRUE) 
 
 # If T, strips characters from transect numbers (i.e., would combine 105A and 105B to 105)
 strip.tx.chars         <- c(RL  = TRUE,
+                            SH  = TRUE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE) 
 
 # If T, removes transects with names including "transit"
 rm.transit             <- c(RL  = FALSE,
+                            SH  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE)  
 
 # If T, removes transects with names including "offshore"
 rm.offshore            <- c(RL  = TRUE,
+                            SH  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE) 
 
 # If T, removes transects with names including "inshore"
 rm.inshore             <- c(RL  = TRUE,
+                            SH  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE)
 
 # If T, removes transects with names including "nearshore"
 rm.nearshore           <- c(RL  = TRUE,
+                            SH  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE)
 
 # If T, extracts nearshore intervals from vessels that sample close to shore
 extract.nearshore      <- c(RL  = FALSE,
+                            SH  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE)
 
 # If T, subtracts NASC.5 from cps.nasc
 rm.surface             <- c(RL  = FALSE,
+                            SH  = FALSE,
                             LM  = FALSE,
                             LBC = FALSE,
                             SD  = FALSE) 
 
 # regex for matching number pattern
 tx.num.pattern         <- c(RL  = "-\\d{1}",
+                            SH  = "-\\d{1}",
                             LM  = "-\\d{1}",
                             LBC = "-\\d{1}",
                             SD  = "-\\d{1}")
 
 # Use transect names for transect numbers
 use.tx.number          <- c(RL  = TRUE,
+                            SH  = TRUE,
                             LM  = TRUE,
                             LBC = TRUE,
                             SD  = TRUE)
@@ -488,12 +519,14 @@ use.tx.number          <- c(RL  = TRUE,
 # Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
 # but will ultimately be included in a joint analysis
 tx.rm                  <- list(RL  = NA,
+                               SH  = NA,
                                LM  = NA,
                                LBC = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
 min.tx.length          <- c(RL  = 15,
+                            SH  = 15,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
