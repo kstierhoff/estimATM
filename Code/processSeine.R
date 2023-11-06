@@ -3,7 +3,7 @@
 # This script replaces survey-specific versions, and aims to use standardizised data inputs. -----
 
 # Import set data ------------------------------------------------------------------
-rm(sets)
+if (exists("sets")) rm(sets)
 for (v in seine.vessels) {
   sets.tmp <- readxl::read_xlsx(seine.data.paths[v], sheet = "sets") 
   
@@ -28,7 +28,6 @@ for (v in seine.vessels) {
 
 # Create set cluster file
 set.clusters <- select(sets, key.set, date, datetime, vessel.name, lat, long, sample.type) %>%
-  # bind_rows(select(lbc.sets, key.set, date, datetime, vessel.name, lat, long, sample.type)) %>%
   filter(vessel.name %in% seine.vessels) %>% 
   arrange(vessel.name, datetime) %>% 
   # Begin clustering after primary survey vessel clusters
@@ -43,7 +42,7 @@ set.clusters <- select(sets, key.set, date, datetime, vessel.name, lat, long, sa
 save(sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
 
 ## Import set catch data -----------------------------------------------------------
-rm(set.catch)
+if (exists("set.catch")) rm(set.catch)
 for (v in seine.vessels) {
   set.catch.tmp <- readxl::read_xlsx(seine.data.paths[v], sheet = "catch") 
   
@@ -76,39 +75,8 @@ for (v in seine.vessels) {
   }
 }
 
-# lm.catch <- readxl::read_excel(file.path(survey.dir["LM"], "DATA/SEINE/lm_data_2307RL.xlsx"), 
-#                                sheet = "catch-nearshore") %>%
-#   mutate(vessel.name = "Lisa Marie",
-#          vessel.name = "LM",
-#          key.set = paste(vessel.name, date, set),
-#          scientificName = case_when(
-#            species_name == "Pacific Herring" ~ "Clupea pallasii",
-#            species_name == "Pacific Sardine" ~ "Sardinops sagax",
-#            species_name == "Pacific Mackerel" ~ "Scomber japonicus",
-#            species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
-#            species_name == "Anchovy" ~ "Engraulis mordax",
-#            # species_name == "Jack Smelt" ~ "Atherinopsis californiensis",
-#            # species_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
-#            # species_name == "Pacific Hake" ~ "Merluccius productus",
-#            TRUE ~ NA_character_)) %>% 
-#   filter(!is.na(scientificName)) %>% 
-#   group_by(key.set, vessel.name, scientificName) %>% 
-#   summarise(totalWeight = sum(weight_kg),
-#             totalNum    = sum(count)) 
-# Remove sets N of Cape Mendocino
-# filter(key.set %in% unique(lm.sets$key.set))
-
-## LBC
-# lbc.catch <- read_csv(here("Data/Seine/lbc_catch.csv")) %>%
-#   left_join(select(lbc.sets, set, date)) %>% 
-#   mutate(vessel_name = "Long Beach Carnage",
-#          vessel.name = "LBC",
-#          key.set = paste(vessel.name, date, set)) %>% 
-#   group_by(key.set, vessel.name, scientificName) %>% 
-#   summarise(totalWeight = sum(weightg)/1000)
-
 # Import set specimen data ----------------------------------------------------
-rm(set.lengths)
+if (exists("set.lengths")) rm(set.lengths)
 for (v in seine.vessels) {
   set.lengths.tmp <- readxl::read_xlsx(seine.data.paths[v], sheet = "specimens")
   
@@ -168,14 +136,15 @@ for (v in seine.vessels) {
 }
 
 # Plot lengths
-# ggplot() +
-#   geom_point(data = set.lengths.tmp, 
-#              aes(forkLength_mm, weightg, colour = vessel.name), 
+# length.plot.ns <- ggplot() +
+#   geom_point(data = set.lengths.tmp,
+#              aes(forkLength_mm, weightg, colour = vessel.name),
 #              fill = "green", shape = 21) +
-#   geom_point(data = set.lengths.tmp, 
-#              aes(standardLength_mm, weightg, colour = vessel.name), 
+#   geom_point(data = set.lengths.tmp,
+#              aes(standardLength_mm, weightg, colour = vessel.name),
 #              fill = "blue", shape = 21) +
 #   facet_wrap(~scientificName, scales = "free")
+#   ggplotly(length.plot.ns)
 
 # Summarize catch data ------------------------------------------------
 set.catch.summ <- set.catch %>%
@@ -485,7 +454,8 @@ clf.seine <- clf.seine %>%
   left_join(catch.summ.num.seine,  by = c('haul','cluster')) %>%
   left_join(cluster.summ.wt.seine, by = c('haul','cluster')) %>%
   left_join(ts.proportions.seine,  by = c('haul','cluster')) %>%
-  mutate(sample.type = "Purse seine")
+  mutate(sample.type = "Purse seine") %>%
+  arrange(cluster)
 
 # Replace 0's with 1's for sigmaindiv and sigmawg when proportions == 0
 clf.seine$sigmaindiv.anch[clf.seine$prop.anch == 0]   <- 1
@@ -496,13 +466,13 @@ clf.seine$sigmaindiv.sar[clf.seine$prop.sar   == 0]   <- 1
 clf.seine$sigmaindiv.rher[clf.seine$prop.rher == 0]   <- 1
 clf.seine$sigmaindiv.other[clf.seine$prop.other == 0] <- 1
 
-clf.seine$sigmawg.anch[clf.seine$prop.anch    == 0] <- 1
-clf.seine$sigmawg.her[clf.seine$prop.her      == 0] <- 1
-clf.seine$sigmawg.jack[clf.seine$prop.jack    == 0] <- 1
-clf.seine$sigmawg.mack[clf.seine$prop.mack    == 0] <- 1
-clf.seine$sigmawg.sar[clf.seine$prop.sar      == 0] <- 1
-clf.seine$sigmawg.rher[clf.seine$prop.rher    == 0] <- 1
-clf.seine$sigmawg.other[clf.seine$prop.other  == 0] <- 1
+clf.seine$sigmawg.anch[clf.seine$prop.anch    == 0]   <- 1
+clf.seine$sigmawg.her[clf.seine$prop.her      == 0]   <- 1
+clf.seine$sigmawg.jack[clf.seine$prop.jack    == 0]   <- 1
+clf.seine$sigmawg.mack[clf.seine$prop.mack    == 0]   <- 1
+clf.seine$sigmawg.sar[clf.seine$prop.sar      == 0]   <- 1
+clf.seine$sigmawg.rher[clf.seine$prop.rher    == 0]   <- 1
+clf.seine$sigmawg.other[clf.seine$prop.other  == 0]   <- 1
 
 # Save to file
 write_csv(clf.seine, file = here("Output/clf_ts_proportions_seine.csv"))

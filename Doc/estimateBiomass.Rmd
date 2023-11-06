@@ -109,7 +109,7 @@ overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
 process.cal       <- T # Process calibration results
-process.ctd       <- F # Process CTD and UCTD casts
+process.ctd       <- T # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
@@ -941,6 +941,12 @@ if (process.csv) {
 # Combine nasc data for all NASC vessels in the core area
 # Applied in 2107RL when sampling was coordinated with Carranza,
 # and in 2207RL when core sampling was conducted by Lisa Marie off OR/WA
+
+# Add missing vessel.orig column if not present 
+if (!"vessel.orig" %in% names(nasc)) {
+  nasc$vessel.orig <- nasc$vessel.name
+}
+
 if (!is.na(merge.vessels["Core"])) {
   if (merge.vessels["Core"]) {
     nasc <- nasc %>% 
@@ -1061,11 +1067,6 @@ save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
 For each vessel, plot the backscatter from the CTD.app (`cps.nasc`, or equivalent) to backscatter from the default fixed integration depth (`NASC.250`).
 
 ```{r compare-cps-nasc}
-# Add missing vessel.orig column if not present 
-if (!"vessel.orig" %in% names(nasc)) {
-  nasc$vessel.orig <- nasc$vessel.name
-}
-
 # Compare cps.nasc to NASC.70
 ggplot(nasc, aes(NASC.250, cps.nasc)) +
   geom_point() +
@@ -4270,7 +4271,6 @@ for (i in unique(tx.mid$transect)) {
   } else {
     tx.nn <- tx.i
   }
-  
   
   # # Get NASC data for all other transects
   # nasc.temp <- filter(tx.mid, transect != i, vessel.name %in% tx.i$vessel.name)

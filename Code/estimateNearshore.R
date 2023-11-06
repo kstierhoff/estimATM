@@ -81,12 +81,12 @@ if (process.nearshore) {
     
   } else {
     # Use cps.nasc extracted using extract_cps_nasc.R
-    if ("cps.nasc" %in% colnames(nasc.vessel)) {
-      nasc.vessel$cps.nasc.source <- "cps.nasc"
+    if ("cps.nasc" %in% colnames(nasc.nearshore)) {
+      nasc.nearshore$cps.nasc.source <- "cps.nasc"
     } else {
       # If cps.NASC not extracted, use fixed depth (nasc.depth.cps) defined in settings
       # nasc.vessel$cps.nasc <- purrr::pluck(nasc.vessel, nasc.depth.cps)
-      nasc.vessel <- nasc.vessel %>% 
+      nasc.nearshore <- nasc.nearshore %>% 
         mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
                cps.nasc.source = nasc.depth.cps)
     }
@@ -112,7 +112,7 @@ if (process.nearshore) {
       # Define variables if missing
       if (!"sample.type" %in% names(clf)) clf$sample.type <- "Trawl"
       if (!"sample.type" %in% names(hlf)) hlf$sample.type <- "Trawl"
-      if (!"cluster" %in% names(hlf)) hlf$cluster <- as.numeric(NA)
+      if (!"cluster" %in% names(hlf))     hlf$cluster <- as.numeric(NA)
       
       # Combine clf, hlf, and clf.seine 
       clf <- clf %>%
@@ -157,10 +157,12 @@ if (process.nearshore) {
     st_as_sf(coords = c("long","lat"), crs = crs.geog)
   
   cluster.match.ns <- super.clusters %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    filter(sample.type %in% catch.source.ns)
   
   haul.match.ns <- super.hauls %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    filter(sample.type %in% catch.source.ns)
   
   # Find nearest cluster ----------------------------
   # Returns a vector of nearest clusters
@@ -199,8 +201,10 @@ if (process.nearshore) {
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
 
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) +
-  #   geom_text(data = super.clusters, aes(long, lat, label = factor(cluster), colour = factor(cluster))) +
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + 
+  #   geom_point(show.legend = FALSE) +
+  #   geom_text(data = super.clusters, aes(long, lat, label = factor(cluster), 
+  #                                        colour = factor(cluster)), show.legend = FALSE) +
   #   coord_map()
   
   # Save results of processing
@@ -318,13 +322,8 @@ if (save.figs) {
   save(nasc.cluster.plot.ns, file = here("Output/nasc_cluster_plot_ns.Rdata"))
 }
 
-# Map trawl species proportions -------------------------------------------------------
+# Map nearshore species proportions -------------------------------------------------------
 if (use.seine.data) {
-  # if (survey.name == "2207RL") {
-  #   # Remove LM data (which is uncorrected) from set.pie in 2022
-  #   set.pie <- filter(set.pie, vessel.name != "LM")
-  # }
-  
   # Combine pie chart data from trawls and seines
   cluster.pie <- bind_rows(cluster.pie, set.pie)
   
@@ -447,8 +446,6 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
 }
-
-# RESUME HERE
 
 # Join NASC and cluster length frequency data frames by cluster ----------------
 if (cluster.source["NS"] == "cluster") {
@@ -611,30 +608,32 @@ tx.mid.ns <- nasc.nearshore %>%
   group_by(vessel.name, transect, transect.name) %>% 
   summarise(
     lat  = mean(lat, na.rm = TRUE),
-    long = mean(long, na.rm = TRUE))
+    long = mean(long, na.rm = TRUE)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 for (i in unique(tx.mid.ns$transect.name)) {
   # Get the mid lat/long for each transect
-  tx.nn.i      <- filter(tx.mid.ns, transect.name == i)
-  # Get NASC data for all other transects
-  nasc.temp <- filter(tx.mid.ns, transect.name != i, vessel.name %in% tx.nn.i$vessel.name)
-  # Calculate distance between transect midpoint and all other NASC values
-  nn.dist   <- swfscMisc::distance(tx.nn.i$lat, tx.nn.i$long,
-                                   nasc.temp$lat, nasc.temp$long)
+  tx.nn.i      <- filter(tx.mid.ns, transect.name == i) 
+  # Get midpoint data for all other transects
+  tx.others <- filter(tx.mid.ns, transect.name != i, 
+                      vessel.name %in% tx.nn.i$vessel.name) 
   # Get the transect info and spacing based on shortest distance
-  nn.tx     <- nasc.temp$transect.name[which.min(nn.dist)]
-  min.dist  <- nn.dist[which.min(nn.dist)]
-  nn.lat    <- nasc.temp$lat[which.min(nn.dist)]
-  nn.long   <- nasc.temp$long[which.min(nn.dist)]
+  # Find nearest feature
+  nn.tx <- st_nearest_feature(tx.nn.i, tx.others)
+  # Calculate distance between nearest transect
+  min.dist <- distGeo(as_Spatial(tx.nn.i), as_Spatial(tx.others[nn.tx,]))*0.000539957
+  
+  # Add results to sf object
+  tx.nn.i <- tx.nn.i %>% 
+    mutate(nn.tx = nn.tx,
+           min.dist = min.dist)
   
   # Add to results
   if (exists("tx.nn.ns")) {
-    tx.nn.ns     <- bind_rows(tx.nn.ns, 
-                              data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long))
+    tx.nn.ns <- bind_rows(tx.nn.ns, tx.nn.i)
   } else {
-    tx.nn.ns <- data.frame(tx.nn.i, nn.tx, min.dist, nn.lat, nn.long)
+    tx.nn.ns <- tx.nn.i
   }
-  
 }
 
 # Bin transects by spacing
@@ -713,8 +712,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
     filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max)) %>% 
     # mutate(transect = sprintf("%03d", Transect)) %>% 
     mutate(transect = as.numeric(Transect),
-           transect.name = paste(v, sprintf("%03d", transect))) %>% 
-    ungroup()
+           transect.name = paste(v, sprintf("%03d", transect))) 
   
   # ggplot(region.wpts, aes(long, lat, colour = Region)) + geom_point() + coord_map()
   
@@ -722,7 +720,12 @@ for (v in unique(nasc.nearshore$vessel.name)) {
   region.wpts$depth <- get.depth(noaa.bathy.ns, 
                                  region.wpts$long, 
                                  region.wpts$lat, 
-                                 locator = F, distance = F)$depth 
+                                 locator = FALSE, distance = FALSE)$depth 
+  
+  # Extract shallowest waypoint from each transect
+  region.wpts <- region.wpts %>% 
+    slice(which.min(depth)) %>% 
+    ungroup()
   
   # Add region to nasc by vessel
   nasc.region.temp <- nasc.nearshore %>% 
@@ -891,7 +894,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
           loc = "offshore",
           order = 1)
       
-      tx.o.final.ns <- data.frame()
+      if (exists("tx.o.final.ns")) rm(tx.o.final.ns)
       
       for (v in unique(tx.o.ns$vessel.name)) {
         if (v == "SD1024") {
@@ -901,7 +904,12 @@ for (v in unique(nasc.nearshore$vessel.name)) {
             bind_rows(filter(tx.o.n.ns, vessel.name == v)) %>% 
             bind_rows(filter(tx.o.s.ns, vessel.name == v))
         }
-        tx.o.final.ns <- bind_rows(tx.o.final.ns, tx.o.tmp)
+        
+        if (exists("tx.o.final.ns")) {
+          tx.o.final.ns <- bind_rows(tx.o.final.ns, tx.o.tmp)  
+        } else {
+          tx.o.final.ns <- tx.o.tmp
+        }
       }
       
       # Combine all inshore transects
@@ -940,7 +948,6 @@ for (v in unique(nasc.nearshore$vessel.name)) {
         summarise(do_union = F) %>% 
         st_cast("LINESTRING") %>% 
         ungroup()
-      
     }
     
     # Combine with other strata points ---------------------------------
@@ -1422,10 +1429,15 @@ island.polygons <- strata.ns %>%
   filter(str_detect(region, "Island")) %>%
   st_union() 
 
-# Remove primary super polygon intersecting island polygons
-strata.super.polygons.ns <- strata.super.polygons %>% 
-  st_difference(island.polygons) %>% 
-  ungroup()
+# Remove primary super polygon intersecting island polygons, if they exist
+if (length(island.polygons) > 0) {
+  strata.super.polygons.ns <- strata.super.polygons %>% 
+    st_difference(island.polygons) %>% 
+    ungroup()  
+} else {
+  strata.super.polygons.ns <- strata.super.polygons
+}
+
 
 # Remove overlap with 5 m isobath and primary survey strata
 # strata.nearshore <- select(strata.nearshore, -vessel.name.1, -area.1)
