@@ -690,8 +690,6 @@ if (get.bathy) {
   load(paste0(here("Data/GIS"), "/bathy_data_ns_", survey.name,".Rdata"))
 }
 
-# RESUME HERE
-
 # Remove nearshore strata, if exists
 if (exists("tx.ends.ns"))       rm(tx.ends.ns) # inshore- and offshore-most intervals
 if (exists("strata.ns"))        rm(strata.ns) 
@@ -725,14 +723,14 @@ for (v in unique(nasc.nearshore$vessel.name)) {
                                  locator = FALSE, distance = FALSE)$depth 
   
   # Extract shallowest waypoint from each transect
-  region.wpts <- region.wpts %>% 
+  region.wpts.i <- region.wpts %>% 
     slice(which.min(depth)) %>% 
     ungroup()
   
   # Add region to nasc by vessel
   nasc.region.temp <- nasc.nearshore %>% 
     filter(vessel.name == v) %>%  
-    left_join(select(region.wpts, transect, region = Region)) %>% 
+    left_join(select(region.wpts.i, transect, region = Region)) %>% 
     mutate(key = paste(vessel.name, region))
   
   # ggplot(nasc.region.temp, aes(long, lat, colour = region)) + geom_point() + coord_map()
@@ -761,6 +759,10 @@ for (v in unique(nasc.nearshore$vessel.name)) {
         filter(key == k) %>%
         ungroup() 
       
+      # ggplot() +
+      #   geom_point(data = tx.i.ns, aes(long, lat), colour = "blue") +
+      #   geom_point(data = tx.o.ns, aes(long, lat), colour = "red")
+
       # Create data frame with transect ends
       tx.ends.ns.k <- tx.i.ns %>% 
         mutate(vessel.name = v) %>% 
