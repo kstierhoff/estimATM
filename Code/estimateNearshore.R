@@ -201,9 +201,9 @@ if (process.nearshore) {
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
 
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + 
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
   #   geom_point(show.legend = FALSE) +
-  #   geom_text(data = super.clusters, aes(long, lat, label = factor(cluster), 
+  #   geom_text(data = super.clusters, aes(long, lat, label = factor(cluster),
   #                                        colour = factor(cluster)), show.legend = FALSE) +
   #   coord_map()
   
@@ -690,6 +690,8 @@ if (get.bathy) {
   load(paste0(here("Data/GIS"), "/bathy_data_ns_", survey.name,".Rdata"))
 }
 
+# RESUME HERE
+
 # Remove nearshore strata, if exists
 if (exists("tx.ends.ns"))       rm(tx.ends.ns) # inshore- and offshore-most intervals
 if (exists("strata.ns"))        rm(strata.ns) 
@@ -814,6 +816,9 @@ for (v in unique(nasc.nearshore$vessel.name)) {
         mutate(
           brg = swfscMisc::bearing(lat.i, long.i,
                                    lat.o, long.o)[1])
+      
+      # ggplot() + geom_point(data = tx.ends.ns.k, aes(long.i, lat.i)) + 
+      #   geom_point(data = tx.ends.ns.k, aes(long.o, lat.o), colour = "blue")
       
       # Get original inshore transect ends -------------------------------------------
       # Select original inshore waypoints
