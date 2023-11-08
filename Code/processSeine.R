@@ -52,14 +52,14 @@ for (v in seine.vessels) {
              vessel.name = v,
              key.set = paste(vessel.name, date, set),
              scientificName = case_when(
-               species_name == "Pacific Herring" ~ "Clupea pallasii",
-               species_name == "Pacific Sardine" ~ "Sardinops sagax",
-               species_name == "Pacific Mackerel" ~ "Scomber japonicus",
-               species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
-               species_name == "Northern Anchovy" ~ "Engraulis mordax",
-               # species_name == "Jack Smelt" ~ "Atherinopsis californiensis",
-               # species_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
-               # species_name == "Pacific Hake" ~ "Merluccius productus",
+               common_name == "Pacific Herring" ~ "Clupea pallasii",
+               common_name == "Pacific Sardine" ~ "Sardinops sagax",
+               common_name == "Pacific Mackerel" ~ "Scomber japonicus",
+               common_name == "Jack Mackerel" ~ "Trachurus symmetricus",
+               common_name == "Northern Anchovy" ~ "Engraulis mordax",
+               # common_name == "Jack Smelt" ~ "Atherinopsis californiensis",
+               # common_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
+               # common_name == "Pacific Hake" ~ "Merluccius productus",
                TRUE ~ NA_character_)) %>% 
       filter(!is.na(scientificName)) %>% 
       group_by(key.set, vessel.name, scientificName) %>% 
@@ -85,24 +85,25 @@ for (v in seine.vessels) {
       mutate(vessel_name = seine.vessels.long[v],
              vessel.name = v,
              key.set = paste(vessel.name, date, set),
-             label = paste("Date:", date, "Set:", set, "Fish num:", fish_number),
+             label = paste("Date:", date, "Set:", set, "Specimen:", specimen),
              scientificName = case_when(
-               species_name == "Pacific Herring" ~ "Clupea pallasii",
-               species_name == "Pacific Sardine" ~ "Sardinops sagax",
-               species_name == "Pacific Mackerel" ~ "Scomber japonicus",
-               species_name == "Jack Mackerel" ~ "Trachurus symmetricus",
-               species_name == "Northern Anchovy" ~ "Engraulis mordax",
-               # species_name == "Jacksmelt" ~ "Atherinopsis californiensis",
-               # species_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
+               common_name == "Pacific Herring" ~ "Clupea pallasii",
+               common_name == "Pacific Sardine" ~ "Sardinops sagax",
+               common_name == "Pacific Mackerel" ~ "Scomber japonicus",
+               common_name == "Jack Mackerel" ~ "Trachurus symmetricus",
+               common_name == "Northern Anchovy" ~ "Engraulis mordax",
+               # common_name == "Jacksmelt" ~ "Atherinopsis californiensis",
+               # common_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
                TRUE ~ NA_character_),
-             missing.weight = case_when(is.na(weightg)   ~ T, TRUE ~ FALSE),
-             missing.length = case_when(is.na(fish_length) ~ T, TRUE ~ FALSE)) %>%
+             missing.weight = case_when(is.na(weight_g)   ~ T, TRUE ~ FALSE),
+             missing.length = case_when(is.na(length_mm) ~ T, TRUE ~ FALSE)) %>%
       mutate(
+        weightg = weight_g,
         forkLength_mm = case_when(
-          species_name %in% c("Jack Mackerel","Pacific Mackerel","Pacific Herring") ~ fish_length,
+          scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ length_mm,
           TRUE ~ NA_real_),
         standardLength_mm = case_when(
-          species_name %in% c("Northern Anchovy","Pacific Sardine") ~ fish_length,
+          scientificName %in% c("Engraulis mordax","Sardinops sagax") ~ length_mm,
           TRUE ~ NA_real_)) %>%
       filter(scientificName %in% cps.spp, !is.na(set)) %>%
       mutate(
@@ -135,13 +136,13 @@ for (v in seine.vessels) {
   }
 }
 
-# Plot lengths
+# # Plot lengths
 # length.plot.ns <- ggplot() +
-#   geom_point(data = set.lengths.tmp,
-#              aes(forkLength_mm, weightg, colour = vessel.name),
+#   geom_point(data = set.lengths,
+#              aes(forkLength_mm, weightg, colour = vessel.name, label = key),
 #              fill = "green", shape = 21) +
-#   geom_point(data = set.lengths.tmp,
-#              aes(standardLength_mm, weightg, colour = vessel.name),
+#   geom_point(data = set.lengths,
+#              aes(standardLength_mm, weightg, colour = vessel.name, label = key),
 #              fill = "blue", shape = 21) +
 #   facet_wrap(~scientificName, scales = "free")
 #   ggplotly(length.plot.ns)
