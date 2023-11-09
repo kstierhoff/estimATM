@@ -75,6 +75,8 @@ for (v in seine.vessels) {
   }
 }
 
+save(set.catch, file = here("Output/purse_seine_catch.Rdata"))
+
 # Import set specimen data ----------------------------------------------------
 if (exists("set.lengths")) rm(set.lengths)
 for (v in seine.vessels) {
@@ -135,6 +137,8 @@ for (v in seine.vessels) {
     } 
   }
 }
+
+save(set.lengths, file = here("Output/purse_seine_lengths.Rdata"))
 
 # # Plot lengths
 # length.plot.ns <- ggplot() +

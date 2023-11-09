@@ -655,7 +655,8 @@ save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
 
 # Summarise biomass density by transect and species
 nasc.density.summ.ns <- nasc.density.summ.ns %>% 
-  left_join(select(tx.nn.ns, vessel.name, transect.name, dist.cum, dist.bin))
+  left_join(select(tx.nn.ns, vessel.name, transect.name, dist.cum, dist.bin)) %>% 
+  arrange(scientificName, transect) 
 
 # Draw pseudo-transects ---------------------------------------------------
 # Get transect ends, calculate bearing, and add transect spacing
@@ -995,6 +996,11 @@ nasc.summ.region <- nasc.region %>%
   tally() %>% 
   ungroup()
 
+# TO DO ----------------------------
+# Create a map similar to that which shows mean density by transect and/or latitude
+# Potentially useful for manual stratification, or at least for checking results
+# of automated stratification
+
 # Create stratum polygons -------------------------------------------------
 # Define sampling strata
 if (stratify.manually.ns) {
@@ -1093,7 +1099,8 @@ if (stratify.manually.ns) {
 
 # Add start latitude and longitude to strata table
 strata.final.ns <- strata.final.ns %>%
-  mutate(transect.name = paste(vessel.name, sprintf("%03d", transect))) %>% 
+  mutate(transect.name = paste(vessel.name, transect)) %>% 
+  # mutate(transect.name = paste(vessel.name, sprintf("%03d", transect))) %>% 
   # mutate(key = paste(scientificName, stock, vessel.name, stratum)) %>% 
   left_join(tx.labels.ns) %>%
   filter(!is.na(vessel.name)) %>% 
@@ -1354,6 +1361,8 @@ for (i in unique(nearshore.spp$scientificName)) {
     }
   }
 }
+
+# RESUME HERE
 
 # ggplot(strata.nearshore, aes(colour = stock, fill = factor(stratum))) +
 #   geom_sf() +
