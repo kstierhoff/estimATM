@@ -476,6 +476,7 @@ nasc.summ.ns <- nasc.nearshore %>%
   ungroup()
 
 save(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.Rdata"))
+write_csv(nasc.summ.ns, file = here("Output/nasc_summ_tx_ns.csv"))
 
 # Apportion nearshore backscatter ------------------------------------------
 # If enforcing max cluster distance, set proportions for each species to zero
@@ -1362,8 +1363,6 @@ for (i in unique(nearshore.spp$scientificName)) {
   }
 }
 
-# RESUME HERE
-
 # ggplot(strata.nearshore, aes(colour = stock, fill = factor(stratum))) +
 #   geom_sf() +
 #   facet_wrap(~scientificName) +
@@ -1591,97 +1590,6 @@ nasc.nearshore <- nasc.nearshore %>%
 nasc.density.ns <- nasc.density.ns %>% 
   mutate(id = seq_along(transect)) %>% 
   filter(id %in% nasc.density.ns.sub$id)
-
-# # Plot biomass density for each species and stock -------------------------
-# if (save.figs) {
-#   # Create a list for saving biomass density plots
-#   biomass.dens.figs.ns <- list()
-#   
-#   # Plot biomass density
-#   for (i in unique(strata.nearshore$scientificName)) {
-#     for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
-#       # Filter biomass density
-#       nasc.density.plot.ns <- nasc.density.ns %>%
-#         left_join(filter(nasc.stock.ns, scientificName == i, stock == j)) %>% 
-#         filter(density != 0, scientificName == i, 
-#                stock == j, transect %in% strata.final.ns$transect[strata.final.ns$scientificName == i])
-#       
-#       # Filter positive clusters
-#       pos.cluster.txt <- filter(clf, cluster %in% nasc.density.plot.ns$cluster) 
-#       
-#       # pos.cluster.txt <- pos.clusters.ns %>% 
-#       #   filter(scientificName == i, stock == j,
-#       #          cluster %in% nasc.ns.clusters) %>% 
-#       #   ungroup() %>% 
-#       #   project_df(to = crs.proj)
-#       
-#       # Select biomass density legend objects 
-#       dens.levels.all.ns <- sort(unique(nasc.density.plot.ns$bin.level))
-#       dens.labels.all.ns <- dens.labels[dens.levels.all.ns]
-#       dens.sizes.all.ns  <- dens.sizes[dens.levels.all.ns]
-#       dens.colors.all.ns <- dens.colors[dens.levels.all.ns]
-#       
-#       # Map biomass density, strata polygons, and positive trawl clusters
-#       biomass.dens.ns <- base.map +
-#         geom_sf(data = filter(strata.nearshore, scientificName == i, stock == j),
-#                 aes(colour = factor(stratum)), fill = NA, size = 1) +
-#         scale_colour_discrete('Stratum') + 
-#         # Plot vessel track
-#         # geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
-#         # Plot zero nasc data
-#         geom_point(data = filter(nasc.nearshore, cps.nasc == 0), aes(X, Y),
-#                    colour = 'gray50', size = 0.15, alpha = 0.5) +
-#         # Plot NASC data
-#         geom_point(data = nasc.density.plot.ns, aes(X, Y, size = bin, fill = bin),
-#                    shape = 21, alpha = 0.75) +
-#         # Configure size and colour scales
-#         scale_size_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-#                           values = dens.sizes.all.ns, labels = dens.labels.all.ns) +
-#         scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
-#                           values = dens.colors.all.ns, labels = dens.labels.all.ns) +
-#         # Plot positive cluster midpoints
-#         geom_shadowtext(data = pos.cluster.txt,
-#                         aes(X, Y, label = cluster), 
-#                         colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
-#         # Configure legend guides
-#         guides(colour = guide_legend(order = 1),
-#                fill   = guide_legend(order = 2), 
-#                size   = guide_legend(order = 2)) +
-#         coord_sf(crs = crs.proj, 
-#                  xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-#                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-#       
-#       # Save figures
-#       ggsave(biomass.dens.ns, 
-#              filename = paste(here("Figs/fig_biomass_dens_ns_"), i, "-", j, ".png",sep = ""),
-#              width  = map.width,height = map.height)
-#       
-#       # Save plot to list
-#       biomass.dens.figs.ns[[i]][[j]] <- biomass.dens.ns
-#     }
-#   }
-#   
-#   # Save map objects
-#   save(biomass.dens.figs.ns, file = here("Output/biomass_dens_ns_map_all.Rdata"))  
-#   
-# } else {
-#   load(here("Output/biomass_dens_ns_map_all.Rdata"))
-# }
-# 
-# # Create blank plots for missing species
-# for (i in unique(strata.primary$scientificName)) {
-#   # for (i in unique(strata.nearshore$scientificName)) {
-#   for (j in unique(filter(strata.primary, scientificName == i)$stock)) {
-#     # for (j in unique(filter(strata.nearshore, scientificName == i)$stock)) {
-#     if (is.null(biomass.dens.figs.ns[[i]][[j]])) {
-#       biomass.dens.temp <- base.map + 
-#         annotate('text', 5, 5, label = 'No Data', size = 6, fontface = 'bold') +
-#         theme_bw()  
-#       ggsave(biomass.dens.temp, 
-#              filename = paste0(here("Figs/fig_biomass_dens_ns_"), i, "-", j, ".png"))
-#     }
-#   }
-# }
 
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.nearshore, file = here("Output/nasc_nearshore_final.Rdata"))

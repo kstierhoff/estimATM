@@ -1061,6 +1061,16 @@ if (sampling.cufes) {
       popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
     st_as_sf(coords = c("long","lat"), crs = crs.geog)
   
+  cufes.hake.sf <- cufes %>% 
+    filter(Density > 0, Species == "HakeEggs") %>%
+    mutate(
+      spp.label = case_when(
+        Species == "HakeEggs" ~ "Hake",
+        TRUE ~ Species),
+      label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+      popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+  
   cufes.ofe.sf <- cufes %>% 
     filter(Density > 0, Species == "OtherFishEggs") %>%
     filter(str_detect(Comments, "Scomber japonicus")|
@@ -1206,8 +1216,9 @@ i.map <- leaflet() %>%
                       "Backscatter-CPS", "Backscatter-CPS (Small)",
                       "Backscatter-Krill", "Backscatter-Krill (Small)",
                       "Backscatter (Large)",
-                      "CUFES Egg Density", "CUFES Egg Density-Other",
-                      "CUFES Egg Density-Squid", "CUFES (Negative)",
+                      "CUFES Egg Density", "CUFES Egg Density-Hake",
+                      "CUFES Egg Density-Squid", "CUFES Egg Density-Other",
+                      "CUFES (Negative)",
                       "Saildrone Tracks", "Saildrone Positions"),
     options = layersControlOptions(collapsed = FALSE)) %>% 
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
@@ -1264,6 +1275,13 @@ if (sampling.cufes) {
                        radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
                        fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
                        popup = ~popup, group = "CUFES Egg Density-Squid")
+  
+  if (nrow(cufes.hake.sf) > 0)
+    i.map <- i.map %>% 
+      addCircleMarkers(data = cufes.hake.sf,
+                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                       fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                       popup = ~popup, group = "CUFES Egg Density-Hake")
   
   if (nrow(cufes.ofe.sf) > 0)
     i.map <- i.map %>% 
