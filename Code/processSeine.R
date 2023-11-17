@@ -542,9 +542,10 @@ for (i in cps.spp) {
   
   # Calculate the estimated number of individuals in each size class
   lf.df.seine <- lf.df.seine %>%
-    mutate(counts = f * spp.num,
-           scientificName = i) %>%
-    filter(is.na(cluster) == FALSE)
+    mutate(counts         = f * spp.num,
+           scientificName = i,
+           sample.type    = "Purse seine") %>%
+    filter(is.na(cluster) == FALSE) 
   
   # Combine length frequency data for plotting later
   lf.final.seine <- bind_rows(lf.final.seine, lf.df.seine)
