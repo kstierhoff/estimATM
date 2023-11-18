@@ -1,13 +1,26 @@
 # Get acoustic proportions for mapping
-acoustic.prop.indiv.combo <- clf %>%
+clf.combo <- clf
+
+# Add nearshore proportions
+if(exists("clf.ns")) {
+  clf.combo <- bind_rows(clf.combo, clf.ns)
+}
+
+# Add offshore proportions
+if(exists("clf.os")) {
+  clf.combo <- bind_rows(clf.combo, clf.os)
+}
+
+# Format positive clusters for plotting
+acoustic.prop.indiv.combo <- clf.combo %>%
   filter(!is.na(CPS.wg)) %>% 
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
          prop.mack, prop.rher, prop.sar, sample.type) %>% 
   replace(. == 0, 0.0000001) %>%
   project_df(to = crs.proj) 
 
-# Get empty clusters
-cluster.zero.combo <- clf %>% 
+# Subset empty clusters
+cluster.zero.combo <- clf.combo %>% 
   filter(is.na(CPS.wg))
 
 # Create trawl figure
@@ -36,7 +49,7 @@ acoustic.prop.cluster.combo.final <- base.map +
   # Configure pie outline colors
   scale_colour_manual(name = "Sample type", 
                       labels = c("Purse seine", "Trawl"),
-                      values = c("Seine" = seine.color, "Trawl" = trawl.color),
+                      values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
                       guide = "none") +
   coord_sf(crs = crs.proj, 
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
