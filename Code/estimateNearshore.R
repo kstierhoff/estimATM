@@ -2246,6 +2246,7 @@ nasc.outlier.plot.ns <- ggplot(big.nasc.ns, aes(rank, cps.nasc, ids = label)) +
   geom_point(aes(colour = vessel.name)) +
   geom_text_repel(data = top_n(big.nasc.ns, 20, cps.nasc), 
                   aes(rank, cps.nasc, label = label), size = 2) +
+  geom_hline(yintercept = 10000, linetype = "dashed") +
   scale_color_discrete("Vessel") +
   xlab("\nRank") + ylab(expression(italic(s)[A]/19)) +
   theme_bw() +
