@@ -2237,6 +2237,10 @@ big.nasc.ns <- nasc.nearshore %>%
   select(rank, cps.nasc, label, popup, datetime, dist_m, sounder, 
          lat, long, transect.name, vessel.name) 
 
+# Write outliers to CSV
+write_csv(big.nasc.ns, 
+          here("Output/nasc_outliers_ns.csv"))
+
 # Create outlier plot
 nasc.outlier.plot.ns <- ggplot(big.nasc.ns, aes(rank, cps.nasc, ids = label)) +
   geom_point(aes(colour = vessel.name)) +

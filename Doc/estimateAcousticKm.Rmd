@@ -63,8 +63,9 @@ source(here("Doc/settings", prj.settings))
 save.figs     <- T # Create new figures
 get.nav       <- T # Download Lasker nav data from ERDDAP
 nav.source    <- "ERDDAP" # Navigation data source: ERDDAP or SCS
+get.nav.sh    <- T # Download Shimada nav data from ERDDAP
 get.nav.sd    <- T # Download Saildrone nav data from ERDDAP
-get.nav.ns    <- F # Process data from nearshore vessels
+get.nav.ns    <- T # Process data from nearshore vessels
 get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
 extract.bathy <- T # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -76,6 +77,18 @@ if (nav.source == "ERDDAP") {
   source(here("Code/get_nav_erddap.R"))
 } else if (nav.source == "SCS") {
   source(here("Code/get_nav_scs.R"))
+}
+
+# Source code to get nav data for Shimada from ERDDAP
+if (get.nav.sh) {
+  source(here("Code/get_nav_erddap_SH.R"))
+  
+  nav.sh <- mutate(nav, vessel.name = "SH")
+  
+  # Combine RL and SH nav data
+  nav <- nav %>% 
+    mutate(vessel.name = "RL") %>% 
+    bind_rows(nav.sh)
 }
 
 # Read transect waypoints
@@ -533,7 +546,7 @@ if (exists("nav.sd")) {
 
 Total transit distance (km and nmi) and number of pings emitted from the multifrequency echosounders are summarized by period (day or night, based on daily sunrise and sunset time at the vessel's location) and seabed depth (greater or less than 200 m). Number of pings are estimated every 1 minute based on the seabed depth (m), where the number of pings per second is equal to 750/depth. Deeper than 750 m, the ping rate is assume to be 1 ping per second (pps). A maximum ping rate of be 3 pps is assume for depths shallower than 250 m.  
 
-### Reuben Lasker
+### NOAA Ships
 #### Total acoustic km
 
 ```{r effort-summary}
@@ -576,6 +589,10 @@ if (extract.bathy) {
 
 # Add depth data to nasc
 nasc$depth <- nasc.depth$depth
+
+# Re-cut legs
+nasc <- nasc %>% 
+  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE))
 
 # Summarize transect distance by leg
 nasc.summ <- nasc %>% 

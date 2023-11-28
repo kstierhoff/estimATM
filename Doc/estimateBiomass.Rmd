@@ -106,7 +106,7 @@ do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
 process.cal       <- T # Process calibration results
 process.ctd       <- T # Process CTD and UCTD casts
@@ -197,10 +197,10 @@ if (copy.files) {
     # Copy CSV files
     if (overwrite.csv) {
       # Copy all files
-      file_copy(csv.files.cps, here("Data/Backscatter", dd), 
+      file_copy(csv.files.cps, here("Data/Backscatter", dd, path_file(csv.files.cps)), 
                 overwrite = overwrite.csv)
       
-      file_copy(csv.files.krill, here("Data/Backscatter", dd), 
+      file_copy(csv.files.krill, here("Data/Backscatter", dd, path_file(csv.files.krill)), 
                 overwrite = overwrite.csv)
     } else {
       # List existing files
@@ -1064,7 +1064,7 @@ nasc.summ <- nasc %>%
 save(nasc.summ, file = here("Output/nasc_summ_tx.Rdata"))
 ```
 
-## Compare CPS backscatter (cps.nasc) to NASC.70
+## Compare CPS backscatter (cps.nasc) to `r nasc.depth.cps`
 
 For each vessel, plot the backscatter from the CTD.app (`cps.nasc`, or equivalent) to backscatter from the default fixed integration depth (`NASC.250`).
 
@@ -1123,7 +1123,11 @@ big.nasc <- nasc %>%
                         '<b>NASC: </b>', round(NASC), ' m<sup>2</sup> nmi<sup>-2</sup>')) %>% 
   top_n(100, cps.nasc) %>% 
   select(rank, cps.nasc, label, popup, datetime, dist_m, sounder, 
-         lat, long, transect.name, vessel.name, vessel.orig) 
+         lat, long, transect.name, vessel.name, vessel.orig)
+
+# Write outliers to CSV
+write_csv(big.nasc, 
+          here("Output/nasc_outliers.csv"))
 
 # Create outlier plot
 nasc.outlier.plot <- ggplot(big.nasc, aes(rank, cps.nasc, ids = label)) +
@@ -3188,7 +3192,7 @@ include_graphics(here("Figs/fig_cufes_egg_density.png"))
 
 ## Combine backscatter, CUFES, and species proportion plots  
 
-(ref:nasc-cufes-trawl-wt) The a) distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; and c) proportions of CPS species in trawl clusters (by weight, black points indicate trawls with no CPS).
+(ref:nasc-cufes-trawl-wt) The a) distribution of 38-kHz integrated backscattering coefficients (_s_~A~, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from 5 to 70-m deep) ascribed to CPS; b) CUFES egg density (eggs m^-3^) for anchovy, sardine, and jack mackerel; and c) proportions of CPS species in individual trawls hauls (by weight, black points indicate trawls with no CPS).
 
 ```{r nasc-cufes-trawl-wt,fig.cap='(ref:nasc-cufes-trawl-wt)'}
 if (save.figs) {
