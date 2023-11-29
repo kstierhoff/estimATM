@@ -75,6 +75,8 @@ for (v in seine.vessels) {
   }
 }
 
+save(set.catch, file = here("Output/purse_seine_catch.Rdata"))
+
 # Import set specimen data ----------------------------------------------------
 if (exists("set.lengths")) rm(set.lengths)
 for (v in seine.vessels) {
@@ -135,6 +137,8 @@ for (v in seine.vessels) {
     } 
   }
 }
+
+save(set.lengths, file = here("Output/purse_seine_lengths.Rdata"))
 
 # # Plot lengths
 # length.plot.ns <- ggplot() +
@@ -538,9 +542,10 @@ for (i in cps.spp) {
   
   # Calculate the estimated number of individuals in each size class
   lf.df.seine <- lf.df.seine %>%
-    mutate(counts = f * spp.num,
-           scientificName = i) %>%
-    filter(is.na(cluster) == FALSE)
+    mutate(counts         = f * spp.num,
+           scientificName = i,
+           sample.type    = "Purse seine") %>%
+    filter(is.na(cluster) == FALSE) 
   
   # Combine length frequency data for plotting later
   lf.final.seine <- bind_rows(lf.final.seine, lf.df.seine)

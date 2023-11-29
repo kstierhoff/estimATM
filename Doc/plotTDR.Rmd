@@ -53,6 +53,7 @@ process.tdr <- T # Process TDR files
 process.all <- T # Process all TDR files
 get.db      <- T # Extract data from trawl database (F for testing)
 get.nav     <- T # Download NOAA Ship nav data
+get.nav.sh  <- T # Download NOAA Ship nav data
 ```
 
 ```{r copy-files}
@@ -77,6 +78,13 @@ if (tdr.nav.source == "ERDDAP") {
   source(here("Code/get_nav_erddap.R"))
 } else if (nav.source == "SCS") {
   source(here("Code/get_nav_scs.R"))
+}
+
+# Get nav data from Shimada
+if (get.nav.sh) {
+  source(here("Code/get_nav_erddap_SH.R"))
+  
+  nav <- bind_rows(nav, nav.sh)
 }
 ```
 
@@ -356,8 +364,8 @@ if(nrow(tbl.all.new) > 0) {
     
     tdr.plot <- tdr.plot %>% 
       filter(between(time,  
-                     min(trawl.text$time) - minutes(10), 
-                     max(trawl.text$time) + minutes(10)))
+                     min(trawl.text$time, na.rm = TRUE) - minutes(10), 
+                     max(trawl.text$time, na.rm = TRUE) + minutes(10)))
     
     # Plot TDR data
     plot.tdr <- ggplot() + 
@@ -385,17 +393,17 @@ if(nrow(tbl.all.new) > 0) {
         geom_rect(data = trawl.window,
                   aes(xmin = equilibriumTime,
                       xmax = haulBackTime,
-                      ymin = min(tdr.plot$depth),
+                      ymin = min(tdr.plot$depth, na.rm = TRUE),
                       ymax = 12),
                   fill = 'gray70', alpha = 0.5) +
         geom_rect(data = trawl.window,
                   aes(xmin = netInWaterTime,
                       xmax = netOnDeckTime,
-                      ymin = min(tdr.plot$depth),
+                      ymin = min(tdr.plot$depth, na.rm = TRUE),
                       ymax = 12), fill = NA,
                   colour = 'gray50', linetype = "dashed", alpha = 0.5) +
         geom_text(data = trawl.text,
-                  aes(time, min(tdr.plot$depth), label = event),
+                  aes(time, min(tdr.plot$depth, na.rm = TRUE), label = event),
                   size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1)
     }
     
