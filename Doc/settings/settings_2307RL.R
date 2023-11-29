@@ -145,7 +145,7 @@ wpt.linetypes        <- c(Adaptive = "dashed", Carranza = "solid",
 
 # Saildrone info -----------------------------------------------
 # Select Saildrone numbers
-sd.numbers <- c("1048", "1060", "1096")
+sd.numbers <- c("1048")#, "1060", "1096")
 
 # Set Saildrone filter method
 sd.buffer.type   <- c("saildrone")
@@ -298,7 +298,7 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL", "LBC", "LM", "SH") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL", "LBC", "LM", "SD", "SH") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
 nasc.vessels.krill     <- c("RL", "SH")
@@ -346,7 +346,7 @@ if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
-                            SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+                            SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
@@ -558,7 +558,7 @@ tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculatin
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
-scs.source             <- "XLSX" # "CSV", "ELG", or "XLSX"
+scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
@@ -708,7 +708,7 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2307RL_EK80"
-raw.size      <- 1000  # file size in megabytes (MB)
+raw.size      <- 1  # file size in megabytes (GB)
 raw.log.range <-  350  # depth of ER60 logging (m)
 
 # Echoview settings
@@ -736,7 +736,7 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL","LBC","LM")
+cal.vessels        <- c("RL","SH","LBC","LM")
 cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
 cal.datetime       <- "27 June"     # Date/time of calibration
 cal.plot.date      <- "2023-06-27" # Date of the calibration, used to plot cal time series

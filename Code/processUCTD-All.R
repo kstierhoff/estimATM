@@ -17,6 +17,9 @@ if (length(uctd.hdr) > 0) {
                                 extract_ctd_header(i, type = "UCTD"))
     }
     
+    # # Add a column indicating survey vessel
+    # all.uctd.hdr <- mutate(all.uctd.hdr, Vessel = str_match(all.uctd.hdr$cast, pattern = "(\\w{2})_")[,2])
+    
     # Process UCTD cast files --------------------------------------------------
     # List processed UCTD cast files
     uctd.proc <- dir_ls(here("Data/UCTD"), pattern = uctd.cast.pattern) %>% 
@@ -45,28 +48,29 @@ if (length(uctd.hdr) > 0) {
   }
   
   # Generate ERDDAP URL
-  dataURL <- URLencode(paste0(
-    "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-    erddap.vessel, ".csv0?", erddap.vars,
-    "&time>=", 
-    date(min(all.uctd.hdr$cast.date) - days(1)), 
-    "&time<=", 
-    date(max(all.uctd.hdr$cast.date) + days(1))))
+  # dataURL <- URLencode(paste0(
+  #   "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
+  #   erddap.vessel, ".csv0?", erddap.vars,
+  #   "&time>=", 
+  #   date(min(all.uctd.hdr$cast.date) - days(1)), 
+  #   "&time<=", 
+  #   date(max(all.uctd.hdr$cast.date) + days(1))))
   
   # Download and parse ERDDAP nav data
-  uctd.nav <- read_csv(dataURL, lazy = FALSE,
-                       col_names = erddap.headers) %>% 
-    mutate(long     = long - 360,
-           SOG      = SOG * 1.94384,
-           SST      = na_if(SST, NaN),
-           wind_brg = case_when(
-             wind_dir < 180 ~ wind_dir + 180,
-             TRUE ~ wind_dir - 180),
-           wind_angle = (wind_dir/360)*2*pi,
-           leg      = paste("Leg", 
-                            cut(as.numeric(date(time)), 
-                                leg.breaks, 
-                                labels = FALSE)))
+  uctd.nav <- nav
+  # uctd.nav <- read_csv(dataURL, lazy = FALSE,
+  #                      col_names = erddap.headers) %>% 
+  #   mutate(long     = long - 360,
+  #          SOG      = SOG * 1.94384,
+  #          SST      = na_if(SST, NaN),
+  #          wind_brg = case_when(
+  #            wind_dir < 180 ~ wind_dir + 180,
+  #            TRUE ~ wind_dir - 180),
+  #          wind_angle = (wind_dir/360)*2*pi,
+  #          leg      = paste("Leg", 
+  #                           cut(as.numeric(date(time)), 
+  #                               leg.breaks, 
+  #                               labels = FALSE)))
   
   # Match UCTD headers to nav data
   nav.match.uctd <- data.frame()

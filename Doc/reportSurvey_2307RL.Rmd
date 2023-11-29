@@ -82,7 +82,7 @@ rm.offshore = c(RL  = TRUE,
                 LM  = TRUE,
                 LBC = TRUE,
                 SD  = TRUE,
-                JCF = FALSE) 
+                SH = TRUE) 
 ```
 
 ```{r controls, echo=F, error=F, message=F, warning=F}
@@ -91,7 +91,7 @@ copy.files      <- F # copy Lasker trawl, CUFES, and NASC files from source (e.g
 copy.bib        <- F # copy files from source; requires VPN (LEAVE AS F to use existing file from GitHub)
 overwrite.csv   <- T # overwrite existing CSV files when copying
 overwrite.files <- T # overwrite non-CSV files when copying
-download.hab    <- T # download habitat map from ERDDAP (F if using temporal aggregate map)
+download.hab    <- F # download habitat map from ERDDAP (F if using temporal aggregate map)
 save.figs       <- T # draw new plots and maps, or use existing saved copies
 get.db          <- F # import trawl data from database (if F will load existing RData file)
 process.scs     <- F # process SCS logs, or load processed data
@@ -198,6 +198,9 @@ source(here("Code/get_nav_erddap.R"))
 # Source code to get Shimada nav data from ERDDAP
 source(here("Code/get_nav_erddap_SH.R"))
 
+# Combine Lasker and Shimada nav
+nav <- bind_rows(nav, nav.sh)
+
 # Read transect waypoints
 wpts <- read_csv(here("Data/Nav", wpt.filename))
 
@@ -226,8 +229,14 @@ nav.now <- tail(nav.sf, 1) %>%
 
 ```{r download-habitat-maps}
 if (download.hab) {
-  source(here("Code/plot_sardine_habitat_2107RL.R"))
-  # source(here("Code/plot_sardine_habitat_all.R"))
+  
+  # In the 2023 survey, the Shimada was used to conduct a final leg. Because of
+  # this, overwrite the survey end date specified for the Lasker to use that
+  # from the Shimada
+  erddap.survey.end <- erddap.survey.end.sh
+  
+  # Now call the script to download and plot the sardine habitat
+  source(here("Code/plot_sardine_habitat.R"))
 }
 ```
 
@@ -255,7 +264,7 @@ for (i in cal.vessels) {
   
   # Initialize data frames for storing results
   cal.res   <- data.frame()
-  cal.info  <- data.frame()
+  cal.info  <- data.frame()   # Doesn't appear to be used for anything
   cal.pings <- data.frame()
   
   # Cycle through each calibration file (frequency)
@@ -494,6 +503,7 @@ for (i in cal.vessels) {
     # Define figure widths based on vessel so that plots are relatively square
     fig.width <- switch(i,
                         "RL" = 10,
+                        "SH" = 10,
                         "LM" = 11.5,
                         "LBC" = 7)
     
@@ -869,29 +879,15 @@ cluster.mid <- haul.mid %>%
 # Save haul data
 save(haul, file = here("Output/haul_info.Rdata"))
 ``` 
-
 ```{r process-seine-data}
-# Will probably remove this chunk this year, as we don't need to obtain LM set
-# data to merge with Lasker data, since LM primarily only sampled nearshore.
-# Rather, the processing and plotting of LM and LBC seine data will likely all
-# be done using plot_purseSeine_2307RL
+# Process seine data
+source(here("Code/processSeine.R"))
+```
 
-# Run plot_purseSeine in order to process the seine data from the fishing
-# vessels to obtain the necessary variables for merging with Lasker haul data
-# for plotting the pie maps
-source(here("Code/processSeine_2307RL.R"))
 
-# # Summarize seine catch data for Appendices
-# seine.summ <- set.summ.wt %>% 
-#   arrange(datetime) %>% 
-#   mutate(Date = format(datetime, "%m/%d/%Y %H:%M")) %>%
-#   select(Vessel = vessel.name, Date, 
-#          Latitude = lat, Longitude = long, 
-#          "N. Anchovy" = Anchovy, "P. Sardine" = Sardine,
-#          "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, 
-#          "P. Herring" = PacHerring, "R. Herring" = RndHerring,
-#          Jacksmelt, "All CPS" = AllCPS) %>%
-#   arrange(Date)
+```{r plot-seine-data}
+# Plot seine data
+source(here("Code/plotSeine.R"))
 ```
 
 ```{r process-catch-data}
@@ -1259,13 +1255,17 @@ cufes.plot.ofe <- cufes %>%
 ```  
 
 ```{r process-ctd-stations}
+
 # Convert events to sf
 events_sf <- st_as_sf(bridge.snap, coords = c("Lon","Lat"), crs = crs.geog)
 
 #### Extract CTD and UCTD cast locations
 
-# Process CTD casts
-source(here("Code/processCTD-All.R"))
+# Process CTD casts. This will look at all "_processed.asc" files in the UCTD
+# directory and assume they belong to the primary vessel. For 2023, this is
+# wrong, as some were from Shimada, but for reporting purposes we'll just
+# manually insert the number of casts.
+# source(here("Code/processCTD-All.R"))
 if (exists("all.ctd.hdr")) {
   ctd.sta  <- all.ctd.hdr %>%
     project_df(to = crs.proj) %>%
@@ -1327,7 +1327,12 @@ if (exists("ctd.sta")) {
 ```  
 
 ```{r process-csv-cps}
-# Process backscatter data (CSV files) for CPS
+# Currently, if process.csv is FALSE, then only the core-region NASC will be
+# loaded. That is, any nearshore data won't be loaded, and thus won't be
+# available for plotting.
+
+# Process backscatter data (CSV files) for CPS. The result is a variable 'nasc'
+# that contains data from the core-region transects
 source(here("Code/process_NASC.R"))
 
 # Get intervals with bad lat/long values
@@ -1400,108 +1405,267 @@ processed.cps <- unique(nasc$filename)
 save(processed.cps, file =  here("Output/processed_cps.Rdata"))
 ```
 
-```{r plot-nearshore-figure, eval=FALSE}
-# Will either remove this chunk and use plot_purseSeine_2307RL to process and
-# plot the seine data from both LM and LBC, or update this chunk to also load
-# the Lisa Marie data. Currently it only uses LBC data.
+```{r plot-csv-cps, eval=FALSE}
+# plotNASC() will plot the NASC results for the core-region vessels
+# source('plotNASC')
+```
 
-# Load nearshore data
-nasc.nearshore <- readRDS(here("Data/Backscatter/LBC/nasc_vessel_LBC_nearshore.rds"))
+```{r plot-nearshore-figure, eval=T}
+# Nearshore figure will contain plots of NASC and catch proportions for each of
+# the nearshore vessels, both individually and combined. The catch data figure
+# should already have been generated using plotSeine. The NASC data will need to
+# be loaded individually for each nearshore vessel, then combined with the catch
+# figure
+
+# Define map bounds to use for each vessel
+map.bounds.xlim <- list(LM = c(xmin = -8e5, xmax = 0e5),
+                        LBC = c(xmin = -5e5, xmax = 4e5))
+map.bounds.ylim <- list(LM = c(ymin = -0.3e5, ymax = 12.0e5),
+                        LBC = c(ymin = -7e5, ymax = 0.7e5))
+
+# Set pie radius for each vessel
+pie.radius <- c(LM = 30e3, LBC = 25e3)
+
+# Cycle through nearshore vessels
+for (i in nasc.vessels.nearshore) {
+
+  # Load data for current vessel
+  nasc.nearshore <- readRDS(paste0(here("Data/Backscatter"), "/", i, "/", "nasc_vessel_", i, "_nearshore.rds"))
+  
+  # Summarize nasc for plotting
+  nasc.plot.ns <- nasc.nearshore %>%
+    
+    # Create a variable partitioning the intervals into 20-interval spacings,
+    # and add a column for transect name containing vessel and transect #
+    mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                     labels = FALSE, include.lowest = TRUE),
+           transect.name = paste(vessel.name, transect)) %>% 
+    
+    # Retain only specific columns
+    select(filename, transect, vessel.name, int, lat, long, cps.nasc) %>%
+    
+    # Group by specific variables
+    group_by(filename, transect, vessel.name, int) %>%
+    
+    # For each group retain a single position and compute mean NASC
+    summarise(
+      lat  = lat[1],
+      long = long[1],
+      NASC = mean(cps.nasc)) %>%
+    
+    # Create bins for defining point size in NASC plots
+    mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
+           bin.level =  as.numeric(bin)) %>%
+    
+    # Remove grouping done previously by "group_by()"
+    ungroup() %>%
+    
+    # Project data to California Albers coordinate system
+    project_df(to = crs.proj)
+
+  # Retain NASC for just LBC
+  nasc.plot.ns.sub <- filter(nasc.plot.ns, vessel.name %in% nasc.vessels.nearshore)
+
+  # The NASC values were split up into discrete bins, so assign labels, sizes,
+  # and colors for each of the bins
+  nasc.levels.all <- sort(unique(nasc.plot.ns.sub$bin.level))
+  nasc.labels.all <- nasc.labels[nasc.levels.all]
+  nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
+  nasc.colors.all <- nasc.colors[nasc.levels.all]
+  
+  # Create map of backscatter
+  nasc.map.ns <- base.map +
+    
+    # Plot transects data
+    geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
+            linewidth = 0.5, colour = "gray70", 
+            alpha = 0.75, linetype = "dashed") +
+    
+    # Plot NASC data
+    geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect),
+              colour = "gray50", size = 0.5, alpha = 0.5) +
+    
+    # Plot NASC data
+    geom_point(data = nasc.plot.ns.sub, aes(X, Y, size = bin, fill = bin), 
+               shape = 21, alpha = 0.75) +
+    
+    # Configure size and colour scales
+    scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                      values = nasc.sizes.all,labels = nasc.labels.all) +
+    scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                      values = nasc.colors.all,labels = nasc.labels.all) +
+    
+    # Configure legend guides
+    guides(fill = guide_legend(), size = guide_legend()) +
+    
+    # Set figure boundaries
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = map.bounds.xlim[[i]],
+             ylim = map.bounds.ylim[[i]])
+             # xlim = c(map.bounds["xmin"], map.bounds["xmax"]*1.1),
+             # ylim = c(map.bounds["ymin"], map.bounds["ymax"]*0.95))
+
+  # Create map of seine data
+  set.pies <- base.map +
+    
+    # Plot NASC data
+    geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect)) +
+    
+    # Plot purse seine pies
+    scatterpie::geom_scatterpie(data = filter(set.pos, vessel.name == i),
+                                # data = filter(set.pos, vessel.name %in% nasc.vessels.nearshore),
+                                aes(X, Y, group = key.set, r = pie.radius[[i]]),
+                                # aes(X, Y, group = key.set, r = pie.radius),
+                                cols = c("Anchovy", "JackMack", "Jacksmelt",
+                                         "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                                color = 'black', alpha = 0.8) +
+    
+    # Configure trawl scale
+    scale_fill_manual(name = 'Species',
+                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
+                                 "P. herring", "P. mackerel", "R. herring", "Sardine"),
+                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
+                                 pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+    geom_point(data = filter(set.zero, vessel.name == i), aes(X, Y)) +
+    
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = map.bounds.xlim[[i]],
+             ylim = map.bounds.ylim[[i]])
+             # xlim = c(map.bounds["xmin"], map.bounds["xmax"]*1.1),
+             # ylim = c(map.bounds["ymin"], map.bounds["ymax"]*0.95))
+
+  
+  # Make a figure of both the NASC and catch results
+  nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, ncol = 2,
+                               labels = c("a)", "b)"))
+  # nasc.set.wt.combo <- plot_grid(nasc.map.ns, get(paste0("fig.seine.", i)), ncol = 2,
+  #                                labels = c("a)", "b)"))
+  
+  # Save combo map
+  ggsave(nasc.set.wt.combo, filename = paste0(here("Figs"), "/fig_nasc_seine_proportion_set_wt_", i, ".png"),
+         height = 5, width = 8)
+
+}
+
+##### Create figure that combines the NASC and seine data for both vessels
+
+# Load data for current vessel
+nasc.nearshore <- rbind(readRDS(here("Data/Backscatter/LM/nasc_vessel_LM_nearshore.rds")),
+                        readRDS(here("Data/Backscatter/LBC/nasc_vessel_LBC_nearshore.rds")))
 
 # Summarize nasc for plotting
 nasc.plot.ns <- nasc.nearshore %>%
-  mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval,
-                                         nasc.summ.interval),
-                           labels = FALSE, include.lowest = TRUE),
-                 transect.name = paste(vessel.name, transect)) %>% 
+  
+  # Create a variable partitioning the intervals into 20-interval spacings,
+  # and add a column for transect name containing vessel and transect #
+  mutate(int = cut(Interval, seq(1, max(Interval) + nasc.summ.interval, nasc.summ.interval),
+                   labels = FALSE, include.lowest = TRUE),
+         transect.name = paste(vessel.name, transect)) %>% 
+  
+  # Retain only specific columns
   select(filename, transect, vessel.name, int, lat, long, cps.nasc) %>%
+  
+  # Group by specific variables
   group_by(filename, transect, vessel.name, int) %>%
+  
+  # For each group retain a single position and compute mean NASC
   summarise(
     lat  = lat[1],
     long = long[1],
     NASC = mean(cps.nasc)) %>%
-  # Create bins for defining point size in NASC plots%>%
+  
+  # Create bins for defining point size in NASC plots
   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
          bin.level =  as.numeric(bin)) %>%
+  
+  # Remove grouping done previously by "group_by()"
   ungroup() %>%
+  
+  # Project data to California Albers coordinate system
   project_df(to = crs.proj)
 
-# Retain NASC for just LBC
-nasc.plot.ns.sub <- filter(nasc.plot.ns, vessel.name %in% nasc.vessels.nearshore)
-# nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(vessel.name, "LBC"))
+# Set sub variable equal to main variable since we are combining them
+nasc.plot.ns.sub <- nasc.plot.ns
 
+# The NASC values were split up into discrete bins, so assign labels, sizes,
+# and colors for each of the bins
 nasc.levels.all <- sort(unique(nasc.plot.ns.sub$bin.level))
 nasc.labels.all <- nasc.labels[nasc.levels.all]
 nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
 nasc.colors.all <- nasc.colors[nasc.levels.all]
 
-map.bounds.lbc <- nasc.plot.ns.sub %>% st_as_sf(coords = c("long","lat"), crs = 4326) %>%
-  st_transform(crs = 3310) %>%
-  st_bbox()
-
+map.bounds.combined.xlim <- c(xmin = -8e5, xmax = 4e5)
+map.bounds.combined.ylim <- c(ymin = -7e5, ymax = 12.0e5)
+  
 # Create map of backscatter
-nasc.map.ns.lbc <- base.map +
+nasc.map.ns <- base.map +
+  
   # Plot transects data
   geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
-          size = 0.5, colour = "gray70", 
+          linewidth = 0.5, colour = "gray70", 
           alpha = 0.75, linetype = "dashed") +
+  
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect),
             colour = "gray50", size = 0.5, alpha = 0.5) +
+  
   # Plot NASC data
   geom_point(data = nasc.plot.ns.sub, aes(X, Y, size = bin, fill = bin), 
              shape = 21, alpha = 0.75) +
+  
   # Configure size and colour scales
   scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
                     values = nasc.sizes.all,labels = nasc.labels.all) +
   scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
                     values = nasc.colors.all,labels = nasc.labels.all) +
+  
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
-  # Plot title
-  # ggtitle("CPS Backscatter-Long Beach Carnage") +
+  
+  # Set figure boundaries
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.lbc["xmin"], map.bounds.lbc["xmax"]*1.1), 
-           ylim = c(map.bounds.lbc["ymin"], map.bounds.lbc["ymax"]*0.95))
-
-# map.bounds.lbc <- lbc.catch.summ.sf %>%
-#   st_transform(crs = 3310) %>%
-#   st_bbox()
-
-# Set pie radius to a reasonable size for the reduced survey area
-pie.radius.lbc <- as.numeric(abs(map.bounds.lbc$ymin - map.bounds.lbc$ymax)*.03)
+           xlim = map.bounds.combined.xlim,
+           ylim = map.bounds.combined.ylim)
 
 # Create map of seine data
 set.pies <- base.map +
+  
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect)) +
+  
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = filter(set.pos, vessel.name %in% nasc.vessels.nearshore),
-  # scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
-                              aes(X, Y, group = key.set, r = pie.radius.lbc),
+  scatterpie::geom_scatterpie(data = set.pos,
+                              aes(X, Y, group = key.set, r = 30e3),
                               cols = c("Anchovy", "JackMack", "Jacksmelt",
                                        "PacHerring", "PacMack", "RndHerring", "Sardine"),
                               color = 'black', alpha = 0.8) +
+  
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
                                "P. herring", "P. mackerel", "R. herring", "Sardine"),
                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
                                pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
-  geom_point(data = filter(set.zero, vessel.name %in% nasc.vessels.nearshore), aes(X, Y)) +
+  geom_point(data = set.zero, aes(X, Y)) +
+  
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
-           xlim = c(map.bounds.lbc["xmin"], map.bounds.lbc["xmax"]*1.1), 
-           ylim = c(map.bounds.lbc["ymin"], map.bounds.lbc["ymax"]*0.95))
+           xlim = map.bounds.combined.xlim,
+           ylim = map.bounds.combined.ylim)
 
-nasc.set.wt.combo <- plot_grid(nasc.map.ns.lbc, set.pies, ncol = 2,
+  
+  # Make a figure of both the NASC and catch results
+  nasc.set.wt.combo <- plot_grid(nasc.map.ns, set.pies, ncol = 2,
                                labels = c("a)", "b)"))
 
-# Save combo map
-ggsave(nasc.set.wt.combo, filename = here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"),
-       height = 5, width = 8)
+  # Save combo map
+  ggsave(nasc.set.wt.combo, filename = paste0(here("Figs"), "/fig_nasc_seine_proportion_set_wt_combined.png"),
+         height = 5, width = 8)
+
 ```
 
 ```{r plot-maps, include=F}
+# Plot results for core-region vessels
+
 if (save.figs) {
   
   # Map planned transects
@@ -1520,14 +1684,13 @@ if (save.figs) {
   
   # If 2021 survey, add Carranza transects in Mexico
   if (survey.name %in% c("2107RL")) {
+    
     # Map planned transects
     survey.plan.mx <- base.map +    
       geom_sf(data = transects.sf, aes(colour = Type, linetype = Type), 
               show.legend = "line") +
       geom_sf(data = transects.jcf, aes(colour = Type, linetype = Type), 
               show.legend = "line") +
-      # geom_sf(data = nav.paths.sf, colour = "gray50", size = 1, alpha = 0.5) +
-      # geom_sf(data = nav.paths.jcf.sf, colour = "gray50", size = 1, alpha = 0.5) +
       scale_colour_manual("Type", 
                           values = wpt.colors) +
       scale_linetype_manual("Type", 
@@ -1641,45 +1804,6 @@ if (save.figs) {
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])),
              ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
-  # # Create trawl haul figure for Lisa Marie
-  # trawl.pie.haul.wt.LM <- base.map +
-  #   
-  #   # Plot transects data
-  #   geom_sf(data = transects.sf, size = 0.5, colour = "gray70", 
-  #           alpha = 0.75, linetype = "dashed") +
-  #   
-  #   # plot ship track data
-  #   geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
-  #   
-  #   # Plot trawl pies
-  #   geom_scatterpie(data = filter(haul.pos, vessel.name == "LM"), 
-  #                   aes(X, Y, group = haul, r = r),
-  #                   cols = c("Anchovy", "JackMack", "Jacksmelt",
-  #                            "PacHerring", "PacMack", "RndHerring", "Sardine"),
-  #                   color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
-  #   
-  #   # Configure trawl scale
-  #   scale_fill_manual(name = 'Species',
-  #                     labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-  #                                "P. herring", "P. mackerel", "R. herring", "Sardine"),
-  #                     values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-  #                                pac.herring.color, pac.mack.color, rnd.herring.color, 
-  #                                sardine.color)) +
-  #   
-  #   # Plot empty cluster locations
-  #   geom_point(data = filter(haul.zero, vessel.name == "LM"), 
-  #              aes(X, Y),
-  #              size = 3, shape = 21, fill = 'black', colour = 'white') +
-  #   
-  #   # geom_scatterpie_legend(radius = trawl.breaks, x = -50000, y = -600000) + 
-  #   # annotate("text", label = "italic('Lisa Marie')", parse = TRUE, size = 8,
-  #   #          y = map.bounds$ymax,
-  #   #          x = mean(c(map.bounds$xmin,map.bounds$xmax))) +
-  #   
-  #   coord_sf(crs = crs.proj, 
-  #            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
-  #            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
-
   # # Create trawl haul and cluster proportion figures
   # source(here("Code/plot_haul_proportion_wt.R"))
   
@@ -1687,7 +1811,6 @@ if (save.figs) {
   nasc.cufes.trawl.plot      <- plot_grid(nasc.map.cps,
                                           cufes.density.all,
                                           trawl.pie.haul.wt.RL,
-                                          # trawl.pie.haul.wt.LM,
                                           nrow = 1,
                                           labels = c("a)", "b)", "c)",  "d)"))
 
@@ -1703,32 +1826,38 @@ if (save.figs) {
 } 
 ```  
 
-```{r calc-ns-transect-summaries eval=FALSE}
+```{r calc-ns-transect-summaries}
 # The script plot_purseSeine_xxxx typically derives some variables that are used
 # for summarizing the transects surveyed by each vessel, however that script
 # currently does not run. Thus this code chunk will pull out the necessary code
 # chunks to obtain those variables
 
-# Summarize nasc data for LBC
-nasc.summ.ns <- nasc.nearshore %>% 
-  group_by(vessel.name, transect) %>% 
-  summarise(
-    start     = min(datetime),
-    end       = max(datetime),
-    duration  = difftime(end, start, units = "hours"),
-    n_int     = length(Interval),
-    distance  = length(Interval)*nasc.interval/1852,
-    lat       = lat[which.min(long)],
-    long      = long[which.min(long)],
-    mean_nasc = mean(cps.nasc)) %>% 
-  arrange(vessel.name, start)
+# Summarize nasc data for each nearshore vessel
+for (i in nasc.vessels.nearshore) {
 
-nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
+  # Load data for current vessel
+  nasc.nearshore <- readRDS(paste0(here("Data/Backscatter"), "/", i, "/", "nasc_vessel_", i, "_nearshore.rds"))
+  
+  nasc.summ.ns <- nasc.nearshore %>% 
+    group_by(vessel.name, transect) %>% 
+    summarise(
+      start     = min(datetime),
+      end       = max(datetime),
+      duration  = difftime(end, start, units = "hours"),
+      n_int     = length(Interval),
+      distance  = length(Interval)*nasc.interval/1852,
+      lat       = lat[which.min(long)],
+      long      = long[which.min(long)],
+      mean_nasc = mean(cps.nasc)) %>% 
+    arrange(vessel.name, start)
+  
+  assign(paste0("nasc.summ.ns.", i), filter(nasc.summ.ns, vessel.name == i))
+}
 ```
 
 \pagenumbering{gobble}
 
-**Report on the `r survey.name.long` (`r survey.name`), `r survey.start` to `r survey.end` `r survey.year`, conducted aboard NOAA ship _`r survey.vessel.long`_, fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and uncrewed surface vehicles**  
+**Report on the `r survey.name.long` (`r survey.name`), `r survey.start` to `r survey.end` `r survey.year`, conducted aboard NOAA ships _`r survey.vessel.long`_ and _Bell M. Shimada_, fishing vessels _Lisa Marie_ and _Long Beach Carnage_, and uncrewed surface vehicles**  
 
 Josiah S. Renfree^1^, Alice Beittel^2^, Noelle M. Bowlin^1^, Brad E. Erisman^1^, Scott A. Mau^1^, David W. Murfin^1^, Brittany D. Schwartzkopf^1^, Thomas S. Sessions^1^, Kevin L. Stierhoff^1^, Lanora Vasquez^1^, William Watson^1^, Juan P. Zwolinski^1,3^, and David A. Demer^1^
 
@@ -1903,7 +2032,7 @@ The echosounder systems on each vessel were calibrated using the standard sphere
 
 On _`r survey.vessel`_ and _Shimada_, the computer clocks were synchronized with the GPS clock (UTC) using synchronization software (NetTime^[http://timesynctool.com]). The 18-kHz WBT, operated by a separate PC from the other echosounders, was programmed to track the seabed and output the detected depth to the ship’s Scientific Computing System (SCS). The 38-, 70-, 120-, 200-, and 333-kHz echosounders were controlled by the EK80 Adaptive Logger [EAL^[https://www.fisheries.noaa.gov/west-coast/science-data/ek80-adaptive-logger/], @Renfree2016]. The EAL optimizes the pulse interval based on the seabed depth, while avoiding aliased seabed echoes, and was programmed such that once an hour the echosounders would record three pings in passive mode, for obtaining estimates of the background noise level. Acoustic sampling for CPS-density estimation along the pre-determined transects was limited to daylight hours (approximately between sunrise and sunset).
 
-Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$; dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were stored in Simrad-Kongsberg .raw format with a `r raw.size`-GB [**CHECK UNITS**] maximum file size. During daytime, the echosounders operated in CW mode and logged to 60 m beyond the detected seabed range or to a maximum range of 500, 500, 500, 300, and 150 m for 38, 70, 120, 200, and 333 kHz, respectively. During nighttime, the echosounders operated in FM mode and logged to 100 m. For each acoustic instrument, the prefix for each file name is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software. For example, a file generated by the Simrad-Kongsberg EK80 software (`r ek80.version`) for a WBT operated in CW mode is named `2307RL_CW-D20220826-T155651.raw`.   
+Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$; dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were stored in Simrad-Kongsberg .raw format with a `r raw.size`-GB maximum file size. During daytime, the echosounders operated in CW mode and logged to 60 m beyond the detected seabed range or to a maximum range of 500, 500, 500, 300, and 150 m for 38, 70, 120, 200, and 333 kHz, respectively. During nighttime, the echosounders operated in FM mode and logged to 100 m. For each acoustic instrument, the prefix for each file name is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software. For example, a file generated by the Simrad-Kongsberg EK80 software (`r ek80.version`) for a WBT operated in CW mode is named `2307RL_CW-D20220826-T155651.raw`.   
 
 To minimize acoustic interference, transmit pulses from the EK80s, acoustic Doppler current profiler and echosounder (Simrad-Kongsberg EC150-3C), multibeam echosounder (Simrad-Kongsberg ME70), imaging sonar (Simrad-Kongsberg MS70), scanning sonar (Simrad-Kongsberg SX90), and a separate acoustic Doppler current profiler (Teledyne RD Instruments OS75 ADCP) were triggered using a synchronization system (Simrad-Kongsberg K-Sync). The K-Sync trigger rate, and thus the echosounder ping interval, was modulated by the EAL using the 18-kHz seabed depth provided by the Scientific Computing System (SCS). The EK80, EC150-3C, ME70, MS70, and ADCP were operated continuously, while the SX90 was only operated during daytime when CPS were observed in the area. All other instruments capable of producing sound within the EK80's CW bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Model SRD-500A, Sperry Marine), or both.
 
@@ -1972,25 +2101,22 @@ include_graphics(here("Images/img_Nordic_264.png"))
 
 Purse seine nets were set to provide information about size, age, and species composition of fishes observed in the echosounders mounted on the fishing vessels. _Lisa Marie_ used an approximately 440-m-long and 40-m-deep net with 17-mm-wide mesh (A. Blair, pers. comm.). _Long Beach Carnage_ used an approximately 200-m-long and 27-m-deep net with 17-mm-wide mesh; a small section on the back end of the net had 25-mm-wide mesh (R. Ashley, pers. comm.). Specimens collected by _Lisa Marie_ and _Long Beach Carnage_ were processed by the Washington Department of Fish and Wildlife (WDFW) and California Department of Fish and Wildlife (CDFW), respectively.
 
-[**HAVE KRISTEN REVIEW THIS SECTION**]
+[**EMAILED KRISTEN, BUT SHE'S ON LEAVE UNTIL 12/18**]
 On _Lisa Marie_, purse seine sets were planned for an average of one set per transect, or roughly 4-5 sets per day [**CHECK THIS**]. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. Next, all three dip net samples were combined and up to 50 specimens of each CPS species were randomly sampled to provide a combined weight for each set. Up to 50 specimens of each species were then randomly selected [**ARE THESE THE SAME SPECIMENS FROM THE PREVIOUS SENTENCE?**], then the lengths (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weights measured, otoliths extracted, and macroscopic maturity stage determined visually. Gonads were collected and preserved from female specimens.
 
-[**HAVE JOEL REVIEW THIS SECTION**]
-On _Long Beach Carnage_, purse seine sets were planned for an average of one set per transect. The vessel was to run each transect in its entirety, then randomly set on an observed school. The seine was generally set during daytime, but could include nighttime in areas where schools were abundant and/or daytime sets were unsuccessful. The total weight (tons) of the school was estimated by the captain. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. From each dip net sample, as many as 20 fish of each CPS species were chosen randomly throughout the sample, and combined for a random sample of 50 fish collected throughout the catch [**THIS DIFFERS FROM THE PROJECT INSTRUCTIONS**]. The fish were then frozen for later analysis by CDFW biologists, yielding measures of total sample weight and individual fish weight, length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others), maturity, and otolith-derived ages. Because samples were frozen, no gonad samples from female specimens were analyzed.
+[**EMAILED JOEL. AWAITING REPLY**]
+On _Long Beach Carnage_, purse seine sets were planned for an average of one set per transect. The vessel was to run each transect in its entirety, then randomly set on an observed school. The seine was generally set during daytime, but could include nighttime in areas where schools were abundant and/or daytime sets were unsuccessful. The total weight (tons) of the school was estimated by the captain. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each species. From each dip net sample, as many as 20 fish of each CPS species were chosen randomly throughout the sample, and combined for a random sample of 50 fish collected throughout the catch [**THIS DIFFERS FROM THE PROJECT INSTRUCTIONS**]. The fish were then frozen for later analysis by CDFW biologists, yielding measures of total sample weight and individual fish weight, length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others), maturity, and otolith-derived ages. Because samples were frozen, no gonad samples from female specimens were analyzed.
 
 ## Ichthyoplankton and oceanographic sampling {#methods-other-sampling}
 ### Egg and larva sampling {#methods-egg-sampling}  
 
-[**CONFIRM THAT NO CUFES WERE COLLECTED ON SHIMADA**]
-[**HAVE LANORA CONFIRM THIS SECTION**]
-On _`r survey.vessel`_, fish eggs were collected during the day using a CUFES, which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. For each vessel, the particles in the sampled water were sieved by a 505- and 500-$\mu$m mesh, respectively. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs". Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the durations of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish.
+On _`r survey.vessel`_, fish eggs were collected during the day using a CUFES, which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. The particles in the sampled water were sieved by a 505-$\mu$m mesh. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs." Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the duration of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish. Due to personnel availability, no CUFES samples were obtained during Leg IV on _Shimada_.
 
-[**CHECK IF ANY BONGO TOWS WERE CONDUCTED. IF SO, HAVE LANORA CONFIRM THIS SECTION**]
-On _`r survey.vessel`_, a CalCOFI bongo oblique net [a bridleless pair of 71-cm diameter nets with 505-$\mu$m mesh, @Smith1977] was used opportunistically to sample ichthyoplankton and krill after sunset, to contribute to the CalCOFI ichthyoplankton time series. Where there was adequate depth, 300 m of wire was deployed at a rate of 50 m min^-1^ and then retrieved at 20 m min^-1^, at a nominal wire angle of 45$^\circ$. Starboard-side samples were preserved in 5% sodium-borate buffered seawater formalin, and port-side samples were preserved in 100% Tris-buffered ethanol.  
+On _`r survey.vessel`_, a CalCOFI bongo oblique net [a bridleless pair of 71-cm diameter nets with 505-$\mu$m mesh, @Smith1977] was used opportunistically to sample ichthyoplankton and krill after sunset, to contribute to the CalCOFI ichthyoplankton time series. Where there was adequate depth, 300 m of wire was deployed at a rate of 50 m min^-1^ and then retrieved at 20 m min^-1^, at a nominal wire angle of 45$^\circ$. Starboard-side samples were preserved in 5% sodium-borate buffered seawater formalin.  
 
 ### Conductivity and temperature versus depth (CTD) sampling {#methods-ctd-sampling}  
 
-On _`r survey.vessel`_ AND _Shimada_, conductivity and temperature profiles were measured down to 500 and 300 m, respectively, using calibrated sensors on a probe cast from the vessel while on station (CTD), or a probe cast from the vessel while underway (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day, which is later used to determine the integration-stop depth during acoustic data processing [**NOT CURRENTLY DONE**]. These data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005].
+On _`r survey.vessel`_ AND _Shimada_, conductivity and temperature profiles were measured down to 500 and 300 m, respectively, using calibrated sensors on a probe cast from the vessel while on station (CTD), or a probe cast from the vessel while underway (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day. These data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005].
 
 On _Lisa Marie_ and _Long Beach Carnage_, conductivity and temperature profiles were measured down to 110 and 40 m using a Seabird SBE19plus or Teledyne Oceanscience UnderwayCTD, respectively. Casts were conducted from the vessels while stationary. The data were processed to obtain time-averaged sound speed values used for processing the acoustic data.
 
@@ -2045,8 +2171,25 @@ include_graphics(here("Figs/fig_cal_FM_AllFreqs.png"))
 
 \newpage
 
-[**UPDATE AFTER OBTAINING THE POST-SURVEY CALIBRATION**]
-For _Shimada_, the EK80s were calibrated by the NWFSC on [**INSERT DATE**] after completing the Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey.
+For _Shimada_, the EK80s were calibrated by the NWFSC on 9 September, 2023 in Seattle, WA after completing the Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey. Calibration results for _Shimada_ are presented in **Table \@ref(tab:cal-results-sh)**.
+
+```{r cal-results-sh,results='asis'}
+if (doc.type == "docx") {
+  # create kable object (for Word)
+  pander(all.output.SH)
+} else {
+  # print LaTeX table for HTML or PDF
+  kable(all.output.SH, format = knitr.format, 
+        align = c("l","l", rep("c",ncol(all.output.SH) - 2)),
+        booktabs = TRUE, escape = FALSE, linesep = "",
+        caption = '(ref:cal-results-sh)') %>% 
+    kable_styling(position = "center", 
+                  latex_options = c("hold_position"),
+                  font_size = 8) %>%  
+    row_spec(7, hline_after = TRUE) %>% 
+    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.SH) - 2))
+}
+```  
 
 For _Lisa Marie_, the EK80 WBTs were calibrated on 12 June, 2023 using the standard sphere technique with a WC38.1 while the vessel was anchored in Gig Harbor, WA (47.32212 N, 122.57275 W). Calibration results for _Lisa Marie_ are presented in **Table \@ref(tab:cal-results-lm)**.  
 
@@ -2129,9 +2272,9 @@ nasc.summ.lm.ns <- filter(nasc.summ.ns, vessel.name == "LM")
 ```  
 
 [**UPDATE AFTER LEG 4**]
-Due to the cancellation of Leg I.1 and all of Leg II on _`r survey.vessel`_, transects off Baja California, MX and Vancounver Island, BC were abandoned. Therefore, the core survey region spanned an area from approximately San Diego, CA to Cape Flattery, WA (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-cufes-trawl)**), predominantly including the potential habitat for the northern stock of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html]. _`r survey.vessel`_ sampled from San Diego, CA to Cape Mendocino, CA, then _Shimada_ sampled from Cape Mendocino, CA to Cape Flattery, WA. The three USVs surveyed interstitial to _`r survey.vessel`_ transects from Grays Harbor, WA to Cape Mendocino, CA [**CHECK THIS**]. In total, _`r survey.vessel`_, _Shimada_, and the three USVs sampled `r n_distinct(nasc.summ$transect.name)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(filter(haul.pie, vessel.name == "RL"))` Nordic trawls and `r nrow(filter(haul.pie, vessel.name == "LM"))` purse seine sets.
+Due to the cancellation of Leg I.1 and all of Leg II on _`r survey.vessel`_, transects off Baja California, MX and Vancounver Island, BC were abandoned. Therefore, the core survey region spanned an area from approximately San Diego, CA to Cape Flattery, WA (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-cufes-trawl)**), predominantly including the potential habitat for the northern stock of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html]. _`r survey.vessel`_ sampled from San Diego, CA to Cape Mendocino, CA, then _Shimada_ sampled from Cape Mendocino, CA to Cape Flattery, WA. The three USVs surveyed interstitial to _`r survey.vessel`_ transects from Grays Harbor, WA to Cape Mendocino, CA [**CHECK THIS**]. In total, _`r survey.vessel`_, _Shimada_, and the three USVs sampled `r n_distinct(nasc.summ$transect.name)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(haul.pie)` Nordic trawls.
 
-The nearshore region was surveyed by _Long Beach Carnage_ and _Lisa Marie_, spanning an area from San Diego, CA to Cape Flattery, WA, including around Santa Cruz and Santa Catalina Islands. The vessels completed `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r nrow(lbc.sets)` purse seine sets (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-seine-lbc)**).
+The nearshore region was surveyed by _Long Beach Carnage_ and _Lisa Marie_, spanning an area from San Diego, CA to Cape Flattery, WA, including around Santa Cruz and Santa Catalina Islands. The vessels completed `r nrow(nasc.summ.ns.LM) + nrow(nasc.summ.ns.LBC)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.ns.LM$distance)+sum(nasc.summ.ns.LBC$distance))` nmi and `r nrow(seine.summ)` purse seine sets (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-seine-lbc)**).
 
 **Leg I**  
 
@@ -2176,24 +2319,32 @@ The three USVs sampled transects 102 to 134, from Crescent City, CA to Half Moon
 
 **Leg IV** 
 
-[**UPDATE AFTER SHIMADA SURVEY**]
+* IV.1
+
+Due to inclement weather on 10 and 11 October, Leg IV.1 on _Shimada_ was delayed by two days. At ~1900 on 12 October, _Shimada_ departed from Newport, OR and commenced acoustic sampling on transect 117. Transects 121, 123, 125, and 127 were shortened to 40 nmi in length due to weather conditions. At ~1100 on 16 October, after completing nighttime trawling, _Shimada_ transited south to transect 115 to be closer to Newport, OR in case of needing to come into port due to inclement weather. On 16 October, after completing the third trawl outside the entrance to the Columbia River, the crew discovered that the main body of the trawl net was damaged. An underway replacement of the trawl net was avoided due to the high sea state, and instead planned for the in-port between Legs IV.1 and IV.2. At ~2100 on 17 October, to take advantage of accessible bar conditions, _Shimada_ arrived at the MOC-P pier in Newport, OR to complete Leg IV.1.
+
+* IV.1
+
+[**Waiting for Juan or Scott to provide summary**]
 
 \newpage
 
 (ref:transects-and-habitat) Summary of all transects sampled throughout the survey by _`r survey.vessel`_ (red), _Shimada_ (xxx[**UPDATE**]), _Lisa Marie_ (yellow), USVs (blue), and _Long Beach Carnage_ (green), in relation to the potential habitat for the northern stock of Pacific Sardine. The habitat is temporally aggregated using an average of the habitat centered ±2° around each vessel during the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
 
 ```{r transects-and-habitat,fig.cap='(ref:transects-and-habitat)',out.height = '8in',fig.align='center',fig.pos='H'}
-include_graphics(here("Images/img_sardine_habitat_composite_2207RL.png"))
+include_graphics(here("Figs/fig_summer2023_habitat_RL_SH.png"))
 ```  
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
 
-On _Lasker_ a total of `r nrow(filter(ctd.sta, Vessel == "RL"))` CTD casts and `r nrow(uctd.sta)` UCTD casts were conducted (**Fig. \@ref(fig:station-sampling)** and **Appendix \@ref(appendix-ctd-sampling)**), and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples collected underway. During Leg IV on _Shimada_, a total of `r nrow(filter(ctd.sta, Vessel == "SH"))` CTD casts were obtained.
+On _Lasker_ a total of `r sum(str_detect(uctd.sta$cast, "2307RL"))` UCTD casts (**Appendix \@ref(appendix-ctd-sampling)**), `r sum(str_detect(uctd.sta$cast, "2307RL"))` bongo tows, and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were obtained (**Fig. \@ref(fig:station-sampling)**). During Leg IV on _Shimada_, a total of `r sum(str_detect(uctd.sta$cast, "2310SH"))` UCTD casts were conducted; bongo tows and CUFES sampling were omitted due to personnel shortages.
 
-A total of `r nrow(filter(ctd.sta, Vessel == "SH"))` CTD casts were obtained from the NWFSC's 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_, which were utilized for processing the _Lisa Marie_ and USV transects off of Oregon and Washington.
+On _Lisa Marie_ and _Long Beach Carnage_, a total of 74 and 13 UCTD casts were conducted, respectively. [**MIGHT WANT TO INCLUDE LM AND LBC CTD PROCESSING**]
 
-[**should we include ctd casts from the hake survey used for processing the USVs?**]
-(ref:station-sampling) The locations of surface trawls (white points), CTD and UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_ and _Shimada_. The CTD casts off of Oregon and Washington were provided by the NWFSC from their 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_ from 22 July to 25 August, 2022.
+A total of 195 CTD casts were obtained from the NWFSC's 2023 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_, which were utilized for processing the USV transects. [**INCLUDE IN APPENDIX? IF SO NEED TO INCLUDE IN CTD PROCESSING**]
+
+[**UPDATE DESCRIPTION DEPENDING ON IF SHIMADA HAKE CASTS WERE USED**]
+(ref:station-sampling) The locations of surface trawls (white points), CTD and UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_ and _Shimada_.
 
 ```{r station-sampling,fig.cap='(ref:station-sampling)',out.height='7in',fig.align='center',fig.pos='H'}
 include_graphics(here("Figs/fig_station_samples.png"))
@@ -2204,20 +2355,16 @@ include_graphics(here("Figs/fig_station_samples.png"))
 
 [**update after all data is processed**]
 
-Acoustic backscatter ascribed to CPS (**Fig. \@ref(fig:nasc-cufes-trawl)a**), sampled by _`r survey.vessel`_, _Lisa Marie_, and the USVs, was observed throughout the survey area, but was most prevalent off Cape Flattery, WA; between Willapa Bay, WA to Cape Blanco, OR; and south of Cape Mendocino, CA. 
+Acoustic backscatter ascribed to CPS in the core region (**Fig. \@ref(fig:nasc-cufes-trawl)a**), as sampled by _`r survey.vessel`_, _Shimada_, and the USVs, was observed throughout the survey area, but was most prevalent off Cape Flattery, WA and between Fort Bragg to Monterey Bay, CA. 
 
-Purse seines, conducted by _Lisa Marie_ north of Bodega Bay, CA, caught Pacific Herring predominantly off WA; Pacific Sardine mixed with Jack Mackerel between the WA/OR border to Fort Bragg, CA; and Northern Anchovy off of Bodega Bay, CA and near Cape Blanco, OR (**Fig. \@ref(fig:nasc-cufes-trawl)d**). The combined catches of the `r nrow(filter(haul.pie, vessel.name == "LM"))` purse seine sets included `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$AllCPS, na.rm = T), digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$Sardine, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$Anchovy, na.rm = T), digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$JackMack, na.rm = T), digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$PacMack, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Mackerel, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$PacHerring, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Herring, and `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LM")$RndHerring, na.rm = T), digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-seine-sampling-lm)**).
+Surface trawls, conducted by _`r survey.vessel`_ to the south of Cape Mendocinco, CA and to the north by _Shimada_, caught Pacific Sardine primarily in the region off OR and WA, as well as in the SCB; Northern Anchovy south of Cape Mendocino, CA; Jack Mackerel throughout the survey area, but predominantly in the SCB and outside the mouth of the Columbia River; and Pacific Herring off OR and WA. The combined catches of the `r nrow(trawl.summ)` trawls included `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel, `r prettyNum(haul.PacHerring.kg, digits = 1, big.mark = ",")` kg Pacific Herring, and `r prettyNum(haul.RndHerring.kg, digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-trawl-sampling)**).
 
-Surface trawls, conducted by _`r survey.vessel`_ south of Cape Mendocinco, CA, caught Jack Mackerel, generally mixed with Pacific Sardine, between Cape Mendocino, CA to Bodega Bay, CA and in the SCB; Northern Anchovy throughout the region south of Bodega Bay, CA; and Pacific Mackerel, which were only caught in nearshore trawls off San Clemente, CA and offshore of Punta Colonet, Baja California (**Fig. \@ref(fig:nasc-cufes-trawl)c**). The combined catches of the `r nrow(trawl.summ)` trawls included `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel, `r prettyNum(haul.PacHerring.kg, digits = 1, big.mark = ",")` kg Pacific Herring, and `r prettyNum(haul.RndHerring.kg, digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-trawl-sampling)**).
-
-The area between Cape Mendocino to Bodega Bay, CA was sampled by both _`r survey.vessel`_ and _Lisa Marie_, but had significant discrepancies in the species proportions of their catches. _`r survey.vessel`_'s nighttime trawls mainly contained Jack Mackerels with a small amount of Pacific Sardine, whereas _Lisa Marie_'s daytime purse seines were composed primarily of Pacific Sardine. The two vessels both caught predominantly Northern Anchovy off of Bodega Bay, CA.
-
-CUFES samples were dominated by Jack Mackerel eggs north of Monterey Bay, CA, and to the south by Northern Anchovy (**Fig. \@ref(fig:nasc-cufes-trawl)b**). Pacific Sardine eggs were observed offshore between San Francisco to Monterey Bay, CA, and throughout the SCB. The SCB contained a mixture of eggs from the three species, with Northern Anchovy and Pacific Sardine eggs found predominantly nearshore, Northern Anchovy and Jack Mackerel eggs offshore, and Pacific Sardine eggs nearshore off San Diego, CA. Note that due to the cancellation of Leg I on _`r survey.vessel`_, no CUFES samples exist north of Cape Mendocino, CA. 
+CUFES samples were only collected south of Cape Mendocino, CA by _`r survey.vessel`_, and consisted primarily of Northern Anchovy eggs north of Morro Bay, CA,  Jack Mackerel eggs near Point Conception, CA, and a mixture of Northern Anchovy, Jack Mackerel, and Pacific Sardine eggs in the SCB (**Fig. \@ref(fig:nasc-cufes-trawl)b**). In the SCB, Northern Anchovy eggs were found predominantly nearshore while Pacific Sardine eggs were offshore. 
 
 \newpage  
 \blandscape  
 
-(ref:nasc-cufes-trawl) Survey transects overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); egg densities (eggs m^-3^) for Northern Anchovy, Jack Mackerel, and Pacific Sardine from the CUFES (b); and proportions, by weight, of CPS species in each nighttime _`r survey.vessel`_ trawl (c) or daytime _Lisa Marie_ seine catch (d; black points indicate trawls with no CPS). Species with low catch weights are not visible at this scale.
+(ref:nasc-cufes-trawl) Survey transects overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep [**REMOVE DEPTH DESCRIPTION?**]) ascribed to CPS (a); egg densities (eggs m^-3^) for Northern Anchovy, Jack Mackerel, and Pacific Sardine from the CUFES (b); and proportions, by weight, of CPS species in each trawl catch (c; black points indicate trawls with no CPS). Species with low catch weights are not visible at this scale.
 
 ```{r nasc-cufes-trawl,fig.cap='(ref:nasc-cufes-trawl)',out.width='8in',fig.pos='H'}
 include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
@@ -2227,25 +2374,50 @@ include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
 
 ### Nearshore region  
 
-Acoustic backscatter sampled by _Long Beach Carnage_ was observed throughout the nearshore survey area off California, but was most prevalent outside of Bodega Bay and San Francisco, between Monterey Bay and Point Conception, between Santa Barbara and Long Beach, and around Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-lbc)a**).
+[**UPDATE TO INCLUDE LISA MARIE INFO**]
 
-Purse seine catches by _Long Beach Carnage_ included predominantly Northern Anchovy north of Point Conception, CA; Pacific Sardine south of Morro Bay, CA; and Pacific Mackerel near Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-lbc)b**). The combined catches of the `r nrow(lbc.sets)` purse seine sets included `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$AllCPS, na.rm = T), digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$Sardine, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$Anchovy, na.rm = T), digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$JackMack, na.rm = T), digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$PacMack, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Mackerel, `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$PacHerring, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Herring, and `r prettyNum(sum(filter(set.summ.wt, vessel.name == "LBC")$RndHerring, na.rm = T), digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-seine-sampling-lbc)**)
+Acoustic backscatter sampled by _Long Beach Carnage_ and _Lisa Marie_ was observed throughout the nearshore survey area, but was most prevalent north of Coos Bay, OR, between Santa Barbara, CA to Bodega Bay, CA, and around Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-combined)a**).
 
-(ref:nasc-seine-lbc) Nearshore survey transects conducted by _Long Beach Carnage_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each daytime purse seine catch (b). Species with low catch weights are not visible at this scale.
+Purse seine catches by _Long Beach Carnage_ and _Lisa Marie_ included predominantly Northern Anchovy between Fort Bragg and Long Beach, CA; Pacific Sardine north of Florence, OR and south of Monterey Bay, CA, including throughout the SCB and around the Santa Cruz and Santa Catalina Islands; Jack Mackerel north of Florence, OR and between Fort Bragg, CA to Crescent City, CA; Pacific Mackerel nearshore in the SCB and off Florence, OR; and Pacific Herring north of Cape Mendocino, CA (**Fig. \@ref(fig:nasc-seine-combined)b**). The combined catches of the `r nrow(set.pie)` purse seine sets included `r prettyNum(sum(set.summ.wt$AllCPS, na.rm = T), digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(sum(set.summ.wt$Sardine, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(sum(set.summ.wt$Anchovy, na.rm = T), digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(sum(set.summ.wt$JackMack, na.rm = T), digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(sum(set.summ.wt$PacMack, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Mackerel, and `r prettyNum(sum(set.summ.wt$PacHerring, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Herring; **Appendix \@ref(appendix-seine-sampling-lm) and \@ref(appendix-seine-sampling-lbc)**)
 
-```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.width='6in', fig.pos='H'}
-if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))) {
-  include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LongBeachCarnage.png"))  
+(ref:nasc-seine-combined) Nearshore survey transects conducted by _Long Beach Carnage_ and _Lisa Marie_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each purse seine catch (b). Species with low catch weights are not visible at this scale.
+
+```{r nasc-seine-combined, fig.cap='(ref:nasc-seine-combined)', out.width='6in', fig.pos='H'}
+if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_combined.png"))) {
+  include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_combined.png"))  
 } else {
   print("No purse seing sampling figure present.")
 }
 ```  
 
+<!-- (ref:nasc-seine-lbc) Nearshore survey transects conducted by _Long Beach Carnage_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each daytime purse seine catch (b). Species with low catch weights are not visible at this scale. -->
+
+<!-- ```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)', out.width='6in', fig.pos='H'} -->
+<!-- if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LBC.png"))) { -->
+<!--   include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LBC.png"))   -->
+<!-- } else { -->
+<!--   print("No purse seing sampling figure present.") -->
+<!-- } -->
+<!-- ```   -->
+
+<!-- (ref:nasc-seine-lm) Nearshore survey transects conducted by _Lisa Marie_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each daytime purse seine catch (b). Species with low catch weights are not visible at this scale. -->
+
+<!-- ```{r nasc-seine-lm, fig.cap='(ref:nasc-seine-lm)', out.width='6in', fig.pos='H'} -->
+<!-- if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LM.png"))) { -->
+<!--   include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LM.png"))   -->
+<!-- } else { -->
+<!--   print("No purse seing sampling figure present.") -->
+<!-- } -->
+<!-- ```   -->
+
 \newpage  
 
 # Discussion {#discussion}  
 
-The principal objectives of the `r survey.das`-day Summer 2022 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, to survey the stocks of Pacific Mackerel, Jack Mackerel, Pacific Herring, Pacific Round Herring, and the southern stock of Pacific Sardine. Despite the original survey plan being substantially modified due to OMAO staffing issues on _`r survey.vessel`_, the combined sampling from _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and Saildrones spanned the offshore and nearshore areas from Cape Flattery, WA to Punta Baja, MX. This was made possible by the resilience and adaptability of all personnel from the various sampling platforms, particularly: _Lisa Marie_, which surveyed the _`r survey.vessel`_ transects north of Bodega Bay, CA; the _Long Beach Carnage_ and Saildrone USVs, which repeatedly modified the timing of their surveys; and the scientists and crew on _`r survey.vessel`_, who remained prepared and flexible throughout an uncertain survey schedule.
+[**UPDATE**]
+[**ADD COMMON DISCUSSION WITH MEXICAN RESULTS**]
+
+The principal objectives of the `r survey.das`-day Summer 2023 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, to survey the stocks of Pacific Mackerel, Jack Mackerel, Pacific Herring, Pacific Round Herring, and the southern stock of Pacific Sardine. Despite the original survey plan being substantially modified due to OMAO staffing issues on _`r survey.vessel`_, the combined sampling from _`r survey.vessel`_, _Shimada_, _Lisa Marie_, _Long Beach Carnage_, and Saildrone USVs spanned the offshore and nearshore areas from Cape Flattery, WA to San Diego, CA. This was made possible by the resilience and adaptability of all personnel from the various sampling platforms, particularly: _Lisa Marie_, which surveyed the _`r survey.vessel`_ transects north of Bodega Bay, CA; the _Long Beach Carnage_ and Saildrone USVs, which repeatedly modified the timing of their surveys; and the scientists and crew on _`r survey.vessel`_, who remained prepared and flexible throughout an uncertain survey schedule.
 
 The forage fish assemblage was dominated by Northern Anchovy south of Bodega Bay, CA. To the north, trawl catches from _`r survey.vessel`_ were predominantly Jack Mackerel, while purse seine sets from _Lisa Marie_ caught mainly Pacific Sardine between the WA/OR border to Fort Bragg, CA. Based on differences in the _`r survey.vessel`_ and _Lisa Marie_ catches in the overlapping region in northern California, in addition to comparative historical results [@Renfree2022] and  observations communicated by the _Lisa Marie_ captain, it is hypothesized that purse seines are ineffective in capturing fast-moving Jack Mackerel, deep schools, and schools in clear water. Until further research can quantify the effectiveness of daytime purse seines in catching CPS, the species proportions and length distributions from such data should be analyzed with these discrepancies in mind. 
 
@@ -2391,6 +2563,7 @@ if (doc.type == "docx") {
 Date, time (UTC), location, and biomasses (kg) of CPS collected for each purse seine set by _Lisa Marie_.
 
 ```{r seine-catch-summary-lm,results='asis'}
+
 # Summarize catch by species, used to subset columns
 pos.cps.lm <- seine.summ %>% 
   filter(Vessel == "LM") %>% 

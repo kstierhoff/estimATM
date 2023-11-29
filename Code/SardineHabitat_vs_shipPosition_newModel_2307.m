@@ -12,12 +12,11 @@ clear; close all;
 %% User Settings
 
 % Define vessels for which there are NASC CSVs
-% vessels = {'RL' 'LM' 'LBC' 'SH'};%'SD\1076' 'SD\1077'};
-vessels = {'RL' 'SH'};%'SD\1076' 'SD\1077'};
+vessels = {'LBC' 'LM'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
-colors = 'rycgm';
-% colors = 'rygbb';
+% colors = 'rcgmm';
+colors = 'rbcygbb';
 
 % Define boundary extents of habitat data to download
 latBounds = [27 51];
@@ -42,16 +41,35 @@ addpath 'C:\Users\josiah.renfree\Documents\MATLAB\borders'
 timespan = hours(6);
 
 % Define animated gif name
-surveyName = 'summer2023';
+surveyName = '2307RL';
+
+%% Create sardine habitat model predictor
+
+MDL = readtable("..\Data\Habitat\sardineHabitatModel_20230223.csv");
+% F = scatteredInterpolant(MDL.temp, MDL.log_chl, MDL.sardine_presence);
+
+MDL_sst = unique(MDL.temp);
+MDL_logchl = unique(MDL.log_chl);
+
+[X,Y] = ndgrid(MDL_sst, MDL_logchl);
+Z = reshape(MDL.sardine_presence,size(X));
+
+F = griddedInterpolant(X,Y,Z);
 
 %% Create colormap
 % Define the colormap to use for the habitat. First 5% is bad, next 27% is
 % unsuitable, next 13% is good, and last 55% is optimal
 
-map = 0.0 * ones(50, 3);            % Bad
-map = [map; 0.3 * ones(270, 3)];    % Unsuitable
-map = [map; 0.6 * ones(130, 3)];    % Good
-map = [map; 0.8 * ones(550, 3)];    % Optimal
+% map = 0.0 * ones(50, 3);            % Bad
+% map = [map; 0.3 * ones(270, 3)];    % Unsuitable
+% map = [map; 0.6 * ones(130, 3)];    % Good
+% map = [map; 0.8 * ones(550, 3)];    % Optimal
+
+% Define the colormap to use for the habitat, in chunks of 18%, 11%, and
+% 71%
+map = 0.0 * ones(180, 3);            % Bad
+map = [map; 0.6 * ones(110, 3)];    % Unsuitable
+map = [map; 0.8 * ones(710, 3)];    % Good
 
 %% Get vessel positions using integrated CSV data
 
@@ -103,53 +121,105 @@ for i = 1:length(vessels)
     groups{i} = groups{i}(I);
 end
 
-%% Download habitat data
-% Download habitat data for every available time that spans all the times
+%% Download SST data
+% Download SST data for every available time that spans all the times
 % from the various vessels
+
+satellite = 'erdMWsstd8day';
 
 % Get min and max times over all vessels
 startTime = min(cellfun(@min, times));
 endTime = max(cellfun(@max, times));
 
 % Download metadata to obtain last available date 
-data = webread('https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.das?potential_habitat%5B(2018-07-31T19:00:00Z):1:(2021-08-17T12:00:00Z)%5D%5B(36.1):1:(36.1)%5D%5B(238.1):1:(238.1)%5D');
+data = webread(['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' satellite '.das?time%5B(2023-02-17T00:00:00Z):1:(2023-02-17T00:00:00Z)%5D']);
 coverageEnd = regexp(data, 'time_coverage_end "([^"]*)', 'tokens', 'once');
 
 % Download single pixel over time to get available time stamps
-data = webread(['https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis_Lon0360.json?potential_habitat%5B' ...
-    '(' char(datetime(startTime, 'Format', 'uuuu-MM-dd')) 'T00:00:00Z):1:(' coverageEnd{1} ')%5D%5B' ...
-    '(36.1):1:(36.1)%5D%5B' ...
-    '(238.1):1:(238.1)%5D'], options);
+data = webread(['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' satellite '.json?time%5B' ...
+    '(' char(datetime(startTime, 'Format', 'uuuu-MM-dd')) 'T00:00:00Z):1:(' coverageEnd{1} ')%5D'], options);
 
 % Get list of available habitat times
-habTimes = cellfun(@(x) x{1}, data.table.rows, 'UniformOutput', false);
-habTimes = datetime(habTimes, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z');
+sstTimes = cellfun(@(x) x{1}, data.table.rows, 'UniformOutput', false);
+sstTimes = datetime(sstTimes, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z');
 
 % Only keep times before end date
-habTimes(habTimes > endTime) = [];
+sstTimes(sstTimes > endTime) = [];
 
-% Cycle through each available time and download habitat data
-h = waitbar(0, 'Downloading habitat data...');
-for i = 1:length(habTimes)
+% Cycle through each available time and download satellite data
+h = waitbar(0, 'Downloading SST data...');
+for i = 1:length(sstTimes)
 
     % Generate filename
-    filename = fullfile(pwd, 'habitatData', [char(datetime(habTimes(i), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']);
+    filename = fullfile(pwd, 'satelliteData', [satellite '_' char(datetime(sstTimes(i), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']);
 
     % If file doesn't already exist, download it
     if exist(filename, 'file') == 0
 
         % Generate string to ERDDAP data
         str = ['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' ...
-            'sardine_habitat_modis_Lon0360.mat' ...
-            '?potential_habitat%5B(' char(datetime(habTimes(i), 'Format', 'uuuu-MM-dd''T''HH:mm:ss''Z')) ')' ...
+            satellite '.mat' ...
+            '?sst%5B(' char(datetime(sstTimes(i), 'Format', 'uuuu-MM-dd''T''HH:mm:ss''Z')) ')' ...
+            '%5D%5B(0.0):1:(0.0)' ...
             '%5D%5B(' num2str(latBounds(1)) '):(' num2str(latBounds(2)) ')' ...
-            '%5D%5B(' num2str(lonBounds(1)) '):(' num2str(lonBounds(2)) ')' ...
-            '%5D&.draw=surface&.vars=longitude%7Clatitude%7Cpotential_habitat&.colorBar=%7C%7C%7C%7C%7C&.bgColor=0xffccccff'];
+            '%5D%5B(' num2str(lonBounds(1)) '):(' num2str(lonBounds(2)) ')%5D'];
 
         % Download data
         websave(filename, str, options);
+        
     end
-    waitbar(i/length(habTimes), h)
+    waitbar(i/length(sstTimes), h)
+end
+close(h)
+
+%% Download Chlorophyll data
+% Download SST data for every available time that spans all the times
+% from the various vessels
+
+satellite = 'erdMWchla8day';
+
+% Get min and max times over all vessels
+startTime = min(cellfun(@min, times));
+endTime = max(cellfun(@max, times));
+
+% Download metadata to obtain last available date 
+data = webread(['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' satellite '.das?time%5B(2023-02-17T00:00:00Z):1:(2023-02-17T00:00:00Z)%5D']);
+coverageEnd = regexp(data, 'time_coverage_end "([^"]*)', 'tokens', 'once');
+
+% Download single pixel over time to get available time stamps
+data = webread(['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' satellite '.json?time%5B' ...
+    '(' char(datetime(startTime, 'Format', 'uuuu-MM-dd')) 'T00:00:00Z):1:(' coverageEnd{1} ')%5D'], options);
+
+% Get list of available habitat times
+chlTimes = cellfun(@(x) x{1}, data.table.rows, 'UniformOutput', false);
+chlTimes = datetime(chlTimes, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z');
+
+% Only keep times before end date
+chlTimes(chlTimes > endTime) = [];
+
+% Cycle through each available time and download satellite data
+h = waitbar(0, 'Downloading Chlorophyll data...');
+for i = 1:length(chlTimes)
+
+    % Generate filename
+    filename = fullfile(pwd, 'satelliteData', [satellite '_' char(datetime(chlTimes(i), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']);
+
+    % If file doesn't already exist, download it
+    if exist(filename, 'file') == 0
+
+        % Generate string to ERDDAP data
+        str = ['https://coastwatch.pfeg.noaa.gov/erddap/griddap/' ...
+            satellite '.mat' ...
+            '?chlorophyll%5B(' char(datetime(chlTimes(i), 'Format', 'uuuu-MM-dd''T''HH:mm:ss''Z')) ')' ...
+            '%5D%5B(0.0):1:(0.0)' ...
+            '%5D%5B(' num2str(latBounds(1)) '):(' num2str(latBounds(2)) ')' ...
+            '%5D%5B(' num2str(lonBounds(1)) '):(' num2str(lonBounds(2)) ')%5D'];
+
+        % Download data
+        websave(filename, str, options);
+        
+    end
+    waitbar(i/length(chlTimes), h)
 end
 close(h)
 
@@ -171,8 +241,8 @@ for i = 1:length(vessels)
 end
 
 % Create latitude/longitude grid
-grid_lat = latBounds(1):0.025:latBounds(2);
-grid_lon = lonBounds(1):0.025:lonBounds(2);
+grid_lat = latBounds(1):0.0125:latBounds(2);
+grid_lon = lonBounds(1):0.0125:lonBounds(2);
 [LAT, LON] = ndgrid(grid_lat, grid_lon);
 
 % Initialize matrix for holding averaged habitat data that will be plotted.
@@ -184,32 +254,64 @@ COUNTS = zeros(size(LAT));  % Used for calculating cumulative average
 figure;
 
 % Initialize variable to hold filename of currently-loaded habitat file
-currFile = '';
+currSSTFile = '';
+currCHLFile = '';
 
 % Cycle through ship positions
 h = waitbar(0, 'Processing...');
 for i = 1:length(timeBin)
 
-    % Find habitat dataset closest in time
-    [M,I] = min(abs(habTimes - timeBin(i)));
+    % Find closest sst data
+    [~,I] = min(abs(sstTimes - timeBin(i)));
+
+    newFile = 0;
 
     % If it's not the currently-loaded habitat file, then load it
-    if habTimes(I) ~= currFile
-        habData = load(fullfile(pwd, 'habitatData', ...
-            [char(datetime(habTimes(I), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']));
-        habData = struct2cell(habData);
+    if sstTimes(I) ~= currSSTFile
+        sstData = load(fullfile(pwd, 'satelliteData', ...
+            ['erdMWsstd8day_' char(datetime(sstTimes(I), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']));
+        sstData = struct2cell(sstData);
 
         % Parse out habitat data
-        lat = habData{1}.latitude;
-        lon = habData{1}.longitude;
-        hab = squeeze(habData{1}.potential_habitat);
-
-        % Convert to grid matrix
-        [latgrid, longrid] = ndgrid(lat, lon);
+        sst_lat = sstData{1}.latitude;
+        sst_lon = sstData{1}.longitude;
+        sst = squeeze(sstData{1}.sst);
 
         % Update variable holding currently loaded file
-        currFile = habTimes(I);
+        currSSTFile = sstTimes(I);
+
+        newFile = 1;
     end
+
+    % Find closest chl data
+    [~,I] = min(abs(chlTimes - timeBin(i)));
+
+    % If it's not the currently-loaded file, then load it
+    if chlTimes(I) ~= currCHLFile
+        chlData = load(fullfile(pwd, 'satelliteData', ...
+            ['erdMWchla8day_' char(datetime(chlTimes(I), 'Format', 'uuuuMMdd''T''HHmmss''Z')) '.mat']));
+        chlData = struct2cell(chlData);
+
+        % Parse out habitat data
+        chl_lat = chlData{1}.latitude;
+        chl_lon = chlData{1}.longitude;
+        chl = squeeze(chlData{1}.chlorophyll);
+
+        % Update variable holding currently loaded file
+        currCHLFile = chlTimes(I);
+
+        newFile = 1;
+    end
+
+    % If a new satellite dataset had to be loaded, then need to re-estimate
+    % the habitat
+    if newFile
+%         hab = F(double(sst), log(double(chl)));
+        hab = F(double(sst), log(double(chl)));
+    end
+
+    % Convert to grid matrix
+    [latgrid, longrid] = ndgrid(chl_lat, chl_lon);
 
     % Cycle through each vessel to obtain habitat data surrounding each
     % vessel position
@@ -310,27 +412,40 @@ for i = 1:length(timeBin)
     % Set colorbar options
     set(hcb, 'Position', [0.76 0.1 0.0476 0.85])        % Colorbar size and position
     set(hcb, 'YAxisLocation', 'left')                   % Set colorbar y-axis to left side
-    set(hcb, 'YTick', [0 .048 .32 .45 1])               % Define colorbar y-axis tick locations
-%     set(hcb, 'YTick', [0 .32 1])               % Define colorbar y-axis tick locations
-    set(hcb, 'YtickLabel', {'0' '1' '10' '20' '100'})   % Set the colorbar y-axis tick labels
-%     set(hcb, 'YtickLabel', {'0' '10' '100'})   % Set the colorbar y-axis tick labels
+    set(hcb, 'YTick', [0 .18 .29 1])               % Define colorbar y-axis tick locations
+    set(hcb, 'YtickLabel', {'0' '5' '18' '100'})   % Set the colorbar y-axis tick labels
+%     set(hcb, 'YTick', '')
+%     set(hcb, 'YtickLabel', {'0%' '18%' '29%' '100%'})
     ylabel(hcb, 'Cumulative sardine biomass (%)')       % Set colorbar y-axis label
 
-    % Add colorbar labels
-    annotation(gcf, 'textbox', [0.81 0.67 0.049 0.054], ...
-        'String', {'Optimal'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.81 0.39 0.049 0.054], ...
-        'String', {'Good'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.81 0.22 0.049 0.054], ...
-        'String', {'Bad'}, 'FitBoxToText', 'off', 'EdgeColor','none');
-    annotation(gcf, 'textbox', [0.81 0.08 0.049 0.054], ...
-        'String', {'Unsuitable'}, 'FitBoxToText', 'off', 'EdgeColor','none');
+    annotation(gcf, 'textbox', [0.805 0.06 0.049 0.054], ...
+        'String', {'0'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+    annotation(gcf, 'textbox', [0.805 0.213 0.049 0.054], ...
+        'String', {'0.18'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+    annotation(gcf, 'textbox', [0.805 0.306 0.049 0.054], ...
+        'String', {'0.29'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+    temp = annotation(gcf, 'textbox', [0.805 0.909 0.049 0.054], ...
+        'String', {'1.0'}, 'FitBoxToText', 'off', 'EdgeColor','none', ...
+        'FontSize', 9);
+
+%     % Add colorbar labels
+%     annotation(gcf, 'textbox', [0.81 0.67 0.049 0.054], ...
+%         'String', {'Optimal'}, 'FitBoxToText', 'off', 'EdgeColor','none');
+%     annotation(gcf, 'textbox', [0.81 0.39 0.049 0.054], ...
+%         'String', {'Good'}, 'FitBoxToText', 'off', 'EdgeColor','none');
+%     annotation(gcf, 'textbox', [0.81 0.22 0.049 0.054], ...
+%         'String', {'Bad'}, 'FitBoxToText', 'off', 'EdgeColor','none');
+%     annotation(gcf, 'textbox', [0.81 0.08 0.049 0.054], ...
+%         'String', {'Unsuitable'}, 'FitBoxToText', 'off', 'EdgeColor','none');
 
     % Create new invisible axis for displaying colorbar label text
     axes('position', [0 0 1 1], 'Visible', 'off');
-
+% 
     % Add label to colorbar
-    text(.91, .45, 'Potential habitat', 'Rotation', 90)
+    text(.87, .45, 'Habitat probability', 'Rotation', 90)
 
     % Write to animated gif
     frame = getframe(gcf);          % Get current frame
@@ -339,11 +454,11 @@ for i = 1:length(timeBin)
 
     % If first frame define loop count
     if i == 1
-        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '_RL_SH.gif']),'gif','LoopCount',0,'DelayTime',.1);
-    
+        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '_newModel_LBCandLM.gif']),'gif','LoopCount',0,'DelayTime',.1);
+
     % Otherwise, append to existing gif
     else
-        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '_RL_SH.gif']),'gif','WriteMode','append','DelayTime',.1);
+        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '_newModel_LBCandLM.gif']),'gif','WriteMode','append','DelayTime',.1);
     end
 
     waitbar(i/length(timeBin), h, char(timeBin(i)))
@@ -354,4 +469,4 @@ close(h)
 title(ax, '')
 
 % Save final figure
-exportgraphics(gcf, ['..\Figs\fig_' surveyName '_habitat_RL_SH.png'])
+exportgraphics(gcf, ['..\Figs\fig_sardine_habitat_composite_' surveyName '_newModel_LBCandLM.png'])
