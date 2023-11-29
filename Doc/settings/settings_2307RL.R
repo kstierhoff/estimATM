@@ -624,7 +624,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 5 # 1000 during final
+boot.num <- 500 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -697,8 +697,8 @@ strata.manual <- bind_rows(
 
 # Stock boundaries --------------------------------------------------------
 stock.break.anch <- 40.50  # Latitude of Cape Mendocino
-# stock.break.sar  <- 37.674 # Latitude of San Francisco, based on differences in length dist.
-stock.break.sar  <- 34.3 # Latitude of ~Pt. Conception, base off 2023 habitat map
+stock.break.sar  <- 38.311 # Latitude of Bodega Bay, based on differences in length dist.
+# stock.break.sar  <- 34.3 # Latitude of ~Pt. Conception, base off 2023 habitat map
 
 # Transects used to define stock boundaries (primary or other)
 
