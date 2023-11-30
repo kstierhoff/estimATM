@@ -14,7 +14,7 @@ output:
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf,
+pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf, odbc,
                mapview,mapdata,photobiology,ggmap,knitr,bookdown,tcltk,
                rnaturalearth,ggspatial,kableExtra,geosphere,janitor)
 
@@ -61,6 +61,7 @@ source(here("Doc/settings", prj.settings))
 ```{r user-input}
 # Set processing controls -------------------------------------------------
 save.figs     <- T # Create new figures
+get.db        <- T # Download data from databases (fast; generally TRUE)
 get.nav       <- T # Download Lasker nav data from ERDDAP
 nav.source    <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sh    <- T # Download Shimada nav data from ERDDAP
@@ -917,3 +918,217 @@ if (file.exists(paste0(here("Figs"), "/", survey.name, "_nav_depth_Saildrone.png
   print("No Saildrone data.")
 }  
 ```
+
+## Summarize trawl data
+
+```{r import-trawl-data, include=FALSE}
+if (get.db) {
+  if (trawl.source == "SQL") {
+    # Configure ODBC connection to TRAWL database
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "SQL Server", 
+                            Server = "161.55.235.187", 
+                            Database = "Trawl", 
+                            Trusted_Connection = "True")
+  } else if (trawl.source == "Access") {
+    trawl.con  <- dbConnect(odbc(), 
+                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
+                            DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+  }
+  
+  # Import trawl database tables
+  catch.all	     <- tbl(trawl.con, "Catch") %>% collect()
+  haul.all       <- tbl(trawl.con, "Haul") %>% collect()
+  lengths.all    <- tbl(trawl.con, "Specimen") %>% collect()
+  if (dbExistsTable(trawl.con, "LengthFrequency"))
+      lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+  spp.codes      <- tbl(trawl.con, "SpeciesCodes") %>% collect()
+  
+  # Close database channel
+  dbDisconnect(trawl.con)
+  
+  # Replace round herring in the database
+  spp.codes$scientificName[spp.codes$species == 161743] <- "Etrumeus teres"
+  
+  # Save imported database data to .Rdata file
+    if (exists("lengthFreq.all")) {
+      save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+         file = here("Data/Trawl/trawl_data.Rdata"))
+    } else {
+      save(catch.all, haul.all, lengths.all, spp.codes,  
+         file = here("Data/Trawl/trawl_data.Rdata"))
+    }
+  
+  # Save species codes
+  save(spp.codes, file = here("Output/species_codes.Rdata"))
+  write_csv(spp.codes, here("Output/species_codes.csv"))
+} else {
+  # Load previously imported database data
+  load(here("Data/Trawl/trawl_data.Rdata"))
+}
+``` 
+
+```{r process-trawl-haul-data}
+# Create startLatitudeDecimal and startLongitudeDecimal for Access data
+if (trawl.source == "Access") {
+  if (year(haul.all$netInWaterTime[1]) >= 2021) {
+    haul.all <- haul.all %>% 
+      arrange(haul) %>% 
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
+    
+    catch.all <- catch.all %>% 
+      rename(totalWeight = TotalWtKg,
+             totalNum    = TotalNum)
+    
+  } else {
+    haul.all <- haul.all %>% 
+      arrange(haul) %>% 
+      mutate(
+        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$EquilibriumTime,
+                                                  format = "%H:%M:%S"))),
+        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+                                           format(haul.all$haulbackTime,
+                                                  format = "%H:%M:%S")))) %>%
+      mutate(haulBackTime = case_when(
+        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+        TRUE ~ haulBackTime)) %>%
+      rename(cruise = Cruise, ship = Ship, haul = Haul,
+             collection = Collection, notes = Notes)
+    
+    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+    eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
+    hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
+    
+    # Correct equilibriumTime or haulBackTime
+    haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+    haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+  }
+} else if (trawl.source == "SQL") {
+  haul.all <- haul.all %>% 
+    arrange(haul) %>% 
+    mutate(
+      netInWaterTime  = ymd_hms(netInWaterTime),
+      equilibriumTime = ymd_hms(equilibriumTime),
+      haulBackTime    = ymd_hms(haulBackTime),
+      netOnDeckTime   = ymd_hms(netOnDeckTime))
+  
+  # Compute totalWeight and totalNum, which only exist in the Access database
+  catch.all <- catch.all %>% 
+    # replace_na(list(subSampleWtkg = 0, 
+    #                 subSampleCount = 0,
+    #                 remainingSubSampleWtkg = 0)) %>% 
+    mutate(
+      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
+}
+
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  mutate(season = case_when(
+    month(equilibriumTime) < 6 ~ "spring",
+    TRUE ~ "summer"))
+
+# Filter haul data for current survey
+haul <- haul.all %>% 
+  select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 
+         stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
+         trawlPerformance, season, notes) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>%
+  # Manually remove hauls
+  filter(!haul %in% haul.rm) %>% 
+  # Calculate haul duration
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins")) %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>%
+  filter(!haul %in% trawl.haul.exclude) %>%
+  # Assign cluster based on yearday
+  mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1,
+         sample.type = "Trawl") 
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul %>% 
+  group_by(cluster, haul, sample.type) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal)))
+
+# Convert to sf for plotting
+haul.mid.sf <- haul.mid %>% 
+  mutate(label = paste("Haul", haul)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+
+# Convert haul paths and midpoints to sf; CRS = crs.geog
+# Create haul paths from starts and ends
+haul.paths <- select(haul, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING") 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster, sample.type) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long)) %>% 
+  ungroup() %>% 
+  project_df(to = crs.proj)
+
+# Convert to sf for plotting
+cluster.mid.sf <- cluster.mid %>% 
+  mutate(label = paste("Cluster", cluster)) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) 
+```  
+
+### GPS data for each haul 
+
+```{r trawl-haul-stats}
+haul %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         stopLatDecimal, stopLongDecimal) %>%  
+  kable(format = knitr.format, booktabs = TRUE, escape = F,
+        align = c("c"), digits = c(4),
+        format.args = list(big.mark = ",")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = F) %>% 
+  scroll_box(height = "500px") 
+
+
+haul %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         stopLatDecimal, stopLongDecimal) %>% 
+  write_csv(here("Output/haul_table_EC-ITA.csv"))
+```
+
+### Detailed catch and weight for each haul 
+
+```{r trawl-catch-stats}
+# Filter catch data
+catch <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  left_join(select(haul, haul, equilibriumTime, startLatDecimal, startLongDecimal)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           netSampleType == 'codend') %>% 
+  inner_join(select(haul, haul, cluster)) %>% 
+  mutate(key = paste(haul, scientificName),
+         sample.type = "Trawl")
+
+catch %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         scientificName, commonName, totalWeight, totalNum) %>% 
+  arrange(haul, desc(totalWeight)) %>% 
+  write_csv(here("Output/catch_table_EC-ITA.csv"))
+```
+
+
