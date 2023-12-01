@@ -342,9 +342,6 @@ The echosounder systems aboard _`r survey.vessel`_ were calibrated on `r cal.dat
 # vessel, obtains the calibration info, then formats it for displaying in a
 # table
 
-# Source function for reading ECS files
-source(here("Code/extract_cal_ECS.R"))
-
 # Cycle through each vessel
 for (i in cal.vessels) {
   
@@ -375,7 +372,7 @@ for (i in cal.vessels) {
   # Now read calibration results from ECS file
   cal.ECS <- list.files(cal.dir, pattern = ".ecs$", 
                         full.names = TRUE) %>%
-    extract_cal_ECS()
+    atm::extract_cal_ecs()
   
   # create data frame of important echosounder parameters
   cal.params <- cal.res %>% 
@@ -683,35 +680,6 @@ if (doc.type == "docx") {
 
 \newpage  
 
-<!-- ##### _Carranza_   -->
-
-<!-- The 18, 38, and 70-kHz GPTs aboard _Carranza_ were calibrated on 29 and 30 January, 2022, using either a 63-mm-diameter copper (Cu63) or a WC38.1 standard sphere, depending on the frequency. Calibrations were unsuccessful for the 120 and 200-kHz GPTs, and therefore results from the most recent calibration, conducted in September 2020, were used. Beam model results (**Table \@ref(tab:cal-results-jcf)**) were entered into the EK80 software.   -->
-
-(ref:cal-results-jcf) General Purpose Transceiver (Simrad EK60 GPT; Kongsberg) beam model results estimated from calibrations of the echosounders aboard _Carranza_ using either a Cu63 (for 18 kHz) or WC38.1 (for 38, 70, 120, and 200 kHz). Results for the 120 and 200-kHz GPTs are from a calibration conducted in September 2020. Prior to the survey, calibrated on-axis gain ($G_0$), beam angles, angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values were entered into the GPT-control software (Simrad EK80; Kongsberg).
-
-```{r cal-results-jcf,results='asis',eval=FALSE}
-all.output.jcf <- all.output.jcf %>% 
-  # Remove unwanted lines
-  # slice(-2, -5:-8, -10:-15, -16, -18) %>% 
-  slice(1, 3:4, 9, 19:25)
-
-if (doc.type == "docx") {
-  # create kable object (for Word)
-  pander(all.output.jcf)
-} else {
-  # print LaTeX table for HTML or PDF
-  kable(all.output.jcf, format = knitr.format, 
-        align = c("l","l", rep("c",ncol(all.output.jcf) - 2)),
-        booktabs = TRUE, escape = FALSE, linesep = "",
-        caption = '(ref:cal-results-jcf)') %>% 
-    kable_styling(position = "center", 
-                  latex_options = c("hold_position"),
-                  font_size = 8) %>%  
-    row_spec(4, hline_after = TRUE) %>% 
-    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output.jcf) - 2))
-}
-```  
-
 ##### _Lisa Marie_  
 
 The 38- and 200-kHz WBTs aboard _Lisa Marie_ were calibrated on 15 June 2022, using the standard sphere technique, while the vessel was anchored in Grays Harbor near Westport, WA (46.9202 N, 124.1090 W). Calibration results for _Lisa Marie_ are presented in **Table \@ref(tab:cal-results-lm)**.  
@@ -768,7 +736,7 @@ For the two USVs, the echosounders were calibrated by Saildrone, Inc., using the
 
 (ref:cal-results-sd) Miniature Wideband Transceiver (Simrad-Kongsberg WBT Mini) beam model results estimated from calibrations of echosounders using a WC38.1 standard sphere, of the echosounders aboard the two USVs. 
 
-```{r cal-results-sd,results='asis',eval=T}
+```{r cal-results-sd,results='asis',eval=F}
 if (doc.type == "docx") {
   # create kable object (for Word)
   pander(all.output.sd)
@@ -1224,14 +1192,10 @@ nav.lbc <- readRDS(here("Data/Nav/nav_vessel_lbc.rds"))
 das.lbc <- n_distinct(date(nav.lbc$datetime))
 
 # Summarize Saildrone days at sea
-load("C:/KLS/CODE/Github/estimATM/2207RL/Data/Nav/nav_data_saildrone.Rdata")
+load("C:/KLS/CODE/Github/estimATM/2307RL/Data/Nav/nav_data_saildrone.Rdata")
 das.sd <- nav.sd %>% 
   group_by(saildrone) %>% 
   summarise(das = n_distinct(date(datetime)))
-
-# # Summarize Carranza days at sea
-# nav.jcf <- read_csv(here("Data/Nav/JCF/nav_vessel_JCF.csv")) 
-# das.jcf <- n_distinct(dmy(nav.jcf$date))
 ```
 
 The `r tolower(survey.season)` `r survey.year` survey spanned the area from Cape Flattery and El Rosario between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`, and included most of the potential habitat for the northern stock of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html]. In the core survey region that spanned this area (**Fig. \@ref(fig:nasc-cufes-trawl)**), _`r survey.vessel`_ (`r das.rl` days at sea, DAS), _Lisa Marie_ (`r das.lm` DAS), and the two USVs (`r sum(das.sd$das)` mission days) sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi. Catches from a total of `r nrow(haul)` nighttime surface trawls and `r nrow(lm.sets)` purse-seine sets from _Lisa Marie_ were combined into `r n_distinct(haul$cluster) + nrow(lm.sets)` trawl clusters. In the core area, one to `r num2words(max(as.numeric(be$Stratum), na.rm = TRUE))` post-survey strata were defined by their transect spacing and the densities of echoes attributed to each species.  
@@ -1284,7 +1248,8 @@ Trawl catches from _`r survey.vessel`_ were comprised of mostly Jack Mackerel be
 
 ```{r summarise-seine-catch}
 # Summarise Lisa Marie catch
-seine.summ.lm <- lm.lengths %>% 
+seine.summ.lm <- set.lengths %>% 
+  filter(vessel.name == "LM") %>% 
   group_by(scientificName) %>% 
   summarise(
     total.wt = sum(weightg)/1000,
@@ -1292,12 +1257,16 @@ seine.summ.lm <- lm.lengths %>%
   )
 
 # Summarise Long Beach Carnage catch
-seine.summ.lbc <- lbc.lengths %>%
+seine.summ.lbc <- set.lengths %>% 
+  filter(vessel.name == "LBC") %>% 
   group_by(scientificName) %>%
   summarise(
     total.wt = sum(weightg)/1000,
     total.ct = n()
   )
+
+# RESUME HERE
+## Summarize sets by vessel using `sets`
 ```
 
 ### _Lisa Marie_ {#results-seine-catch-lm}  
