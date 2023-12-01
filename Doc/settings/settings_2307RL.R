@@ -95,8 +95,8 @@ survey.end             <- "3 November"    # Survey end date
 survey.year            <- "2023"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 81              # Days at sea allocated
-survey.landmark.n      <- "Cape Scott, BC" # Landmark - N extent of survey
-survey.landmark.s      <- "Punta Eugenia, Baja CA" # Landmark - S extent of survey
+survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
+survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -586,12 +586,13 @@ trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., fo
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
 ctd.hdr.pattern        <- "RL2203*.*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
-ctd.depth              <- 350
+ctd.cast.depth         <- 350
 
 # UCTD data   
 uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
 uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.*.asc"
 uctd.cast.pattern      <- ".*_processed.asc"
+uctd.cast.depth        <- 350
 
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
@@ -736,9 +737,9 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL","LBC","LM") # "SH"
+cal.vessels        <- c("RL","LBC","LM","SH")
 cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
-cal.datetime       <- "27 June"     # Date/time of calibration
+cal.datetime       <- "27 June"    # Date/time of calibration
 cal.plot.date      <- "2023-06-27" # Date of the calibration, used to plot cal time series
 cal.window         <- 75           # Number of days around calibration date to look for results
 cal.group          <- "SWFSC"      # Group conducting the calibration
