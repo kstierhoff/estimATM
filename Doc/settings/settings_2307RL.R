@@ -773,15 +773,21 @@ cal.noise          <- list(RL  = NA,
 cal.scales    <- "free"  # fixed or free
 
 # Vessel echosounder info  ------------------------------------------------
-if (survey.vessel.primary == "SH") {
-  echo.freqs      <- "18, 38, 70, 120, and 200" # list of echosounder frequencies for Shimada
-  echo.freqs.dash <- "18-, 38-, 70-, 120-, and 200-" # list of echosounder frequencies for Shimada
-  echo.models     <- "ES18-11, ES38B, ES70-7C, ES120-7C, and ES200-7C" # list of echosounder models for Shimada
-} else if (survey.vessel.primary == "RL") {
-  echo.freqs      <- "18, 38, 70, 120, 200, and 333" # list of echosounder frequencies for Lasker
-  echo.freqs.dash <- "18-, 38-, 70-, 120-, 200-, and 333-" # list of echosounder frequencies for Lasker
-  echo.models     <- "ES18-11, ES38B, ES70-7C, ES120-7C, ES200-7C, and ES333-7C" # list of echosounder models for Shimada
-}
+echo.freqs      <- c(SH  = "18, 38, 70, 120, and 200",
+                     RL  = "18, 38, 70, 120, 200, and 333",
+                     LBC = "38, 70, 120, and 200",
+                     LM  = "38, 70, 120, and 200",
+                     SD  = "38 and 200") # list of echosounder frequencies for Shimada
+echo.freqs.dash <- c(SH  = "18-, 38-, 70-, 120-, and 200-",
+                     RL  = "18-, 38-, 70-, 120-, 200-, and 333-",
+                     LBC = "38-, 70-, 120-, and 200-",
+                     LM  = "38-, 70-, 120-, and 200-",
+                     SD  = "38- and 200-") # list of echosounder frequencies for Shimada
+echo.models     <- c(SH  = "ES18-11, ES38B, ES70-7C, ES120-7C, and ES200-7C",
+                     RL  = "ES18-11, ES38B, ES70-7C, ES120-7C, ES200-7C, and ES333-7C",
+                     LBC = "ES38-12, ES70-7C, ES120-7C and ES200-7C",
+                     LM  = "ES38-12, ES70-7C, ES120-7C and ES200-7C",
+                     SD  = "ES38-18|200-18C") # list of echosounder models for Shimada
 
 # nominal centerboard positions
 cb.retracted    <- 5
