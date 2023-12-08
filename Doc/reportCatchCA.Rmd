@@ -11,7 +11,7 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,sp,rgeos,mapview,RODBC,
                knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
-               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs, RSQLite,
                ggspatial,janitor,DT)
 
 # Install and load required packages from Github -------------------------------
@@ -525,9 +525,90 @@ A summary of samples taken from specimens collected in CA.
 datatable(specimen.summ, rownames = FALSE)
 ```
 
+# CUFES samples
 
+```{r import-cufes-data}
+if (get.db) {
+  if (cufes.source == "SQLite") {
+    # Configure ODBC connection to TRAWL database
+    cufes.filename <- path_file(dir_ls(here("Data/CUFES"), regexp = "*.sqlite"))
+    cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
+    # Create the pointer to the CUFES table
+    cufes.all <- tbl(cufes.con, "cufessqlite") %>% collect()
+    
+    # Close connection
+    dbDisconnect(cufes.con)  
+  } else if (cufes.source == "SQL") {
+    cufes.con  <- dbConnect(odbc::odbc(), 
+                            Driver = "SQL Server", 
+                            Server = "161.55.235.187", 
+                            Database = "CUFES", 
+                            Trusted_Connection = "True")
+    # Create the pointer to the CUFES table
+    cufes.all <- tbl(cufes.con, "CUFES") %>% collect()
+    
+    # Close connection
+    dbDisconnect(cufes.con)  
+  } else if (cufes.source == "CSV") {
+    # cufes.source = "CSV"
+    cufes.filename <- file.path(here("Data/CUFES", cufes.db.csv))
+    
+    cufes.all <- read_csv(cufes.filename) %>% 
+      mutate(Cruise = as.character(Cruise))
+    
+    if (is.null(cufes.all$Comments)) cufes.all$Comments <- NA_character_
+  }
+  
+  # Read CUFES data
+  cufes.all <- cufes.all %>%
+    # collect() %>% 
+    mutate(
+      Start = case_when(
+        cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+        cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+      Stop = case_when(
+        cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+        cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
+      Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+      Year = year(Start),
+      AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+    filter(between(Start, date(cufes.start), date(cufes.end)),
+           Ship %in% cruise.ship) 
+  
+  if (survey.name %in% c("1507SH")) {
+    cufes.all <- cufes.all %>% 
+      rename(lat = StopLatitude, long = StopLongitude) %>% 
+      project_df(to = crs.proj)
+  } else {
+    cufes.all <- cufes.all %>% 
+      rename(lat = StartLatitude, long = StartLongitude)%>% 
+      project_df(to = crs.proj)
+  }
+  
+  # Save imported database data to .Rdata file
+  save(cufes.all, file = here("Data/CUFES/cufes_data.Rdata"))
+} else {
+  # Load previously imported database data
+  load(here("Data/CUFES/cufes_data.Rdata"))
+}
+
+cufes.all %>% 
+  select(SampleNumber, Start, lat, long, SardineEggs, AnchovyEggs,
+         JackMackerelEggs, HakeEggs, SquidEggs, OtherFishEggs, Comments) %>% 
+  write_csv(here("Output/cufes_table_CDFW.csv"))
+```  
 
 ```{r extract-ca-net-tows,eval=FALSE}
+tows = read_csv(here("Data/Bongo/BONGO_TOWS.csv")) %>% 
+  # st_as_sf(sf_column_name = "geometry") %>% 
+  mutate(long = unlist(str_split(geometry[1], ","))[1],
+         lat = unlist(str_split(geometry[1], ","))[2]) %>% 
+  mutate(long = str_replace(long, "c\\(", ""),
+         lat = str_replace(lat, "c", "")) %>% 
+  select(-geometry, -filename)
+
+write_csv(tows, here("Output/bongo_table_CDFW.csv"))
+
 if (get.db) {
   # Define connection to CalCOFI database
   odbc_channel <- RODBC::odbcConnect("CalCOFI")
@@ -558,7 +639,7 @@ if (get.db) {
 					 CC.TOWS.T_S_C BETWEEN 1501 AND 1709"
   
   # Query CalCOFI database for net tows
-  tows <- sqlQuery(odbc_channel, t_sql) %>% 
+  tows <- RODBC::sqlQuery(odbc_channel, t_sql) %>% 
     mutate(
       date = ymd(date),
       key = paste(cruise, ship, Order_Occupied)) 
