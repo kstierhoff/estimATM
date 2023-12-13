@@ -625,7 +625,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 500 # 1000 during final
+boot.num <- 5 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -654,15 +654,35 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Clupea pallasii", 
     stratum = 1,
-    transect = 32:45),
+    transect = 57:62),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 2,
+    transect = 63:81),
+  data.frame(
+    scientificName = "Clupea pallasii", 
+    stratum = 3,
+    transect = 82:87),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 1,
-    transect = 1:31),
+    transect = 1:9),
   data.frame(
     scientificName = "Engraulis mordax", 
     stratum = 2,
-    transect = 32:44),
+    transect = 10:53),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 3,
+    transect = 54:62),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 4,
+    transect = 63:81),
+  data.frame(
+    scientificName = "Engraulis mordax", 
+    stratum = 5,
+    transect = 82:86),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 1,
@@ -670,34 +690,108 @@ strata.manual <- bind_rows(
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 2,
-    transect = 9:12),
+    transect = 9:14),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 3,
-    transect = 16:22),
+    transect = 23:32),
   data.frame(
     scientificName = "Sardinops sagax", 
     stratum = 4,
-    transect = 32:45),
+    transect = 57:62),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 5,
+    transect = 63:81),
+  data.frame(
+    scientificName = "Sardinops sagax", 
+    stratum = 6,
+    transect = 82:87),
   data.frame(
     scientificName = "Scomber japonicus", 
     stratum = 1,
     transect = 2:5),
   data.frame(
     scientificName = "Scomber japonicus", 
-    stratum = 2,
-    transect = 35:38),
+    stratum = 4,
+    transect = 58:62),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 5,
+    transect = 63:66),
+  data.frame(
+    scientificName = "Scomber japonicus", 
+    stratum = 6,
+    transect = 70:75),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 1,
-    transect = 1:31),
+    transect = 1:9),
   data.frame(
     scientificName = "Trachurus symmetricus", 
     stratum = 2,
-    transect = 35:45))
+    transect = 11:53),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 3,
+    transect = 54:62),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 4,
+    transect = 63:81),
+  data.frame(
+    scientificName = "Trachurus symmetricus", 
+    stratum = 5,
+    transect = 82:87))
+
+# strata.manual <- bind_rows( # Without Saildrone)
+#   data.frame(
+#     scientificName = "Clupea pallasii", 
+#     stratum = 1,
+#     transect = 32:45),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 1,
+#     transect = 1:31),
+#   data.frame(
+#     scientificName = "Engraulis mordax", 
+#     stratum = 2,
+#     transect = 32:44),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 1,
+#     transect = 1:7),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 2,
+#     transect = 9:12),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 3,
+#     transect = 16:22),
+#   data.frame(
+#     scientificName = "Sardinops sagax", 
+#     stratum = 4,
+#     transect = 32:45),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 1,
+#     transect = 2:5),
+#   data.frame(
+#     scientificName = "Scomber japonicus", 
+#     stratum = 2,
+#     transect = 35:38),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 1,
+#     transect = 1:31),
+#   data.frame(
+#     scientificName = "Trachurus symmetricus", 
+#     stratum = 2,
+#     transect = 35:45))
 
 # Stock boundaries --------------------------------------------------------
-stock.break.anch <- 40.50  # Latitude of Cape Mendocino
+stock.break.anch <- 40.80  # Latitude of Cape Mendocino
 stock.break.sar  <- 38.311 # Latitude of Bodega Bay, based on differences in length dist.
 # stock.break.sar  <- 34.3 # Latitude of ~Pt. Conception, base off 2023 habitat map
 
