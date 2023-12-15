@@ -593,6 +593,8 @@ uctd.cast.depth        <- 350
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
+tdr.dir.stbd           <- here("Data/TDR/Starboard")
+tdr.dir.port           <- here("Data/TDR/Port")
 tdr.pattern            <- "2312RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
