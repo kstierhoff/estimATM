@@ -60,7 +60,7 @@ if (process.nearshore) {
     nasc.nearshore <- nasc.nearshore %>% 
       mutate(vessel.orig = vessel.name)
   }
-
+  
   # Export data for processing using the CTD app
   write_csv(nasc.nearshore, here("Output/CTDapp/CTDapp_All_Nearshore.csv"))
   save(nasc.nearshore, file = here("Output/CTDapp/CTDapp_All_Nearshore.Rdata"))
@@ -103,7 +103,7 @@ if (process.nearshore) {
         # Remove LM sets north of Cape Mendocino
         clf.seine      <- filter(clf.seine, lat <= 40.42)
         lf.final.seine <- filter(lf.final.seine, cluster %in% unique(clf.seine$cluster))
-
+        
         # Remove LM sets north of Cape Mendocino, maybe
         # set.pie   <- filter(set.pie, lat <= 40.42)
         # set.zero   <- filter(set.pie, lat <= 40.42)
@@ -124,7 +124,7 @@ if (process.nearshore) {
         ungroup() %>% 
         bind_rows(clf.seine) %>% 
         filter(sample.type %in% catch.source.ns)  
-    
+      
       lf.final.ns <- lf.final %>% 
         bind_rows(lf.final.seine) %>% 
         filter(sample.type %in% catch.source.ns)
@@ -132,6 +132,7 @@ if (process.nearshore) {
       # Combine super.clusters and super.clusters.ns
       super.clusters.ns <- bind_rows(super.clusters, super.clusters.ns) %>% 
         filter(sample.type %in% catch.source.ns)
+      
       super.hauls.ns    <- bind_rows(super.hauls, super.clusters.ns) %>% 
         filter(sample.type %in% catch.source.ns)
       
@@ -148,6 +149,53 @@ if (process.nearshore) {
     load(here("Output/cluster_length_frequency_all_seine.Rdata"))
     load(here("Output/cluster_length_frequency_tables_seine.Rdata"))
     load(here("Output/super_clusters_hauls_ns.Rdata"))
+  }
+  
+  # Remove nearshore seine sets and acoustic intervals that extend beyond the
+  # nearshore survey footprint
+  if (survey.name %in% c("2307RL")) {
+    # Create land masks for clipping nearshore transects and purse seine sets
+    # Read N. America land mask
+    na_landmask <- st_read(here("Data/GIS/na_landmask_final.shp")) %>% 
+      st_buffer(10/60)
+    
+    # Read Channel Islands land mask
+    ci_landmask <- st_read(here("Data/GIS/channel_islands.shp")) %>% 
+      st_buffer(5/60) %>% 
+      st_transform(crs = 4326)
+    
+    # Combine land masks
+    nearshore_mask <- st_union(na_landmask, ci_landmask)
+    
+    # Code below has been replaced by nearshore_mask code above ------------
+    
+    # # within the boundaries of the nearshore transect footprint
+    # # Filter nearshore transects used to create convex hull polygons
+    # transects.sf.ns <- filter(transects.sf, Type == "Nearshore")
+    # 
+    # if (exists("transect.hulls.ns")) rm(transect.hulls.ns)
+    # 
+    # # Create convex hull polygons around nearshore transects
+    # for (r in unique(transects.sf.ns$Region)) {
+    #   transect.hulls.ns.tmp <- transects.sf.ns %>% 
+    #     filter(Region == r) %>%
+    #     group_by(Region) %>%
+    #     st_cast("POINT") %>% 
+    #     concaveman(concavity = 2.5)  
+    #   
+    #   if (exists("transect.hulls.ns")) {
+    #     transect.hulls.ns <- bind_rows(transect.hulls.ns, transect.hulls.ns.tmp)
+    #   } else {
+    #     transect.hulls.ns <- transect.hulls.ns.tmp
+    #   }
+    # }
+    
+    # Next steps ----------
+    # Create clf.ns.sf, to identify sets that occurred beyond land mask
+    ## Do st_intersection() on nasc.nearshore
+    
+    ## Do st_intersection() on clf.ns, hlf.ns, lf.final.ns, 
+    ## super.clusters.ns, and super.hauls.ns
   }
   
   # Save after processing nearshore
@@ -205,7 +253,7 @@ if (process.nearshore) {
     bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance)) 
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
-
+  
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
   #   geom_point(show.legend = FALSE) +
   #   geom_text(data = super.clusters.ns, aes(long, lat, label = factor(cluster),
@@ -342,7 +390,7 @@ if (use.seine.data) {
   #   coord_map()
 }
 
-# Select only clusters assigned to nasc intervals
+# Select only clusters assigned to nasc intervals and included in catch.source.ns
 cluster.pie.ns <- cluster.pie %>% 
   filter(cluster %in% unique(nasc.nearshore$cluster),
          sample.type %in% catch.source.ns) 
@@ -350,7 +398,7 @@ cluster.pie.ns <- cluster.pie %>%
 cluster.pos.ns <- filter(cluster.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
-# Select only hauls assigned to nasc intervals
+# Select only hauls assigned to nasc intervals and included in catch.source.ns
 haul.pie.ns <- haul.pie %>% 
   filter(haul %in% unique(nasc.nearshore$haul),
          sample.type %in% catch.source.ns) 
@@ -776,7 +824,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       # ggplot() +
       #   geom_point(data = tx.i.ns, aes(long, lat), colour = "blue") +
       #   geom_point(data = tx.o.ns, aes(long, lat), colour = "red")
-
+      
       # Create data frame with transect ends
       tx.ends.ns.k <- tx.i.ns %>% 
         mutate(vessel.name = v) %>% 
@@ -1214,10 +1262,10 @@ for (i in unique(nearshore.spp$scientificName)) {
         
         poly.region <- poly.region[grep(keep.region$Region, poly.region)]
       }
-
+      
       # ggplot(primary.poly.temp, aes(long, lat, group = region, colour = region)) + geom_polygon() + coord_map()
       if (length(grep("Island", poly.region)) > 0) {
-      # if (str_detect(poly.region, "Island")) {
+        # if (str_detect(poly.region, "Island")) {
         # If an Island strata
         # Get latitude range for backscatter data
         nasc.nearshore.summ <- nasc.nearshore %>% 
@@ -1439,6 +1487,9 @@ nasc.stock.ns <- nasc.stock.ns %>%
 
 # Clip primary polygons using the 5 m isobath polygon -------------------------
 # Summarize strata transects
+
+## ADD ABILITY TO CLIP NEARSHORE POLYGONS USING THE 5 NMI MAINLAND BUFFER OR CORE AREA STRATA POLYGONS
+
 strata.summ.ns <- strata.final.ns %>% 
   left_join(nasc.stock.ns) %>% 
   group_by(scientificName, stock, vessel.name, stratum) %>% 
@@ -1465,13 +1516,18 @@ if (length(island.polygons) > 0) {
   strata.super.polygons.ns <- strata.super.polygons
 }
 
-
 # Remove overlap with 5 m isobath and primary survey strata
-# strata.nearshore <- select(strata.nearshore, -vessel.name.1, -area.1)
+# and remove parts of stratum polygons that extend beyond the core area footprint
+
+# Extract polygons that intersect the nearshore_mask
 strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
+  # Remove overlap with land
   st_difference(st_union(bathy_5m_poly)) %>% 
+  # Remove overlap with core strata
   st_difference(select(strata.super.polygons.ns, geometry)) %>%
+  # Remove portions of polygons beyond ~5 nmi of mainland and Channel Is. land masks
+  # st_intersection(nearshore_mask) %>% 
   ungroup() %>% 
   mutate(area = st_area(.)) 
 
@@ -1726,7 +1782,7 @@ if (use.seine.data) {
     # Define sample type for non-trawl samples
     mutate(sample.type = case_when(
       is.na(sample.type) ~ "Purse seine",
-            TRUE ~ sample.type)) %>% 
+      TRUE ~ sample.type)) %>% 
     filter(sample.type %in% catch.source.ns)
   
 } else {
@@ -2308,7 +2364,7 @@ if (save.figs) {
       filter(haul %in% unique(nasc.nearshore$haul),
              CPS.wg == 0)
   }
-
+  
   # Map backscatter
   nasc.map.cps.ns <- base.map +
     # Plot transects data
@@ -2342,38 +2398,38 @@ if (save.figs) {
   
   # Create purse seine pie chart map
   if (cluster.source["NS"] == "cluster") {
-  acoustic.prop.ns <- base.map +
-    # Plot transects data
-    geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
-            size = 0.5, colour = "gray70", 
-            alpha = 0.75, linetype = "dashed") +
-    # plot ship track data
-    geom_sf(data = nav.paths.ns, colour = "gray50", size = 0.5, alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = acoustic.prop.indiv.ns, 
-                    aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
-                    cols = c("prop.anch","prop.jack","prop.her",
-                             "prop.mack","prop.rher","prop.sar"),
-                    alpha = 0.8) +
-    # Plot empty trawl locations
-    geom_point(data = cluster.zero.ns, aes(X, Y),
-               size = 3, shape = 21, fill = 'black', colour = 'white') +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. mackerel", "P. herring",
-                                 "P. mackerel", "R. herring", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, pac.herring.color,   
-                                 pac.mack.color, rnd.herring.color, sardine.color)) +
-    # Configure pie outline colors
-    scale_colour_manual(name = "Sample type", 
-                        labels = c("Purse seine", "Trawl"),
-                        values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
-                        guide = "none") +
-    # Configure legend guides
-    guides(fill = guide_legend(), size = guide_legend()) +
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    acoustic.prop.ns <- base.map +
+      # Plot transects data
+      geom_sf(data = filter(transects.sf, Type == "Nearshore"), 
+              size = 0.5, colour = "gray70", 
+              alpha = 0.75, linetype = "dashed") +
+      # plot ship track data
+      geom_sf(data = nav.paths.ns, colour = "gray50", size = 0.5, alpha = 0.5) +
+      # Plot trawl pies
+      geom_scatterpie(data = acoustic.prop.indiv.ns, 
+                      aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
+                      cols = c("prop.anch","prop.jack","prop.her",
+                               "prop.mack","prop.rher","prop.sar"),
+                      alpha = 0.8) +
+      # Plot empty trawl locations
+      geom_point(data = cluster.zero.ns, aes(X, Y),
+                 size = 3, shape = 21, fill = 'black', colour = 'white') +
+      # Configure trawl scale
+      scale_fill_manual(name = 'Species',
+                        labels = c("Anchovy", "J. mackerel", "P. herring",
+                                   "P. mackerel", "R. herring", "Sardine"),
+                        values = c(anchovy.color, jack.mack.color, pac.herring.color,   
+                                   pac.mack.color, rnd.herring.color, sardine.color)) +
+      # Configure pie outline colors
+      scale_colour_manual(name = "Sample type", 
+                          labels = c("Purse seine", "Trawl"),
+                          values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
+                          guide = "none") +
+      # Configure legend guides
+      guides(fill = guide_legend(), size = guide_legend()) +
+      coord_sf(crs = crs.proj, 
+               xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+               ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   } else {
     acoustic.prop.ns <- base.map +
       # Plot transects data
