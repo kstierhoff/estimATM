@@ -51,6 +51,8 @@ dir_create(here(c("Figs/TDR", "Output")))
 copy.files  <- F # Copy TDR files
 process.tdr <- T # Process TDR files
 process.all <- T # Process all TDR files
+process.asc <- T # Process all Seabird .asc TDR files
+asc.offset  <- 0 # Ascii file time offset, in hours
 get.db      <- T # Extract data from trawl database (F for testing)
 get.nav     <- T # Download NOAA Ship nav data
 get.nav.sh  <- T # Download NOAA Ship nav data
@@ -155,11 +157,11 @@ if (tdr.trawl.source == "Access") {
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime)) #%>% 
-#     mutate(
-#         startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-#         startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-#         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-#         stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)))
+  #     mutate(
+  #         startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+  #         startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+  #         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+  #         stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)))
 }
 
 # Classify hauls by season (spring or summer)
@@ -288,7 +290,7 @@ if (process.tdr) {
   if (length(rsk.files.kite) > 0) {
     for (i in rsk.files.kite) {
       rsk.kite <- read.rsk(i)
-
+      
       # Convert to tibble
       tbl.kite.tmp <- as_tibble(rsk.kite@data) %>% 
         mutate(filename = path_file(rsk.kite@metadata$filename),
@@ -302,7 +304,7 @@ if (process.tdr) {
       tbl.kite <- bind_rows(tbl.kite, tbl.kite.tmp)
     }
   }
-
+  
   # Process Footrope files ----------------------------------------------------------------------
   ## Create tibble for storing results
   tbl.foot <- tibble()
@@ -338,13 +340,81 @@ if (process.tdr) {
 }
 ```
 
+```{r process-asc}
+# Process .asc files from Seabird TDRs
+if (process.asc) {
+  # List all kite files
+  asc.files.stbd <- dir_ls(tdr.dir.stbd, 
+                           recurse = TRUE, regexp = "*.asc")
+  # List all footrope files
+  asc.files.port <- dir_ls(tdr.dir.port, 
+                           recurse = TRUE, regexp = "*.asc")
+  
+  # Process Starboard files ------------------------------------------------------------------
+  ## Create tibble for storing results
+  tbl.stbd <- tibble()
+  
+  if (length(asc.files.stbd) > 0) {
+    for (i in asc.files.stbd) {
+      asc.stbd <- read_csv(i, skip = 11,
+                           col_names = c("temperature","pressure","date","time")) %>% 
+        mutate(filename = path_file(i),
+               cruise = survey.name,
+               haul  = as.numeric(str_sub(filename, nchar("starboard_") + 1, nchar("starboard_") + 3)),
+               loc   = "Starboard",
+               depth = surveyR::calc_depth(mean.lat, pressure*100)-10,
+               time = dmy_hms(paste(date, time)) - hours(asc.offset),
+               time = with_tz(time, tzone = tdr.tz))
+      
+      tbl.stbd <- bind_rows(tbl.stbd, asc.stbd)
+    }
+    
+    # Combine results
+    tbl.all <- bind_rows(tbl.all, filter(tbl.stbd, !filename %in% unique(tbl.all$filename)))
+    
+    # Combine with tbl.all.new
+    if(nrow(tbl.all.new) > 0) {
+      tbl.all.new <- bind_rows(tbl.all.new, filter(tbl.stbd, haul %in% unique(tbl.all.new$haul)))
+    }
+  }
+  
+  # Process Port files ----------------------------------------------------------------------
+  ## Create tibble for storing results
+  tbl.port <- tibble()
+  
+  if (length(asc.files.port) > 0) {
+    for (i in asc.files.port) {
+      asc.port <- read_csv(i, skip = 11,
+                           col_names = c("temperature","pressure","date","time")) %>% 
+        mutate(filename = path_file(i),
+               cruise = survey.name,
+               haul  = as.numeric(str_sub(filename, nchar("port_") + 1, nchar("port_") + 3)),
+               loc   = "Port",
+               depth = surveyR::calc_depth(mean.lat, pressure*100)-10,
+               time = dmy_hms(paste(date, time)) - hours(asc.offset),
+               time = with_tz(time, tzone = tdr.tz))
+      
+      tbl.port <- bind_rows(tbl.port, asc.port)
+    }
+    
+    # Combine results
+    tbl.all <- bind_rows(tbl.all, filter(tbl.port, !filename %in% unique(tbl.all$filename)))
+    
+    # Combine with tbl.all.new
+    if(nrow(tbl.all.new) > 0) {
+      tbl.all.new <- bind_rows(tbl.all.new, filter(tbl.port, haul %in% unique(tbl.all.new$haul)))
+    }
+  }
+}
+```
+
 ```{r plot-results}
 # Plot and save all new deployments
 if(nrow(tbl.all.new) > 0) {
   for (k in unique(tbl.all.new$haul)) {
     # Get TDR data from haul k
     tdr.plot <- filter(tbl.all.new, haul == k) %>% mutate(time = time + hours(tdr.offset[k]))
-
+    
     # Get haul info from haul k
     trawl.window <- haul %>% 
       filter(haul == k)
@@ -354,7 +424,7 @@ if(nrow(tbl.all.new) > 0) {
       select(haul, 'Net in water' = netInWaterTime, 'Equilibrium' = equilibriumTime, 
              'Haul back' = haulBackTime, 'Net on deck' = netOnDeckTime) %>% 
       pivot_longer(cols = 'Net in water':'Net on deck', names_to = "event", values_to = "time") 
-
+    
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
       mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
@@ -371,7 +441,8 @@ if(nrow(tbl.all.new) > 0) {
     plot.tdr <- ggplot() + 
       geom_line(data = tdr.plot,
                 aes(time, depth + 10, colour = loc)) + 
-      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red"),
+      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red",
+                                                        Starboard = "magenta", Port = "green"),
                           guide = guide_legend(reverse = TRUE)) +
       geom_hline(yintercept = 0, colour = "gray50") +
       # ylim(min(tdr.plot$depth), 10) +
