@@ -64,9 +64,9 @@ save.figs     <- T # Create new figures
 get.db        <- T # Download data from databases (fast; generally TRUE)
 get.nav       <- T # Download Lasker nav data from ERDDAP
 nav.source    <- "ERDDAP" # Navigation data source: ERDDAP or SCS
-get.nav.sh    <- T # Download Shimada nav data from ERDDAP
-get.nav.sd    <- T # Download Saildrone nav data from ERDDAP
-get.nav.ns    <- T # Process data from nearshore vessels
+get.nav.sh    <- F # Download Shimada nav data from ERDDAP
+get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
+get.nav.ns    <- F # Process data from nearshore vessels
 get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
 extract.bathy <- T # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -571,55 +571,59 @@ nav.summ %>%
 In addition to the total kilometers, the ship often requests a summary of transect distance sampled by the ship during each leg.
 
 ```{r transect-summary}
-# Load backscatter data
-load(here("Data/Backscatter/nasc_all.Rdata"))
-
-if (extract.bathy) {
-  # Extract depth for each interval
-  nasc.depth <- get.depth(noaa.bathy, nasc$long, nasc$lat, 
-                          locator = F, distance = T) %>%
-    rename(long = lon) 
+if (exists(here("Data/Backscatter/nasc_all.Rdata"))) {
+  # Load backscatter data
+  load(here("Data/Backscatter/nasc_all.Rdata"))
   
-  # Save results
-  save(nasc.depth, file = here("Output/nasc_bathy_Lasker.Rdata"))
+  if (extract.bathy) {
+    # Extract depth for each interval
+    nasc.depth <- get.depth(noaa.bathy, nasc$long, nasc$lat, 
+                            locator = F, distance = T) %>%
+      rename(long = lon) 
+    
+    # Save results
+    save(nasc.depth, file = here("Output/nasc_bathy_Lasker.Rdata"))
+    
+  } else {
+    # Load extracted bathymetry
+    load(here("Output/nasc_bathy_Lasker.Rdata"))
+  }
   
+  # Add depth data to nasc
+  nasc$depth <- nasc.depth$depth
+  
+  # Re-cut legs
+  nasc <- nasc %>% 
+    mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE))
+  
+  # Summarize transect distance by leg
+  nasc.summ <- nasc %>% 
+    mutate(key = paste(transect.orig, Interval)) %>% 
+    group_by(leg) %>% 
+    summarise(
+      Transects = n_distinct(transect),
+      dist_km = n_distinct(key)/10,
+      dist_nmi = dist_km * 0.539957)
+  
+  nav.das <- nav %>% 
+    group_by(leg) %>% 
+    summarise(das = n_distinct(date))
+  
+  nasc.summ %>% 
+    adorn_totals() %>%
+    rename("Leg" = leg,
+           "Distance (km)"  = dist_km,
+           "Distance (nmi)" = dist_nmi) %>%  
+    kable(format = knitr.format, booktabs = TRUE, escape = F,
+          align = c("c"),
+          digits = c(0,0,0,0),
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                  full_width = F) %>%
+    row_spec(0, align = c("c"))
 } else {
-  # Load extracted bathymetry
-  load(here("Output/nasc_bathy_Lasker.Rdata"))
+  print("No backscatter data present")
 }
-
-# Add depth data to nasc
-nasc$depth <- nasc.depth$depth
-
-# Re-cut legs
-nasc <- nasc %>% 
-  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE))
-
-# Summarize transect distance by leg
-nasc.summ <- nasc %>% 
-  mutate(key = paste(transect.orig, Interval)) %>% 
-  group_by(leg) %>% 
-  summarise(
-    Transects = n_distinct(transect),
-    dist_km = n_distinct(key)/10,
-    dist_nmi = dist_km * 0.539957)
-
-nav.das <- nav %>% 
-  group_by(leg) %>% 
-  summarise(das = n_distinct(date))
-
-nasc.summ %>% 
-  adorn_totals() %>%
-  rename("Leg" = leg,
-         "Distance (km)"  = dist_km,
-         "Distance (nmi)" = dist_nmi) %>%  
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
-        align = c("c"),
-        digits = c(0,0,0,0),
-        format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = F) %>%
-  row_spec(0, align = c("c"))
 ```
 
 ### Nearshore
@@ -941,7 +945,7 @@ if (get.db) {
   haul.all       <- tbl(trawl.con, "Haul") %>% collect()
   lengths.all    <- tbl(trawl.con, "Specimen") %>% collect()
   if (dbExistsTable(trawl.con, "LengthFrequency"))
-      lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+    lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
   spp.codes      <- tbl(trawl.con, "SpeciesCodes") %>% collect()
   
   # Close database channel
@@ -951,13 +955,13 @@ if (get.db) {
   spp.codes$scientificName[spp.codes$species == 161743] <- "Etrumeus teres"
   
   # Save imported database data to .Rdata file
-    if (exists("lengthFreq.all")) {
-      save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+  if (exists("lengthFreq.all")) {
+    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
          file = here("Data/Trawl/trawl_data.Rdata"))
-    } else {
-      save(catch.all, haul.all, lengths.all, spp.codes,  
+  } else {
+    save(catch.all, haul.all, lengths.all, spp.codes,  
          file = here("Data/Trawl/trawl_data.Rdata"))
-    }
+  }
   
   # Save species codes
   save(spp.codes, file = here("Output/species_codes.Rdata"))
