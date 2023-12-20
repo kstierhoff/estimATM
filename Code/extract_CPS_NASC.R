@@ -37,7 +37,7 @@ atm::extract_cps_nasc(
   dist.bin    = 2000,  # Distance bins for results plot (2000 default, smaller for short transects)
   root        = 2,     # Constant for controlling bubble size (2)
   scaling     = 0.1,   # Constant for controlling bubble size (0.1)
-  jpeg        = FALSE, # Save intermediate plots from line picks
+  jpeg        = TRUE, # Save intermediate plots from line picks
   x11.w       = 1600,  # Width of graphics window (px)
   x11.h       = 600)   # Height of graphics window (px)
 
