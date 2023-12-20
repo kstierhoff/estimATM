@@ -1529,12 +1529,6 @@ strata.summ.plot.ns <- strata.final.ns %>%
     nTx       = n()) %>% 
   arrange(scientificName, stratum)
 
-# Plot results of strata definition algorithm compared to transect spacing, biomass density, etc.
-## Similar to fig_biomass_density_transect_tx/lat.png
-if (save.figs) {
-  source(here("Code/plot_strata_summaries_nearshore.r"))
-}
-
 # Remove overlapping intervals --------------------------------------------
 # Create a mask for LBC data, used to punch holes in Lasker's super polygons
 island.polygons <- strata.ns %>% 
@@ -1621,6 +1615,12 @@ strata.summ.nearshore <- strata.nearshore %>%
   # select(scientificName, stratum, stock, area) %>%
   mutate(area = as.numeric(area)) %>% 
   st_set_geometry(NULL)
+
+# Plot results of strata definition algorithm compared to transect spacing, biomass density, etc.
+## Similar to fig_biomass_density_transect_tx/lat.png
+if (save.figs) {
+  source(here("Code/plot_strata_summaries_nearshore.r"))
+}
 
 if (save.figs) {
   # Add strata polygons to acoustic proportions map
