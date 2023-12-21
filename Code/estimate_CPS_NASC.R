@@ -352,7 +352,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   gps.status <- new.masked.file %>% 
     select(Dist_M, Lat_M, Lon_M) %>% 
     group_by(Dist_M) %>% 
-    summarize(Lat_M = Lat_M[1],
+    summarise(Lat_M = Lat_M[1],
               Lon_M = Lon_M[1]) %>% 
     mutate(gps.good = case_when(
       is.na(Lat_M) | is.na(Lon_M) ~ FALSE,
@@ -363,7 +363,7 @@ extractNASC <- function(path.in, pattern.in, path.out, suffix.out,
   seabed.depth <- new.masked.file %>% 
     arrange(Dist_M) %>% 
     group_by(Dist_M) %>% 
-    summarize(max.depth = -max(Depth_mean))
+    summarise(max.depth = -max(Depth_mean))
   
   ## Plot results
   cps.nasc.bubble <- ggplot(new.masked.file) +
