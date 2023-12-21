@@ -12,11 +12,14 @@ clear; close all;
 %% User Settings
 
 % Define vessels for which there are NASC CSVs
+% vessels = {'RL' 'SH'};
+% vessels = {'SD\1048' 'SD\1060' 'SD\1096'};
 vessels = {'LBC' 'LM'};
 
 % Define color order for plotting vessel NASCs, respective to 'vessels'
 % colors = 'rcgmm';
-colors = 'rbcygbb';
+% colors = 'rbcygbb';
+colors = 'rby';
 
 % Define boundary extents of habitat data to download
 latBounds = [27 51];
@@ -41,7 +44,7 @@ addpath 'C:\Users\josiah.renfree\Documents\MATLAB\borders'
 timespan = hours(6);
 
 % Define animated gif name
-surveyName = '2307RL';
+surveyName = '2307RL_newModel_LBCandLM';
 
 %% Create sardine habitat model predictor
 
@@ -454,11 +457,11 @@ for i = 1:length(timeBin)
 
     % If first frame define loop count
     if i == 1
-        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '_newModel_LBCandLM.gif']),'gif','LoopCount',0,'DelayTime',.1);
+        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '.gif']),'gif','LoopCount',0,'DelayTime',.1);
 
     % Otherwise, append to existing gif
     else
-        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '_newModel_LBCandLM.gif']),'gif','WriteMode','append','DelayTime',.1);
+        imwrite(imind, cm, fullfile(pwd, 'habitatData', [surveyName '.gif']),'gif','WriteMode','append','DelayTime',.1);
     end
 
     waitbar(i/length(timeBin), h, char(timeBin(i)))
@@ -469,4 +472,4 @@ close(h)
 title(ax, '')
 
 % Save final figure
-exportgraphics(gcf, ['..\Figs\fig_sardine_habitat_composite_' surveyName '_newModel_LBCandLM.png'])
+exportgraphics(gcf, ['..\Figs\fig_sardine_habitat_composite_' surveyName '.png'])

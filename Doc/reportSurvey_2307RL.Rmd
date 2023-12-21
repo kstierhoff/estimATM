@@ -715,6 +715,56 @@ if (process.scs) {
 }
 ```
 
+
+```{r process-centerboard-position}
+# Read the raw centerboard position data from the SCS sensor, as opposed to
+# parsing those events from the SCS event logs
+
+# Read CSV containing centerboard times, then create new columns with new time
+# formats
+cb.position <- read_csv(here("Data/SCS/Centerboard/CB_Changes.csv")) %>% 
+  mutate(time = mdy_hms(paste(Date, Time_UTC)),
+         datetime = format(time, format = "%m/%d/%Y %H:%M"))
+
+# # Find data files in Centerboard directory
+# cb.files <- list.files(here("Data/SCS/Centerboard"), pattern = ".CALC.log",
+#                             full.names = T, recursive = T)  
+# 
+# # create data frame
+# cb.positions <- data.frame(matrix(ncol = 2, nrow = 0))
+# colnames(cb.positions) <- c("Time", "Depth")
+#     
+# # Cycle through each log file
+# for (i in cb.files) {
+#   
+#   # Read file contents (exclude header)
+#   tmp <- read_lines(i)[-1]
+#   
+#   # Obtain time stamps
+#   cb.time <- lapply(tmp, function(x) strsplit(x, ",")[[1]][1])
+#   cb.time <- as.POSIXct(unlist(cb.time), format = "%Y-%m-%dT%H:%M:%OS", tz = "UTC")
+#   
+#   # Obtain centerboard depths
+#   cb.depths <- as.numeric(unlist(lapply(tmp, function(x) strsplit(x, ",")[[1]][4])))
+#   
+#   # Bind rows
+#   cb.positions <- rbind(cb.positions, data.frame(Time = cb.time, Depth = cb.depths))
+# }
+# 
+# # Remove outliers
+# cb.positions <- cb.positions[cb.positions$Depth <= 12 & cb.positions$Depth >= 0, ]
+# 
+# plot(cb.positions$Time, cb.positions$Depth)
+# 
+# library(plotly)
+# 
+# # Create a scatter plot with hover text
+# plot_ly(data = cb.positions, x = ~Time, y = ~Depth, type = "scatter", mode = "markers", text = ~paste("Timestamp: ", Time))
+
+
+```
+
+
 ```{r import-trawl-data}
 if (get.db) {
   # An installation of Microsoft Access Database Engine Redistributable is required
@@ -879,6 +929,7 @@ cluster.mid <- haul.mid %>%
 # Save haul data
 save(haul, file = here("Output/haul_info.Rdata"))
 ``` 
+
 ```{r process-seine-data}
 # Process seine data
 source(here("Code/processSeine.R"))
@@ -1305,6 +1356,68 @@ if (survey.name %in% c("2207RL")) {
   } else {
     ctd.sta <- bind_rows(ctd.sta, ctd.sh.sf)  
   }  
+  
+# If 2023
+} else if (survey.name %in% c("2307RL")) {
+  
+  ##### Change any station after Oct 1st to Shimada
+  uctd.sta$Vessel[uctd.sta$cast.date > mdy("10-01-2023")] <- "SH"
+  
+  ##### Read and append Lisa Marie casts
+  
+  # Read station info
+  uctd.lm <- read_csv(here("Data/UCTD/LM/CTD_Casts.csv")) %>% 
+    mutate(Button = "UCTD Cast",
+           time = mdy_hms(paste(Date, Time)),
+           datetime = format(time, format = "%m/%d/%Y %H:%M"),
+           Vessel = "LM")
+  
+  uctd.lm.sf <- uctd.lm %>% 
+    project_df(to = crs.proj) %>% 
+    st_as_sf(coords = c("X", "Y"), crs = crs.proj)
+  
+  # Combine with Lasker and Shimada casts
+  if (nrow(uctd.sta) == 0) {
+    uctd.sta <- uctd.lm.sf  
+  } else {
+    uctd.sta <- bind_rows(uctd.sta, uctd.lm.sf)  
+  }  
+
+  ##### Read and append Long Beach Carnage casts
+  
+  # Read station info
+  uctd.lbc <- read_csv(here("Data/UCTD/LBC/CTD_Casts.csv")) %>% 
+    mutate(Button = "UCTD Cast",
+           time = mdy_hms(paste(Date, Time)),
+           datetime = format(time, format = "%m/%d/%Y %H:%M"),
+           Vessel = "LBC")
+  
+  uctd.lbc.sf <- uctd.lbc %>% 
+    project_df(to = crs.proj) %>% 
+    st_as_sf(coords = c("X", "Y"), crs = crs.proj)
+  
+  # Combine with Lasker and Shimada casts
+  if (nrow(uctd.sta) == 0) {
+    uctd.sta <- uctd.lbc.sf  
+  } else {
+    uctd.sta <- bind_rows(uctd.sta, uctd.lbc.sf)  
+  }  
+  
+  ##### Read and append CTD casts from NSWFSC Hake survey on Shimada
+  
+  # Read station info
+  ctd.sh.hake <- read_csv(here("Data/CTD/SH_hake/CTD_Casts.csv")) %>% 
+    mutate(Button = "CTD Cast",
+           time = mdy_hms(paste(Date, Time)),
+           datetime = format(time, format = "%m/%d/%Y %H:%M"),
+           Vessel = "SH Hake")
+  
+  ctd.sh.hake.sf <- ctd.sh.hake %>% 
+    project_df(to = crs.proj) %>% 
+    st_as_sf(coords = c("X", "Y"), crs = crs.proj)
+  
+  # There were no other CTD casts, so just set equal to ctd.sta
+  ctd.sta <- ctd.sh.hake.sf  
 }
 
 # Extract bongo locations
@@ -1755,7 +1868,7 @@ if (save.figs) {
     #         shape = 21, size = 2, fill = "red", colour = "black") +
     
     # Plot UCTD stations
-    geom_sf(data = uctd.sta, 
+    geom_sf(data = filter(uctd.sta, Vessel == "RL"), 
             shape = 21, size = 2, fill = "red", colour = "black") +
     coord_sf(crs = crs.proj,
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
@@ -1888,7 +2001,7 @@ Santa Cruz, CA 95064, USA
 
 # Introduction {#introduction}
 
-The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA ships *`r survey.vessel.long`* (hereafter *`r survey.vessel`*) and _Shimada_, `r survey.start` to `r survey.end` `r survey.year`, and augmented by data collected from the fishing vessels _Lisa Marie_ and _Long Beach Carnage_ and uncrewed surface vehicles (USVs; Saildrone, Inc.)(**Fig.** \@ref(fig:vessel-pic)). The Acoustic-Trawl Method (ATM) is routinely used to assess coastal pelagic fish species (CPS) within the California Current Ecosystem (CCE), typically between Vancouver Island, British Columbia and San Diego, CA. Starting in 2021, the survey has extended southward to include central Baja California, Mexico. Data were collected using multi-frequency echosounders, surface trawls, obliquely integrating net tows, a Continuous Underway Fish-Egg Sampler [CUFES; @Checkley1997], and conductivity-temperature-depth probes (CTDs).
+The `r survey.name.long` (`r survey.name`) was conducted by the Fisheries Resources Division (FRD) of the Southwest Fisheries Science Center (SWFSC) aboard NOAA ships *`r survey.vessel.long`* (hereafter *`r survey.vessel`*) and _Bell M. Shimada_ (hereafter _Shimada_), `r survey.start` to `r survey.end` `r survey.year`, and augmented by data collected from the fishing vessels _Lisa Marie_ and _Long Beach Carnage_ and uncrewed surface vehicles (USVs; Saildrone, Inc.)(**Fig.** \@ref(fig:vessel-pic)). The Acoustic-Trawl Method (ATM) is routinely used to assess coastal pelagic fish species (CPS) within the California Current Ecosystem (CCE), typically between Vancouver Island, British Columbia and San Diego, CA. Starting in 2021, the survey has extended southward to include central Baja California, Mexico. Data were collected using multi-frequency echosounders, surface trawls, obliquely integrating net tows, a Continuous Underway Fish-Egg Sampler [CUFES; @Checkley1997], and conductivity-temperature-depth probes (CTDs).
 
 The objectives for the survey were to: 
 
@@ -1896,14 +2009,14 @@ The objectives for the survey were to:
   2. Characterize and investigate linkages to their biotic and abiotic environments; 
   3. Gather information regarding their life histories; 
   4. Use fishing vessels and USVs to sample transects and nearshore areas (typically within 5 nmi of the coast) when and where sampling from NOAA ships was deemed inefficient, unsafe, or both (**Fig.** \@ref(fig:vessel-pic));
-  5. Compare the species and size distributions of CPS and Pacific Hake *Merluccius productus* between night-time _Lisa Marie_ purse seine sets to proximate trawl sampling from *`r survey.vessel.long`*, NOAA FSV _Shimada_, and Canadian R/V _Franklin_; and
+  5. Compare the species and size distributions of CPS and Pacific Hake *Merluccius productus* between night-time _Lisa Marie_ purse seine sets with proximate trawl sampling from *`r survey.vessel`*, _Shimada_, and Canadian R/V _Franklin_; and
   6. Compare the species and size distributions of proximate day-time and night-time _Lisa Marie_ purse seine sets.
   
-The survey domain, from *survey.landmark.n* to *survey.landmark.s*, was defined primarily by the historically observed distribution of the northern subpopulation (stock) of Pacific Sardine [@Zwolinski2011], with a southern extension permitted by available sampling effort. This area was chosen to encompass the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S., Canada, and Mexico, but it also spanned portions of the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, Pacific Round Herring, and Pacific Herring.
+The survey domain, from Punta Eugenia, Baja CA to Cape Scott, BC, was defined primarily by the historically observed distribution of the northern subpopulation (stock) of Pacific Sardine [@Zwolinski2011], with a southern extension permitted by available sampling effort. This area was chosen to encompass the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy off the west coasts of the U.S., Canada, and Mexico, but it also spanned portions of the southern stock of Pacific Sardine, Pacific Mackerel, Jack Mackerel, Pacific Round Herring, and Pacific Herring.
 
 This report provides an overview of the survey objectives and a summary of the survey equipment, sampling protocols, and data collections. This report does not include estimates of the animal distributions and biomasses, which are documented separately. 
 
-(ref:vessel-pic) NOAA ship _`r survey.vessel`_ (top), F/V _Lisa Marie_ (bottom left), F/V _Long Beach Carnage_ (bottom middle), and an uncrewed surface vehicle (Saildrone USV, bottom right).
+(ref:vessel-pic) NOAA ship _`r survey.vessel`_ (top), F/V _Lisa Marie_ (bottom left), F/V _Long Beach Carnage_ (bottom middle), and an uncrewed surface vehicle (Saildrone USV, bottom right). NOAA ship _Shimada_ not pictured.
 
 ```{r vessel-pic, fig.cap='(ref:vessel-pic)', out.height='5.0in', fig.pos='H'}
 include_graphics(here("Images/img_vessels_1907RL.png"))
@@ -1912,33 +2025,33 @@ include_graphics(here("Images/img_vessels_1907RL.png"))
 \newpage  
 
 ## Scientific Personnel {#introduction-personnel}
-The collection and analysis of the survey data were conducted by members of 1-NOAA, 2-UCSC/CIMEAS, 3-OAI, 4-INFISH intern, 5-UCSD/SIO, 6-volunteer, 7-INAPESCA, 8-WDFW, and 9-CWPA. Asterisks denote Chief Scientists.
+The collection and analysis of the survey data were conducted by members of 1-NOAA, 2-UCSC/CIMEAS, 3-OAI, 4-INFISH intern, 5-UCSD/SIO, 6-volunteer, 7-OSU, 8-INAPESCA, 9-WDFW, and 10-CWPA. Asterisks denote Chief Scientists.
 
-The survey on _`r survey.vessel`_ was originally divided into three legs, with each leg consisting of two parts (denoted 1 or 2) and a personnel transfer conducted partway through the leg. Leg I.1 and all of Leg II were cancelled due to OMAO staffing shortages and maintenance issues. Because of these issues, a fourth leg, consisting of two parts, was added and conducted by _Shimada_.
+The survey on _`r survey.vessel`_ was originally divided into three legs, with each leg consisting of two parts (denoted 1 or 2) and a personnel transfer conducted partway through the leg. Leg I.1 and all of Leg II were cancelled due to OMAO staffing shortages and _Lasker_ maintenance issues. Accordingly, a fourth leg consisting of two parts was added and conducted aboard _Shimada_.
 
 **Project Lead:**
 
-* D. Demer^1^
+* K. Stierhoff^1^
 
 **Acoustic Data Collection and Processing:**
 
 * Leg I.2:    S. Mau^1^ and D. Palance^2^
-* Leg III.1:  D. Murfin^1^ and A. Beittel^1^
+* Leg III.1:  A. Beittel^1^ and D. Murfin^1^ 
 * Leg III.2:  K. Stierhoff^1\*^
-* Leg IV.1:   S. Sessions^1\*^ and A. Beittel^1^
-* Leg IV.2:   J. Zwolinski^2\*^ and S. Mau^1^
+* Leg IV.1:   A. Beittel^1^ and S. Sessions^1\*^ 
+* Leg IV.2:   S. Mau^1^ and J. Zwolinski^2\*^ 
 
 **Trawl Sampling:**
 
-* Leg I.2:    K. James^1\*^, D. Kuyper^3^, S. Mitchell^4^, B. Bellerud^1^, and N. Concha-Saiz^1^
-* Leg III.1:  O. Snodgrass^1\*^, D. Kuyper^3^, G. Angle^1^, and S. Callahan^5^
-* Leg III.2:  O. Snodgrass^1^, D. Kuyper^3^, G. Longo^6^, M. Macaskill^5^, and J. Evanilla^6^
-* Leg IV.1:   D. Kuyper^3^, N. Concha-Saiz^1^, Z. Skelton^3^, O. Boisen^6^, and B. Lind^1^
-* Leg IV.2:   K. James^1^, E. Ruhl^1^, Z. Skelton^3^, and M. Dunlap^1^
+* Leg I.2:    B. Bellerud^1^, N. Concha-Saiz^1^, K. James^1\*^, D. Kuyper^3^, and S. Mitchell^4^
+* Leg III.1:  G. Angle^1^, S. Callahan^5^, D. Kuyper^3^, and O. Snodgrass^1\*^ 
+* Leg III.2:  J. Evanilla^6^, D. Kuyper^3^, G. Longo^6^, M. Macaskill^5^, and O. Snodgrass^1^ 
+* Leg IV.1:   O. Boisen^6^, N. Concha-Saiz^1^, D. Kuyper^3^, B. Lind^1^, and Z. Skelton^3^ 
+* Leg IV.2:   M. Dunlap^1^, K. James^1^, E. Ruhl^1^, and Z. Skelton^3^ 
 
 **CUFES Sampling:**
 
-* Leg I.2:    L. Vasquez^1^ and S. Morales^7^
+* Leg I.2:    S. Morales^8^ and L. Vasquez^1^
 * Leg III.1:  E. Gardner^1^ and A. Hays^1^
 * Leg III.2:  N. Concha-Saiz^1^ and A. Hays^1^
 * Leg IV.1:   CUFES sampling not conducted
@@ -1947,9 +2060,9 @@ The survey on _`r survey.vessel`_ was originally divided into three legs, with e
 **Purse-seine Sampling:**  
 
 * _Lisa Marie_
-  + K. Hinton^8^ and Z. Calef^8^
+  + Z. Calef^9^ and K. Hinton^9^
 * _Long Beach Carnage_
-  + J. van Noord^[**UPDATE**]^
+  + J. van Noord^10^
 
 **Echosounder Calibrations:**  
 
@@ -1971,13 +2084,13 @@ The SWFSC’s ATM surveys of CPS in the CCE began in 2006 with a focus on the no
 
 Historically, in spring the northern stock of Pacific Sardine aggregates offshore of central and southern California to spawn [@Demer2012, and reference therein]. During summer, adults migrate north, compress along the coast, and feed in the upwelled regions (**Fig. \@ref(fig:sardine-distribution)**). However, since 2012, when the population began to decline, the seasonal migration of the northern stock of Pacific Sardine diminished to the extent that it remains north of Cape Mendocino year-round.  
 
-During `r tolower(survey.season)` `r survey.year`, the west coasts of the United States and Baja California, Mexico were to be surveyed using _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and USVs. Compulsory transects were nearly perpendicular to the coast and separated by 10 nmi. The survey was to begin off `r survey.landmark.s` and progress northwards toward `r survey.landmark.n`.    
+During `r tolower(survey.season)` `r survey.year`, the west coasts of the United States and Baja California, Mexico were to be surveyed using _`r survey.vessel`_, _Lisa Marie_, _Long Beach Carnage_, and USVs. Compulsory transects were nearly perpendicular to the coast and separated by 10 nmi. The survey was to begin off Punta Eugenia, Baja CA and progress northwards toward Cape Scott, BC.    
 
-The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent, based on historical observations, of the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy. For _`r survey.vessel`_, the planned transects ranged from `r survey.landmark.s` to `r survey.landmark.n`, spaced 20 nmi apart south of Cape Mendocino, CA, 10 nmi between Cape Mendocino, CA to Cape Flattery, WA, and 20 nmi north of Cape Flattery, WA. Off Vancouver Island, BC, adaptive transects would be added 10 nmi north and south of compulsory transects containing observations of CPS.  To further increase the spatial sampling resolution from _`r survey.vessel`_, USVs were to conduct acoustic sampling interstitial to _`r survey.vessel`_ transects between Point Conception, CA and Cape Mendocino, CA. The USVs were to also sample transects spaced 20 nmi apart north of Cape Mendocino, CA, resulting in _`r survey.vessel`_ and the USVs duplicating every other transect. Lastly, in Baja California the Mexican research vessel _Dr. Jorge Carranza Fraser_ was to sample interstitial to _`r survey.vessel`_ transects, although their results are not presented here. The final result would be acoustically-sampled transects spaced 10 nmi apart throughout the entire survey region, except in the Southern California Bight where only _`r survey.vessel`_ would sample with 20-nmi spacing. 
+The planned transects (**Fig. \@ref(fig:survey-plan)**) spanned the latitudinal extent, based on historical observations, of the anticipated distributions of the northern stock of Pacific Sardine and the central and northern stocks of Northern Anchovy. For _`r survey.vessel`_, the planned transects ranged from Punta Eugenia, Baja CA to Cape Scott, BC, spaced 20 nmi apart south of Cape Mendocino, CA, 10 nmi between Cape Mendocino, CA to Cape Flattery, WA, and 20 nmi north of Cape Flattery, WA. Off Vancouver Island, BC, adaptive transects would be added 10 nmi north and south of compulsory transects containing observations of CPS.  To further increase the spatial sampling resolution from _`r survey.vessel`_, USVs were to conduct acoustic sampling interstitial to _`r survey.vessel`_ transects between Point Conception, CA and Cape Mendocino, CA. The USVs were to also sample transects spaced 20 nmi apart north of Cape Mendocino, CA, resulting in _`r survey.vessel`_ and the USVs duplicating every other transect. Lastly, in Baja California the Mexican research vessel _Dr. Jorge Carranza Fraser_ was to sample interstitial to _`r survey.vessel`_ transects. The final result would be acoustically-sampled transects spaced 10 nmi apart throughout the entire survey region, except in the Southern California Bight where only _`r survey.vessel`_ would sample with 20-nmi spacing. 
 
-To estimate CPS biomass near shore, typically within 5 nmi of the coast where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was to be augmented with echosounder and purse-seine sampling from _Lisa Marie_ between Bodega Bay, CA to `r survey.landmark.n`; and from _Long Beach Carnage_ between San Diego, CA to Bodega Bay, CA, and around Santa Cruz and Santa Catalina Islands (**Fig. \@ref(fig:survey-plan)**). And to compare the species and size compositions between the various platforms and net systems, _Lisa Marie_ was to conduct nighttime purse seine sets in proximity to _`r survey.vessel`_ nighttime surface trawls and _Shimada_ daytime midwater trawls between Point Conception, CA to Cape Flattery, WA. _Lisa Marie_ would also conduct daytime purse seine sets throughout the nearshore survey to compare with their nighttime catches.
+To estimate the nearshore CPS biomass, typically within 5 nmi of the coast where it is too shallow to navigate NOAA ships safely, sampling from _`r survey.vessel`_ was to be augmented with echosounder and purse-seine sampling from _Long Beach Carnage_ between San Diego, CA to Bodega Bay, CA, and around Santa Cruz and Santa Catalina Islands; and from _Lisa Marie_ between Bodega Bay, CA to `r survey.landmark.n` (**Fig. \@ref(fig:survey-plan)**). And to compare the species and size compositions between the various platforms and net systems, _Lisa Marie_ was to conduct nighttime purse seine sets in proximity to _`r survey.vessel`_ nighttime surface trawls and _Shimada_ daytime midwater trawls between Point Conception, CA to Cape Flattery, WA. _Lisa Marie_ would also conduct daytime purse seine sets throughout the nearshore survey to compare with their nighttime catches.
 
-Due to OMAO staffing shortages and maintenance issues on _`r survey.vessel`_, Leg I.1 and all of Leg II were cancelled, prompting modifications to the sampling plan throughout the survey. All transects off Baja California were abandoned, with Leg I.2 beginning the survey off San Diego, CA. Because of the delay, _`r survey.vessel`_ was unable to conduct comparative trawls with _Shimada_ and _Lisa Marie_.  Moreover, because _Lisa Marie_ delayed its schedule to synchronize its nearshore sampling with _`r survey.vessel`_, comparative purse seine catches with _Shimada_ were only conducted between Point Conception, CA and Bodega Bay, CA. _`r survey.vessel`_ completed its survey, after Leg III, having only sampled to Cape Mendocino, CA. An additional Leg IV on _Shimada_ was then added to sample transects from Cape Mendocino, CA to Cape Flattery, WA [**UPDATE IF NECESSARY**]. No changes were made to the sampling plan for _Long Beach Carnage_ or the USVs.
+Due to OMAO staffing shortages and maintenance issues on _`r survey.vessel`_, Leg I.1 and all of Leg II were cancelled, prompting modifications to the sampling plan throughout the survey. All transects off Baja California were abandoned, with Leg I.2 beginning the survey off San Diego, CA. Because of the delay, _`r survey.vessel`_ was unable to conduct comparative trawls with _Shimada_ and _Lisa Marie_.  Moreover, because _Lisa Marie_ delayed its schedule to synchronize its nearshore sampling with _`r survey.vessel`_, comparative purse seine catches with _Shimada_ were only conducted between Point Conception, CA and Bodega Bay, CA. _`r survey.vessel`_ completed its survey after Leg III, having only sampled to Cape Mendocino, CA. An additional Leg IV on _Shimada_ was then added to sample transects from Cape Mendocino, CA to Cape Flattery, WA, however due to time constraints only sampled as far south as Reedsport, OR. No changes were made to the sampling plan for _Long Beach Carnage_ or the USVs.
 
 For _`r survey.vessel`_ and _Shimada_, the offshore extent of the transects was extended by 5-nmi segments if CPS were observed in the echograms or CUFES samples during the last 3 nmi of the transect or additional segment, for up to a total extension of 50 nmi. If a transect was extended, the ensuing transect was extended by the same amount.
 
@@ -1989,7 +2102,7 @@ include_graphics(here("Images/img_survey_region.png"))
 
 \newpage  
 
-(ref:survey-plan) Planned core-area (solid black lines) and adaptive (dashed red lines) transect lines to be sampled by _`r survey.vessel`_; interstitial transects to be sampled by USVs (solid cyan lines); and nearshore transect lines to be sampled by fishing vessels (solid magenta lines). Isobaths (light gray lines) are at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 ftm).
+(ref:survey-plan) Planned core-region (solid black lines) and adaptive (dashed red lines) transects to be sampled by _`r survey.vessel`_; core-region transects to be sampled in Baja California, MX by _Carranza_ (solid green lines); interstitial transects to be sampled by USVs (dashed cyan lines); and nearshore transect lines to be sampled by fishing vessels (solid magenta lines). Isobaths (light gray lines) are at 50, 200, 500, and 2,000 m (or approximately 25, 100, 250, and 1,000 ftm).
 
 ```{r survey-plan, fig.cap='(ref:survey-plan)', out.height='8in',fig.align='center',fig.pos='H'}
 include_graphics(here("Figs/fig_survey_plan.png"))
@@ -2026,15 +2139,15 @@ include_graphics(here("Images/img_carnage_MTA4.jpg"))
 
 ### Calibrations {#methods-echosounder-calibration}  
 
-The echosounder systems on each vessel were calibrated using the standard sphere technique [@Foote1987;@Demer2015]. On _`r survey.vessel`_, each WBT was calibrated in both CW (continuous wave or narrowband mode) and FM modes (frequency modulation or broadband mode). For both modes, the reference target was a `r cal.sphere`; For FM mode, additional calibrations were conducted for the 120, 200, and 333-kHz echosounders using a smaller 25-mm WC sphere. Calibrations for _Lisa Marie_, _Long Beach Carnage_, and the USVs were all conducted using a WC38.1. Calibrations for _Shimada_ were conducted by the Northwest Fisheries Science Center, with their results utilized for subsequent data processing. Apart from _Shimada_, the calibration parameters were derived in Echoview (see **Section \@ref(results-echosounder-calibration)**).  
+The echosounder systems on each vessel were calibrated using the standard sphere technique [@Foote1987;@Demer2015]. On _`r survey.vessel`_, each WBT was calibrated in both CW (continuous wave or narrowband mode) and FM modes (frequency modulation or broadband mode). For both modes, the reference target was a `r cal.sphere`; For FM mode, additional calibrations were conducted for the 120, 200, and 333-kHz echosounders using a smaller 25-mm WC sphere. Calibrations for _Shimada_, _Lisa Marie_, _Long Beach Carnage_, and the USVs were all conducted using a WC38.1. The _Shimada_ calibration was conducted by the Northwest Fisheries Science Center after completion of the Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey. The calibration parameters for all vessels were derived in Echoview (see **Section \@ref(results-echosounder-calibration)**). For each echosounder, the calibrated Equivalent Two-Way Beam Angle (EBA) was derived by compensating the factory-measured EBA by the change in local sound speed [@Demer2015;@Bodholt2002]; when processing the survey transects, the calibrated measures of transducer gain, beamwidths, and EBA were then also compensated by the changes in local sound speed.
 
 ### Data collection {#methods-acoustic-data-collection}  
 
 On _`r survey.vessel`_ and _Shimada_, the computer clocks were synchronized with the GPS clock (UTC) using synchronization software (NetTime^[http://timesynctool.com]). The 18-kHz WBT, operated by a separate PC from the other echosounders, was programmed to track the seabed and output the detected depth to the ship’s Scientific Computing System (SCS). The 38-, 70-, 120-, 200-, and 333-kHz echosounders were controlled by the EK80 Adaptive Logger [EAL^[https://www.fisheries.noaa.gov/west-coast/science-data/ek80-adaptive-logger/], @Renfree2016]. The EAL optimizes the pulse interval based on the seabed depth, while avoiding aliased seabed echoes, and was programmed such that once an hour the echosounders would record three pings in passive mode, for obtaining estimates of the background noise level. Acoustic sampling for CPS-density estimation along the pre-determined transects was limited to daylight hours (approximately between sunrise and sunset).
 
-Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$; dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were stored in Simrad-Kongsberg .raw format with a `r raw.size`-GB maximum file size. During daytime, the echosounders operated in CW mode and logged to 60 m beyond the detected seabed range or to a maximum range of 500, 500, 500, 300, and 150 m for 38, 70, 120, 200, and 333 kHz, respectively. During nighttime, the echosounders operated in FM mode and logged to 100 m. For each acoustic instrument, the prefix for each file name is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software. For example, a file generated by the Simrad-Kongsberg EK80 software (`r ek80.version`) for a WBT operated in CW mode is named `2307RL_CW-D20220826-T155651.raw`.   
+Measurements of volume backscattering strength ($S_v$; dB re 1 m^2^ m^-3^) and target strength ($TS$; dB re 1 m^2^), indexed by time and geographic positions provided by GPS receivers, were stored in Simrad-Kongsberg .raw format with a `r raw.size`-GB maximum file size. During daytime, the echosounders operated in CW mode and logged to 60 m beyond the detected seabed range or to a maximum range of 500, 500, 500, 300, and 150 m for 38, 70, 120, 200, and 333 kHz, respectively. During nighttime, the echosounders operated in FM mode and logged to 100 m. For each acoustic instrument, the prefix for each file name is a concatenation of the survey name (e.g.,  `r survey.name`), the operational mode (CW or FM), and the logging commencement date and time from the EK80 software (`r ek80.version`). For example, a file generated by the Simrad-Kongsberg EK80 software for a WBT operated in CW mode is named `2307RL_CW-D20220826-T155651.raw`.   
 
-To minimize acoustic interference, transmit pulses from the EK80s, acoustic Doppler current profiler and echosounder (Simrad-Kongsberg EC150-3C), multibeam echosounder (Simrad-Kongsberg ME70), imaging sonar (Simrad-Kongsberg MS70), scanning sonar (Simrad-Kongsberg SX90), and a separate acoustic Doppler current profiler (Teledyne RD Instruments OS75 ADCP) were triggered using a synchronization system (Simrad-Kongsberg K-Sync). The K-Sync trigger rate, and thus the echosounder ping interval, was modulated by the EAL using the 18-kHz seabed depth provided by the Scientific Computing System (SCS). The EK80, EC150-3C, ME70, MS70, and ADCP were operated continuously, while the SX90 was only operated during daytime when CPS were observed in the area. All other instruments capable of producing sound within the EK80's CW bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Model SRD-500A, Sperry Marine), or both.
+To minimize acoustic interference on _Lasker_ and _Shimada_, transmit pulses from the EK80s, acoustic Doppler current profiler and echosounder (Simrad-Kongsberg EC150-3C), multibeam echosounder (Simrad-Kongsberg ME70), imaging sonar (Simrad-Kongsberg MS70), scanning sonar (Simrad-Kongsberg SX90), and a separate acoustic Doppler current profiler (Teledyne RD Instruments OS75 ADCP) were triggered using a synchronization system (Simrad-Kongsberg K-Sync). The K-Sync trigger rate, and thus the echosounder ping interval, was modulated by the EAL using the 18-kHz seabed depth provided by the Scientific Computing System (SCS). The EK80, EC150-3C, ME70, MS70, and ADCP were operated continuously, while the SX90 was only operated during daytime when CPS were observed in the area. All other instruments capable of producing sound within the EK80's CW bandwidths were secured during daytime survey operations. Exceptions were made during stations (e.g., plankton sampling and fish trawling) or in shallow water when the vessel's command occasionally operated the bridge's 50- and 200-kHz echosounders (Furuno), the Doppler velocity log (Model SRD-500A, Sperry Marine), or both.
 
 On _Lisa Marie_ and _Long Beach Carnage_, the EAL was used to control the EK80 software to modulate the echosounder recording ranges and ping intervals to avoid aliased seabed echoes. When the EAL was not utilized, the EK80 software recorded to 1000 m and used the maximum ping rate. Transmit pulses from the EK60s and fishing sonars were not synchronized. Therefore, the latter was secured during daytime acoustic transects.
 
@@ -2042,7 +2155,7 @@ On the USVs, the echosounders were programmed to transmit CW pulses to a range d
 
 ### Data processing {#methods-acoustic-data-processing}  
 
-Echoes from schooling CPS and plankton (**Figs. \@ref(fig:ev-filtering-example)a, d**) were identified using a semi-automated data processing algorithm implemented using Echoview software (`r ev.version`; Echoview Software Pty Ltd). The filters and thresholds were based on a subsample of echoes from randomly selected CPS schools. The aim of the filter criteria is to retain at least 95% of the noise-free backscatter from CPS while rejecting at least 95% of the non-CPS backscatter (**Fig. \@ref(fig:ev-filtering-example)**). Data from _`r survey.vessel`_, _Lisa Marie_, and _Long Beach Carnage_ were processed using the following steps:  
+Echoes from schooling CPS and plankton (**Figs. \@ref(fig:ev-filtering-example)a, d**) were identified using a semi-automated data processing algorithm implemented using Echoview software (`r ev.version`; Echoview Software Pty Ltd). The filters and thresholds were based on a subsample of echoes from randomly selected CPS schools. The aim of the filter criteria is to retain at least 95% of the noise-free backscatter from CPS while rejecting at least 95% of the non-CPS backscatter (**Fig. \@ref(fig:ev-filtering-example)**). Data from _`r survey.vessel`_, _Shimada_, _Lisa Marie_, and _Long Beach Carnage_ were processed using the following steps:  
 
 1. Match geometry of all $S_v$ variables to the 38-kHz $S_v$;
 2. Remove passive-mode pings;
@@ -2091,7 +2204,7 @@ Up to three nighttime (i.e., 60 min after sunset to 30 min before sunrise) surfa
 
 Trawls were towed at ~4 kn for 45 min, excluding the deployment and haulback times. To the extent possible, the tow-track was curved in an arc-shaped pattern to keep the trawl outside of the vessel’s wake. The total catch from each trawl was weighed and sorted by species or groups. From the catches with CPS, specimens were selected randomly for each of the target species (up to 75 for Pacific Sardine and Northern Anchovy and up to 50 for Pacific Mackerel, Jack Mackerel, Pacific Round Herring, Pacific Hake, and Pacific Herring). Those were weighed and measured to either their standard length ($L_S$; mm) for Pacific Sardine and Northern Anchovy, or fork length ($L_F$; mm) for Jack Mackerel, Pacific Mackerel, Pacific Round Herring, Pacific Hake, and Pacific Herring. In addition, sex and maturity were visually determined and recorded for up to 50 specimens from Pacific Sardine and Pacific Hake and up to 25 for Northern Anchovy and Pacific and Jack Mackerels. For subsequent histological processing to validate maturity, ovaries were preserved of each CPS, except Pacific Round Herring, Pacific Hake, and Pacific Herring. For each CPS, ovaries (either whole or partial) were preserved for up to 10 specimens from each maturity code (immature specimens: maturity code 1; mature specimens: maturity codes 2-4). Fin clips were removed from all Pacific Sardine and 50 Northern Anchovy specimens each from seven different geographic zones (designated by J. Hyde and M. Craig, SWFSC) and preserved in ethanol for genetic analysis. Otoliths were removed from up to 50 Pacific Sardine and Pacific Hake in the subsample; for other CPS species (except Pacific Round Herring and Pacific Herring), 25 otoliths were removed from fish representing the range of lengths present, for age determination as described in @Schwartzkopf2022 and @Dorval2022. The combined catches of CPS in up to three trawls per night (i.e., trawl cluster) were used to estimate the proportions of species contributing to the nearest samples of acoustic backscatter.  
 
-(ref:trawl-diagrams) Schematic drawings of the Nordic 264 rope trawl net (a) and cod-end (b) on _`r survey.vessel`_.
+(ref:trawl-diagrams) Schematic drawings of the Nordic 264 rope trawl net (a) and cod-end (b) used on _`r survey.vessel`_ and _Shimada_.
 
 ```{r trawl-diagrams, fig.cap='(ref:trawl-diagrams)',out.height='7in',fig.align='center',fig.pos='H'}
 include_graphics(here("Images/img_Nordic_264.png")) 
@@ -2104,30 +2217,29 @@ Purse seine nets were set to provide information about size, age, and species co
 [**EMAILED KRISTEN, BUT SHE'S ON LEAVE UNTIL 12/18**]
 On _Lisa Marie_, purse seine sets were planned for an average of one set per transect, or roughly 4-5 sets per day [**CHECK THIS**]. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each. Next, all three dip net samples were combined and up to 50 specimens of each CPS species were randomly sampled to provide a combined weight for each set. Up to 50 specimens of each species were then randomly selected [**ARE THESE THE SAME SPECIMENS FROM THE PREVIOUS SENTENCE?**], then the lengths (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others) and weights measured, otoliths extracted, and macroscopic maturity stage determined visually. Gonads were collected and preserved from female specimens.
 
-[**EMAILED JOEL. AWAITING REPLY**]
-On _Long Beach Carnage_, purse seine sets were planned for an average of one set per transect. The vessel was to run each transect in its entirety, then randomly set on an observed school. The seine was generally set during daytime, but could include nighttime in areas where schools were abundant and/or daytime sets were unsuccessful. The total weight (tons) of the school was estimated by the captain. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each species. From each dip net sample, as many as 20 fish of each CPS species were chosen randomly throughout the sample, and combined for a random sample of 50 fish collected throughout the catch [**THIS DIFFERS FROM THE PROJECT INSTRUCTIONS**]. The fish were then frozen for later analysis by CDFW biologists, yielding measures of total sample weight and individual fish weight, length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others), maturity, and otolith-derived ages. Because samples were frozen, no gonad samples from female specimens were analyzed.
+On _Long Beach Carnage_, purse seine sets were planned for an average of one set per transect. The vessel was to run each transect in its entirety, then randomly set on an observed school. The seine was generally set during daytime, but could include nighttime in areas where schools were abundant and/or daytime sets were unsuccessful. The total weight (tons) of the school was estimated by the captain. For each set, three dip net samples, spatially separated as much as possible, were collected. For each dip net sample, all specimens were sorted, weighed, and counted to provide a combined weight and count for each species. From each dip net sample, as many as 20 fish of each CPS species were chosen randomly throughout the sample, and combined for a random sample of 50 fish collected throughout the catch. The fish were then frozen for later analysis by CDFW biologists, yielding measures of total sample weight and individual fish weight, length (mm; $L_S$ for Pacific Sardine and Northern Anchovy and $L_F$ for all others), maturity, and otolith-derived ages. Because samples were frozen, no gonad samples from female specimens were analyzed.
 
 ## Ichthyoplankton and oceanographic sampling {#methods-other-sampling}
 ### Egg and larva sampling {#methods-egg-sampling}  
 
-On _`r survey.vessel`_, fish eggs were collected during the day using a CUFES, which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. The particles in the sampled water were sieved by a 505-$\mu$m mesh. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs." Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the duration of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish. Due to personnel availability, no CUFES samples were obtained during Leg IV on _Shimada_.
+On _`r survey.vessel`_, fish eggs were collected during the day using a CUFES, which collects water and plankton at a rate of ~640 l min^-1^ from an intake on the hull of the ship at ~3-m depth. The particles in the sampled water were sieved by a 505-$\mu$m mesh. Pacific Sardine, Northern Anchovy, Jack Mackerel, and Pacific Hake (_Merluccius productus_) eggs were identified to species, counted, and logged. Eggs from other species (e.g., Pacific Mackerel and flatfishes) were also counted and logged as "other fish eggs." Typically, the duration of each CUFES sample was 30 min, corresponding to a distance of 5 nmi at a speed of 10 kn. Because the duration of the initial egg stages is short for most CPS, the egg distributions inferred from CUFES samples indicate the nearby presence of actively spawning fish.
 
 On _`r survey.vessel`_, a CalCOFI bongo oblique net [a bridleless pair of 71-cm diameter nets with 505-$\mu$m mesh, @Smith1977] was used opportunistically to sample ichthyoplankton and krill after sunset, to contribute to the CalCOFI ichthyoplankton time series. Where there was adequate depth, 300 m of wire was deployed at a rate of 50 m min^-1^ and then retrieved at 20 m min^-1^, at a nominal wire angle of 45$^\circ$. Starboard-side samples were preserved in 5% sodium-borate buffered seawater formalin.  
 
 ### Conductivity and temperature versus depth (CTD) sampling {#methods-ctd-sampling}  
 
-On _`r survey.vessel`_ AND _Shimada_, conductivity and temperature profiles were measured down to 500 and 300 m, respectively, using calibrated sensors on a probe cast from the vessel while on station (CTD), or a probe cast from the vessel while underway (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day. These data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005].
+On _`r survey.vessel`_ and _Shimada_, conductivity and temperature profiles were measured down to 300 m using calibrated sensors on a probe cast from the vessel while underway (UnderwayCTD, or UCTD; Teledyne Oceanscience). These data indicate the depth of the surface mixed layer, above which most epipelagic CPS reside during the day. These data were also used to estimate the time-averaged sound speed [@Demer2004c], for estimating ranges to the sound scatterers, and frequency-specific sound absorption coefficients, for compensating signal attenuation of the sound pulse between the transducer and scatterers [@Simmonds2005].
 
 On _Lisa Marie_ and _Long Beach Carnage_, conductivity and temperature profiles were measured down to 110 and 40 m using a Seabird SBE19plus or Teledyne Oceanscience UnderwayCTD, respectively. Casts were conducted from the vessels while stationary. The data were processed to obtain time-averaged sound speed values used for processing the acoustic data.
 
-To process acoustic data from the USVs, conductivity and temperature profiles were obtained from CTD casts conducted by _Lisa Marie_ or _Shimada_. For the latter, the casts were acquired during the Northwest Fisheries Science Center's (NWFSC) 2023 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey, conducted from 18 June to 15 September, 2023.
+To process acoustic data from the USVs, conductivity and temperature profiles were obtained from CTD casts conducted by _Shimada_ during the Northwest Fisheries Science Center's (NWFSC) 2023 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey, from 18 June to 15 September, 2023.
 
 \newpage
 
 # Results {#results}
 ## Echosounder calibrations {#results-echosounder-calibration}  
 
-For _`r survey.vessel`_, the EK80s were calibrated on `r cal.datetime` while the vessel was alongside the pier near `r cal.loc` (`r cal.lat.dd` $^\circ$N, `r cal.lon.dd` $^\circ$W). Measurements of sea-surface temperature ($t_w$ = `r cal.temp` $^\circ$C) and salinity ($s_w$ = `r cal.sal` psu) were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) and input to the WBT-control software (EK80 `r ek80.version`, Simrad-Kongsberg), which derived estimates of sound speed ($c_w$ = `r cal.c` m s$^{-1}$) and absorption coefficients. The centerboard was placed in the Retracted position, which resulted in the seabed being approximately `r cal.min.z` to `r cal.max.z` m beneath the transducers, depending on the tide. The calibration spheres were positioned in the far-field of each transducer, at 3.5- to 7-m range. WBT information, settings, and calibration results are presented in **Table \@ref(tab:cal-results)**. Measurements of beam-compensated sphere target strength relative to the theoretical target strength ($TS_{rel}$, dB re 1 m^2^) are presented in **Fig. \@ref(fig:tsc-plot)**. Measurements of gains, beamwidths, and offset angles from WBTs operated in FM mode are presented in **Fig. \@ref(fig:cal-plot-fm)**.
+For _`r survey.vessel`_, the EK80s were calibrated on `r cal.datetime` while the vessel was alongside the pier at `r cal.loc` (`r cal.lat.dd` $^\circ$N, `r cal.lon.dd` $^\circ$W). Measurements of sea-surface temperature ($t_w$ = `r cal.temp` $^\circ$C) and salinity ($s_w$ = `r cal.sal` psu) were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) and input to the WBT-control software (EK80 `r ek80.version`, Simrad-Kongsberg), which derived estimates of sound speed and absorption coefficients. The centerboard was placed in the Retracted position, which resulted in the seabed being approximately `r cal.min.z` to `r cal.max.z` m beneath the transducers, depending on the tide. The calibration spheres were positioned in the far-field of each transducer, at 3.5- to 7-m range. WBT information, settings, and calibration results are presented in **Table \@ref(tab:cal-results)**. Measurements of beam-compensated sphere target strength relative to the theoretical target strength ($TS_{rel}$, dB re 1 m^2^) are presented in **Fig. \@ref(fig:tsc-plot)**. Measurements of gains, beamwidths, and offset angles from WBTs operated in FM mode are presented in **Fig. \@ref(fig:cal-plot-fm)**.
 
 (ref:cal-results) Simrad-Kongsberg EK80 wideband transceiver (WBT; 18, 38, 70, 120, 200, and 333 kHz) and transducer information aboard _`r survey.vessel`_ (above horizontal line); and beam model results following calibration (below horizontal line).
 
@@ -2172,6 +2284,8 @@ include_graphics(here("Figs/fig_cal_FM_AllFreqs.png"))
 \newpage
 
 For _Shimada_, the EK80s were calibrated by the NWFSC on 9 September, 2023 in Seattle, WA after completing the Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey. Calibration results for _Shimada_ are presented in **Table \@ref(tab:cal-results-sh)**.
+
+(ref:cal-results-sh) Wideband Transceiver (Simrad-Kongsberg EK80 WBT) and transducer information (above horizontal line) and beam model results (below horizontal line) estimated from an in situ calibration of echosounders aboard _Shimada_ using a WC38.1.
 
 ```{r cal-results-sh,results='asis'}
 if (doc.type == "docx") {
@@ -2271,80 +2385,89 @@ nasc.summ.lbc.ns <- filter(nasc.summ.ns, vessel.name == "LBC")
 nasc.summ.lm.ns <- filter(nasc.summ.ns, vessel.name == "LM")
 ```  
 
-[**UPDATE AFTER LEG 4**]
-Due to the cancellation of Leg I.1 and all of Leg II on _`r survey.vessel`_, transects off Baja California, MX and Vancounver Island, BC were abandoned. Therefore, the core survey region spanned an area from approximately San Diego, CA to Cape Flattery, WA (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-cufes-trawl)**), predominantly including the potential habitat for the northern stock of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html]. _`r survey.vessel`_ sampled from San Diego, CA to Cape Mendocino, CA, then _Shimada_ sampled from Cape Mendocino, CA to Cape Flattery, WA. The three USVs surveyed interstitial to _`r survey.vessel`_ transects from Grays Harbor, WA to Cape Mendocino, CA [**CHECK THIS**]. In total, _`r survey.vessel`_, _Shimada_, and the three USVs sampled `r n_distinct(nasc.summ$transect.name)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(haul.pie)` Nordic trawls.
+Due to the cancellation of Leg I.1 and all of Leg II on _`r survey.vessel`_, transects off Baja California, MX and Vancounver Island, BC were abandoned. The core survey region thus spanned an area from approximately San Diego, CA to Cape Flattery, WA (**Figs. \@ref(fig:transects-and-habitat-core) and \@ref(fig:nasc-cufes-trawl)**). Apart from Vancouver Island, this predominantly included the latitudinal extent of the potential habitat for the northern stock of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html]. _`r survey.vessel`_ sampled from San Diego, CA to Cape Mendocino, CA, then _Shimada_ sampled from Reedsport, OR to Cape Flattery, WA. The three USVs surveyed interstitial to _`r survey.vessel`_ and _Shimada_ transects from Point Conception, CA to Santiago, WA. In total, _`r survey.vessel`_, _Shimada_, and the three USVs sampled `r n_distinct(nasc.summ$transect.name)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi, and conducted `r nrow(haul.pie)` Nordic trawls.
 
-The nearshore region was surveyed by _Long Beach Carnage_ and _Lisa Marie_, spanning an area from San Diego, CA to Cape Flattery, WA, including around Santa Cruz and Santa Catalina Islands. The vessels completed `r nrow(nasc.summ.ns.LM) + nrow(nasc.summ.ns.LBC)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.ns.LM$distance)+sum(nasc.summ.ns.LBC$distance))` nmi and `r nrow(seine.summ)` purse seine sets (**Figs. \@ref(fig:transects-and-habitat) and \@ref(fig:nasc-seine-lbc)**).
+The nearshore region was surveyed by _Long Beach Carnage_ and _Lisa Marie_, spanning an area from San Diego, CA to Cape Flattery, WA, including around Santa Cruz and Santa Catalina Islands. The vessels completed `r nrow(nasc.summ.ns.LM) + nrow(nasc.summ.ns.LBC)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.ns.LM$distance)+sum(nasc.summ.ns.LBC$distance))` nmi and `r nrow(seine.summ)` purse seine sets (**Figs. \@ref(fig:transects-and-habitat-nearshore) and \@ref(fig:nasc-seine-combined)**).
 
 **Leg I**  
 
-* I.1
+*I.1*
 
-Canceled due to staffing shortages and a seawater leak aboard _`r survey.vessel`_.
+>Canceled due to staffing shortages and a seawater leak aboard _`r survey.vessel`_.
 
-* I.2
+*I.2*
 
-On 17 July, after a 14-d delay, _Lasker_ departed from the 10th Avenue Marine Terminal in San Diego, CA at ~2000 (all times GMT). Prior to the transit, a calibration for the Simrad EC150-3C ADCP was conducted northwest of the sea buoy outside San Diego Bay (32.6598 N,  117.3833 W). Due to the departure delays, sampling off Baja California was abandoned, with the survey commencing on 18 July along transect 033 off Imperial Beach, CA. On the evening of 22 July, a scientist and member of the deck crew were embarked using _Lasker_’s small boat at Dana Point Harbor. On 29 July, _Lasker_ ceased acoustic sampling after completing the nearshore portion of transect 057 off Morro Bay, CA. At ~1300 on 30 July, _Lasker_ arrived at Pier 30/32 in San Francisco, CA to complete Leg I.
+>On 17 July, after a 14-d delay, _Lasker_ departed from the 10th Avenue Marine Terminal in San Diego, CA at ~2000 (all times GMT). Prior to the transit, a calibration for the Simrad EC150-3C ADCP was conducted northwest of the sea buoy outside San Diego Bay (32.6598 N,  117.3833 W). Due to the departure delays, sampling off Baja California was abandoned, with the survey commencing on 18 July along transect 033 off Imperial Beach, CA. On the evening of 22 July, a scientist and member of the deck crew were embarked using _Lasker_’s small boat at Dana Point Harbor. On 29 July, _Lasker_ ceased acoustic sampling after completing the nearshore portion of transect 057 off Morro Bay, CA. At ~1300 on 30 July, _Lasker_ arrived at Pier 30/32 in San Francisco, CA to complete Leg I.
 
-_Long Beach Carnage_ sampled nearshore transects 001 to 038, between San Diego, CA to Point Conception, CA, including around the Santa Catalina and Santa Cruz Islands, from 8 to 18 July.
+*Nearshore*
 
-_Lisa Marie_ conducted purse seine sets for comparative catch analyses between Point Conception, CA and Monterey Bay, CA from 22 to 25 July.
+>_Long Beach Carnage_ sampled nearshore transects 001 to 038, between San Diego, CA to Point Conception, CA, including around the Santa Catalina and Santa Cruz Islands, from 8 to 18 July.
 
-[**UPDATE AFTER SAILDRONE DATA IS PROCESSED**]
-The three USVs (SD-1048, SD-1060, and SD-1096) sampled transects 052 to 070, from Point Conception, CA to Half Moon Bay, CA, from 21 to 30 July.
+>_Lisa Marie_ conducted purse seine sets for comparative catch analyses between Point Conception, CA and Monterey Bay, CA from 22 to 25 July.
+
+>Two USVs (SD-1060 and SD-1096) sampled transects 052 to 070, from Point Conception, CA to Half Moon Bay, CA, from 21 to 30 July.
 
 **Leg II**  
 
-The entirety of Leg II on _Lasker_ was canceled due to staffing shortages and COVID-19.
+>The entirety of Leg II on _Lasker_ was canceled due to staffing shortages and COVID-19.
 
-_Long Beach Carnage_ sampled nearshore transects 039 to 090, from Point Conception, CA to Bodega Bay, CA from 7 to 16 August. This marked the end of the 2023 nearshore survey for _Long Beach Carnage_.
+*Nearshore*
 
-_Lisa Marie_ conducted purse seine sets for comparative catch analyses between Point Conception, CA and San Luis Obispo, CA from 6 to 8 August. Then, from 11 August to 2 September, _Lisa Marie_ sampled nearshore transects 091 to 216, from Bodega Bay, CA to Cape Flattery, WA. This marked the end of the 2023 nearshore survey for _Lisa Marie_.
+>_Long Beach Carnage_ sampled nearshore transects 039 to 090, from Point Conception, CA to Bodega Bay, CA from 7 to 16 August. This marked the end of the 2023 nearshore survey for _Long Beach Carnage_.
 
-[**UPDATE AFTER SAILDRONE DATA IS PROCESSED**]
-The three USVs sampled transects 072 to 100, from Half Moon Bay, CA to Crescent City, CA, from 10 to 29 August
+>_Lisa Marie_ conducted purse seine sets for comparative catch analyses between Point Conception, CA and San Luis Obispo, CA from 6 to 8 August. Then, from 11 August to 2 September, _Lisa Marie_ sampled nearshore transects 091 to 216, from Bodega Bay, CA to Cape Flattery, WA. This marked the end of the 2023 nearshore survey for _Lisa Marie_.
+
+>The three USVs sampled transects 072 to 100, from Half Moon Bay, CA to Crescent City, CA, from 10 to 29 August
 
 **Leg III** 
 
-* III.1
+*III.1*
 
-At ~2030 on 5 September, _Lasker_ departed from 10th Avenue Marine Terminal, San Diego.  At ~2100 UTC on 6 September, an acoustic lander was deployed near Point Conception, CA at 34.43877 N, 120.54697 W.  At ~1400 on 7 September, acoustic sampling resumed along transect 057 offshore of Morro Bay, CA. At ~0100 on 11 September, after completing acoustic transect 067, a scientist was embarked via a small boat transfer near Moss Landing, CA. On 12 September, after a crack was discovered in a freshwater anti-roll tank, an emergency trip was planned to Pier 30/32 in San Francisco, CA after en-route evening trawling operations. However, while in transit to the first trawl location on transect 077, the S-Band RADAR unexpectedly stopped turning. As a result, the ship abandoned the planned trawls on transects 079 and 077 and began the emergency transit to San Francisco, CA. The ship moored alongside pier 30/32 at ~1400 on 13 September. On 13 and 14 September, the ship's engineers patched the crack in the anti-roll tank, and the ship's Electronics Technician worked with RADAR technicians to fix the S-Band RADAR. At ~1430 on 15 September, the ship departed San Francisco, CA, resumed daytime acoustic sampling on transect 081, then trawled that evening on transects 077 and 079. At ~0700 on 17 September, after finishing acoustic sampling on transect 089 and conducting one nighttime trawl, _Lasker_ transited to San Francisco, CA for a mid-leg crew transfer on 18 September.
+>At ~2030 on 5 September, _Lasker_ departed from 10th Avenue Marine Terminal, San Diego.  At ~2100 UTC on 6 September, an acoustic lander was deployed near Point Conception, CA at 34.43877 N, 120.54697 W.  At ~1400 on 7 September, acoustic sampling resumed along transect 057 off Morro Bay, CA. At ~0100 on 11 September, after completing acoustic transect 067, a scientist was embarked via a small boat transfer near Moss Landing, CA. On 12 September, after a crack was discovered in a freshwater anti-roll tank, an emergency trip was planned to Pier 30/32 in San Francisco, CA after en-route evening trawling operations. However, while in transit to the first trawl location on transect 077, the S-Band RADAR unexpectedly stopped turning. As a result, the ship abandoned the planned trawls on transects 079 and 077 and began the emergency transit to San Francisco, CA. The ship moored alongside pier 30/32 at ~1400 on 13 September. On 13 and 14 September, the ship's engineers patched the crack in the anti-roll tank, and the ship's Electronics Technician worked with RADAR technicians to fix the S-Band RADAR. At ~1430 on 15 September, the ship departed San Francisco, CA, resumed daytime acoustic sampling on transect 081, then trawled that evening on transects 077 and 079. At ~0700 on 17 September, after finishing acoustic sampling on transect 089 and conducting one nighttime trawl, _Lasker_ transited to San Francisco, CA for a mid-leg crew transfer on 18 September.
 
-* III.2
+*III.2*
 
-At ~1800 on 21 September, _Lasker_ departed from Pier 30/32 in San Francisco, CA. On 21 September, a passive acoustic buoy, part of SWFSC's ADRIFT acoustic monitoring project, was safely recovered after its previously scheduled retrieval vessel experienced mechanical problems. During the transit, the leak in _Lasker_'s anti-roll tank reemerged, but the decision was made to continue the survey. At ~1815 on 22 September, _Lasker_ resumed acoustic sampling along transect 091 off Petrolia, CA. On 22 September, transects 091 and 093 were sampled acoustically and two trawls conducted that evening. With a leaking anti-roll tank and unworkable weather conditions in the forecast, it was decided to cease survey operations on 23 September and return to Newport, OR. At 1700 on 24 September, _Lasker_ returned to the MOC-P Pier in Newport, OR to end Leg III and conclude the 2023 Summer CCE survey aboard _Lasker_. On 24 and 25 September, survey equipment was demobilized and transferred ashore, awaiting mobilization of _Shimada_ for Leg IV.
+>At ~1800 on 21 September, _Lasker_ departed from Pier 30/32 in San Francisco, CA. On 21 September, a passive acoustic buoy, part of SWFSC's ADRIFT acoustic monitoring project, was safely recovered after its previously scheduled retrieval vessel experienced mechanical problems. During the transit, the leak in _Lasker_'s anti-roll tank reemerged, but the decision was made to continue the survey. At ~1815 on 22 September, _Lasker_ resumed acoustic sampling along transect 091 off Petrolia, CA. On 22 September, transects 091 and 093 were sampled acoustically and two trawls conducted that evening. With a leaking anti-roll tank and unworkable weather conditions in the forecast, it was decided to cease survey operations on 23 September and return to Newport, OR. At 1700 on 24 September, _Lasker_ returned to the MOC-P Pier in Newport, OR to end Leg III and conclude the 2023 Summer CCE survey aboard _Lasker_. On 24 and 25 September, survey equipment was demobilized and transferred ashore, awaiting mobilization of _Shimada_ for Leg IV.
 
-[**UPDATE AFTER SAILDRONE DATA IS PROCESSED**]
-The three USVs sampled transects 102 to 134, from Crescent City, CA to Half Moon Bay, CA to Santiago, WA, from 5 to 29 September. This marked the end of the 2023 survey for the USVs.
+*Nearshore*
+
+>The three USVs sampled transects 102 to 134, from Crescent City, CA to Santiago, WA, from 5 to 30 September. This marked the end of the 2023 survey for the USVs.
 
 **Leg IV** 
 
-* IV.1
+*IV.1*
 
-Due to inclement weather on 10 and 11 October, Leg IV.1 on _Shimada_ was delayed by two days. At ~1900 on 12 October, _Shimada_ departed from Newport, OR and commenced acoustic sampling on transect 117. Transects 121, 123, 125, and 127 were shortened to 40 nmi in length due to weather conditions. At ~1100 on 16 October, after completing nighttime trawling, _Shimada_ transited south to transect 115 to be closer to Newport, OR in case of needing to come into port due to inclement weather. On 16 October, after completing the third trawl outside the entrance to the Columbia River, the crew discovered that the main body of the trawl net was damaged. An underway replacement of the trawl net was avoided due to the high sea state, and instead planned for the in-port between Legs IV.1 and IV.2. At ~2100 on 17 October, to take advantage of accessible bar conditions, _Shimada_ arrived at the MOC-P pier in Newport, OR to complete Leg IV.1.
+>Due to inclement weather on 10 and 11 October, Leg IV.1 on _Shimada_ was delayed by two days. At ~1900 on 12 October, _Shimada_ departed from Newport, OR and commenced acoustic sampling on transect 117. Transects 121, 123, 125, and 127 were shortened to 40 nmi in length due to weather conditions. At ~1100 on 16 October, after completing nighttime trawling, _Shimada_ transited south to transect 115 to be closer to Newport, OR in case of needing to come into port due to inclement weather. On 16 October, after completing the third trawl outside the entrance to the Columbia River, the crew discovered that the main body of the trawl net was damaged. An underway replacement of the trawl net was avoided due to the high sea state, and instead planned for the in-port between Legs IV.1 and IV.2. At ~2100 on 17 October, to take advantage of accessible bar conditions, _Shimada_ arrived at the MOC-P pier in Newport, OR to complete Leg IV.1.
 
-* IV.1
+*IV.2*
 
 [**Waiting for Juan or Scott to provide summary**]
 
 \newpage
 
-(ref:transects-and-habitat) Summary of all transects sampled throughout the survey by _`r survey.vessel`_ (red), _Shimada_ (xxx[**UPDATE**]), _Lisa Marie_ (yellow), USVs (blue), and _Long Beach Carnage_ (green), in relation to the potential habitat for the northern stock of Pacific Sardine. The habitat is temporally aggregated using an average of the habitat centered ±2° around each vessel during the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
+(ref:transects-and-habitat-core) Summary of all core-region transects, in relation to the potential habitat for the northern stock of Pacific Sardine, as sampled by a) _`r survey.vessel`_ (red) and _Shimada_ (blue); and b) Saildrone USVs SD-1048 (red), SD-1060 (blue), and SD-1096 (yellow). The habitat is temporally aggregated using an average of the habitat centered ±2° around each vessel during the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
 
-```{r transects-and-habitat,fig.cap='(ref:transects-and-habitat)',out.height = '8in',fig.align='center',fig.pos='H'}
-include_graphics(here("Figs/fig_summer2023_habitat_RL_SH.png"))
+```{r transects-and-habitat-core,fig.cap='(ref:transects-and-habitat-core)',out.width = '6in',fig.align='center',fig.pos='H'}
+# include_graphics(here("Figs/fig_sardine_habitat_composite_2307RL_newModel_RLandSH.png"))
+include_graphics(here("Figs/fig_sardine_habitat_composite_2307RL_newModel_RLandSH_SD.png"))
+
+```  
+
+(ref:transects-and-habitat-nearshore) Summary of all nearshore-region transects sampled by _Long Beach Carnage_ (red) and _Lisa Marie_ (blue), in relation to the potential habitat for the northern stock of Pacific Sardine. The habitat is temporally aggregated using an average of the habitat centered ±2° around each vessel during the survey. Areas in white correspond to no available data, e.g., cloud coverage preventing satellite-sensed observations.
+
+```{r transects-and-habitat-nearshore,fig.cap='(ref:transects-and-habitat-nearshore)',out.height = '8in',fig.align='center',fig.pos='H'}
+include_graphics(here("Figs/fig_sardine_habitat_composite_2307RL_newModel_LBCandLM.png"))
 ```  
 
 ### Ichthyoplankton and oceanographic sampling {#results-other-sampling}  
 
-On _Lasker_ a total of `r sum(str_detect(uctd.sta$cast, "2307RL"))` UCTD casts (**Appendix \@ref(appendix-ctd-sampling)**), `r sum(str_detect(uctd.sta$cast, "2307RL"))` bongo tows, and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were obtained (**Fig. \@ref(fig:station-sampling)**). During Leg IV on _Shimada_, a total of `r sum(str_detect(uctd.sta$cast, "2310SH"))` UCTD casts were conducted; bongo tows and CUFES sampling were omitted due to personnel shortages.
+On _Lasker_ a total of `r sum(str_detect(uctd.sta$Vessel, "RL"))` UCTD casts (**Appendix \@ref(appendix-ctd-sampling)**), `r nrow(bongo.sta)` bongo tows, and `r prettyNum(nrow(cufes.all), digits = 1, big.mark = ",")` CUFES samples were obtained (**Fig. \@ref(fig:station-sampling)**). During Leg IV on _Shimada_, a total of `r sum(str_detect(uctd.sta$Vessel, "SH"))` UCTD casts were conducted; bongo tows and CUFES sampling were omitted due to personnel shortages.
 
-On _Lisa Marie_ and _Long Beach Carnage_, a total of 74 and 13 UCTD casts were conducted, respectively. [**MIGHT WANT TO INCLUDE LM AND LBC CTD PROCESSING**]
+On _Lisa Marie_ and _Long Beach Carnage_, a total of `r sum(str_detect(uctd.sta$Vessel, "LM"))` and `r sum(str_detect(uctd.sta$Vessel, "LBC"))` UCTD casts were conducted, respectively.
 
-A total of 195 CTD casts were obtained from the NWFSC's 2023 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_, which were utilized for processing the USV transects. [**INCLUDE IN APPENDIX? IF SO NEED TO INCLUDE IN CTD PROCESSING**]
+A total of `r sum(str_detect(ctd.sta$Vessel, "SH"))` CTD casts were obtained from the NWFSC's 2023 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey aboard _Shimada_, which were utilized for processing the USV transects (**Appendix \@ref(appendix-ctd-sampling)**).
 
-[**UPDATE DESCRIPTION DEPENDING ON IF SHIMADA HAKE CASTS WERE USED**]
-(ref:station-sampling) The locations of surface trawls (white points), CTD and UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_ and _Shimada_.
+(ref:station-sampling) The locations of core-region surface trawls (white points), UCTD casts (red circles), and bongo nets (orange triangles) relative to the planned east-west acoustic transects (solid and dashed grey lines) and cruise tracks (thick black line) of _`r survey.vessel`_, _Shimada_, and Saildrone USVs.
 
 ```{r station-sampling,fig.cap='(ref:station-sampling)',out.height='7in',fig.align='center',fig.pos='H'}
 include_graphics(here("Figs/fig_station_samples.png"))
@@ -2353,18 +2476,16 @@ include_graphics(here("Figs/fig_station_samples.png"))
 ## Distribution of CPS {#results-cps-distribution}
 ### Core region  
 
-[**update after all data is processed**]
-
 Acoustic backscatter ascribed to CPS in the core region (**Fig. \@ref(fig:nasc-cufes-trawl)a**), as sampled by _`r survey.vessel`_, _Shimada_, and the USVs, was observed throughout the survey area, but was most prevalent off Cape Flattery, WA and between Fort Bragg to Monterey Bay, CA. 
 
-Surface trawls, conducted by _`r survey.vessel`_ to the south of Cape Mendocinco, CA and to the north by _Shimada_, caught Pacific Sardine primarily in the region off OR and WA, as well as in the SCB; Northern Anchovy south of Cape Mendocino, CA; Jack Mackerel throughout the survey area, but predominantly in the SCB and outside the mouth of the Columbia River; and Pacific Herring off OR and WA. The combined catches of the `r nrow(trawl.summ)` trawls included `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel, `r prettyNum(haul.PacHerring.kg, digits = 1, big.mark = ",")` kg Pacific Herring, and `r prettyNum(haul.RndHerring.kg, digits = 1, big.mark = ",")` kg Round Herring; **Appendix \@ref(appendix-trawl-sampling)**).
+Surface trawls, conducted by _`r survey.vessel`_ to the south of Cape Mendocinco, CA and to the north by _Shimada_, caught Pacific Sardine primarily in the region off OR and WA, as well as in the SCB; Northern Anchovy south of Cape Mendocino, CA; Jack Mackerel throughout the survey area, but predominantly in the SCB and outside the mouth of the Columbia River; and Pacific Herring off OR and WA. The combined catches of the `r nrow(trawl.summ)` trawls included `r prettyNum(haul.CPS.kg, digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(haul.Sardine.kg, digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(haul.Anchovy.kg, digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(haul.JackMack.kg, digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(haul.PacMack.kg, digits = 1, big.mark = ",")` kg Pacific Mackerel, and `r prettyNum(haul.PacHerring.kg, digits = 1, big.mark = ",")` kg Pacific Herring; **Appendix \@ref(appendix-trawl-sampling)**). Due to the lack of sampling off Baja California, MX, there were no catches of Round Herring. 
 
 CUFES samples were only collected south of Cape Mendocino, CA by _`r survey.vessel`_, and consisted primarily of Northern Anchovy eggs north of Morro Bay, CA,  Jack Mackerel eggs near Point Conception, CA, and a mixture of Northern Anchovy, Jack Mackerel, and Pacific Sardine eggs in the SCB (**Fig. \@ref(fig:nasc-cufes-trawl)b**). In the SCB, Northern Anchovy eggs were found predominantly nearshore while Pacific Sardine eggs were offshore. 
 
 \newpage  
 \blandscape  
 
-(ref:nasc-cufes-trawl) Survey transects overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep [**REMOVE DEPTH DESCRIPTION?**]) ascribed to CPS (a); egg densities (eggs m^-3^) for Northern Anchovy, Jack Mackerel, and Pacific Sardine from the CUFES (b); and proportions, by weight, of CPS species in each trawl catch (c; black points indicate trawls with no CPS). Species with low catch weights are not visible at this scale.
+(ref:nasc-cufes-trawl) Survey transects overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); egg densities (eggs m^-3^) for Northern Anchovy, Jack Mackerel, and Pacific Sardine from the CUFES (b); and proportions, by weight, of CPS species in each trawl catch (c; black points indicate trawls with no CPS). Species with low catch weights are not visible at this scale.
 
 ```{r nasc-cufes-trawl,fig.cap='(ref:nasc-cufes-trawl)',out.width='8in',fig.pos='H'}
 include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
@@ -2374,15 +2495,13 @@ include_graphics(here("Figs/fig_nasc_cufes_haul_wt.png"))
 
 ### Nearshore region  
 
-[**UPDATE TO INCLUDE LISA MARIE INFO**]
-
 Acoustic backscatter sampled by _Long Beach Carnage_ and _Lisa Marie_ was observed throughout the nearshore survey area, but was most prevalent north of Coos Bay, OR, between Santa Barbara, CA to Bodega Bay, CA, and around Santa Cruz Island (**Fig. \@ref(fig:nasc-seine-combined)a**).
 
 Purse seine catches by _Long Beach Carnage_ and _Lisa Marie_ included predominantly Northern Anchovy between Fort Bragg and Long Beach, CA; Pacific Sardine north of Florence, OR and south of Monterey Bay, CA, including throughout the SCB and around the Santa Cruz and Santa Catalina Islands; Jack Mackerel north of Florence, OR and between Fort Bragg, CA to Crescent City, CA; Pacific Mackerel nearshore in the SCB and off Florence, OR; and Pacific Herring north of Cape Mendocino, CA (**Fig. \@ref(fig:nasc-seine-combined)b**). The combined catches of the `r nrow(set.pie)` purse seine sets included `r prettyNum(sum(set.summ.wt$AllCPS, na.rm = T), digits = 1, big.mark = ",")` kg of CPS (`r prettyNum(sum(set.summ.wt$Sardine, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Sardine, `r prettyNum(sum(set.summ.wt$Anchovy, na.rm = T), digits = 1, big.mark = ",")` kg Northern Anchovy, `r prettyNum(sum(set.summ.wt$JackMack, na.rm = T), digits = 1, big.mark = ",")` kg Jack Mackerel, `r prettyNum(sum(set.summ.wt$PacMack, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Mackerel, and `r prettyNum(sum(set.summ.wt$PacHerring, na.rm = T), digits = 1, big.mark = ",")` kg Pacific Herring; **Appendix \@ref(appendix-seine-sampling-lm) and \@ref(appendix-seine-sampling-lbc)**)
 
 (ref:nasc-seine-combined) Nearshore survey transects conducted by _Long Beach Carnage_ and _Lisa Marie_ overlaid with the distributions of: 38-kHz integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals and from `r int.start`- to `r cps.depth`-m deep) ascribed to CPS (a); and the proportions, by weight, of CPS in each purse seine catch (b). Species with low catch weights are not visible at this scale.
 
-```{r nasc-seine-combined, fig.cap='(ref:nasc-seine-combined)', out.width='6in', fig.pos='H'}
+```{r nasc-seine-combined, fig.cap='(ref:nasc-seine-combined)', out.width='6.0in', fig.pos='H'}
 if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_combined.png"))) {
   include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_combined.png"))  
 } else {
@@ -2417,9 +2536,9 @@ if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_combined.png"))) {
 [**UPDATE**]
 [**ADD COMMON DISCUSSION WITH MEXICAN RESULTS**]
 
-The principal objectives of the `r survey.das`-day Summer 2023 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, to survey the stocks of Pacific Mackerel, Jack Mackerel, Pacific Herring, Pacific Round Herring, and the southern stock of Pacific Sardine. Despite the original survey plan being substantially modified due to OMAO staffing issues on _`r survey.vessel`_, the combined sampling from _`r survey.vessel`_, _Shimada_, _Lisa Marie_, _Long Beach Carnage_, and Saildrone USVs spanned the offshore and nearshore areas from Cape Flattery, WA to San Diego, CA. This was made possible by the resilience and adaptability of all personnel from the various sampling platforms, particularly: _Lisa Marie_, which surveyed the _`r survey.vessel`_ transects north of Bodega Bay, CA; the _Long Beach Carnage_ and Saildrone USVs, which repeatedly modified the timing of their surveys; and the scientists and crew on _`r survey.vessel`_, who remained prepared and flexible throughout an uncertain survey schedule.
+The principal objectives of the `r survey.das`-day Summer 2023 CCE Survey were to survey the northern stock of Pacific Sardine and the northern and central stocks of Northern Anchovy. Then, as possible, to survey the stocks of Pacific Mackerel, Jack Mackerel, Pacific Herring, Pacific Round Herring, and the southern stock of Pacific Sardine. Despite the original survey plan being substantially modified due to OMAO staffing issues on _`r survey.vessel`_, the combined sampling from _`r survey.vessel`_, _Shimada_, _Lisa Marie_, _Long Beach Carnage_, and Saildrone USVs spanned the offshore and nearshore areas from San Diego, CA to Cape Flattery, WA. This was made possible by the resilience and adaptability of all personnel from the various sampling platforms, who repeatedly had to modify the timing of their surveys, along with the NOAA scientists and crew who remained prepared and flexible throughout the uncertain survey schedule.
 
-The forage fish assemblage was dominated by Northern Anchovy south of Bodega Bay, CA. To the north, trawl catches from _`r survey.vessel`_ were predominantly Jack Mackerel, while purse seine sets from _Lisa Marie_ caught mainly Pacific Sardine between the WA/OR border to Fort Bragg, CA. Based on differences in the _`r survey.vessel`_ and _Lisa Marie_ catches in the overlapping region in northern California, in addition to comparative historical results [@Renfree2022] and  observations communicated by the _Lisa Marie_ captain, it is hypothesized that purse seines are ineffective in capturing fast-moving Jack Mackerel, deep schools, and schools in clear water. Until further research can quantify the effectiveness of daytime purse seines in catching CPS, the species proportions and length distributions from such data should be analyzed with these discrepancies in mind. 
+Due to the delays and cancellations on _Lasker_, no core-region trawl sampling was conducted between Cape Mendocino, CA and Reedsport, OR (**Fig. \@ref(fig:nasc-cufes-trawl)a**); and sampling off Baja California, MX was only conducted by _Carranza_, which is presented in a separate report by INAPESCA. Meanwhile, the nearshore sampling by _Lisa Marie_ and _Long Beach Carnage_ was comprehensive of the US west coast. Combined, the trawl and seine sampling indicate that the forage fish assemblage was dominated by Northern Anchovy south of Cape Mendocino, CA. To a lesser extent, Pacific Herring were prevalent north of Cape Mendocino, CA; Pacific Sardine north of Reedsport, OR, and in the nearshore regions off central CA and in the SCB, including around the Santa Catalina and Santa Cruz Islands; Jack Mackerel throughout the survey area, and in the SCB found predominantly offshore; and Pacific Mackerel nearshore in the SCB and off Florence, OR. From the CUFES samples collected by _Lasker_ south of Cape Mendocino, CA, CPS spawning was dominated by Northern Anchovy throughout the region, with areas of spawning Jack Mackerel near Point Conception, CA and Pacific Sardine near the Santa Cruz and Santa Catalina Islands in the SCB.
 
 # Disposition of Data {#data-disposition}
 
@@ -2448,7 +2567,7 @@ All raw EK60, EK80, ME70, MS70, SX90, and EC150-3C data, including the EK60 and 
 
 # Acknowledgements {#acknowledgements}  
 
-We thank the crew members of the NOAA ship _`r survey.vessel`_ and all of the scientists who participated in the sampling operations at sea. We thank Captains Rick Blair (_Lisa Marie_) and Rich Ashley and Tom Brinton (_Long Beach Carnage_), along with all the F/V crew members, for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey. We thank Trevor Stocking, Diego Aceituno, Dane McDermott, Angela Garelick, Trung Nguyen, Chelsea Protasio, and Michelle Horeczko (CDFW) for their efforts to coordinate with and process samples from _Long Beach Carnage_, and Dianna Porzio for coordinating the biological sampling and organizing, validating, and disseminating the resulting data. We thank Jennifer Topping (WDFW) for the ageing of biological samples from _Lisa Marie_. Andy Blair [President, West Coast Pelagic Conservation Group (WCPCG)], Mike Okoniewski (Secretary, WCPCG), and Greg Shaughnessy (Vice President of WCPCG and Chief Operating Officer of Ocean Gold Seafoods) were integral in the permitting and planning for _Lisa Marie_. Finally, we thank John Pohl and the NWFSC's Fisheries Engineering and Acoustic Technologies (FEAT) team for providing CTD data from their 2022 Pacific Hake survey. A critical review by Jarrod Santora improved this report.  
+We thank the crew members of the NOAA ship _`r survey.vessel`_ and all of the scientists who participated in the sampling operations at sea. We thank Captains Rick Blair (_Lisa Marie_) and Rich Ashley and Tom Brinton (_Long Beach Carnage_), along with all the F/V crew members, for their coordination and cooperation during the nearshore sampling. We thank Diane Pleschner-Steele for contracting the _Long Beach Carnage_ to conduct the nearshore survey. We thank Sandy Diaz, Christian Juico, Leeanne Laughlin, Heather Lee, Dane McDermott, Trung Nguyen, and Chelsea Protasio (CDFW) for their efforts to coordinate with and process samples from _Long Beach Carnage_, and Dianna Porzio for coordinating the biological sampling and organizing, validating, and disseminating the resulting data. We thank Jennifer Topping (WDFW) for the ageing of biological samples from _Lisa Marie_. Andy Blair [President, West Coast Pelagic Conservation Group (WCPCG)], Mike Okoniewski (Secretary, WCPCG), and Greg Shaughnessy (Vice President of WCPCG and Chief Operating Officer of Ocean Gold Seafoods) were integral in the permitting and planning for _Lisa Marie_. Finally, we thank Alicia Billings, Rebecca Thomas, John Pohl, and the entire NWFSC's Fisheries Engineering and Acoustic Technologies (FEAT) team for providing CTD and calibration data from their 2023 Pacific Hake survey. A critical review by [*UPDATE*] improved this report.  
 
 \newpage 
 
@@ -2460,17 +2579,20 @@ We thank the crew members of the NOAA ship _`r survey.vessel`_ and all of the sc
 
 # (APPENDIX) Appendix {-}
 # Appendix {-} 
-# Centerboard positions {#appendix-cb-pos}
+## Centerboard positions {#appendix-cb-pos}
 
-Date, time, and location associated with changes to the position of the centerboard and transducer depth. The information is obtained from event data generated by the ship's bridge, and may not be comprehensive.
+Date, time, and vessel associated with changes to the position of the centerboard and transducer depth on _Lasker_ (RL) and _Shimada_ (SH).
 
 ```{r cb-pos,results='asis'}
 # get centerboard position records
-cb.pos <- filter(bridge.snap, 
-                 Button %in% c("Retracted (5 m)","Intermediate (7 m)","Extended (9 m)")) %>% 
-  select(datetime, Button, Lat, Lon) %>% 
-  rename(`Date Time` = datetime, `Position (depth)` = Button, 
-         `Latitude` = Lat, `Longitude` = Lon)
+# cb.pos <- filter(bridge.snap, 
+#                  Button %in% c("Retracted (5 m)","Intermediate (7 m)","Extended (9 m)")) %>% 
+#   select(datetime, Button, Lat, Lon) %>% 
+#   rename(`Date Time` = datetime, `Position (depth)` = Button, 
+#          `Latitude` = Lat, `Longitude` = Lon)
+
+cb.pos <- select(cb.position, datetime, Vessel, Position) %>%
+  rename(`Date Time` = datetime)
 
 if (doc.type == "docx") {
   # create kable object (for Word)
@@ -2478,7 +2600,7 @@ if (doc.type == "docx") {
 
 } else {
   # print LaTeX table for HTML or PDF
-  kable(cb.pos, align = c("l","l","c","c"), digits = c(0,0,4,4),
+  kable(cb.pos, align = c("l","l","l","c"), digits = c(0,0,4,4),
         escape = F, booktabs = T, linesep = "") %>% 
     kable_styling(position = "center",
                   latex_options = c("striped", "hold_position"))
@@ -2487,9 +2609,9 @@ if (doc.type == "docx") {
 
 \newpage
 
-# CTD and UCTD sampling locations {#appendix-ctd-sampling}
+## CTD and UCTD sampling locations {#appendix-ctd-sampling}
 
-Times and locations of conductivity and temperature versus depth casts while on station (CTD) and underway (UCTD) from _`r survey.vessel`_ (RL). Also included are CTD casts conducted by _Shimada_ (SH) during the NWFSC's 2022 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey, used for processing acoustic data from _Lisa Marie_ and the USVs.
+Times and locations of conductivity and temperature versus depth casts while on station (CTD) and underway (UCTD) from _`r survey.vessel`_ (RL), _Shimada_ (SH), _Lisa Marie_ (LM), and _Long Beach Carnage_ (LBC). Also included are CTD casts conducted by _Shimada_ (SH Hake) during the NWFSC's 2023 Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey, used for processing acoustic data from the USVs.
 
 ```{r uctd-sample-table,results='asis'}
 # Rename
@@ -2518,9 +2640,9 @@ if (doc.type == "docx") {
 \newpage
 \blandscape
 
-# Trawl sample summary {#appendix-trawl-sampling}
+## Trawl sample summary {#appendix-trawl-sampling}
 
-Date, time, location at the start of trawling (i.e., at net equilibrium, when the net is fully deployed and begins fishing), and biomasses (kg) of CPS collected for each trawl haul.
+Date, time, and location at the start of trawling (i.e., at net equilibrium, when the net is fully deployed and begins fishing), and biomasses (kg) of CPS collected for each trawl haul aboard _Lasker_ and _Shimada_.
 
 ```{r trawl-catch-summary,results='asis'}
 # Summarize catch by species, used to subset columns
@@ -2557,8 +2679,8 @@ if (doc.type == "docx") {
 
 \newpage 
 
-# Seine sample summary {#appendix-seine-sampling}
-## _Lisa Marie_ {#appendix-seine-sampling-lm}
+## Seine sample summary {#appendix-seine-sampling}
+### _Lisa Marie_ {#appendix-seine-sampling-lm}
 
 Date, time (UTC), location, and biomasses (kg) of CPS collected for each purse seine set by _Lisa Marie_.
 
@@ -2600,7 +2722,7 @@ if (doc.type == "docx") {
 
 \newpage
 
-## _Long Beach Carnage_ {#appendix-seine-sampling-lbc}
+### _Long Beach Carnage_ {#appendix-seine-sampling-lbc}
 
 Date, time (UTC), location, and biomasses (kg) of CPS collected for each purse seine set by _Long Beach Carnage_.
 
