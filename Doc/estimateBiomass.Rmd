@@ -95,7 +95,7 @@ get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 get.nav.sh        <- T # Download NOAA Ship nav data
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
-save.figs         <- T # Draw new figures and maps
+save.figs         <- F # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- T # Process SCS data 
 
@@ -4842,15 +4842,6 @@ strata.points <- tx.i %>%
 # Convert to points
 strata.points.sf <- st_as_sf(strata.points, coords = c("long","lat"), crs = crs.geog) 
 
-# Create polygons
-strata.super.polygons <- strata.points.sf %>%
-  group_by(vessel.name) %>%
-  summarise(do_union = FALSE) %>%
-  st_cast("POLYGON") %>%
-  st_make_valid() %>%
-  st_difference(st_union(bathy_20m_poly)) %>%
-  mutate(area = st_area(.))
-
 # Convert to lines
 tx.lines.sf <- strata.points.sf %>% 
   group_by(transect, grp) %>% 
@@ -4908,12 +4899,6 @@ tx.c <- tx.c %>%
 ```
 
 ```{r create-final-strata-polygons}
-# # Read 5 m isobath points; used to create nearshore stratum polygons
-# nearshore.points <- read.csv(here("Data/GIS/isobath_5m_final.csv")) %>%
-#   mutate(order = seq(1, n()))
-# 
-# nearshore.points.sf <- st_as_sf(nearshore.points, coords = c("long","lat"), crs = crs.geog)
-
 # Read 20 m isobath points; used to create nearshore stratum polygons
 nearshore.points.sf <- st_read(here("Data/GIS/bathy_20m_points.shp")) 
 
@@ -5084,60 +5069,63 @@ save(strata.primary,
 save(strata.nse.temp, 
      file = here("Output/strata_nse_raw.Rdata"))
 
-# Clip primary polygons using the 5 m isobathy polygon -------------------------
+# Create sf used to remove nearshore portions of the core area tranects ---------------------------
+# Convert nearshore transect ends to sf
+tx.ends.sf <- tx.ends %>% 
+  st_as_sf(coords = c("long.i","lat.i"), crs = 4326) %>% 
+  st_transform(crs = crs.proj)
+
+# Read North America landmask shapefile
+na_landmask <- st_read(here("Data/GIS/na_landmask_final.shp")) %>% 
+  st_union() %>% 
+  st_transform(crs = crs.proj)
+
+# Compute distances from each transect end to the mainland coastline (in meters)
+dist.to.shore <- mean(as.numeric(st_distance(tx.ends.sf, na_landmask)))
+
+# Buffer land mask by the mean distance from shore 
+na_buffer <- st_buffer(na_landmask, dist = dist.to.shore) %>% 
+  st_transform(crs.geog)
+
+# Preview results
+# mapview(na_buffer) + 
+#   mapview(filter(strata.primary, 
+#                  scientificName == "Sardinops sagax"), 
+#           zcol = "stratum") + 
+#   mapview(tx.ends.sf)
+
+# Clip primary polygons using the buffered landmask polygon -------------------------
 strata.primary <- strata.primary %>% 
   st_make_valid() %>% 
-  st_difference(st_union(bathy_20m_poly)) %>% 
-  st_difference(st_union(bathy_5m_poly)) %>% 
+  st_difference(na_buffer) %>% 
   ungroup() %>% 
   mutate(area = st_area(.)) %>% 
   left_join(select(strata.summ, 
-                   scientificName, stratum, vessel.name))
+                   scientificName, stratum, vessel.name)) %>% 
+  # Ensure that strata are ordered by number
+  arrange(scientificName, stratum)
 
-# Manually substitute stratum polygons
-# if (survey.name == "1606RL") {
-#   polygon.reorder <- FALSE
-#   
-#   source(here("Sandbox/externalStrata.R"))
-#   
-#   # area.orig <- filter(strata.primary, scientificName == "Sardinops sagax", stock == "Northern") %>% 
-#   #   select(stratum, area) %>% 
-#   #   st_set_geometry(NULL)
-#   # 
-#   # area.juan <- filter(strata.polygon.final) %>% 
-#   #   select(stratum, area) %>% 
-#   #   st_set_geometry(NULL)
-#   # 
-#   # area.comp <- area.orig %>% 
-#   #   left_join(select(area.juan, stratum, area.juan = area))
-#   # 
-#   # ggplot(area.comp, aes(as.numeric(area), as.numeric(area.juan), label = stratum)) + 
-#   #   geom_text() + 
-#   #   geom_abline(slope = 1, intercept = 0) + 
-#   #   coord_equal()
-#   # 
-#   
-#   strata.primary <- strata.primary %>%
-#     mutate(key = paste(scientificName, stock, stratum)) %>% 
-#     filter(!key %in% strata.polygon.final$key) %>% 
-#     bind_rows(strata.polygon.final) %>% 
-#     arrange(key)
-# }
-
-# Ensure that strata are ordered by number
-strata.primary <- arrange(strata.primary, scientificName, stratum)
+# Create polygons
+strata.super.polygons <- strata.points.sf %>%
+  group_by(vessel.name) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("POLYGON") %>%
+  st_make_valid() %>%
+  st_difference(st_union(na_buffer)) %>%
+  mutate(area = st_area(.))
 
 # Save clipped primary polygons
 save(strata.primary, 
      file = here("Output/strata_primary_final.Rdata"))
 
-# Write final strata to shapefile
+# Write final strata to shapefile ---------------------------
+## Remove polygons that are GEOMETRYCOLLECTION
 strata.primary.sub <- strata.primary %>% 
   filter(!sf::st_geometry_type(.) == "GEOMETRYCOLLECTION") %>% 
   mutate(area = round(as.numeric(area))) %>% 
   ungroup() 
 
-# Write polygons to shapefile
+## Write polygons to shapefile
 strata.primary.sub %>% 
   select(-area) %>% 
   sf::st_write(here::here("Output/strata_primary.shp"),

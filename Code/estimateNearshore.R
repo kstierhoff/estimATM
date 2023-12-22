@@ -104,10 +104,6 @@ if (process.nearshore) {
         # Remove LM sets north of Cape Mendocino
         clf.seine      <- filter(clf.seine, lat <= 40.42)
         lf.final.seine <- filter(lf.final.seine, cluster %in% unique(clf.seine$cluster))
-        
-        # Remove LM sets north of Cape Mendocino, maybe
-        # set.pie   <- filter(set.pie, lat <= 40.42)
-        # set.zero   <- filter(set.pie, lat <= 40.42)
       }
       
       # Define variables if missing
@@ -152,74 +148,40 @@ if (process.nearshore) {
     load(here("Output/super_clusters_hauls_ns.Rdata"))
   }
   
-  # Remove nearshore seine sets and acoustic intervals that extend beyond the
-  # nearshore survey footprint; applies to extended transects by Lisa Marie
+  # Convert nearshore backscatter to sf 
+  nasc.nearshore.sf <- nasc.nearshore %>% 
+    st_as_sf(coords = c("long", "lat"), crs = crs.geog)
+  
+  # During 2307RL, Lisa Marie extended transects and purse seine sampling well beyond
+  # the planned transects in the nearshore region. This section removes nearshore acoustic intervals 
+  # that extend beyond the nearshore survey footprint for that survey only.
   if (survey.name %in% c("2307RL")) {
-    # Create land masks for clipping nearshore transects and purse seine sets
-    # Read N. America land mask
-    na_landmask <- st_read(here("Data/GIS/na_landmask_final.shp")) %>% 
-      # Buffer mainland by 7 nmi, which seems to encompass the footprint of the 
-      # planned nearshore transects
-      st_buffer(dist = 7/60) %>% 
-      st_union()
+    # Buffer mainland by 7 nmi, which seems to encompass the footprint of the
+    # planned nearshore transects
+    na_buffer <- na_landmask %>% 
+      st_transform(crs = crs.geog) %>% 
+      st_union() %>% 
+      st_buffer(dist = 7/60) 
     
-    # Read Channel Islands land mask
-    ci_landmask <- st_read(here("Data/GIS/channel_islands.shp")) %>% 
-      # Buffer Channel Islands by 5 nmi, which should encompass the footprint of the 
-      # planned nearshore transects that are shorter than mainland transects
-      st_buffer(dist = 5/60) %>% 
-      st_transform(crs = 4326) %>% 
-      st_union()
+    # Buffer Channel Islands by 5 nmi, which should encompass the footprint of the
+    # planned nearshore transects that are shorter than mainland transects
+    ci_buffer <- st_read(here("Data/GIS/channel_islands.shp")) %>%
+      st_union() %>% 
+      st_transform(crs = crs.geog) %>%
+      st_buffer(dist = 3/60)
     
     # Combine land masks
-    nearshore_mask <- st_union(na_landmask, ci_landmask)
+    nearshore_mask <- st_union(na_buffer, ci_buffer)
     
-    # Code below has been replaced by nearshore_mask code above ------------
-    
-    # # within the boundaries of the nearshore transect footprint
-    # # Filter nearshore transects used to create convex hull polygons
-    # transects.sf.ns <- filter(transects.sf, Type == "Nearshore")
-    # 
-    # if (exists("transect.hulls.ns")) rm(transect.hulls.ns)
-    # 
-    # # Create convex hull polygons around nearshore transects
-    # for (r in unique(transects.sf.ns$Region)) {
-    #   transect.hulls.ns.tmp <- transects.sf.ns %>% 
-    #     filter(Region == r) %>%
-    #     group_by(Region) %>%
-    #     st_cast("POINT") %>% 
-    #     concaveman(concavity = 2.5)  
-    #   
-    #   if (exists("transect.hulls.ns")) {
-    #     transect.hulls.ns <- bind_rows(transect.hulls.ns, transect.hulls.ns.tmp)
-    #   } else {
-    #     transect.hulls.ns <- transect.hulls.ns.tmp
-    #   }
-    # }
-    
-    # Next steps ----------
-    # Create clf.ns.sf, to identify sets that occurred beyond land mask
-    clf.ns.sf <- clf.ns %>% 
-      st_as_sf(coords = c("long", "lat"), crs = crs.geog)
-    
-    # mapview(na_landmask) +
-    #   mapview(filter(transects.sf, Type == "Nearshore"), color = "red") +
-    #   mapview(clf.ns.sf, zcol = "cluster")
-    
-    ## Do st_intersection() on nasc.nearshore
-    nasc.nearshore.sf <- nasc.nearshore %>% 
-      st_as_sf(coords = c("long", "lat"), crs = crs.geog)
-    
-    # mapview(na_landmask) +
+    # mapview(nearshore_mask) +
     #   mapview(nasc.nearshore.sf) +
     #   mapview(filter(transects.sf, Type == "Nearshore"), color = "red")
     
-    ## Do st_intersection() on clf.ns, hlf.ns, lf.final.ns, 
-    ## super.clusters.ns, and super.hauls.ns
+    ## Retain nearshore intervals that intersect the nearshore mask
     nasc.nearshore.sf.sub <- nasc.nearshore.sf %>% 
       st_intersection(nearshore_mask)
     
-    # mapview(nasc.nearshore.sf.sub)
+    # mapview(nasc.nearshore.sf.sub) + mapview(nearshore_mask)
     
     # Keep nearshore acoustic intervals that intersect the nearshore mask
     nasc.nearshore <- filter(nasc.nearshore, id %in% nasc.nearshore.sf.sub$id)
@@ -1530,7 +1492,7 @@ strata.summ.plot.ns <- strata.final.ns %>%
   arrange(scientificName, stratum)
 
 # Remove overlapping intervals --------------------------------------------
-# Create a mask for LBC data, used to punch holes in Lasker's super polygons
+# Create a mask for LBC data, used to punch holes in the core area's super polygons
 island.polygons <- strata.ns %>% 
   filter(str_detect(region, "Island")) %>%
   st_union() 
@@ -1550,15 +1512,14 @@ if (length(island.polygons) > 0) {
 # Extract polygons that intersect the nearshore_mask
 strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
-  # Remove overlap with land
-  st_difference(st_union(bathy_5m_poly)) 
+  st_difference(st_transform(na_landmask, crs = 4326))
 
-# In 2023, nearshore strata are not clipped by the core area
-if (!survey.name %in% c("2307RL")) {
-  strata.nearshore <- strata.nearshore %>% 
-    # Remove overlap with core strata
-    st_difference(select(strata.super.polygons.ns, geometry))
-} 
+# Remove overlap with core area super polygons
+strata.nearshore <- strata.nearshore %>% 
+  st_difference(strata.super.polygons.ns)
+
+# mapview(strata.super.polygons.ns) + mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
+# mapview(strata.super.polygons.ns) + mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
 
 # Finalize strata creation
 strata.nearshore <- strata.nearshore %>%
@@ -1671,44 +1632,46 @@ nasc.ns.clusters <- sort(unique(nasc.nearshore$cluster))
 save(nasc.nearshore, 
      file = here("Output/nasc_nearshore_all.Rdata"))
 
-# Remove overlapping intervals --------------------------------------------
-# Except in 2023, when Lisa Marie sampled independently with Lasker/Shimada and thus
-# the data was treated independently and overlapping intervals were not removed
-if (!survey.name %in% c("2307RL")) {
-  if (process.nearshore) {
-    # Subset nearshore backscatter and remove overlap with Lasker
-    nasc.ns.sub <- nasc.nearshore %>%
-      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-      st_difference(strata.super.polygons.ns)
-    
-    # Subset nearshore biomass density and remove overlap with Lasker
-    nasc.density.ns.sub <- nasc.density.ns %>% 
-      mutate(id = seq_along(transect)) %>% 
-      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-      st_difference(strata.super.polygons.ns)  
-    
-    save(nasc.ns.sub, nasc.density.ns.sub,
-         file = here("Output/nasc_nearshore_unique.Rdata"))
-  } else {
-    load(here("Output/nasc_nearshore_unique.Rdata"))
-  } 
-}
+# This is now handled in the st_difference calls above ----------------------
 
-# If non-overlapping intervals were created
-if (exists("nasc.ns.sub")) {
-  # Filter nearshore backscatter using nasc.ns.sub
-  nasc.nearshore <- nasc.nearshore %>% 
-    filter(id %in% nasc.ns.sub$id)
-  
-  # Filter nearshore biomass density using nasc.density.ns.sub
-  nasc.density.ns <- nasc.density.ns %>% 
-    mutate(id = seq_along(transect)) %>% 
-    filter(id %in% nasc.density.ns.sub$id)  
-} else {
-  # Create id variable
-  nasc.density.ns <- nasc.density.ns %>% 
-    mutate(id = seq_along(transect))  
-}
+# # Remove overlapping intervals --------------------------------------------
+# # Except in 2023, when Lisa Marie sampled independently with Lasker/Shimada and thus
+# # the data was treated independently and overlapping intervals were not removed
+# if (!survey.name %in% c("2307RL")) {
+#   if (process.nearshore) {
+#     # Subset nearshore backscatter and remove overlap with Lasker
+#     nasc.ns.sub <- nasc.nearshore %>%
+#       st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+#       st_difference(strata.super.polygons.ns)
+#     
+#     # Subset nearshore biomass density and remove overlap with Lasker
+#     nasc.density.ns.sub <- nasc.density.ns %>% 
+#       mutate(id = seq_along(transect)) %>% 
+#       st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+#       st_difference(strata.super.polygons.ns)  
+#     
+#     save(nasc.ns.sub, nasc.density.ns.sub,
+#          file = here("Output/nasc_nearshore_unique.Rdata"))
+#   } else {
+#     load(here("Output/nasc_nearshore_unique.Rdata"))
+#   } 
+# }
+
+# # If non-overlapping intervals were created
+# if (exists("nasc.ns.sub")) {
+#   # Filter nearshore backscatter using nasc.ns.sub
+#   nasc.nearshore <- nasc.nearshore %>% 
+#     filter(id %in% nasc.ns.sub$id)
+#   
+#   # Filter nearshore biomass density using nasc.density.ns.sub
+#   nasc.density.ns <- nasc.density.ns %>% 
+#     mutate(id = seq_along(transect)) %>% 
+#     filter(id %in% nasc.density.ns.sub$id)  
+# } else {
+#   # Create id variable
+#   nasc.density.ns <- nasc.density.ns %>% 
+#     mutate(id = seq_along(transect))  
+# }
 
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.nearshore, file = here("Output/nasc_nearshore_final.Rdata"))
@@ -2540,7 +2503,7 @@ if (save.figs) {
                stock == j, transect %in% strata.final.ns$transect[strata.final.ns$scientificName == i])
       
       # Filter positive clusters
-      pos.cluster.txt <- filter(clf, cluster %in% nasc.density.plot.ns$cluster) 
+      pos.cluster.txt <- filter(clf.ns, cluster %in% nasc.density.plot.ns$cluster) 
       
       # pos.cluster.txt <- pos.clusters.ns %>% 
       #   filter(scientificName == i, stock == j,
@@ -2615,4 +2578,3 @@ for (i in unique(strata.primary$scientificName)) {
     }
   }
 }
-
