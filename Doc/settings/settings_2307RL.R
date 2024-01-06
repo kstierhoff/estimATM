@@ -848,7 +848,7 @@ cal.lat.dd         <-   32.6956    # Cal location latitude in decimal degrees (f
 cal.lon.dd         <- -117.15278   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
-cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1; _Lasker_ sphere #1)" # Cal sphere info
+cal.sphere         <- "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)" # Cal sphere info
 cal.sphere.name    <- "_Lasker_ sphere #1"
 cal.sphere.z       <- 6 # Nominal depth of calibration sphere below the transducer
 cal.imp.anal       <- "Agilent 4294A Precision Impedance Analyzer" # Info about impedance analyzer
