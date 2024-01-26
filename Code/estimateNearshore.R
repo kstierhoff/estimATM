@@ -93,6 +93,18 @@ if (process.nearshore) {
     }
   }
   
+  # For 2023, replace cps.nasc with NASC.30, to examine the contribution of deep anchovy schools to the sardine estimates
+  if (survey.name %in% c("2307RL")) {
+    nasc.nearshore <- nasc.nearshore %>% 
+      mutate(cps.nasc = case_when(
+        cps.nasc >= NASC.30 & vessel.orig == "LBC" ~ NASC.30,
+        TRUE ~ cps.nasc
+      ))  
+    
+    # ggplot(nasc.nearshore2, aes(cps.nasc2, NASC.30)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+    # ggplot(nasc.nearshore2, aes(cps.nasc, cps.nasc2)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+  }
+  
   # Process purse seine data
   if (process.seine) {
     source(here("Code/processSeine.R"))
