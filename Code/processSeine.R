@@ -245,12 +245,12 @@ if (nrow(set.pos) > 0) {
 
 # Summarize seine set data
 seine.summ <- set.summ.wt %>% 
-  left_join(select(set.clusters, key.set, Vessel = vessel.name, Date = date, 
+  left_join(select(set.clusters, key.set, Vessel = vessel.name, Date = datetime, 
                    Latitude = lat, Longitude = long)) %>%
   select(Vessel, Set = haul, Date, Latitude, Longitude, "N. Anchovy" = Anchovy, "P. Sardine" = Sardine, 
          "P. Mackerel" = PacMack, "J. Mackerel" = JackMack, "P. Herring" = PacHerring, 
          "R. Herring" = RndHerring, "Other" = Other, Jacksmelt, "All CPS" = AllCPS) %>% 
-  mutate(Date = format(Date, "%m/%d/%Y")) %>% 
+  mutate(Date = format(Date, "%m/%d/%Y %H:%M")) %>% 
   arrange(desc(Vessel), Set)
 
 # Select positive clusters
