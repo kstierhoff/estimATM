@@ -755,5 +755,11 @@ if (update.routes) {
     write_csv(uctd.sub, here("Output/waypoints_updated/pairovet_wpts.csv"),
               col_names = FALSE)
   }
+  
+  # Write route plans to CSV
+  write_csv(select(route.fsv, -X, -Y), 
+            here("Output/routes_updated/route_plan_fsv.csv"))
+  write_csv(select(route.ns, -X, -Y), 
+            here("Output/routes_updated/route_plan_ns.csv"))
 }
 
