@@ -17,7 +17,7 @@ tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
 
 # Mainland buffer distance for FSV and Saildrone transects
 sd.buffer  <- 6 # nmi
-fsv.buffer <- 80
+fsv.buffer <- 80 #limits offshore portion of lines (SCB)
 
 # Minimum transect length
 min.tx.length <- 0 # nmi
@@ -41,7 +41,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- here("Data/Nav")
-gpx.file         <- "rosepoint_waypoints_20240208.gpx" #"rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints.gpx" #"rosepoint_waypoints.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
@@ -49,7 +49,7 @@ transit.speed    <- 10
 survey.direction <- "Northward" # Southward or Northward; to compute day lengths
 
 # Beginning transit length (d)
-transit.distance <- 320 # From SD to Punta Eugenia in 2023
+transit.distance <- 0 # begining in san diego 2024
 transit.duration <- ceiling(transit.distance/transit.speed/24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
@@ -60,9 +60,10 @@ transects.rm <- NA # Numbered transects to remove
 
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
-leg.ends <- c(ymd("2023-07-03"), ymd("2023-07-30"),
-              ymd("2023-08-05"), ymd("2023-08-31"),
-              ymd("2023-09-05"), ymd("2023-09-30"))
+leg.ends <- c(ymd("2024-06-26"), ymd("2024-07-17"),
+              ymd("2024-07-22"), ymd("2024-08-12"),
+              ymd("2024-08-17"), ymd("2024-09-07"),
+              ymd("2024-09-12"), ymd("2024-09-30"))
 
 # Compute days per leg
 leg.days <- (leg.ends[seq(2, length(leg.ends), 2)] - leg.ends[seq(1,length(leg.ends) - 1, 2)]) + 1
@@ -94,7 +95,7 @@ survey.start           <- "17 July"       # Survey start date
 survey.end             <- "3 November"    # Survey end date
 survey.year            <- "2023"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
-survey.das             <- 81              # Days at sea allocated
+survey.das             <- 85              # Days at sea allocated
 survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
 survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
@@ -104,15 +105,15 @@ daynight.filter        <- c("Day","Night")# A character string including "Day", 
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
-leg.breaks <- as.numeric(lubridate::ymd(c("2023-07-15", "2023-08-01", 
-                                          "2023-09-01", "2023-10-01",
-                                          "2023-11-04")))
+leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22", 
+                                          "2024-08-17", "2024-09-12",
+                                          "2024-09-30")))
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2023-07-17" # Start of survey for ERDDAP vessel data query
-erddap.survey.end    <- "2023-10-01" # End of survey for ERDDAP vessel data query
+erddap.survey.start  <- "2024-06-26" # Start of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed","flag")
@@ -122,8 +123,9 @@ survey.long          <- c(-130,-113)
 
 # Inport dates for classifying data by cruise leg (if desired) -----------------
 # Use start dates of each leg + end date of last leg
-leg.breaks.sh <- as.numeric(lubridate::ymd(c("2023-10-08", "2023-10-19",
-                                             "2023-11-04")))
+leg.breaks.sh <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22", 
+                                             "2024-08-17", "2024-09-12",
+                                             "2024-09-30")))
 
 # Define ERDDAP data variables for Shimada
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
@@ -132,7 +134,7 @@ erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data q
 erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2307RL.csv"
+wpt.filename         <- "waypoints_2406RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
                           Compulsory = "Compulsory", Nearshore = "Nearshore",
                           Offshore = "Offshore", Saildrone = "Saildrone")
