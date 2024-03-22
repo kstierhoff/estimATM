@@ -308,6 +308,7 @@ nasc.vessels.krill     <- c("RL", "SH")
 # Defined by the atm::extract_csv() function.
 nasc.depth.cps   <- "NASC.250"
 nasc.depth.krill <- "NASC.350"
+nasc.depth.deep  <- "NASC.20"
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
