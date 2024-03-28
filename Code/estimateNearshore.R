@@ -29,13 +29,6 @@ if (process.nearshore) {
                               nasc.summ.interval),
                 labels = FALSE, include.lowest = TRUE)) 
   
-  # Plot data for 2022
-  # ggplot() +
-  #   geom_point(data = nasc, aes(long, lat, colour = vessel.orig)) +
-  #   geom_point(data = nasc.nearshore, aes(long, lat, fill = vessel.name), shape = 21) +
-  #   geom_sf(data = bathy_20m_poly, fill = NA) +
-  #   coord_sf()
-  # 
   # In 2022, LM sampled core transects between Cape Flattery and Bodega Bay spaced 20 nmi
   # Transect numbers correspond to the core transect names, and will not be unique with other
   # nearshore transects surveyed by LBC, so we must increment the transect numbers starting
