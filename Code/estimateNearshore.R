@@ -145,19 +145,45 @@ if (process.nearshore) {
       super.hauls.ns    <- bind_rows(super.hauls, super.clusters.ns) %>% 
         filter(sample.type %in% catch.source.ns)
       
+      # Do deep data
+      clf.ns.deep <- clf %>%
+        bind_rows(clf.seine.deep) %>% 
+        filter(sample.type %in% catch.source.ns)
+      
+      hlf.ns.deep <- hlf %>% 
+        ungroup() %>% 
+        bind_rows(clf.seine.deep) %>% 
+        filter(sample.type %in% catch.source.ns)  
+      
+      lf.final.ns.deep <- lf.final %>% 
+        bind_rows(lf.final.seine.deep) %>% 
+        filter(sample.type %in% catch.source.ns)
+      
+      # Combine super.clusters and super.clusters.ns.deep
+      super.clusters.ns.deep <- bind_rows(super.clusters, super.clusters.ns.deep) %>% 
+        filter(sample.type %in% catch.source.ns)
+      
+      super.hauls.ns.deep    <- bind_rows(super.hauls, super.clusters.ns.deep) %>% 
+        filter(sample.type %in% catch.source.ns)
+      
       # ggplot() +
       #   geom_text(data = super.clusters.ns, aes(long, lat, label = cluster, colour = sample.type)) +
       #   coord_map()
       
       # Save super clusters and hauls
-      save(super.clusters.ns, super.hauls.ns,
-           file = here("Output/super_clusters_hauls_ns.Rdata"))
+      save(super.clusters.ns.deep, super.hauls.ns.deep,
+           file = here("Output/super_clusters_hauls_ns_deep.Rdata"))
     }
   } else {
     load(here("Output/seine_summaries.Rdata"))
     load(here("Output/cluster_length_frequency_all_seine.Rdata"))
     load(here("Output/cluster_length_frequency_tables_seine.Rdata"))
     load(here("Output/super_clusters_hauls_ns.Rdata"))
+    
+    load(here("Output/seine_summaries_deep.Rdata"))
+    load(here("Output/cluster_length_frequency_all_seine_deep.Rdata"))
+    load(here("Output/cluster_length_frequency_tables_seine_deep.Rdata"))
+    load(here("Output/super_clusters_hauls_ns_deep.Rdata"))
   }
   
   # Convert nearshore backscatter to sf 
@@ -202,6 +228,9 @@ if (process.nearshore) {
   # Save after processing nearshore
   save(clf.ns, hlf.ns, super.clusters.ns, super.hauls.ns, lf.final.ns, set.pie, 
        file = here("Output/clf_nearshore.Rdata"))
+  
+  save(clf.ns.deep, hlf.ns.deep, super.clusters.ns.deep, super.hauls.ns.deep, lf.final.ns.deep, set.pie.deep, 
+       file = here("Output/clf_nearshore_deep.Rdata"))
   
   # Assign backscatter to trawl clusters ------------------------------------
   saveRDS(nasc.nearshore, here("Output/nasc_match_ns.rds"))

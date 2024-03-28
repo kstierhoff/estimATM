@@ -336,7 +336,7 @@ seine.summ.deep <- set.summ.wt.deep %>%
 super.clusters.ns <- filter(set.clusters, cluster %in% unique(set.pos$cluster)) %>% 
   select(-key.set, -vessel.name)
 
-super.clusters.deep.ns <- filter(set.clusters, cluster %in% unique(set.pos.deep$cluster)) %>% 
+super.clusters.ns.deep <- filter(set.clusters, cluster %in% unique(set.pos.deep$cluster)) %>% 
   select(-key.set, -vessel.name)
 
 # Subset data from all platforms
