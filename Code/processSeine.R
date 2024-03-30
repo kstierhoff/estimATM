@@ -309,6 +309,9 @@ set.zero.deep <- filter(set.pie.deep, AllCPS == 0)
 if (nrow(set.pos) > 0) {
   set.pos <- set.pos %>% 
     replace(. == 0, 0.0000001) 
+}
+
+if (nrow(set.pos.deep) > 0) {
   set.pos.deep <- set.pos.deep %>% 
     replace(. == 0, 0.0000001) 
 }
