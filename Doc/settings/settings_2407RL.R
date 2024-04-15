@@ -86,14 +86,14 @@ nav.vessels.ns <- c("LM","LBC")
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
-survey.name.long       <- "Summer 2023 California Current Ecosystem Survey (CCES)"
+survey.name.long       <- "Summer 2024 California Current Ecosystem Survey (CCES)"
 survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
-survey.name            <- "2307RL"        # SWFSC/AST survey name
-survey.start           <- "17 July"       # Survey start date
-survey.end             <- "3 November"    # Survey end date
-survey.year            <- "2023"          # Survey year, for report
+survey.name            <- "2407RL"        # SWFSC/AST survey name
+survey.start           <- "25 June"       # Survey start date
+survey.end             <- "30 September"    # Survey end date
+survey.year            <- "2024"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 85              # Days at sea allocated
 survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
@@ -177,7 +177,7 @@ sd.date.range    <- data.frame(saildrone  = c(1048, 1060, 1096),
 sd.time.offset   <- 0 # Hours to add/subtract from GPS data (typically 0)
 
 # Filter variables for TRAWL and CUFES data on SQL Server ----------------------
-cruise.name <- 202307 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
+cruise.name <- 202407 # May be a numeric or numeric vector (e.g., c(201704,201706,...))
 cruise.ship <- c("RL", "SH") # May be a character or character vector (e.g., c("RL",",...))
 
 # Growth model parameters ------------------------------------------------------
@@ -314,7 +314,7 @@ nasc.depth.krill <- "NASC.350"
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
 # in the same strata? Or, in 2023, Lasker and Shimada when additional sea days were provided
-merge.vessels <- c(Core = TRUE, # To combine RL and SH in 2307RL; perhaps SD too
+merge.vessels <- c(Core = TRUE, # To combine RL and SH in 2407RL; perhaps SD too
                    OS = FALSE,
                    NS = FALSE)
 
@@ -338,17 +338,17 @@ sounder.type           <- c(RL  = "EK80",
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2307RL",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
-                            SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+  survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
+                           # SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
-                            SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240703_LASKER_SummerCPS",
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
+                           # SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
@@ -418,8 +418,8 @@ use.seine.data  <- TRUE
 catch.source.ns <- c("Purse seine")
 
 # Define path to seine data directories for each vessel
-seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2307RL.xlsx"),
-                      "LM" = file.path(survey.dir["LM"],  "DATA/SEINE/lm_data_2307RL.xlsx"))
+seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2407RL.xlsx"),
+                      "LM" = file.path(survey.dir["LM"],  "DATA/SEINE/lm_data_2407RL.xlsx"))
 
 # source.cps.nasc determines whether to use cps.nasc values from a separate file
 # Since 2022, Code/extract_CPS_NASC.R is used to remove non-CPS backscatter and compute cps.nasc
@@ -438,7 +438,7 @@ source.cps.nasc        <- c(RL  = FALSE,
                             SH  = FALSE) # in the nearshore strata
 
 # File containing CPS nasc from CTD app
-data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2307RL.csv")) # in the nearshore strata 
+data.cps.nasc          <- c(RL  = here("Data/Backscatter/nasc_cps_RL_2407RL.csv")) # in the nearshore strata 
 
 # regex for matching character pattern
 tx.char.pattern        <- c(RL  = "[^0-9]",
@@ -564,7 +564,7 @@ scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
-scs.nav.path           <- "C:/SURVEY/2307RL/DATA/SCS" # Local
+scs.nav.path           <- "C:/SURVEY/2407RL/DATA/SCS" # Local
 scs.nav.dir            <- "SAMOS"
 scs.nav.pattern        <- "SAMOS-OBS.*.elg"
 scs.nav.recurse        <- TRUE
@@ -572,7 +572,7 @@ scs.nav.recurse        <- TRUE
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes202307RL.sqlite" # CUFES SQLite database
+cufes.db.sqlite        <- "cufes202407RL.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 cufes.vessels          <- c("RL")
 
@@ -580,7 +580,7 @@ cufes.vessels          <- c("RL")
 trawl.source           <- "SQL"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
-trawl.db.access        <- "TrawlDataEntry2307RL.accdb"
+trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
 trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
@@ -599,7 +599,7 @@ uctd.cast.depth        <- 350
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
-tdr.pattern            <- "2307RL*.*rsk"
+tdr.pattern            <- "2407RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
 # Time offset, in hours (usually -1, diff between PDT and PST in summer)
@@ -809,7 +809,7 @@ stock.break.source <- "primary"
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
-raw.prefix    <- "2307RL_EK80"
+raw.prefix    <- "2407RL_EK80"
 raw.size      <- 1  # file size in megabytes (GB)
 raw.log.range <-  350  # depth of ER60 logging (m)
 
@@ -839,7 +839,7 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
 cal.vessels        <- c("RL","LBC","LM","SH")
-cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20230703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
+cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20240703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
 cal.datetime       <- "27 June"    # Date/time of calibration
 cal.plot.date      <- "2023-06-27" # Date of the calibration, used to plot cal time series
 cal.window         <- 75           # Number of days around calibration date to look for results
