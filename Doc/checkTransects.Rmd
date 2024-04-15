@@ -84,6 +84,10 @@ scott_islands_mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>%
   mutate(MPA = "Scott Islands Protected Marine Area") %>% 
   st_difference(filter(countries, name == "Canada"))
 
+pacific_rim_mpa <- st_read(here("Data/GIS/pacific_rim_reserve_polygon.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = "Pacific Rim National Park Reserve") 
+
 ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
   st_transform(crs.geog) %>% 
   mutate(MPA = paste(NAME, Type))
@@ -306,6 +310,8 @@ if (leaflet.checkTransects.simple) {
     # Add Canadian MPAs
     addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
                 label = ~htmlEscape(MPA), group = "MPAs") %>%
+    addPolygons(data = pacific_rim_mpa, color = "#000414", weight = 2, 
+                label = ~htmlEscape(MPA), group = "MPAs") %>%
     # Add CA MPAs
     addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
                 fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
@@ -382,6 +388,8 @@ if (leaflet.checkTransects.simple) {
                 group = "State Waters") %>%
     # Add Canadian MPAs
     addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
+                label = ~htmlEscape(MPA), group = "MPAs") %>%
+    addPolygons(data = pacific_rim_mpa, color = "#000414", weight = 2, 
                 label = ~htmlEscape(MPA), group = "MPAs") %>%
     # Add CA MPAs
     addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
@@ -728,10 +736,6 @@ bathy_5m_df <- bathy_5m_points %>%
     lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL)
 
-# Read Scott Island MPA shapefile
-si.mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>% 
-  st_difference(filter(countries, name == "Canada"))
-
 write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
 ```
 
@@ -760,7 +764,8 @@ base.map <- get_basemap(transects, states, countries,
 
 # Map planned transects
 survey.plan <- base.map +   
-  geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
+  geom_sf(data = scott_islands_mpa, colour = "green", fill = NA, linetype = "dashed") +
+  geom_sf(data = pacific_rim_mpa, colour = "green", fill = NA, linetype = "dashed") +
   # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
   geom_sf(data = transects, aes(colour = Type, linetype = Type), 
           show.legend = "line") +
@@ -800,7 +805,8 @@ for (ii in unique(transects$loc)) {
                           landmarks, bathy, map.bounds, crs = crs.proj)
   
   region.map <- base.map +
-    geom_sf(data = si.mpa, colour = "green", fill = NA, linetype = "dashed") +
+    geom_sf(data = scott_islands_mpa, colour = "green", fill = NA, linetype = "dashed") +
+    geom_sf(data = pacific_rim_mpa, colour = "green", fill = NA, linetype = "dashed") +
     geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
     geom_sf(data = filter(transects, loc == ii), aes(colour = Type, linetype = Type), 
             show.legend = "line") +
