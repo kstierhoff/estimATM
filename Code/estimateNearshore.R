@@ -800,7 +800,7 @@ if (save.figs) {
          width = map.width*3, height = map.height*2)
   
   # Save plot objects
-  save(map.prop.all, map.prop.all.deep, file = here("Output/acoustic_proportion_maps_ns.Rdata"))
+  save(map.prop.all.ns, map.prop.all.ns.deep, file = here("Output/acoustic_proportion_maps_ns.Rdata"))
   
 } else {
   # Load plot objects
