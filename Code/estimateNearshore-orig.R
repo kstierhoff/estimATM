@@ -94,22 +94,15 @@ if (process.nearshore) {
   }
   
   # For 2023, replace cps.nasc with NASC.30, to examine the contribution of deep anchovy schools to the sardine estimates
-  # Ideally, provide variable for nasc.depth.deep (e.g., NASC20), but hard-coded for 2307RL
   if (survey.name %in% c("2307RL")) {
-    nasc.nearshore <- nasc.nearshore %>%
-      # Retain original cps.nasc
-      # Create deep backscatter variable
-      mutate(cps.nasc.orig = cps.nasc) %>%
-      # Create deep backscatter variable
-      mutate(cps.nasc.deep = cps.nasc - NASC.20) %>% 
-      # Remove deep backscatter from 
+    nasc.nearshore <- nasc.nearshore %>% 
       mutate(cps.nasc = case_when(
-        cps.nasc >= NASC.20 & vessel.orig == "LBC" ~ NASC.20,
+        cps.nasc >= NASC.30 & vessel.orig == "LBC" ~ NASC.30,
         TRUE ~ cps.nasc
-      ))
-
-    # ggplot(nasc.nearshore, aes(cps.nasc2, NASC.30)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
-    # ggplot(nasc.nearshore, aes(cps.nasc, cps.nasc.deep)) + geom_abline(slope = 1, intercept = 0) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+      ))  
+    
+    # ggplot(nasc.nearshore2, aes(cps.nasc2, NASC.30)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+    # ggplot(nasc.nearshore2, aes(cps.nasc, cps.nasc2)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
   }
   
   # Process purse seine data
@@ -276,36 +269,6 @@ if (process.nearshore) {
   load(here("Data/Backscatter/nasc_nearshore.Rdata"))
   load(here("Output/clf_nearshore.Rdata"))
   load(here("Output/seine_summaries.Rdata"))
-}
-
-# For 2307RL (and perhaps beyond), deep backscatter observed by nearshore vessels are probably
-# incorrectly assigned to species (principally P. sardine) that do not routinely occur beneath the mixed-layer
-# Therefore, backscatter deeper than a particular depth (>30 m depth, or >NASC.20) should be assigned
-# to the relative proportions of N. anchovy and P. herring in the nearest seine set, biomass computed
-# separately, and then added to the biomass observed above the mixed layer.
-if (survey.name %in% c("2307RL")) {
-  # # Create cps.nasc.deep
-  # nasc.nearshore <- nasc.nearshore %>% 
-  #   # Extract deep NASC
-  #   mutate(cps.nasc.deep = cps.nasc - NASC.20) %>% 
-  #   # Remove deep NASC from cps.nasc
-  #   mutate(cps.nasc = case_when(
-  #     cps.nasc >= NASC.30 & vessel.orig == "LBC" ~ NASC.30,
-  #     TRUE ~ cps.nasc))
-  
-  # Create new cluster file, containing only N. anchovy and P. herring
-  
-  # Recalculate acoustic proportions, so anchovy and herring sum to 1
-  
-  # Match new clusters to nasc.nearshore
-  
-  # Calculate numerical and biomass densities for deep NASC
-  
-  # Add biomass and abundance densities from deep NASC to shallower estimates
-  
-  # Compute biomass and abundance estimates for each transect and stratum using the new density vectors
-  
-  
 }
 
 # Filter unwanted transects
