@@ -30,7 +30,7 @@ nasc.map.cps <- base.map +
 
 # Save nasc plot
 ggsave(nasc.map.cps,
-       filename = here("Figs/fig_backscatter_cps.png"),
+       filename = here("Figs/fig_backscatter_cps_combo.png"),
        width = map.width, height = map.height) 
 
 save(nasc.map.cps, file = here("Output/nasc_plot_cps_combo.Rdata"))
