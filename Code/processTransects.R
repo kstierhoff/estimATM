@@ -114,8 +114,8 @@ starts <- transects %>%
 if (survey.direction == "Southward") {
   # Calculate the day length at the start of the survey at the northernmost latitude
   daylength.start <- day_length(date = min(leg.ends),
-                              geocode = data.frame(lat = max(starts$lat), lon = max(starts$long)),
-                              twilight = "none")
+                                geocode = data.frame(lat = max(starts$lat), lon = max(starts$long)),
+                                twilight = "none")
   # Calculate the day length at the end of the survey at the northernmost latitude
   daylength.end <- day_length(date = max(leg.ends),
                               geocode = data.frame(lat = min(starts$lat), lon = min(starts$long)),
@@ -124,8 +124,8 @@ if (survey.direction == "Southward") {
 } else if (survey.direction == "Northward") {
   # Calculate the day length at the start of the survey at the southernmost latitude
   daylength.start <- day_length(date = min(leg.ends),
-                              geocode = data.frame(lat = min(starts$lat), lon = max(starts$long)),
-                              twilight = "none")
+                                geocode = data.frame(lat = min(starts$lat), lon = max(starts$long)),
+                                twilight = "none")
   # Calculate the day length at the end of the survey at the northernmost latitude
   daylength.end <- day_length(date = max(leg.ends),
                               geocode = data.frame(lat = max(starts$lat), lon = min(starts$long)),
@@ -279,7 +279,7 @@ if (survey.direction == "Northward") {
     route.sd <- arrange(route.sd, Transect, order)   
   }
 }
-  
+
 # Compute timing and distances
 ## FSV
 route.fsv <- route.fsv %>%
@@ -315,40 +315,35 @@ route.fsv <- route.fsv %>%
          distance_to_next, distance_cum, time_to_next, time_cum, leg, Region)
 
 ## Nearshore
-route.ns <- route.ns %>%
-  # left_join(daylength.df) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
-  select(-group, -order) %>%
-  mutate(long = as.data.frame(st_coordinates(.))$X,
-         lat  = as.data.frame(st_coordinates(.))$Y,
-         distance_to_next = as.numeric(
-           na.omit(c(0, st_distance(geometry,
-                                    lead(geometry, 
-                                         default = NA),
-                                    by_element = TRUE))))/1852,
-         distance_to_next = c(distance_to_next[2:n()],0)) %>% 
-  # mutate(distance_to_next = c(distance_to_next[2:n()],0),
-  #        distance_cum = cumsum(distance_to_next),
-  #        time_to_next = distance_to_next / survey.speed / daylength,
-  #        time_cum     = cumsum(time_to_next) + transit.duration,
-  #        on_off       = 1,
-  #        leg          = cut(time_cum, leg.breaks.gpx, 
-  #                           labels = FALSE, include.lowest = TRUE)) %>%
-  st_set_geometry(NULL) %>% 
-  project_df(to = 3310) %>% 
-  mutate(
-    diff.wpt = c(diff(round(Waypoint)), 0),
-    speed = case_when(
-      diff.wpt == 0 ~ survey.speed,
-      TRUE ~ transit.speed),
-    mode         = case_when(
-      speed == survey.speed ~ "survey",
-      speed == transit.speed ~ "transit",
-      TRUE ~ "other")) %>% 
-  # select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
-  #        distance_to_next, distance_cum, time_to_next, time_cum, leg, Region) %>% 
-  select(Transect, Waypoint, Type, long, lat, X, Y, speed, mode, 
-         distance_to_next, Region)
+if(nrow(route.ns) > 0) {
+  route.ns <- route.ns %>%
+    # left_join(daylength.df) %>% 
+    st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+    select(-group, -order) %>%
+    mutate(long = as.data.frame(st_coordinates(.))$X,
+           lat  = as.data.frame(st_coordinates(.))$Y,
+           distance_to_next = as.numeric(
+             na.omit(c(0, st_distance(geometry,
+                                      lead(geometry, 
+                                           default = NA),
+                                      by_element = TRUE))))/1852,
+           distance_to_next = c(distance_to_next[2:n()],0)) %>% 
+    st_set_geometry(NULL) %>% 
+    project_df(to = 3310) %>% 
+    mutate(
+      diff.wpt = c(diff(round(Waypoint)), 0),
+      speed = case_when(
+        diff.wpt == 0 ~ survey.speed,
+        TRUE ~ transit.speed),
+      mode         = case_when(
+        speed == survey.speed ~ "survey",
+        speed == transit.speed ~ "transit",
+        TRUE ~ "other")) %>% 
+    # select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
+    #        distance_to_next, distance_cum, time_to_next, time_cum, leg, Region) %>% 
+    select(Transect, Waypoint, Type, long, lat, X, Y, speed, mode, 
+           distance_to_next, Region)
+}
 
 # # Combine even and odd transects into one continuous route
 # route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>% 
@@ -397,10 +392,16 @@ ggsave(route.plot.fsv, filename = here("Figs/fig_route_plan.png"),
 # Write route plan to CSV
 write_csv(select(route.fsv, -X, -Y), 
           here("Output/routes/route_plan_fsv.csv"))
-write_csv(select(route.ns, -X, -Y), 
-          here("Output/routes/route_plan_ns.csv"))
-# write_csv(select(route.sd, -X, -Y), 
-#           here("Output/routes/route_plan_sd.csv"))
+
+if(nrow(route.ns) > 0) {
+  write_csv(select(route.ns, -X, -Y), 
+            here("Output/routes/route_plan_ns.csv"))
+}
+
+if(nrow(route.sd) > 0) {
+  write_csv(select(route.sd, -X, -Y),
+            here("Output/routes/route_plan_sd.csv"))
+}
 
 # Add legs to transects ---------------------------------------------------
 leg.summ <- route.fsv %>% 
@@ -759,7 +760,10 @@ if (update.routes) {
   # Write route plans to CSV
   write_csv(select(route.fsv, -X, -Y), 
             here("Output/routes_updated/route_plan_fsv.csv"))
-  write_csv(select(route.ns, -X, -Y), 
-            here("Output/routes_updated/route_plan_ns.csv"))
+  
+  if(nrow(route.ns) > 0) {
+    write_csv(select(route.ns, -X, -Y), 
+              here("Output/routes_updated/route_plan_ns.csv"))
+  }
 }
 
