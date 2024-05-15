@@ -1,5 +1,9 @@
+# pacman::p_load(tidyverse, here, sf, mapview, surveyR)
+# 
+# source(here::here("Doc/settings/settings_2307RL.r"))
+
 # Load basemap
-load(here("Data/Map/basemap.Rdata"))
+load(here::here("Data/Map/basemap.Rdata"))
 
 # Import waypoints
 # Read transect waypoints
@@ -120,15 +124,15 @@ set.pies.lm.day <- base.map +
   # Plot purse seine pies
   scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM"), day_night == "Day"), 
                               aes(X, Y, group = key.set, r = pie.radius.ns),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                              cols = c("Anchovy", "JackMack", 
+                                       "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = c("Anchovy", "J. Mackerel", 
+                               "P. herring", "P. mackerel", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, 
+                               pac.herring.color, pac.mack.color, sardine.color)) +
   geom_point(data = filter(set.zero, vessel.name == "LM", day_night == "Day"), 
              aes(X, Y), shape = 21, colour = "white", fill = "black") +
   ggtitle("Lisa Marie - Day") +
@@ -140,15 +144,15 @@ set.pies.lm.night <- base.map +
   # Plot purse seine pies
   scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM"), day_night == "Night"), 
                               aes(X, Y, group = key.set, r = pie.radius.ns),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                              cols = c("Anchovy", "JackMack", 
+                                       "PacHerring", "PacMack", "Sardine"),
                               color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = c("Anchovy", "J. Mackerel", 
+                               "P. herring", "P. mackerel", "Sardine"),
+                    values = c(anchovy.color, jack.mack.color, 
+                               pac.herring.color, pac.mack.color,  sardine.color)) +
   geom_point(data = filter(set.zero, vessel.name == "LM", day_night == "Night"), 
              aes(X, Y), shape = 21, colour = "white", fill = "black") +
   ggtitle("Lisa Marie - Night") +
