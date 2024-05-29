@@ -1,19 +1,19 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
-process.seine     <- T # Process purse seine data, if present
-process.nearshore <- T # Process near backscatter data; typically TRUE
-estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.seine     <- F # Process purse seine data, if present
+process.nearshore <- F # Process near backscatter data; typically TRUE
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns   <- 7 # For nearshore sampling
+tx.spacing.ns   <- 5 # For nearshore sampling
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -27,7 +27,7 @@ min.tx.length <- 0 # nmi
 uctd.spacing   <- 15
 
 ### Transect removal and renumbering
-rm.n.transects     <- 37 # Number of transects to remove from the start (if near Mexico)
+rm.n.transects     <- 69 # Number of transects to remove from the start (if near Mexico)
 rm.i.transects     <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 renumber.transects <- TRUE # Renumber transects to start at zero if transect are removed
 
@@ -87,16 +87,16 @@ nav.vessels.ns <- c("LM","LBC")
 
 # Survey information ------------------------------------------------------
 # Full survey name; only used in report title
-survey.name.long       <- "Summer 2024 California Current Ecosystem Survey (CCES)"
-survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shimada
-survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
-survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
-survey.name            <- "2407RL"        # SWFSC/AST survey name
-survey.start           <- "25 June"       # Survey start date
-survey.end             <- "30 September"    # Survey end date
-survey.year            <- "2024"          # Survey year, for report
+survey.name.long       <- "Summer 2025 Integrated West Coast Pelagics Survey (IWCPS)"
+survey.vessel.long     <- "Bell M. Shimada" # Full vessel name: e.g., Bell M. Shimada
+survey.vessel          <- "Shimada"       # Short vessel name; e.g., Shimada
+survey.vessel.primary  <- "SH"            # Primary vessel abbreviation 
+survey.name            <- "2506SH"        # SWFSC/AST survey name
+survey.start           <- "4 June"        # Survey start date
+survey.end             <- "30 September"  # Survey end date
+survey.year            <- "2025"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
-survey.das             <- 85              # Days at sea allocated
+survey.das             <- 100             # Days at sea allocated
 survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
 survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
@@ -112,9 +112,9 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2024-06-26" # Start of survey for ERDDAP vessel data query
-erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
+erddap.vessel        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.survey.start  <- "2025-05-04" # Start of survey for ERDDAP vessel data query
+erddap.survey.end    <- "2025-10-01" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
 erddap.headers       <- c("time", "lat","long","SST","SOG","wind_dir","wind_speed","flag")
@@ -130,12 +130,12 @@ leg.breaks.sh <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for Shimada
 erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start.sh  <- "2023-10-09" # Start of survey for ERDDAP vessel data query
-erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data query
+erddap.survey.start.sh  <- "2024-06-04" # Start of survey for ERDDAP vessel data query
+erddap.survey.end.sh    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2406RL.csv"
+wpt.filename         <- "waypoints_2506SH.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
                           Compulsory = "Compulsory", Nearshore = "Nearshore",
                           Offshore = "Offshore", Saildrone = "Saildrone")
@@ -301,10 +301,10 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL", "LBC", "LM", "SH") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("SH", "LBC", "LM") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
-nasc.vessels.krill     <- c("RL", "SH")
+nasc.vessels.krill     <- c("SH")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
 # Options include 0-100 (by 5), 100, 150, 250, and 350 m.
@@ -342,14 +342,14 @@ if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
-                           # SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS",
+                            SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")
 } else {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240703_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
-                           # SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
+                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS",
+                            SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
@@ -562,7 +562,7 @@ scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
 scs.pattern            <- "MOA*.*xlsx" # regex for MOA files
 
 # SCS data info for extracting NAV data
-scs.nav.path           <- "C:/SURVEY/2407RL/DATA/SCS" # Local
+scs.nav.path           <- "C:/SURVEY/2506SH/DATA/SCS" # Local
 scs.nav.dir            <- "SAMOS"
 scs.nav.pattern        <- "SAMOS-OBS.*.elg"
 scs.nav.recurse        <- TRUE
@@ -570,7 +570,7 @@ scs.nav.recurse        <- TRUE
 # CUFES data
 cufes.source           <- "SQLite" # "SQL" or "SQLite"
 cufes.dir.sqlite       <- file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/CUFES")
-cufes.db.sqlite        <- "cufes202407RL.sqlite" # CUFES SQLite database
+cufes.db.sqlite        <- "cufes202506SH.sqlite" # CUFES SQLite database
 cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys)
 cufes.vessels          <- c("RL")
 
@@ -578,13 +578,13 @@ cufes.vessels          <- c("RL")
 trawl.source           <- "SQL"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
-trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
+trawl.db.access        <- "TrawlDataEntry2506SH.accdb"
 trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
-ctd.hdr.pattern        <- "RL2203*.*hdr"
+ctd.hdr.pattern        <- "SH2506*.*hdr"
 ctd.cast.pattern       <- ".*_processed.asc"
 ctd.cast.depth         <- 350
 
@@ -597,7 +597,7 @@ uctd.cast.depth        <- 350
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
-tdr.pattern            <- "2407RL*.*rsk"
+tdr.pattern            <- "2506SH*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
 # Time offset, in hours (usually -1, diff between PDT and PST in summer)
@@ -807,7 +807,7 @@ stock.break.source <- "primary"
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
-raw.prefix    <- "2407RL_EK80"
+raw.prefix    <- "2506SH_EK80"
 raw.size      <- 1  # file size in megabytes (GB)
 raw.log.range <-  350  # depth of ER60 logging (m)
 
