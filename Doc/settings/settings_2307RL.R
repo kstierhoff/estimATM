@@ -213,7 +213,7 @@ label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
                 "Cape Blanco","Bodega Bay","Westport","Fort Bragg",
                 "Morro Bay","Long Beach","Cape Scott","San Diego",
                 "Ensenada","Punta Eugenia","El Rosario","Cabo San Lucas",
-                "Punta Abreojos","San Carlos")
+                "Punta Abreojos","San Carlos","Florence")
 
 # Species, stock and strata for nearshore biomass plots -------------------
 spp.common.ns <- "Northern Anchovy"
