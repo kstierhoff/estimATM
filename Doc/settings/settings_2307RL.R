@@ -14,6 +14,7 @@ combine.regions   <- T # Combine nearshore/offshore plots with those from the co
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
 tx.spacing.ns   <- tx.spacing.fsv/2 # For nearshore sampling
+tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # Mainland buffer distance for FSV and Saildrone transects
 sd.buffer  <- 6 # nmi
@@ -554,9 +555,6 @@ max.cluster.dist       <- 30
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
 tx.spacing.bins <- c(0,  6, 15, 35, 70, 100)
 tx.spacing.dist <- c(5, 10, 20, 40, 80)
-
-tx.spacing.ns   <-  5 # Nearshore transect spacing, in nmi; set NA if calculating programatically
-tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # SCS data
 scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
