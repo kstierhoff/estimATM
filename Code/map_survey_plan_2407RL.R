@@ -17,7 +17,7 @@ base.map <- get_basemap(filter(transects, loc == ii), states, countries,
                         landmarks, bathy, map.bounds, crs = crs.proj)
 
 if (nrow(filter(transects, Type == "Nearshore", Transect %in% lbc.transects))>0) {
-  lbc.map <- base.map
+  lbc.map <- base.map +
     # geom_sf(data = ca_mpas, aes(fill = Type), alpha = 0.5) +
     geom_sf(data = filter(transects, Type != "Nearshore"),
             aes(colour = Type, linetype = Type),
@@ -78,7 +78,7 @@ if (nrow(filter(transects, Type == "Nearshore", Transect %in% lm.transects))>0) 
                         values = wpt.colors) +
     scale_linetype_manual("Type", 
                           values = wpt.linetypes) +
-    theme(legend.position      = c(1,0.5),
+    theme(legend.position.inside = c(1,0.5),
           legend.justification = c(0,0.5)) +
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
              xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
