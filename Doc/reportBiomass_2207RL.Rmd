@@ -39,7 +39,7 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate,knitr,here,
                png,devtools,forcats,jpeg,bookdown,bookdownplus,magick,
-               odbc,cowplot,mapview,fs,reshape2,patchwork,gt)
+               odbc,cowplot,mapview,fs,patchwork,gt)
 
 # Install and load required packages from Github -------------------------------
 # AST packages
@@ -434,8 +434,13 @@ for (i in cal.vessels) {
                      "Equivalent Two-way Beam Angle ($\\Psi$)")
   
   # Sort data frames by frequency
-  param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
-  bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+  param.output <- cal.params %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output <- bm.res %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
 
   # Create column defining parameter units
   param.units <- data.frame(Units = c(" ",                 # Model number

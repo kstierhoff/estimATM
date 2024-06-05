@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, sp, leaflet, here, rgdal, raster,atm, rnaturalearth,sf)
+pacman::p_load(tidyverse,sf,sp,leaflet,here,raster,atm,rnaturalearth)
 
 # Made a new data frame with lat, long, and the value
 chl <- read_csv(here("Data/Habitat/sardine_habitat_chla.csv"),

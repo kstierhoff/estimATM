@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,
                knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
                png,grid,gridExtra,cowplot,flextable,fs,ftExtra,mapview,
-               stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
+               stringr,xtable,devtools,gdata,lubridate,rworldmap,
                scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra,tcltk)
 
 # Install and load required packages from Github -------------------------------
@@ -341,8 +341,13 @@ for (i in cal.vessels) {
                      "Equivalent Two-way Beam Angle ($\\Psi$)")
   
   # Sort data frames by frequency
-  param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
-  bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+  param.output <- cal.params %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output <- bm.res %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
 
   # Create column defining parameter units
   param.units <- data.frame(Units = c(" ",                 # Model number

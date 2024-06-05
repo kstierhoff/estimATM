@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,leaflet,
-               here,bookdown,odbc,DBI,knitr,DT,fs,sf,reshape2,leafem,
+               here,bookdown,odbc,DBI,knitr,DT,fs,sf,leafem,
                cowplot)
 
 # Install and load required packages from Github -------------------------------
@@ -212,9 +212,10 @@ catch <- catch.all %>%
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
-  haul.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
-                        haul + cluster ~ scientificName, sum)
-  
+  haul.summ.wt <- catch %>% 
+    select(haul, cluster, scientificName, totalWeight) %>% 
+    pivot_wider(names_from = scientificName, values_from = totalWeight, values_fn = sum, values_fill = 0)
+
   # Add species with zero total weight
   if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
   if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}

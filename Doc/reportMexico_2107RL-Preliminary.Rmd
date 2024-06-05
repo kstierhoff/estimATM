@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,mapview,
                knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
                png,grid,gridExtra,cowplot,flextable,fs,magick,ftExtra,
-               stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
+               stringr,xtable,devtools,gdata,lubridate,rworldmap,
                scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra)
 
 # Install and load required packages from Github -------------------------------
@@ -219,8 +219,13 @@ names(echo.settings) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interv
                           "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
 
 # cast output by frequency and transducer model number
-param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
-bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+param.output <- cal.params %>% 
+  pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+  pivot_wider(names_from = Frequency, values_from = value)
+
+bm.output <- bm.res %>% 
+  pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+  pivot_wider(names_from = Frequency, values_from = value)
 
 # add a column with parameter units
 param.units <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
@@ -351,8 +356,13 @@ if ("LBC" %in% cal.vessels) {
                                 "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
   
   # cast output by frequency and transducer model number
-  param.output.lbc  <- suppressMessages(dcast(melt(cal.params.lbc, id.vars = "Frequency"), variable~Frequency))
-  bm.output.lbc     <- suppressMessages(dcast(melt(bm.res.lbc, id.vars = "Frequency"), variable~Frequency))
+  param.output.lbc <- cal.params.lbc %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output.lbc <- bm.res.lbc %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
   
   # add a column with parameter units
   param.units.lbc <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
@@ -483,9 +493,14 @@ if ("LM" %in% cal.vessels) {
                                 "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
   
   # cast output by frequency and transducer model number
-  param.output.lm  <- suppressMessages(dcast(melt(cal.params.lm, id.vars = "Frequency"), variable~Frequency))
-  bm.output.lm     <- suppressMessages(dcast(melt(bm.res.lm, id.vars = "Frequency"), variable~Frequency))
+  param.output.lm <- cal.params.lm %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
   
+  bm.output.lm <- bm.res.lm %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+
   # add a column with parameter units
   param.units.lm <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
                                           "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",

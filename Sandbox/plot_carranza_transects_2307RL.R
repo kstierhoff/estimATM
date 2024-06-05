@@ -1,7 +1,6 @@
 library(tidyverse)
 library(sf)
 library(mapview)
-library(rgdal)
 
 jcf.transects = st_read(here::here("Data/Nav/Carranza_transects/Carranza_transects.shp"))
 
