@@ -501,23 +501,23 @@ load(here("Output/trawl_pie_plotBio.Rdata"))
 # Load planned transects
 transects.sf <- st_read(here::here("Output/planned_transects.shp"))
 
+# Get species present in the seine catches
+pie.spp.lm  <- sort(unique(lm.catch$scientificName))
+pie.spp.lbc <- sort(unique(lbc.catch$scientificName))
+
 set.pies.lm <- base.map + 
   # Plot NASC data
   geom_path(data = lm.points, aes(X, Y)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM")), 
-                              aes(X, Y, group = key.set, r = pie.radius.ns),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
-                              color = 'black', alpha = 0.8) +
+  geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM")), 
+                  aes(X, Y, group = key.set, r = pie.radius.ns),
+                  cols = pie.columns[names(pie.columns) %in% pie.spp.lm],
+                  color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.lm]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp.lm])) +
   geom_point(data = filter(set.zero, vessel.name == "LM"), aes(X, Y)) +
-  # # ggtitle("Lisa Marie") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]),
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]))
@@ -533,17 +533,14 @@ set.pies.lbc <- base.map +
   # Plot NASC data
   # geom_path(data = lbc.points, aes(X, Y)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
-                              aes(X, Y, group = key.set, r = pie.radius.ns),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
-                              color = 'black', alpha = 0.8) +
+  geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
+                  aes(X, Y, group = key.set, r = pie.radius.ns),
+                  cols = pie.columns[names(pie.columns) %in% pie.spp.lbc],
+                  color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.lbc]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp.lbc])) +
   geom_point(data = filter(set.zero, vessel.name == "LBC"), aes(X, Y)) +
   # ggtitle("Long Beach Carnage") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -553,21 +550,21 @@ set.pies.lbc <- base.map +
 ggsave(set.pies.lbc, filename = here("Figs/fig_seine_proportion_set_wt_Carnage.png"),
        height = 10, width = 6)
 
+# Get species present in the trawl catch
+pie.spp <- sort(unique(catch$scientificName))
+
 haul.pies <- base.map + 
   # # Plot NASC data
   geom_path(data = project_df(nav, to = crs.proj), aes(X, Y)) +
   # Plot haul pies
-  scatterpie::geom_scatterpie(data = haul.pos, 
-                              aes(X, Y, group = haul, r = pie.radius.ns),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
-                              color = 'black', alpha = 0.8) +
+  geom_scatterpie(data = haul.pos, 
+                  aes(X, Y, group = haul, r = pie.radius.ns),
+                  cols = pie.columns[names(pie.columns) %in% pie.spp],
+                  color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
   geom_point(data = haul.zero, aes(X, Y)) +
   # ggtitle("Reuben Lasker") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -651,32 +648,23 @@ set.pos <- filter(set.pie, AllCPS > 0) %>%
   replace(. == 0, 0.0000001) %>% 
   arrange(desc(X))
 
+# Plot LBC catches
 set.pies <- base.map +
   # Plot NASC data
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect.name)) +
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
-                              aes(X, Y, group = key.set, r = r*2.5),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "Sardine"),
-                              color = 'black', alpha = 0.8) +
-  # scatterpie::geom_scatterpie(data = cluster.pie, aes(X, Y, group = cluster, r = r*0.5),
-  #                             cols = c("Anchovy", "JackMack", "Jacksmelt",
-  #                                      "PacHerring", "PacMack", "Sardine"),
-  #                             color = 'black', alpha = 0.8) +
+  geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
+                  aes(X, Y, group = key.set, r = r*2.5),
+                  cols = pie.columns[names(pie.columns) %in% pie.spp.lbc],
+                  color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. herring", "P. mackerel", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, sardine.color)) +
+                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.lbc]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp.lbc])) +
   geom_point(data = set.zero, aes(X, Y)) +
-  # ggtitle("CPS Proportions in Purse Seines") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
-
-# set.pos.sf <- set.pos %>% st_as_sf(coords = c("long","lat"), crs = 4326)
 
 ggsave(set.pies, filename = here("Figs/fig_seine_proportion_set_wt_LongBeachCarnage.png"),
        height = 6, width = 10)
@@ -701,7 +689,6 @@ nasc.map.ns.lbc <- base.map +
   # Configure legend guides
   guides(fill = guide_legend(), size = guide_legend()) +
   # Plot title
-  # ggtitle("CPS Backscatter-Long Beach Carnage") +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = c(map.bounds.ns["xmin"], map.bounds.ns["xmax"]*1.1), 
            ylim = c(map.bounds.ns["ymin"], map.bounds.ns["ymax"]*0.95))
@@ -913,8 +900,6 @@ lw.plot.lm <- ggplot() +
 ggsave(lw.plot.lm, filename = here("Figs/fig_LW_plots_LisaMarie.png"),
        width = 10, height = 7)
 
-# ggplotly(lw.plot.lm)
-
 # Plot speciment L/W for Long Beach Carnage ----------------------------- 
 lw.plot.lbc <- ggplot() + 
   # Plot seasonal length models for each species
@@ -934,6 +919,3 @@ lw.plot.lbc <- ggplot() +
 
 ggsave(lw.plot.lbc, filename = here("Figs/fig_LW_plots_LongBeachCarnage.png"),
        width = 10, height = 7)
-
-# ggplotly(lw.plot.lbc)
-

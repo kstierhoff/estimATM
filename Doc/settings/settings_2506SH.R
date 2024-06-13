@@ -265,6 +265,25 @@ trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000)
 trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
 trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
 
+# For pie charts; subsetted using pie.spp, which is defined from the catch data
+# Species columns
+pie.columns <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMack", 
+                 "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "PacHerring", 
+                 "Scomber japonicus" = "PacMack", "Etrumeus acuminatus" = "RndHerring", 
+                 "Sardinops sagax" = "Sardine")
+
+# Species labels
+pie.labels <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
+                "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring", 
+                "Scomber japonicus" = "P. mackerel", "Etrumeus acuminatus" = "R. herring", 
+                "Sardinops sagax" = "Sardine")
+
+# Species colors
+pie.colors <- c("Engraulis mordax" = anchovy.color, "Trachurus symmetricus" = jack.mack.color, 
+                "Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color, 
+                "Scomber japonicus" = pac.mack.color, "Etrumeus acuminatus" = rnd.herring.color,
+                "Sardinops sagax" = sardine.color)
+
 # NASC
 # For legend objects
 nasc.breaks        <- c(0, 1, 200, 500, 2000, 5000, 20000, 50000, 20000000)

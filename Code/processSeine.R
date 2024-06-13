@@ -1,6 +1,6 @@
 # This script imports and processes purse seine data from fishing vessels -------
 # Source following the section entitled estimateNearshore in estimateBiomass ----
-# This script replaces survey-specific versions, and aims to use standardizised data inputs. -----
+# This script replaces survey-specific versions, and aims to use standardized data inputs. -----
 
 # Import set data ------------------------------------------------------------------
 if (exists("sets")) rm(sets)

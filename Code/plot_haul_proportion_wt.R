@@ -1,4 +1,7 @@
 # Map trawl species proportions -------------------------------------------------------
+# Get species present in the trawl catch
+pie.spp <- sort(unique(catch$scientificName))
+
 if (nrow(haul.pos) > 0) {
   # Create trawl haul figure
   trawl.pie.haul.wt <- base.map +
@@ -9,8 +12,7 @@ if (nrow(haul.pos) > 0) {
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = r, colour = sample.type),
-                    cols = c("Anchovy", "JackMack", "Jacksmelt", "Other",
-                             "PacHerring", "PacMack", "RndHerring", "Sardine"),
+                    cols = pie.columns[names(pie.columns) %in% pie.spp],
                     alpha = 0.8, sorted_by_radius = TRUE) +
     # Configure pie outline colors
     scale_colour_manual(name = "Sample type", 
@@ -19,11 +21,8 @@ if (nrow(haul.pos) > 0) {
                         guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt", "Other",
-                                 "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color, other.color,
-                                 pac.herring.color, pac.mack.color, rnd.herring.color, 
-                                 sardine.color)) +
+                      labels = unname(pie.labels[names(pie.labels) %in% pie.spp]),
+                      values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
     # Plot empty cluster locations
     geom_point(data = haul.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
