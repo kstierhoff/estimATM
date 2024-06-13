@@ -263,6 +263,25 @@ trawl.breaks       <- c(0, 1, 10, 25, 50, 500, 1000, 10000)
 trawl.labels       <- c("<1", "1-10", "10-25", "25-50", "50-500", "500-1000", ">1000") 
 trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7) 
 
+# For pie charts; subsetted using pie.spp, which is defined from the catch data
+# Species columns
+pie.columns <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMack", 
+                 "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "PacHerring", 
+                 "Scomber japonicus" = "PacMack", "Etrumeus acuminatus" = "RndHerring", 
+                 "Sardinops sagax" = "Sardine")
+
+# Species labels
+pie.labels <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
+                "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring", 
+                "Scomber japonicus" = "P. mackerel", "Etrumeus acuminatus" = "R. herring", 
+                "Sardinops sagax" = "Sardine")
+
+# Species colors
+pie.colors <- c("Engraulis mordax" = anchovy.color, "Trachurus symmetricus" = jack.mack.color, 
+                "Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color, 
+                "Scomber japonicus" = pac.mack.color, "Etrumeus acuminatus" = rnd.herring.color,
+                "Sardinops sagax" = sardine.color)
+
 # NASC
 # For legend objects
 nasc.breaks        <- c(0, 1, 200, 500, 2000, 5000, 20000, 50000, 20000000)
@@ -340,13 +359,13 @@ sounder.type           <- c(RL  = "EK80",
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2307RL",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
                             SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20230703_LASKER_SummerCPS",
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20230703_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
                             SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
 }

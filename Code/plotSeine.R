@@ -9,6 +9,8 @@ ybuff <- c(50000, 50000)
 
 # Cycle through purse seine vessels
 for (v in seine.vessels) {
+  # Get species present in the seine catches of each vessel
+  pie.spp.seine.vessel  <- sort(unique(set.catch$scientificName[set.catch$vessel.name == v]))
   
   # Compute the boundary extents for the current vessel sets
   map.bounds.seine <- set.pie %>%
@@ -19,20 +21,16 @@ for (v in seine.vessels) {
   
   # Create plot of pies containing species proportions by weight
   set.pies <- base.map + 
-    
     # Plot purse seine pies
-    scatterpie::geom_scatterpie(data = filter(set.pos, str_detect(key.set, v)), 
-                                aes(X, Y, group = key.set, r = r*0.8),
-                                cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                         "PacHerring", "PacMack", "RndHerring","Sardine"),
-                                color = 'black', alpha = 0.8) +
+    geom_scatterpie(data = filter(set.pos, str_detect(key.set, v)), 
+                    aes(X, Y, group = key.set, r = r*0.8),
+                    cols = pie.columns[names(pie.columns) %in% pie.spp.seine.vessel],
+                    color = 'black', alpha = 0.8) +
     
     # Configure legend
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. Herring", "P. Mackerel", "R. Herrinng", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                      labels = unname(pie.labels[names(pie.labels) %in% pie.spp.seine.vessel]),
+                      values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine.vessel])) +
     
     # Plot empty sets as dots
     geom_point(data = filter(set.zero, str_detect(key.set, v)), aes(X, Y)) +
@@ -58,22 +56,22 @@ map.bounds.seine <- set.pie %>%
   st_transform(crs = 3310) %>%                          # Convert to California Albers coordinate system
   st_bbox()                                             # Return bounding box
 
+# Get species present in the seine catches from all vessels
+pie.spp.seine  <- sort(unique(set.catch$scientificName))
+
 # Create plot of pies containing species proportions by weight
 fig.seine.combined <- base.map + 
   
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = set.pos, 
-                              aes(X, Y, group = key.set, r = r*0.8),
-                              cols = c("Anchovy", "JackMack", "Jacksmelt",
-                                       "PacHerring", "PacMack", "RndHerring","Sardine"),
-                              color = 'black', alpha = 0.8) +
+  geom_scatterpie(data = set.pos, 
+                  aes(X, Y, group = key.set, r = r*0.8),
+                  cols = pie.columns[names(pie.columns) %in% pie.spp.seine],
+                  color = 'black', alpha = 0.8) +
   
   # Configure legend
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                               "P. Herring", "P. Mackerel", "R. Herrinng", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.seine]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine])) +
   
   # Plot empty sets as dots
   geom_point(data = set.zero, aes(X, Y)) +
