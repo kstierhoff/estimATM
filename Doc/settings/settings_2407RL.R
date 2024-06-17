@@ -209,6 +209,12 @@ leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
+# Lookup table for renaming columns
+pie.spp <- c("Jacksmelt"  = "Atherinopsis californiensis", "PacHerring" = "Clupea pallasii",
+             "Anchovy"    = "Engraulis mordax", "Sardine"    = "Sardinops sagax",
+             "PacMack"    = "Scomber japonicus", "JackMack"   = "Trachurus symmetricus",
+             "RndHerring" = "Etrumeus acuminatus", "AllCPS" = "AllCPS")
+
 # Map landmarks
 label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
                 "Newport","Point Conception","Cape Mendocino","Columbia River",
@@ -359,16 +365,12 @@ sounder.type           <- c(RL  = "EK80",
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
-                           # SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240703_LASKER_SummerCPS",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
-                           # SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
+                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 }
 
 # Backscatter data (within survey.dir, typically)
@@ -594,7 +596,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "SQL"    # "SQL" or "Access"
+trawl.source           <- "Access"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"

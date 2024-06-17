@@ -127,6 +127,12 @@ leaflet.checkTransects.simple <- FALSE # Use a simple Leaflet for checkTransects
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
 
+# Lookup table for renaming columns
+pie.spp <- c("Jacksmelt"  = "Atherinopsis californiensis", "PacHerring" = "Clupea pallasii",
+             "Anchovy"    = "Engraulis mordax", "Sardine"    = "Sardinops sagax",
+             "PacMack"    = "Scomber japonicus", "JackMack"   = "Trachurus symmetricus",
+             "RndHerring" = "Etrumeus acuminatus", "AllCPS" = "AllCPS")
+
 # Map landmarks
 label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
                 "Newport","Point Conception","Cape Mendocino","Columbia River",
