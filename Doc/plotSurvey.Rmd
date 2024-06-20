@@ -74,9 +74,9 @@ process.csv.all    <- F # Process all CSV files (F = new files only)
 get.db             <- T # Import trawl database
 
 # Are we sampling? If no, F. Skips data processing steps.
-sampling.acoustics <- T 
-sampling.cufes     <- T 
-sampling.trawl     <- T 
+sampling.acoustics <- F 
+sampling.cufes     <- F 
+sampling.trawl     <- F 
 
 # Control script behavior (often F)
 resize.map         <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -971,6 +971,24 @@ or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>%
 wc_mpas <- st_read(here("Data/GIS/wc_mpas.shp")) %>% 
   st_transform(crs.geog) 
 
+# Read MPA shapefiles  -----------------------------------------
+# Canada
+scott_islands_mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = "Scott Islands Protected Marine Area") %>% 
+  st_difference(filter(countries, name == "Canada"))
+
+pacific_rim_mpa <- st_read(here("Data/GIS/pacific_rim_reserve_polygon.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = "Pacific Rim National Park Reserve") 
+
+# Mexico
+baja_mpas <- st_read(here("Data/GIS/baja_mpas.shp")) %>% 
+  st_transform(crs.geog)
+
+mex_mpas <- st_read(here("Data/GIS/mex_mpas.shp")) %>% 
+  st_transform(crs.geog)
+
 # Read CA MPAs shapefile
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
   st_transform(crs.geog)
@@ -1114,6 +1132,12 @@ mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
 ## All West Coast MPAs
 mpaPalWC <- colorFactor(topo.colors(10), unique(wc_mpas$Design))
 
+# Create color palette for Mexico MPAs
+all.mpa.types.mex <- as.factor(c(unique(as.character(baja_mpas$NOMBRE)),
+                                 unique(as.character(mex_mpas$NOMBRE))))
+
+mpaPalMex  <- colorFactor(topo.colors(10), all.mpa.types.mex)
+
 # Create color pallette for CUFES
 cufesPal <- colorFactor(cufes.colors, cufes.plot.spp)
 
@@ -1175,6 +1199,18 @@ i.map <- leaflet() %>%
   # Add West Coast MPAs
   addPolygons(data = wc_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalWC(Design),
               fillOpacity = 0.3, label = ~htmlEscape(Site_Nm), group = "MPAs") %>%
+  # Add Canadian MPAs
+  addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
+              label = ~htmlEscape(MPA), group = "MPAs") %>%
+  addPolygons(data = pacific_rim_mpa, color = "#000414", weight = 2, 
+              label = ~htmlEscape(MPA), group = "MPAs") %>%
+  # Add Mexico MPAs
+  # Baja
+  addPolygons(data = baja_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+              fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "MPAs") %>%
+    # All of Mexico
+    addPolygons(data = mex_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+                fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "MPAs") %>%
   # Add core planned transects
   addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,

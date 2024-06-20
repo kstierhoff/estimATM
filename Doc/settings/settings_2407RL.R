@@ -135,7 +135,7 @@ erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data q
 erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2406RL.csv"
+wpt.filename         <- "waypoints_2407RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
                           Compulsory = "Compulsory", Nearshore = "Nearshore",
                           Offshore = "Offshore", Saildrone = "Saildrone")
