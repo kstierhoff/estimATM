@@ -54,14 +54,14 @@ transit.distance <- 0 # begining in san diego 2024
 transit.duration <- ceiling(transit.distance/transit.speed/24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
-leg.waste <- c(3, 2, 6)
+leg.waste <- c(2, 2, 2, 2) # Speculating, to make code work
 
 # Remove transects to adjust survey progress
 transects.rm <- NA # Numbered transects to remove
 
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
-leg.ends <- c(ymd("2024-06-26"), ymd("2024-07-17"),
+leg.ends <- c(ymd("2024-06-25"), ymd("2024-07-17"),
               ymd("2024-07-22"), ymd("2024-08-12"),
               ymd("2024-08-17"), ymd("2024-09-07"),
               ymd("2024-09-12"), ymd("2024-09-30"))
