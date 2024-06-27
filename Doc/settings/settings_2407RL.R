@@ -363,7 +363,7 @@ sounder.type           <- c(RL  = "EK80",
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
+if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
@@ -618,7 +618,7 @@ uctd.cast.depth        <- 350
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
-tdr.pattern            <- "2407RL*.*rsk"
+tdr.pattern            <- "2406RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
 # Time offset, in hours (usually -1, diff between PDT and PST in summer)
