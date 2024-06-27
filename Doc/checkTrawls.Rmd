@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,leaflet,
-               here,bookdown,odbc,DBI,knitr,DT,fs,sf,leafem,
+               here,bookdown,odbc,DBI,knitr,DT,fs,sf,leafem,naniar,
                cowplot)
 
 # Install and load required packages from Github -------------------------------
@@ -215,15 +215,18 @@ if (nrow(catch) > 0) {
   haul.summ.wt <- catch %>% 
     select(haul, cluster, scientificName, totalWeight) %>% 
     pivot_wider(names_from = scientificName, values_from = totalWeight, values_fn = sum, values_fill = 0)
-
+  
+  # I think we can delete this section, which is only important for pie charts 
+  # and no longer needs to have all species present for plotting to work.
+  
   # Add species with zero total weight
-  if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
-  if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
-  if (is.null(haul.summ.wt$`Scomber japonicus`))     {haul.summ.wt$`Scomber japonicus`     <- 0}
-  if (is.null(haul.summ.wt$`Trachurus symmetricus`)) {haul.summ.wt$`Trachurus symmetricus` <- 0}
-  if (is.null(haul.summ.wt$`Clupea pallasii`))       {haul.summ.wt$`Clupea pallasii`       <- 0}
-  if (is.null(haul.summ.wt$`Atherinopsis californiensis`)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
-  if (is.null(haul.summ.wt$`Etrumeus acuminatus`)) {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+  if (!"Engraulis mordax" %in% names(haul.summ.wt))            {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (!"Sardinops sagax" %in% names(haul.summ.wt))             {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (!"Scomber japonicus" %in% names(haul.summ.wt))           {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (!"Trachurus symmetricus" %in% names(haul.summ.wt))       {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (!"Clupea pallasii" %in% names(haul.summ.wt))             {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (!"Atherinopsis californiensis" %in% names(haul.summ.wt)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (!"Etrumeus acuminatus" %in% names(haul.summ.wt))         {haul.summ.wt$`Etrumeus acuminatus` <- 0}
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>% 
@@ -236,25 +239,13 @@ if (nrow(catch) > 0) {
     summarise_all(list(sum)) %>% 
     mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
     right_join(cluster.mid) %>% 
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus",
-           "RndHerring" = "Etrumeus acuminatus") %>% 
+    rename(any_of(pie.spp)) %>% 
     replace(is.na(.), 0)
   
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
     right_join(haul.mid) %>% 
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus",
-           "RndHerring" = "Etrumeus acuminatus") %>% 
+    rename(any_of(pie.spp)) %>%
     replace(is.na(.), 0)
   
 } else {
@@ -283,9 +274,21 @@ if (nrow(catch) > 0) {
 # Prepare catch data for plotting ----------------------------------------------
 # Select and rename trawl data for pie charts
 catch.pie <- cluster.summ.wt %>% 
-  select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+  select(cluster, long, lat, any_of(names(pie.spp))) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
+
+# Two alternative methods for selecting columns; leaving until testing is completed.
+
+# catch.pie <- cluster.summ.wt %>% 
+#   select(cluster, long, lat, Anchovy, JackMack, 
+#          Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
+#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
+# 
+# catch.pie <- cluster.summ.wt %>% 
+#   select(cluster, long, lat, any_of(c("Anchovy", "JackMack", 
+#          "Jacksmelt", "PacHerring", "PacMack", "RndHerring", 
+#          "Sardine", "AllCPS"))) %>% 
+#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Project pie data
 catch.pie <- project_sf(catch.pie, crs.proj) 
@@ -626,6 +629,7 @@ lengths %>%
     FL.max = round(max(forkLength_mm, na.rm = TRUE)/10,0),
     w.min  = round(min(weightg, na.rm = TRUE),1),
     w.max  = round(max(weightg, na.rm = TRUE),1)) %>% 
+  replace_with_na_all(condition = ~.x %in% c(-Inf, Inf)) %>% 
   datatable(rownames = FALSE)
 ```
 
@@ -640,7 +644,8 @@ lengths %>%
     ML.min = round(min(mantleLength_mm, na.rm = TRUE)/10,0),
     ML.max = round(max(mantleLength_mm, na.rm = TRUE)/10,0),
     w.min  = round(min(weightg, na.rm = TRUE),1),
-    w.max  = round(max(weightg, na.rm = TRUE),1)) %>% 
+    w.max  = round(max(weightg, na.rm = TRUE),1)) %>%
+  # replace_with_na_all(condition = ~.x %in% c(-Inf, Inf)) %>% 
   datatable(rownames = FALSE)
 ```
 
@@ -1431,8 +1436,8 @@ specimen.comp %>%
         format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
-  row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-  row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
+  # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
+  # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = 1) %>% 
   scroll_box(height = "500px")
@@ -1605,16 +1610,20 @@ dna.vial.summ <- lengths %>%
 dna.summ <- dna.tray.summ %>% 
   left_join(select(dna.vial.summ, scientificName, nVials))
 
-# Format and print table
-dna.summ %>% 
-  mutate(
-    nVials = cell_spec(round(nVials, digits = 4),
-                                 knitr.format, color = "black",
-                                 background = ifelse(!nVials == nTrays, "red", "white"))) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-        align = c("c","c","c")) %>% 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
-  column_spec(1, italic = TRUE) 
+if (nrow(dna.summ) > 0) {
+  # Format and print table
+  dna.summ %>% 
+    mutate(
+      nVials = cell_spec(round(nVials, digits = 4),
+                         knitr.format, color = "black",
+                         background = ifelse(!nVials == nTrays, "red", "white"))) %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+          align = c("c","c","c")) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+    column_spec(1, italic = TRUE)   
+} else {
+  print("Hooray, the number of DNA vials and trays is equal!")
+}
 ```
 
 ## Gonad samples

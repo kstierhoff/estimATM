@@ -54,14 +54,14 @@ transit.distance <- 0 # begining in san diego 2024
 transit.duration <- ceiling(transit.distance/transit.speed/24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
-leg.waste <- c(3, 2, 6)
+leg.waste <- c(2, 2, 2, 2) # Speculating, to make code work
 
 # Remove transects to adjust survey progress
 transects.rm <- NA # Numbered transects to remove
 
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
-leg.ends <- c(ymd("2024-06-26"), ymd("2024-07-17"),
+leg.ends <- c(ymd("2024-06-25"), ymd("2024-07-17"),
               ymd("2024-07-22"), ymd("2024-08-12"),
               ymd("2024-08-17"), ymd("2024-09-07"),
               ymd("2024-09-12"), ymd("2024-09-30"))
@@ -113,7 +113,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
 erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
-erddap.survey.start  <- "2024-06-26" # Start of survey for ERDDAP vessel data query
+erddap.survey.start  <- "2024-06-24" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
 erddap.classes       <- c("character", "numeric", "numeric", "numeric","numeric","numeric","numeric","character")
@@ -135,7 +135,7 @@ erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data q
 erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
 
 # Survey plan info --------------------------------------------------------
-wpt.filename         <- "waypoints_2406RL.csv"
+wpt.filename         <- "waypoints_2407RL.csv"
 wpt.types            <- c(Adaptive = "Adaptive", Carranza = "Carranza",
                           Compulsory = "Compulsory", Nearshore = "Nearshore",
                           Offshore = "Offshore", Saildrone = "Saildrone")
@@ -208,6 +208,12 @@ leaflet.checkTransects.simple <- TRUE # Use a simple Leaflet for checkTransects
 # Trawl proportion plots
 scale.pies <- FALSE   # Scale pie charts (TRUE/FALSE)
 pie.scale  <- 0.0125 # 0.01-0.02 works well for coast-wide survey (i.e., summer), larger values (~0.03) for spring
+
+# Lookup table for renaming columns
+pie.spp <- c("Jacksmelt"  = "Atherinopsis californiensis", "PacHerring" = "Clupea pallasii",
+             "Anchovy"    = "Engraulis mordax", "Sardine"    = "Sardinops sagax",
+             "PacMack"    = "Scomber japonicus", "JackMack"   = "Trachurus symmetricus",
+             "RndHerring" = "Etrumeus acuminatus", "AllCPS" = "AllCPS")
 
 # Map landmarks
 label.list <- c("Monterey Bay","San Francisco","Cape Flattery","Crescent City",
@@ -357,18 +363,14 @@ sounder.type           <- c(RL  = "EK80",
 
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
-if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
+if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
-                           # SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else {
-  survey.dir           <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240703_LASKER_SummerCPS",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20240703_SAILDRONE_SummerCPS")
-                           # SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
+                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 }
 
 # Backscatter data (within survey.dir, typically)
@@ -594,7 +596,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "SQL"    # "SQL" or "Access"
+trawl.source           <- "Access"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
@@ -616,7 +618,7 @@ uctd.cast.depth        <- 350
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
-tdr.pattern            <- "2407RL*.*rsk"
+tdr.pattern            <- "2406RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
 # Time offset, in hours (usually -1, diff between PDT and PST in summer)

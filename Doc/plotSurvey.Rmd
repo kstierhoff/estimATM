@@ -61,7 +61,7 @@ nasc.plot.min    <- 0
 
 ```{r processing-controls}
 # Control script behavior (usually T)
-get.nav            <- F # Download NOAA Ship nav data
+get.nav            <- T # Download NOAA Ship nav data
 get.nav.sd         <- F # Download Saildrone nav data from ERDDAP
 get.nav.sh         <- F # Download NOAA Ship nav data
 nav.source         <- "ERDDAP" # Navigation data source: ERDDAP or SCS
@@ -74,9 +74,9 @@ process.csv.all    <- F # Process all CSV files (F = new files only)
 get.db             <- T # Import trawl database
 
 # Are we sampling? If no, F. Skips data processing steps.
-sampling.acoustics <- T 
-sampling.cufes     <- T 
-sampling.trawl     <- T 
+sampling.acoustics <- F 
+sampling.cufes     <- F 
+sampling.trawl     <- F 
 
 # Control script behavior (often F)
 resize.map         <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -971,6 +971,26 @@ or_mpas <- st_read(here("Data/GIS/or_mpas.shp")) %>%
 wc_mpas <- st_read(here("Data/GIS/wc_mpas.shp")) %>% 
   st_transform(crs.geog) 
 
+nms_bounds <- st_read(here("Data/GIS/national_marine_sanctuaries.shp"))
+
+# Read MPA shapefiles  -----------------------------------------
+# Canada
+scott_islands_mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = "Scott Islands Protected Marine Area") %>% 
+  st_difference(filter(countries, name == "Canada"))
+
+pacific_rim_mpa <- st_read(here("Data/GIS/pacific_rim_reserve_polygon.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  mutate(MPA = "Pacific Rim National Park Reserve") 
+
+# Mexico
+baja_mpas <- st_read(here("Data/GIS/baja_mpas.shp")) %>% 
+  st_transform(crs.geog)
+
+mex_mpas <- st_read(here("Data/GIS/mex_mpas.shp")) %>% 
+  st_transform(crs.geog)
+
 # Read CA MPAs shapefile
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
   st_transform(crs.geog)
@@ -1114,6 +1134,15 @@ mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
 ## All West Coast MPAs
 mpaPalWC <- colorFactor(topo.colors(10), unique(wc_mpas$Design))
 
+## National Marine Sanctuaries
+mpaPalNMS  <- colorFactor(topo.colors(10), as.factor(unique(nms_bounds$NAME)))
+
+# Create color palette for Mexico MPAs
+all.mpa.types.mex <- as.factor(c(unique(as.character(baja_mpas$NOMBRE)),
+                                 unique(as.character(mex_mpas$NOMBRE))))
+
+mpaPalMex  <- colorFactor(topo.colors(10), all.mpa.types.mex)
+
 # Create color pallette for CUFES
 cufesPal <- colorFactor(cufes.colors, cufes.plot.spp)
 
@@ -1157,6 +1186,9 @@ i.map <- leaflet() %>%
   # Add bathymetry contours
   addPolylines(data = bathy, color = "white", weight = 2, 
                label = ~paste(Depth, "m"), group = "Bathymetry Contours") %>% 
+  # Add National Marine Sanctuaries
+  addPolygons(data = nms_bounds, color = "#000414", weight = 2, fillColor = ~mpaPal(NAME),
+              fillOpacity = 0.25, label = ~htmlEscape(NAME), group = "U.S. MPAs") %>%
   # Add State waters
   addPolygons(data = or_waters, weight = 2, fillColor = "transparent", 
               opacity = 0.75,
@@ -1166,15 +1198,21 @@ i.map <- leaflet() %>%
               opacity = 0.75,
               label = ~htmlEscape("CA State Waters"),
               group = "State Waters") %>%
-  # # Add CA MPAs
-  # addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
-  #             fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
-  # # Add OR MPAs
-  # addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
-  #             fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
   # Add West Coast MPAs
   addPolygons(data = wc_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalWC(Design),
-              fillOpacity = 0.3, label = ~htmlEscape(Site_Nm), group = "MPAs") %>%
+              fillOpacity = 0.3, label = ~htmlEscape(Site_Nm), group = "State MPAs") %>%
+  # Add Canadian MPAs
+  addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
+              label = ~htmlEscape(MPA), group = "Canada MPAs") %>%
+  addPolygons(data = pacific_rim_mpa, color = "#000414", weight = 2, 
+              label = ~htmlEscape(MPA), group = "Canada MPAs") %>%
+  # Add Mexico MPAs
+  # Baja
+  addPolygons(data = baja_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+              fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "MPAs") %>%
+  # All of Mexico
+  addPolygons(data = mex_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+              fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "Mexico MPAs") %>%
   # Add core planned transects
   addPolylines(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")),
                color = ~txPal(Type), weight = 3, opacity = 0.5,
@@ -1209,7 +1247,8 @@ i.map <- leaflet() %>%
              position = "topleft") %>% 
   # Add layer controls
   addLayersControl(
-    overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+    overlayGroups = c("Canada MPAs","Mexico MPAs","U.S. MPAs","State MPAs",
+                      "State Waters", "Exclusive Economic Zones", 
                       "Bathymetry Contours",
                       "Planned Transects (Core)", "Planned Transects (Ancillary)",
                       "Vessel Track", "Vessel Positions", "Trawls",
@@ -1387,17 +1426,17 @@ if (exists("nav.now.sh"))
 i.map <- i.map %>%  
   hideGroup(c("Backscatter (Large)", "Backscatter-Krill", "Backscatter-Krill (Small)", 
               "CUFES Egg Density", "CUFES Egg Density-Other",
-              "CUFES Egg Density-Squid", "CUFES (Negative)",
+              "CUFES Egg Density-Squid", "CUFES Egg Density-Hake", "CUFES (Negative)",
               "Vessel Positions", "Saildrone Tracks", 
               "Saildrone Tracks", "Saildrone Positions",
               "State Waters", "Exclusive Economic Zones",
-              "MPAs"))
+              "Canada MPAs","Mexico MPAs","U.S. MPAs","State MPAs"))
 
 # Save i.map
 dir_create(here("Output/imap"))
 
 if (save.imap) {
-  mapshot(i.map, url = here("Output/imap/plotBio_explorer.HTML"))
+  mapshot(i.map, url = here("Output/imap/plotSurvey_explorer.HTML"))
 }
 ```
 

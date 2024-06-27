@@ -1,0 +1,56 @@
+---
+title: "Simrad TV80 Data Explorer"
+author: "Kevin Stierhoff"
+date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
+output:
+  bookdown::html_document2:
+    toc: no
+    toc_float: no
+    number_sections: yes
+css: css/ast.css
+---
+
+```{r setup,echo=F,message=F,warning=F,error=F,include=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN and Github ---------------------------
+pacman::p_load(tidyverse, lubridate, fs, here, mapproj,mapview)
+pacman::p_load_gh("SWFSC/atm")
+pacman::p_load_gh("SWFSC/surveyR")
+
+# Plotting preferences
+theme_set(theme_bw())
+```
+
+```{r user-input, include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(), "/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+
+source(here("Doc/settings", prj.settings))
+```
+
+```{r list-measurement-files}
+# List measurement files
+meas.files <- fs::dir_ls(here("data/TV80"), 
+                        recurse = TRUE,
+                        regexp = "*.measurements.csv")
+
+print(as.character(meas.files))
+
+cat("Type the order of the file you want to integrate:\n")
+file.1 <- scan(n = 1)
+```
+
+```{r extract-measurement-data}
+dat <- atm::extract_tv80(file = meas.files[file.1])
+
+print(paste("Extracted data from file:", meas.files[file.1]))
+```
+

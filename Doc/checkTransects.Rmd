@@ -79,6 +79,7 @@ if (process.transects) {
 if (!exists("bathy")) {bathy <- st_read(here("Data/GIS/bathy_contours.shp"))}
 
 # Read MPA shapefiles  -----------------------------------------
+# Canada
 scott_islands_mpa <- st_read(here("Data/GIS/scott_islands_mpa_polygon.shp")) %>% 
   st_transform(crs.geog) %>% 
   mutate(MPA = "Scott Islands Protected Marine Area") %>% 
@@ -88,6 +89,7 @@ pacific_rim_mpa <- st_read(here("Data/GIS/pacific_rim_reserve_polygon.shp")) %>%
   st_transform(crs.geog) %>% 
   mutate(MPA = "Pacific Rim National Park Reserve") 
 
+# USA
 ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>% 
   st_transform(crs.geog) %>% 
   mutate(MPA = paste(NAME, Type))
@@ -103,6 +105,13 @@ or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>%
 
 nms_bounds <- st_read(here("Data/GIS/national_marine_sanctuaries.shp"))
 
+# Mexico
+baja_mpas <- st_read(here("Data/GIS/baja_mpas.shp")) %>% 
+  st_transform(crs.geog)
+
+mex_mpas <- st_read(here("Data/GIS/mex_mpas.shp")) %>% 
+  st_transform(crs.geog)
+
 # Read EEZ shapefiles -----------------------------------------
 eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
   st_transform(crs.geog)
@@ -111,6 +120,7 @@ eez_can <- st_read(here("Data/GIS/eez_canada.shp")) %>%
 eez_mex <- st_read(here("Data/GIS/eez_mex.shp")) %>% 
   st_transform(crs.geog)
 
+# Make transects sf and add labels and pop-ups
 transects <- transects %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   group_by(Type, Transect, Region) %>% 
@@ -123,7 +133,7 @@ transects <- transects %>%
          popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
                           'Distance:', distance, 'nmi<br/>'))
 
-# Add labels and popups to waypoints
+# Add labels and pop-ups to waypoints
 wpts <- wpt.export %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
   mutate(
@@ -189,10 +199,11 @@ write_csv(select(ungroup(reg.90), Transect, lat, long),
             col_names = FALSE)
 
 uctds.sf <- uctds %>% 
-  as.tibble() %>% 
+  as_tibble() %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
 
 pairovets.sf <- pairovets %>% 
+  as_tibble() %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
 
 # Write objects to shapefile
@@ -200,32 +211,6 @@ dir_create(here("Output/shapefiles"))
 
 st_write(transects.sf, here("Output/shapefiles/transects.shp"), delete_layer = TRUE)
 st_write(wpts, here("Output/shapefiles/waypoints.shp"), delete_layer = TRUE)
-
-# 
-# poly.tmp <- st_read(here("Data/GIS/bathy_5m_wc_poly.shp")) %>% 
-#   st_cast("POLYGON")
-# 
-# poly.buff.25 <- st_buffer(poly.tmp, 25/60)
-# poly.buff.55 <- st_buffer(poly.buff.25, 30/60)
-# poly.buff.100 <- st_buffer(poly.buff.55, 30/60)
-# 
-# mapview(poly.buff.100, col.regions = "yellow") + 
-#   mapview(poly.buff.55, col.regions = "orange") + 
-#   mapview(poly.buff.25, col.regions = "green") + 
-#   mapview(poly.tmp, col.regions = "gray50") + 
-#   mapview(transects, color = "white")
-# 
-# temp.sp <- as_Spatial(poly.buff.25)
-# 
-# sf::writeOGR(as_Spatial(poly.buff.25), here("Data/GIS/test_buffer.gpx"), layer = "Contour", driver = "GPX")
-# 
-# poly.25.out <- poly.buff.25 %>% 
-#   mutate(
-#     long = as.data.frame(st_coordinates(.))$X,
-#     lat = as.data.frame(st_coordinates(.))$Y)
-# 
-# sf::writeOGR(temp.sp, "test_buffer", layer = "test", driver = "GPX")
-# writeOGR(cities, here("Data/GIS"), "cities", driver="GPX")
 ```
 
 # Overview  
@@ -256,11 +241,19 @@ wpts.df <- wpts %>%
 
 imap.bounds <-  map_bounds(wpts.df$Y, wpts.df$X, pad = 0.1)
 
-# Create color palette for MPAs
+# Create color palette for US MPAs
 all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)), 
                              unique(as.character(or_mpas$Label))))
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
+
+mpaPalNMS  <- colorFactor(topo.colors(10), as.factor(unique(nms_bounds$NAME)))
+
+# Create color palette for Mexico MPAs
+all.mpa.types.mex <- as.factor(c(unique(as.character(baja_mpas$NOMBRE)),
+                                 unique(as.character(mex_mpas$NOMBRE))))
+
+mpaPalMex  <- colorFactor(topo.colors(10), all.mpa.types.mex)
 
 # Create pairovet color palette
 pairovetPal <- colorFactor(c("#FF0000", "#0000FF"), c("Compulsory", "Adaptive"))
@@ -309,15 +302,25 @@ if (leaflet.checkTransects.simple) {
                 group = "State Waters") %>%
     # Add Canadian MPAs
     addPolygons(data = scott_islands_mpa, color = "#000414", weight = 2, 
-                label = ~htmlEscape(MPA), group = "MPAs") %>%
+                label = ~htmlEscape(MPA), group = "Canada MPAs") %>%
     addPolygons(data = pacific_rim_mpa, color = "#000414", weight = 2, 
-                label = ~htmlEscape(MPA), group = "MPAs") %>%
+                label = ~htmlEscape(MPA), group = "Canada MPAs") %>%
+    # Add National Marine Sanctuaries
+    addPolygons(data = nms_bounds, color = "#000414", weight = 2, fillColor = ~mpaPal(NAME),
+                fillOpacity = 0.25, label = ~htmlEscape(NAME), group = "U.S. MPAs") %>%
     # Add CA MPAs
     addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
-                fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+                fillOpacity = 0.25, label = ~htmlEscape(MPA), group = "State MPAs") %>%
     # Add OR MPAs
     addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
-                fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+                fillOpacity = 0.25, label = ~htmlEscape(Name), group = "State MPAs") %>%
+    # Add Mexico MPAs
+    # Baja
+    addPolygons(data = baja_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+                fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "Mexico MPAs") %>%
+    # All of Mexico
+    addPolygons(data = mex_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+                fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "Mexico MPAs") %>%
     # Add core planned transects
     addPolylines(data = transects,
                  color = ~txPal(Type), weight = 3, opacity = 0.5,
@@ -341,7 +344,8 @@ if (leaflet.checkTransects.simple) {
     # Add layer controls
     addLayersControl(
       baseGroups = c("Esri.OceanBasemap", "Esri.WorldImagery","Esri.WorldStreetMap","OpenStreetMap.Mapnik"),
-      overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+      overlayGroups = c("Canada MPAs","Mexico MPAs","U.S. MPAs","State MPAs", 
+                        "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours", "Planned Transects", 
                         "UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
@@ -393,10 +397,17 @@ if (leaflet.checkTransects.simple) {
                 label = ~htmlEscape(MPA), group = "MPAs") %>%
     # Add CA MPAs
     addPolygons(data = ca_mpas, color = "#000414", weight = 2, fillColor = ~mpaPal(Type),
-                fillOpacity = 0.3, label = ~htmlEscape(MPA), group = "MPAs") %>%
+                fillOpacity = 0.25, label = ~htmlEscape(MPA), group = "MPAs") %>%
     # Add OR MPAs
     addPolygons(data = or_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPal(Label),
-                fillOpacity = 0.3, label = ~htmlEscape(Name), group = "MPAs") %>%
+                fillOpacity = 0.25, label = ~htmlEscape(Name), group = "MPAs") %>%
+    # Add Mexico MPAs
+    # Baja
+    addPolygons(data = baja_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+                fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "MPAs") %>%
+    # All of Mexico
+    addPolygons(data = mex_mpas, color = "#000414", weight = 2, fillColor =  ~mpaPalMex(NOMBRE),
+                fillOpacity = 0.25, label = ~htmlEscape(NOMBRE), group = "MPAs") %>%
     # Add core planned transects
     addPolylines(data = filter(transects, Type == "Compulsory"),
                  color = ~txPal(Type), weight = 3, opacity = 0.5,
@@ -465,7 +476,8 @@ if (leaflet.checkTransects.simple) {
     # Add layer controls
     addLayersControl(
       baseGroups = c("Esri.OceanBasemap", "Esri.WorldImagery","Esri.WorldStreetMap","OpenStreetMap.Mapnik"),
-      overlayGroups = c("MPAs", "State Waters", "Exclusive Economic Zones", 
+      overlayGroups = c("Canada MPAs","Mexico MPAs","U.S. MPAs","State MPAs",
+                        "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours",
                         "Planned Transects (Compulsory)", "Planned Transects (Adaptive)",
                         "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
