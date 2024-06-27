@@ -1,6 +1,6 @@
 # This script imports and processes purse seine data from fishing vessels -------
 # Source following the section entitled estimateNearshore in estimateBiomass ----
-# This script replaces survey-specific versions, and aims to use standardizised data inputs. -----
+# This script replaces survey-specific versions, and aims to use standardized data inputs. -----
 
 # Import set data ------------------------------------------------------------------
 if (exists("sets")) rm(sets)
@@ -835,7 +835,10 @@ for (i in cps.spp) {
   lf.final.seine <- bind_rows(lf.final.seine, lf.df.seine)
   
   # Reshape data frame by cluster for adding to clf
-  lf.table.seine <- reshape2::dcast(lf.df.seine, cluster ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
+  lf.table.seine <- pivot_wider(lf.df.seine, id_cols = cluster, names_from = lf.labels, values_from = counts, values_fn = sum) %>% 
+    rowwise(cluster) %>%
+    mutate('(all)' = sum(c_across(all_of(lf.labels)))) %>% 
+    arrange(cluster)
   
   # Convert counts to relative frequencies
   lf.table.seine[ , 2:ncol(lf.table.seine)] <- lf.table.seine[ , 2:ncol(lf.table.seine)]/lf.table.seine$`(all)`
@@ -956,7 +959,10 @@ for (i in cps.spp) {
   lf.final.seine.deep <- bind_rows(lf.final.seine.deep, lf.df.seine)
   
   # Reshape data frame by cluster for adding to clf
-  lf.table.seine <- reshape2::dcast(lf.df.seine, cluster ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
+  lf.table.seine <- pivot_wider(lf.table.seine, id_cols = cluster, names_from = lf.labels, values_from = counts, values_fn = sum) %>% 
+    rowwise(cluster) %>%
+    mutate('(all)' = sum(c_across(all_of(lf.labels)))) %>% 
+    arrange(cluster)
   
   # Convert counts to relative frequencies
   lf.table.seine[ , 2:ncol(lf.table.seine)] <- lf.table.seine[ , 2:ncol(lf.table.seine)]/lf.table.seine$`(all)`

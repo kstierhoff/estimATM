@@ -98,8 +98,13 @@ if ("LBC" %in% cal.vessels) {
                                 "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
   
   # cast output by frequency and transducer model number
-  param.output.lbc  <- suppressMessages(dcast(melt(cal.params.lbc, id.vars = "Frequency"), variable~Frequency))
-  bm.output.lbc     <- suppressMessages(dcast(melt(bm.res.lbc, id.vars = "Frequency"), variable~Frequency))
+  param.output.lbc <- cal.params.lbc %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output.lbc <- bm.res.lbc %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
   
   # add a column with parameter units
   param.units.lbc <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
@@ -229,8 +234,13 @@ if ("LM" %in% cal.vessels) {
                                "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
   
   # cast output by frequency and transducer model number
-  param.output.lm  <- suppressMessages(dcast(melt(cal.params.lm, id.vars = "Frequency"), variable~Frequency))
-  bm.output.lm     <- suppressMessages(dcast(melt(bm.res.lm, id.vars = "Frequency"), variable~Frequency))
+  param.output.lm <- cal.params.lm %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output.lm <- bm.res.lm %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
   
   # add a column with parameter units
   param.units.lm <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
@@ -360,8 +370,13 @@ if ("JCF" %in% cal.vessels) {
                                 "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
   
   # cast output by frequency and transducer model number
-  param.output.jcf  <- suppressMessages(dcast(melt(cal.params.jcf, id.vars = "Frequency"), variable~Frequency))
-  bm.output.jcf     <- suppressMessages(dcast(melt(bm.res.jcf, id.vars = "Frequency"), variable~Frequency))
+  param.output.jcf <- cal.params.jcf %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output.jcf <- bm.res.jcf %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
   
   # add a column with parameter units
   param.units.jcf <- data.frame(Units = c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",

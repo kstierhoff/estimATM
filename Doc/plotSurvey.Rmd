@@ -13,10 +13,10 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,raster,cowplot,DBI,odbc,RSQLite,scatterpie,ggspatial,vroom,
-               reshape2,readxl,lubridate,rnaturalearth,sf,rgeos,here,naniar,mapview,
+               readxl,lubridate,rnaturalearth,sf,here,naniar,mapview,
                shadowtext,knitr,ggrepel,fs,plotly,leaflet,leaflet.extras,bookdown,
-               leaflet.minicharts,maptools,htmltools,leafem,DT,rworldmap,rworldxtra,
-               lwgeom,htmlwidgets,beepr)
+               htmltools,leafem,DT,rworldmap,rworldxtra,
+               lwgeom,htmlwidgets)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -61,12 +61,12 @@ nasc.plot.min    <- 0
 
 ```{r processing-controls}
 # Control script behavior (usually T)
-get.nav            <- T # Download NOAA Ship nav data
-get.nav.sh         <- T # Download NOAA Ship nav data
+get.nav            <- F # Download NOAA Ship nav data
+get.nav.sd         <- F # Download Saildrone nav data from ERDDAP
+get.nav.sh         <- F # Download NOAA Ship nav data
 nav.source         <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 save.figs          <- T # Save figures
-get.nav.sd         <- T # Download Saildrone nav data from ERDDAP
-copy.files         <- T # Copy data files from data to plotBio directory
+copy.files         <- F # Copy data files from data to plotBio directory
 overwrite.files    <- T # Overwrite existing files when copying (not CSV, see below)
 process.csv        <- T # Process acoustic backscatter files
 process.csv.krill  <- T # Process krill backscatter files
@@ -346,8 +346,8 @@ if (sampling.trawl) {
   if (nrow(catch) > 0) {
     # Summarize trawl catch by species
     haul.summ.wt <- catch %>% 
-      select(haul, cluster, scientificName, totalWeight) %>% 
-      tidyr::spread(scientificName, totalWeight) 
+      select(haul, cluster, scientificName, totalWeight) %>%
+      pivot_wider(names_from = scientificName, values_from = totalWeight) 
     
     # Add species with zero total weight
     if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}

@@ -15,10 +15,10 @@ bibliography: bib/ast_bib.bib
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,rgeos,
+pacman::p_load(tidyverse,swfscMisc,readr,pander,kableExtra,bookdown,
                knitr,ggmap,maps,readxl,RSQLite,shadowtext,xml2,sf,odbc,ggspatial,
-               maptools,png,grid,gridExtra,cowplot,flextable,fs,ftExtra,mapview,
-               stringr,xtable,devtools,gdata,reshape2,lubridate,rworldmap,
+               png,grid,gridExtra,cowplot,flextable,fs,ftExtra,mapview,
+               stringr,xtable,devtools,gdata,lubridate,rworldmap,
                scatterpie,forcats,here,viridis,rnaturalearth,rworldxtra,tcltk)
 
 # Install and load required packages from Github -------------------------------
@@ -341,8 +341,13 @@ for (i in cal.vessels) {
                      "Equivalent Two-way Beam Angle ($\\Psi$)")
   
   # Sort data frames by frequency
-  param.output  <- suppressMessages(dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
-  bm.output     <- suppressMessages(dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+  param.output <- cal.params %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output <- bm.res %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
 
   # Create column defining parameter units
   param.units <- data.frame(Units = c(" ",                 # Model number
@@ -1617,6 +1622,9 @@ for (i in nasc.vessels.nearshore) {
              ylim = map.bounds.ylim[[i]])
              # xlim = c(map.bounds["xmin"], map.bounds["xmax"]*1.1),
              # ylim = c(map.bounds["ymin"], map.bounds["ymax"]*0.95))
+  
+  # Get species present in the seine catches from all vessels
+  pie.spp.seine  <- sort(unique(set.catch$scientificName))
 
   # Create map of seine data
   set.pies <- base.map +
@@ -1625,20 +1633,17 @@ for (i in nasc.vessels.nearshore) {
     geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect)) +
     
     # Plot purse seine pies
-    scatterpie::geom_scatterpie(data = filter(set.pos, vessel.name == i),
-                                # data = filter(set.pos, vessel.name %in% nasc.vessels.nearshore),
-                                aes(X, Y, group = key.set, r = pie.radius[[i]]),
-                                # aes(X, Y, group = key.set, r = pie.radius),
-                                cols = c("Anchovy", "JackMack",
-                                         "PacHerring", "PacMack", "RndHerring", "Sardine"),
-                                color = 'black', alpha = 0.8) +
+    geom_scatterpie(data = filter(set.pos, vessel.name == i),
+                    # data = filter(set.pos, vessel.name %in% nasc.vessels.nearshore),
+                    aes(X, Y, group = key.set, r = pie.radius[[i]]),
+                    # aes(X, Y, group = key.set, r = pie.radius),
+                    cols = pie.columns[names(pie.columns) %in% pie.spp.seine],
+                    color = 'black', alpha = 0.8) +
     
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel",
-                                 "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color,
-                                 pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                      labels = unname(pie.labels[names(pie.labels) %in% pie.spp.seine]),
+                      values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine])) +
     geom_point(data = filter(set.zero, vessel.name == i), aes(X, Y)) +
     
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -1747,18 +1752,15 @@ set.pies <- base.map +
   geom_path(data = nasc.plot.ns.sub, aes(X, Y, group = transect)) +
   
   # Plot purse seine pies
-  scatterpie::geom_scatterpie(data = set.pos,
-                              aes(X, Y, group = key.set, r = 30e3),
-                              cols = c("Anchovy", "JackMack",
-                                       "PacHerring", "PacMack", "RndHerring", "Sardine"),
-                              color = 'black', alpha = 0.8) +
+  geom_scatterpie(data = set.pos,
+                  aes(X, Y, group = key.set, r = 30e3),
+                  cols = pie.columns[names(pie.columns) %in% pie.spp.seine],
+                  color = 'black', alpha = 0.8) +
   
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "J. Mackerel",
-                               "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                    values = c(anchovy.color, jack.mack.color,
-                               pac.herring.color, pac.mack.color, rnd.herring.color, sardine.color)) +
+                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.seine]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine])) +
   geom_point(data = set.zero, aes(X, Y)) +
   
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -1883,47 +1885,48 @@ if (save.figs) {
   # Create final CUFES egg density map
   source(here("Code/plot_CUFES.R"))
   
-  # Create trawl haul figure for Lasker
-  trawl.pie.haul.wt.RL <- base.map +
-
-    # Plot transects data
-    geom_sf(data = transects.sf, size = 0.5, colour = "gray70",
-            alpha = 0.75, linetype = "dashed") +
-
-    # plot ship track data
-    geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
-
-    # Plot trawl pies
-    geom_scatterpie(data = haul.pos,
-                    aes(X, Y, group = haul, r = r),
-                    cols = c("Anchovy", "JackMack",
-                             "PacHerring", "PacMack", "RndHerring", "Sardine"),
-                    color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
-
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel",
-                                 "P. herring", "P. mackerel", "R. herring", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color,
-                                 pac.herring.color, pac.mack.color, rnd.herring.color,
-                                 sardine.color)) +
-
-    # Plot empty cluster locations
-    geom_point(data = haul.zero,
-               aes(X, Y),
-               size = 3, shape = 21, fill = 'black', colour = 'white') +
-
-    coord_sf(crs = crs.proj,
-             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])),
-             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
+  # Create trawl haul and cluster proportion figures
+  source(here("Code/plot_haul_proportion_wt.R"))
+  source(here("Code/plot_cluster_proportion_wt.R"))
   
-  # # Create trawl haul and cluster proportion figures
-  # source(here("Code/plot_haul_proportion_wt.R"))
+  # # Create trawl haul figure for Lasker
+  # trawl.pie.haul.wt.RL <- base.map +
+  # 
+  #   # Plot transects data
+  #   geom_sf(data = transects.sf, size = 0.5, colour = "gray70",
+  #           alpha = 0.75, linetype = "dashed") +
+  # 
+  #   # plot ship track data
+  #   geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
+  # 
+  #   # Plot trawl pies
+  #   geom_scatterpie(data = haul.pos,
+  #                   aes(X, Y, group = haul, r = r),
+  #                   cols = c("Anchovy", "JackMack",
+  #                            "PacHerring", "PacMack", "RndHerring", "Sardine"),
+  #                   color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
+  # 
+  #   # Configure trawl scale
+  #   scale_fill_manual(name = 'Species',
+  #                     labels = c("Anchovy", "J. Mackerel",
+  #                                "P. herring", "P. mackerel", "R. herring", "Sardine"),
+  #                     values = c(anchovy.color, jack.mack.color,
+  #                                pac.herring.color, pac.mack.color, rnd.herring.color,
+  #                                sardine.color)) +
+  # 
+  #   # Plot empty cluster locations
+  #   geom_point(data = haul.zero,
+  #              aes(X, Y),
+  #              size = 3, shape = 21, fill = 'black', colour = 'white') +
+  # 
+  #   coord_sf(crs = crs.proj,
+  #            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])),
+  #            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
   
-  # Combine backscatter, CUFES, and trawl maps
+    # Combine backscatter, CUFES, and trawl maps
   nasc.cufes.trawl.plot      <- plot_grid(nasc.map.cps,
                                           cufes.density.all,
-                                          trawl.pie.haul.wt.RL,
+                                          trawl.pie.haul.wt,
                                           nrow = 1,
                                           labels = c("a)", "b)", "c)",  "d)"))
 

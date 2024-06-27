@@ -1,5 +1,5 @@
 ---
-title: "Summary of data for DFO Canada"
+title: "Summary of data for MSR-Mexico"
 author: "Kevin L. Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output: html_document
@@ -10,9 +10,9 @@ output: html_document
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,reshape2,lubridate,knitr,maps,rnaturalearth,
+pacman::p_load(tidyverse,lubridate,knitr,maps,rnaturalearth,
                cowplot,kableExtra,devtools,scatterpie,here,leaflet,
-               maptools,mapview,fs,DT,lwgeom,DBI,odbc,bookdown,sf,
+               mapview,fs,DT,lwgeom,DBI,odbc,bookdown,sf,
                data.table,xts,mapproj)
 
 # Install and load required packages from Github -------------------------------
@@ -201,12 +201,12 @@ lengths <- lengths.all %>%
 
 ```{r write-trawl-csv}
 # Create output directory
-dir_create(here("Output/INAPESCA"))
+dir_create(here("Output/MSR-Mexico"))
 
 # Write CSV files
-write_csv(catch, here("Output/INAPESCA/catch.csv"))
-write_csv(haul, here("Output/INAPESCA/haul.csv"))
-write_csv(lengths, here("Output/INAPESCA/lengths.csv"))
+write_csv(catch, here("Output/MSR-Mexico/catch.csv"))
+write_csv(haul, here("Output/MSR-Mexico/haul.csv"))
+write_csv(lengths, here("Output/MSR-Mexico/lengths.csv"))
 ```
 
 ```{r load-acoustic-data}
@@ -245,13 +245,16 @@ nasc.plot.sf <- nasc.plot %>%
   filter(transect.name %in% nasc.sf$transect.name)
 
 # Write CSV files
-write_csv(nasc, here("Output/INAPESCA/backscatter_raw.csv"))
-write_csv(nasc.plot, here("Output/INAPESCA/backscatter_summ.csv"))
+write_csv(nasc, here("Output/MSR-Mexico/backscatter_raw.csv"))
+write_csv(nasc.plot, here("Output/MSR-Mexico/backscatter_summ.csv"))
 ```
 
 ```{r get-nav-data}
 # Load data
 load(here("Data/Nav/nav_data.Rdata"))
+
+# Write nav data to .csv
+write_csv(nav, here("Output/MSR-Mexico/nav_data.csv"))
 ```
 
 ```{r load-uctd-data}
@@ -267,11 +270,11 @@ if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
     nav.match.uctd <- bind_rows(nav.match.uctd, nav[min.diff, ])
   }
   
-  # Combine header and nav data
-  all.uctd.hdr <- all.uctd.hdr %>% 
-    bind_cols(nav.match.uctd) %>% 
-    mutate(lag = difftime(cast.date, time)) %>% 
-    arrange(cast.date)
+  # # Combine header and nav data
+  # all.uctd.hdr <- all.uctd.hdr %>% 
+  #   bind_cols(select(nav.match.uctd,)) %>% 
+  #   mutate(lag = difftime(cast.date, time)) %>% 
+  #   arrange(cast.date)
   
   # Summarize UCTD cast results
   uctd.summ <- all.uctd.casts %>%
@@ -318,9 +321,9 @@ if (file.exists(here("Data/UCTD/uctd_data.Rdata"))) {
     filter(cast %in% uctd.sf$cast)
   
   # Write CSV files
-  write_csv(uctd.summ, file = here("Output/INAPESCA/cast_summary_uctd.csv"))
+  write_csv(uctd.summ, file = here("Output/MSR-Mexico/cast_summary_uctd.csv"))
   
-  write_csv(all.uctd.casts, file = here("Output/INAPESCA/cast_data_uctd.csv"))
+  write_csv(all.uctd.casts, file = here("Output/MSR-Mexico/cast_data_uctd.csv"))
 }
 ```
 
@@ -394,9 +397,9 @@ if (file.exists(here("Data/CTD/ctd_data.Rdata"))) {
     filter(cast %in% ctd.sf$cast)
   
   # write table to CSV
-  write_csv(all.ctd.hdr, file = here("Output/INAPESCA/cast_summary_ctd.csv"))
+  write_csv(all.ctd.hdr, file = here("Output/MSR-Mexico/cast_summary_ctd.csv"))
   
-  write_csv(all.ctd.casts, file = here("Output/INAPESCA/cast_data_ctd.csv"))
+  write_csv(all.ctd.casts, file = here("Output/MSR-Mexico/cast_data_ctd.csv"))
 }
 ```
 
@@ -505,9 +508,9 @@ if (exists("uctd.sf")) {
 
 # Save nasc plot
 ggsave(map,
-       filename = here("Output/INAPESCA/fig_all_data.png"),
+       filename = here("Output/MSR-Mexico/fig_all_data.png"),
        width = map.width, height = map.height) 
 
 # Include figure
-include_graphics(here("Output/INAPESCA/fig_all_data.png"))
+include_graphics(here("Output/MSR-Mexico/fig_all_data.png"))
 ```

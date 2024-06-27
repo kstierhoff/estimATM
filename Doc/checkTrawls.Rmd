@@ -18,7 +18,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,plotly,lubridate,mapview,kableExtra,leaflet,
-               here,bookdown,odbc,DBI,knitr,DT,fs,sf,reshape2,leafem,
+               here,bookdown,odbc,DBI,knitr,DT,fs,sf,leafem,
                cowplot)
 
 # Install and load required packages from Github -------------------------------
@@ -61,8 +61,8 @@ dir_create(here(c("Figs", "Output")))
 ```{r user-settings}
 # User-specified settings
 get.db     <- T # Extract data from trawl database (F for testing)
-get.nav    <- T # Download NOAA Ship nav data
-get.nav.sh <- T # Download NOAA Ship nav data
+get.nav    <- F # Download NOAA Ship nav data
+get.nav.sh <- F # Download NOAA Ship nav data
 nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 ```
 
@@ -141,7 +141,8 @@ if (trawl.source == "Access") {
       stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>%
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) 
+      TRUE ~ haulBackTime)) %>% 
+    rename(duration = Duration)
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -211,9 +212,10 @@ catch <- catch.all %>%
 
 if (nrow(catch) > 0) {
   # Summarize trawl catch by species
-  haul.summ.wt <- dcast(select(catch, haul, cluster, scientificName, totalWeight),
-                        haul + cluster ~ scientificName, sum)
-  
+  haul.summ.wt <- catch %>% 
+    select(haul, cluster, scientificName, totalWeight) %>% 
+    pivot_wider(names_from = scientificName, values_from = totalWeight, values_fn = sum, values_fill = 0)
+
   # Add species with zero total weight
   if (is.null(haul.summ.wt$`Engraulis mordax`))      {haul.summ.wt$`Engraulis mordax`      <- 0}
   if (is.null(haul.summ.wt$`Sardinops sagax`))       {haul.summ.wt$`Sardinops sagax`       <- 0}
@@ -421,6 +423,7 @@ lengths.all <- lengths.all %>%
          standardLength_mm, forkLength_mm, totalLength_mm, mantleLength_mm,
          sex, weightg, otolithNumber, 
          DNAtrayNumber, DNAvialNumber,
+         isGonadSaved, 
          isRandomSample, flaggedData) %>%
   # Standardize sex values
   mutate(sex = tolower(trimws(sex)),
@@ -1208,10 +1211,10 @@ Trawl durations are examined to look for data entry errors. Trawls longer than 5
 ```{r check-trawl-duration}
 haul %>%
   arrange(desc(haul)) %>% 
-  mutate(Duration = cell_spec(
-    Duration, knitr.format, color = "black",
-    background = ifelse(Duration >= 50, "orange", "white"))) %>%
-  select(haul, cluster, equilibriumTime, haulBackTime, Duration) %>%
+  mutate(duration = cell_spec(
+    duration, knitr.format, color = "black",
+    background = ifelse(duration >= 50, "orange", "white"))) %>%
+  select(haul, cluster, equilibriumTime, haulBackTime, duration) %>%
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("c")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
@@ -1345,8 +1348,8 @@ catch.comp %>%
         format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
-  row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-  row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
+  # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
+  # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = 1) %>% 
   scroll_box(height = "500px")  
@@ -1368,8 +1371,8 @@ if (nrow(catch.comp.errors) > 0) {
           format.args = list(big.mark = ",")) %>% 
     kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
-    row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-    row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
+    # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
+    # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = 1) %>% 
     scroll_box(height = "500px")  
@@ -1612,6 +1615,53 @@ dna.summ %>%
         align = c("c","c","c")) %>% 
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) 
+```
+
+## Gonad samples
+### Gonads saved
+
+This barcode type indicates that isGonadSaved should be "Y" so please confirm.
+
+```{r verify-gonad-samples-y}
+gonad.check <- lengths %>%
+  filter(startsWith(as.character(individual_ID), "0"),
+         isGonadSaved=="N")
+
+# Print problematic barcodes  
+if (nrow(gonad.check) > 0) {
+  gonad.check %>%
+    # filter(individual_ID %in% duplicate.ids) %>% 
+    select(individual_ID, specimenNumber, scientificName, commonName) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+    scroll_box(height = "500px")
+} else {
+  print("Hooray, no incorrect barcodes!")
+}
+```
+
+### Gonads NOT saved
+
+This barcode type indicates that isGonadSaved should be "N" so please confirm.  
+
+```{r verify-gonad-samples-n}
+gonad.check2 <- lengths %>%
+  filter(startsWith(as.character(individual_ID), "A"),
+         isGonadSaved=="Y")
+
+# Print problematic barcodes  
+if (nrow(gonad.check2) > 0) {
+  gonad.check2 %>%
+    # filter(individual_ID %in% duplicate.ids) %>% 
+    select(individual_ID, specimenNumber, scientificName, commonName) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          format.args = list(big.mark = ",")) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+    scroll_box(height = "500px")
+} else {
+  print("Hooray, no incorrect barcodes!")
+}
 ```
 
 # References

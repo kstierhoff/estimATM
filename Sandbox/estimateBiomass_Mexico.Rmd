@@ -27,11 +27,11 @@ editor_options:
 if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
-pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,rgeos,
+pacman::p_load(tidyverse,swfscMisc,reshape2,tcltk,lubridate,sp,
                knitr,maps,geosphere,Hmisc,ggrepel,png,cowplot,forecast,xts,
                RSQLite,geoR,kableExtra,devtools,scatterpie,marmap,magick,
-               beepr,rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
-               leaflet.extras,maptools,mapview,photobiology,fs,plotly,
+               rnaturalearth,shadowtext,here,leaflet,leafem,htmltools,
+               leaflet.extras,mapview,photobiology,fs,plotly,
                concaveman,DT,xml2,glue,lwgeom,DBI,odbc,bookdown,sf,ggnewscale,
                rworldmap,rworldxtra,data.table,stplanr,ggspatial,htmlwidgets)
 
@@ -3626,8 +3626,15 @@ for (i in unique(lengths$scientificName)) {
   lf.final <- bind_rows(lf.final, lf.df)
   
   # Reshape data frame by cluster for adding to clf
-  lf.table <- reshape2::dcast(lf.df, cluster ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
-  lf.table.h <- reshape2::dcast(lf.df, haul ~ lf.labels, value.var = 'counts', sum, margins = 'lf.labels')
+  lf.table <- pivot_wider(lf.df, id_cols = cluster, names_from = lf.labels, values_from = counts, values_fn = sum) %>% 
+    rowwise(cluster) %>%
+    mutate('(all)' = sum(c_across(all_of(lf.labels)))) %>% 
+    arrange(cluster)
+  
+  lf.table.h <- pivot_wider(lf.df, id_cols = haul, names_from = lf.labels, values_from = counts, values_fn = sum) %>% 
+    rowwise(haul) %>%
+    mutate('(all)' = sum(c_across(all_of(lf.labels)))) %>% 
+    arrange(haul)
   
   # Convert counts to relative frequencies
   lf.table[ ,2:ncol(lf.table)] <- lf.table[ , 2:ncol(lf.table)]/lf.table$`(all)`
@@ -8807,8 +8814,13 @@ names(echo.settings) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interv
                           "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
 
 # cast output by frequency and transducer model number
-param.output  <- suppressMessages(reshape2::dcast(melt(cal.params, id.vars = "Frequency"), variable~Frequency))
-bm.output     <- suppressMessages(reshape2::dcast(melt(bm.res, id.vars = "Frequency"), variable~Frequency))
+param.output <- cal.params %>% 
+  pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+  pivot_wider(names_from = Frequency, values_from = value)
+
+bm.output <- bm.res %>% 
+  pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+  pivot_wider(names_from = Frequency, values_from = value)
 
 # add a column with parameter units
 param.units <- as.data.frame(c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
@@ -8868,11 +8880,6 @@ if (file.exists(here("Figs/fig_cal_time_series_combo.png"))) {
 } else {
   print("No calibration time series plots available.")
 }
-```
-
-
-```{r work-complete}
-beep(4)
 ```
 
 # Literature cited  
