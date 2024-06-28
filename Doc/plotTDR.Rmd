@@ -1,6 +1,6 @@
 ---
 title: "TDR Data Explorer"
-author: "Kevin Stierhoff"
+author: "Kevin Stierhoff (maintainer)"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
   bookdown::html_document2:
@@ -49,11 +49,11 @@ dir_create(here(c("Figs/TDR", "Output")))
 ```{r user-settings}
 # User-specified settings
 copy.files  <- T # Copy TDR files
-process.tdr <- T # Process TDR files
+process.rsk <- T # Process RBR Duet^3^ TDR files (.rsk format)
+process.asc <- F # Process Seabird TDR files (.asc format)
 process.all <- T # Process all TDR files
-process.asc <- T # Process all Seabird .asc TDR files
 asc.offset  <- 0 # Ascii file time offset, in hours
-get.db      <- F # Extract data from trawl database (F for testing)
+get.db      <- T # Extract data from trawl database (F for testing)
 get.nav     <- T # Download NOAA Ship nav data
 get.nav.sh  <- F # Download NOAA Ship nav data
 ```
@@ -171,7 +171,7 @@ haul.all <- haul.all %>%
     TRUE ~ "summer"))
 
 # Get only hauls from current survey
-haul <- filter(haul.all, cruise %in% cruise.name) %>% 
+haul <- filter(haul.all, cruise %in% tdr.cruise) %>% 
   arrange(haul) %>% 
   mutate(
     netInWaterTime  = ymd_hms(netInWaterTime,  tz = tdr.tz),
@@ -227,7 +227,7 @@ tdr.changed.f    <- changedFiles(tdr.snapshot.end.f, tdr.snapshot.start.f)
 tdr.to.process.k <- c(tdr.changed.k$changed, tdr.changed.k$added)
 tdr.to.process.f <- c(tdr.changed.f$changed, tdr.changed.f$added)
 
-if (process.tdr) {
+if (process.rsk) {
   # List all kite files
   rsk.files.kite <- dir_ls(tdr.dir.kite, 
                            recurse = tdr.recurse, regexp = tdr.pattern)
@@ -454,8 +454,8 @@ if(nrow(tbl.all.new) > 0) {
            title = paste("Cruise:", unique(tdr.plot$cruise), 
                          "; Haul:", unique(tdr.plot$haul),
                          "; Date:", date(tdr.plot$time[1]))) + 
-      theme(legend.position      = c(0.99,0.01),
-            legend.justification = c(1,0),
+      theme(legend.position.inside = c(0.99,0.01),
+            legend.justification   = c(1,0),
             axis.text.x = element_text(angle = 45, vjust = 0.5)) 
     
     # Add trawl window, if present
@@ -511,14 +511,35 @@ Below are TDR data for the last three trawl hauls. **<span style="color: black;"
 tdr.figs <- tail(dir_ls(here("Figs/TDR")), 3)
 ```
 
+## First plot
+
 ```{r plot-1}
-include_graphics(tdr.figs[1])
+# Plot the first TDR plot
+if(length(tdr.figs) > 0) {
+  include_graphics(tdr.figs[1])  
+} else {
+  print("No TDR plots available.")  
+}
 ```
+
+## Second plot
 
 ```{r plot-2}
-include_graphics(tdr.figs[2])
+# Plot the second TDR plot, if present
+if(length(tdr.figs) > 1) {
+  include_graphics(tdr.figs[2])  
+} else {
+  print("No more TDR plots available.")  
+}
 ```
 
+## Third plot
+
 ```{r plot-31}
-include_graphics(tdr.figs[3])
+# Plot the second TDR plot, if present
+if(length(tdr.figs) > 2) {
+  include_graphics(tdr.figs[3])  
+} else {
+  print("No more TDR plots available.")  
+}
 ```

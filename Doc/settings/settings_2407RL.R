@@ -618,6 +618,8 @@ uctd.cast.depth        <- 350
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
+tdr.dir.stbd           <- here("Data/TDR/Starboard")
+tdr.dir.port           <- here("Data/TDR/Port")
 tdr.pattern            <- "2406RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
@@ -628,6 +630,7 @@ tdr.offset             <- rep(0, 100)
 tdr.offset             <- setNames(tdr.offset, 1:length(tdr.offset)) # Add names from haul numbers
 tdr.nav.source         <- "ERDDAP"
 tdr.trawl.source       <- "Access"
+tdr.cruise             <- c("202406","202407") # Cruise name(s) for TDR files
 
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
