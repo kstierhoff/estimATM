@@ -959,7 +959,7 @@ for (i in cps.spp) {
   lf.final.seine.deep <- bind_rows(lf.final.seine.deep, lf.df.seine)
   
   # Reshape data frame by cluster for adding to clf
-  lf.table.seine <- pivot_wider(lf.table.seine, id_cols = cluster, names_from = lf.labels, values_from = counts, values_fn = sum) %>% 
+  lf.table.seine <- pivot_wider(lf.df.seine, id_cols = cluster, names_from = lf.labels, values_from = counts, values_fn = sum) %>% 
     rowwise(cluster) %>%
     mutate('(all)' = sum(c_across(all_of(lf.labels)))) %>% 
     arrange(cluster)

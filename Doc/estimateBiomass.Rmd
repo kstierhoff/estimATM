@@ -91,14 +91,14 @@ source(here("Doc/settings", prj.settings))
 ```{r user-controls, echo = TRUE}
 # Processing controls (T/F) ---------------------------------------------------
 ### Usually TRUE
-get.db            <- F # Download data from databases (fast; generally TRUE)
+get.db            <- T # Download data from databases (fast; generally TRUE)
 get.nav           <- F # Download primary vessel nav data from ERDDAP
 nav.source        <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 get.nav.sh        <- F # Download NOAA Ship nav data
 copy.files        <- F # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
-save.figs         <- F # Draw new figures and maps
+save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
@@ -1487,6 +1487,7 @@ Haul data are filtered, formatted, and assigned to clusters, where a trawl clust
 ```{r process-trawl-haul-data}
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
+  # The Access database format changed in 2022, so the steps below handle that format
   if (year(haul.all$netInWaterTime[1]) >= 2021) {
     haul.all <- haul.all %>% 
       arrange(haul) %>% 
@@ -1494,13 +1495,15 @@ if (trawl.source == "Access") {
         startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
         startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
+        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>% 
+      rename(notes = Notes)
     
     catch.all <- catch.all %>% 
       rename(totalWeight = TotalWtKg,
              totalNum    = TotalNum)
     
   } else {
+    # Process using the >= 2022 Access format
     haul.all <- haul.all %>% 
       arrange(haul) %>% 
       mutate(
@@ -1529,6 +1532,7 @@ if (trawl.source == "Access") {
     haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
   }
 } else if (trawl.source == "SQL") {
+  # Process the SQL data, which hasn't changed over time
   haul.all <- haul.all %>% 
     arrange(haul) %>% 
     mutate(
