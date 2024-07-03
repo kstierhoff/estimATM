@@ -3643,14 +3643,21 @@ acoustic.prop.indiv <- clf %>%
   select(cluster, lat, long, prop.anch, prop.jack, prop.her,
          prop.mack, prop.sar, prop.rher, prop.other, sample.type) %>% 
   replace(. == 0, 0.0000001) %>% 
-  project_df(to = crs.proj)
+  project_df(to = crs.proj) %>% 
+  mutate(pie.radius = pie.radius)
 
 acoustic.prop.wg <- clf %>%
   filter(!is.na(CPS.wg), CPS.wg > 0) %>% 
-  select(cluster, lat, long, prop.anch.wg, prop.jack.wg, prop.her.wg,
-         prop.mack.wg, prop.sar.wg, prop.rher.wg, prop.other.wg, sample.type) %>% 
+  select(cluster, lat, long, prop.anch = prop.anch.wg, prop.jack = prop.jack.wg, 
+         prop.her = prop.her.wg, prop.mack = prop.mack.wg, 
+         prop.sar = prop.sar.wg, prop.rher = prop.rher.wg, 
+         prop.other = prop.other.wg, sample.type) %>% 
   replace(. == 0, 0.0000001) %>% 
-  project_df(to = crs.proj)
+  project_df(to = crs.proj) %>% 
+  mutate(pie.radius = pie.radius)
+
+# Get species present in the trawl catch
+pie.spp <- sort(unique(catch$scientificName))
 
 if (save.figs) {
   # Create trawl figure
@@ -3663,9 +3670,9 @@ if (save.figs) {
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.indiv, 
                     aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
-                    cols = c("prop.anch","prop.her","prop.jack",
-                             "prop.mack", "prop.rher", "prop.sar", "prop.other"),
-                    alpha = 0.8) +
+                    # r = pie.radius,
+                    cols = pie.cols.prop[names(pie.cols.prop) %in% pie.spp],
+                    alpha = 0.8, sorted_by_radius = TRUE) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
@@ -3676,11 +3683,8 @@ if (save.figs) {
                         guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "P. herring", "J. mackerel",
-                                 "P. mackerel", "R. herring", "Sardine", "Other"),
-                      values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                                 pac.mack.color, rnd.herring.color,
-                                 sardine.color, other.color)) +
+                      labels = unname(pie.labs[names(pie.labs) %in% pie.spp]),
+                      values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
     # Plot panel label
     ggtitle("Acoustic Proportions (Number) by Cluster") +
     coord_sf(crs = crs.proj, 
@@ -3697,9 +3701,9 @@ if (save.figs) {
     # Plot trawl pies
     geom_scatterpie(data = acoustic.prop.wg, 
                     aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
-                    cols = c("prop.anch.wg","prop.her.wg","prop.jack.wg",
-                             "prop.mack.wg", "prop.rher.wg", "prop.sar.wg", "prop.other.wg"),
-                    alpha = 0.8) +
+                    # r = pie.radius,
+                    cols = pie.cols.prop[names(pie.cols.prop) %in% pie.spp],
+                    alpha = 0.8, sorted_by_radius = TRUE) +
     # Plot empty trawl locations
     geom_point(data = cluster.zero, aes(X, Y),
                size = 3, shape = 21, fill = 'black', colour = 'white') +
@@ -3710,11 +3714,8 @@ if (save.figs) {
                         guide = "none") +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "P. herring", "J. mackerel",
-                                 "P. mackerel", "R. herring", "Sardine", "Other"),
-                      values = c(anchovy.color, pac.herring.color, jack.mack.color,  
-                                 pac.mack.color, rnd.herring.color,
-                                 sardine.color, other.color)) +
+                      labels = unname(pie.labs[names(pie.labs) %in% pie.spp]),
+                      values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
     # Plot panel label
     ggtitle("Acoustic Proportions (Weight) by Cluster") +
     coord_sf(crs = crs.proj, 
@@ -3756,9 +3757,9 @@ acoustic.prop.cluster.final <- base.map +
   # Plot trawl pies
   geom_scatterpie(data = acoustic.prop.indiv, 
                   aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
-                  cols = c("prop.anch","prop.her","prop.jack",
-                           "prop.mack", "prop.rher", "prop.sar","prop.other"),
-                  color = 'black', alpha = 0.8) +
+                  # r = pie.radius,
+                  cols = pie.cols.prop[names(pie.cols.prop) %in% pie.spp],
+                  alpha = 0.8, sorted_by_radius = TRUE) +
   # Plot empty trawl locations
   geom_point(data = cluster.zero, aes(X, Y),
              size = 3, shape = 21, fill = 'black', colour = 'white') +
@@ -3769,10 +3770,8 @@ acoustic.prop.cluster.final <- base.map +
                       guide = "none") +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = c("Anchovy", "P. herring", "J. mackerel", 
-                               "P. mackerel", "R. herring", "Sardine", "Other"),
-                    values = c(anchovy.color, pac.herring.color, jack.mack.color, 
-                               pac.mack.color, rnd.herring.color, sardine.color, other.color)) +
+                    labels = unname(pie.labs[names(pie.labs) %in% pie.spp]),
+                    values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
   coord_sf(crs = crs.proj, 
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))

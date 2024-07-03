@@ -10,19 +10,19 @@ pac.herring.color  <- '#F5DEB3'
 rnd.herring.color  <- '#F0B81D'
 other.color        <- 'gray'
 
-pie.columns <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMack", 
+pie.cols <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMack", 
                  "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "PacHerring", 
                  "Scomber japonicus" = "PacMack", "Etrumeus acuminatus" = "RndHerring", 
                  "Sardinops sagax" = "Sardine")
 
-pie.columns[names(pie.columns) %in% pie.spp]
+pie.cols[names(pie.cols) %in% pie.spp]
 
-pie.labels <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
+pie.labs <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
                 "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring", 
                 "Scomber japonicus" = "P. mackerel", "Etrumeus acuminatus" = "R. herring", 
                 "Sardinops sagax" = "Sardine")
 
-pie.labels[names(pie.labels) %in% pie.spp]
+pie.labs[names(pie.labs) %in% pie.spp]
 
 pie.colors <- c("Engraulis mordax" = anchovy.color, "Trachurus symmetricus" = jack.mack.color, 
                 "Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color, 

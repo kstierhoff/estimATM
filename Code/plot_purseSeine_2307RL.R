@@ -511,11 +511,11 @@ set.pies.lm <- base.map +
   # Plot purse seine pies
   geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LM")), 
                   aes(X, Y, group = key.set, r = pie.radius.ns),
-                  cols = pie.columns[names(pie.columns) %in% pie.spp.lm],
+                  cols = pie.cols[names(pie.cols) %in% pie.spp.lm],
                   color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.lm]),
+                    labels = unname(pie.labs[names(pie.labs) %in% pie.spp.lm]),
                     values = unname(pie.colors[names(pie.colors) %in% pie.spp.lm])) +
   geom_point(data = filter(set.zero, vessel.name == "LM"), aes(X, Y)) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -535,11 +535,11 @@ set.pies.lbc <- base.map +
   # Plot purse seine pies
   geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
                   aes(X, Y, group = key.set, r = pie.radius.ns),
-                  cols = pie.columns[names(pie.columns) %in% pie.spp.lbc],
+                  cols = pie.cols[names(pie.cols) %in% pie.spp.lbc],
                   color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.lbc]),
+                    labels = unname(pie.labs[names(pie.labs) %in% pie.spp.lbc]),
                     values = unname(pie.colors[names(pie.colors) %in% pie.spp.lbc])) +
   geom_point(data = filter(set.zero, vessel.name == "LBC"), aes(X, Y)) +
   # ggtitle("Long Beach Carnage") +
@@ -559,11 +559,11 @@ haul.pies <- base.map +
   # Plot haul pies
   geom_scatterpie(data = haul.pos, 
                   aes(X, Y, group = haul, r = pie.radius.ns),
-                  cols = pie.columns[names(pie.columns) %in% pie.spp],
+                  cols = pie.cols[names(pie.cols) %in% pie.spp],
                   color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp]),
+                    labels = unname(pie.labs[names(pie.labs) %in% pie.spp]),
                     values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
   geom_point(data = haul.zero, aes(X, Y)) +
   # ggtitle("Reuben Lasker") +
@@ -655,11 +655,11 @@ set.pies <- base.map +
   # Plot purse seine pies
   geom_scatterpie(data = filter(set.pos, str_detect(key.set, "LBC")), 
                   aes(X, Y, group = key.set, r = r*2.5),
-                  cols = pie.columns[names(pie.columns) %in% pie.spp.lbc],
+                  cols = pie.cols[names(pie.cols) %in% pie.spp.lbc],
                   color = 'black', alpha = 0.8) +
   # Configure trawl scale
   scale_fill_manual(name = 'Species',
-                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.lbc]),
+                    labels = unname(pie.labs[names(pie.labs) %in% pie.spp.lbc]),
                     values = unname(pie.colors[names(pie.colors) %in% pie.spp.lbc])) +
   geom_point(data = set.zero, aes(X, Y)) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection

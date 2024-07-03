@@ -12,11 +12,11 @@ if (nrow(haul.pos) > 0) {
     geom_sf(data = nav.paths.sf, colour = "gray50", size = 0.5, alpha = 0.5) +
     # Plot trawl pies
     geom_scatterpie(data = haul.pos, aes(X, Y, group = haul, r = r),
-                    cols = pie.columns[names(pie.columns) %in% pie.spp],
+                    cols = pie.cols[names(pie.cols) %in% pie.spp],
                     color = 'black', alpha = 0.8, sorted_by_radius = TRUE) +
     # Configure trawl scale
     scale_fill_manual(name = 'Species',
-                      labels = unname(pie.labels[names(pie.labels) %in% pie.spp]),
+                      labels = unname(pie.labs[names(pie.labs) %in% pie.spp]),
                       values = unname(pie.colors[names(pie.colors) %in% pie.spp])) +
     # Plot empty cluster locations
     geom_point(data = haul.zero, aes(X, Y),

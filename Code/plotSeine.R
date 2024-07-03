@@ -24,12 +24,12 @@ for (v in seine.vessels) {
     # Plot purse seine pies
     geom_scatterpie(data = filter(set.pos, str_detect(key.set, v)), 
                     aes(X, Y, group = key.set, r = r*0.8),
-                    cols = pie.columns[names(pie.columns) %in% pie.spp.seine.vessel],
+                    cols = pie.cols[names(pie.cols) %in% pie.spp.seine.vessel],
                     color = 'black', alpha = 0.8) +
     
     # Configure legend
     scale_fill_manual(name = 'Species',
-                      labels = unname(pie.labels[names(pie.labels) %in% pie.spp.seine.vessel]),
+                      labels = unname(pie.labs[names(pie.labs) %in% pie.spp.seine.vessel]),
                       values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine.vessel])) +
     
     # Plot empty sets as dots
@@ -65,12 +65,12 @@ fig.seine.combined <- base.map +
   # Plot purse seine pies
   geom_scatterpie(data = set.pos, 
                   aes(X, Y, group = key.set, r = r*0.8),
-                  cols = pie.columns[names(pie.columns) %in% pie.spp.seine],
+                  cols = pie.cols[names(pie.cols) %in% pie.spp.seine],
                   color = 'black', alpha = 0.8) +
   
   # Configure legend
   scale_fill_manual(name = 'Species',
-                    labels = unname(pie.labels[names(pie.labels) %in% pie.spp.seine]),
+                    labels = unname(pie.labs[names(pie.labs) %in% pie.spp.seine]),
                     values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine])) +
   
   # Plot empty sets as dots

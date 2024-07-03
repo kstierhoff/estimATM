@@ -273,13 +273,13 @@ trawl.sizes        <- c(1, 2, 3, 4, 5, 6, 7)
 
 # For pie charts; subsetted using pie.spp, which is defined from the catch data
 # Species columns
-pie.columns <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMack", 
+pie.cols <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMack", 
                  "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "PacHerring", 
                  "Scomber japonicus" = "PacMack", "Etrumeus acuminatus" = "RndHerring", 
                  "Sardinops sagax" = "Sardine")
 
 # Species labels
-pie.labels <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
+pie.labs <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
                 "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring", 
                 "Scomber japonicus" = "P. mackerel", "Etrumeus acuminatus" = "R. herring", 
                 "Sardinops sagax" = "Sardine")
