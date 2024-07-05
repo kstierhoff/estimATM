@@ -2559,10 +2559,10 @@ if (save.figs) {
          height = 3, width = 5)
 }
 
-# if (save.figs) {
-#   # Plot nearshore backscatter and purse seine data
-#   source(here("Code", paste0("plot_purseSeine_", survey.name, ".R")))
-# }
+if (save.figs) {
+  # Plot nearshore backscatter and purse seine data
+  source(here("Code/plotSeine.R"))
+}
 
 # Plot sA for CPS -------------------------------------------
 # Create vessel paths for plotting

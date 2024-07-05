@@ -12,6 +12,9 @@ for (v in seine.vessels) {
   # Get species present in the seine catches of each vessel
   pie.spp.seine.vessel  <- sort(unique(set.catch$scientificName[set.catch$vessel.name == v]))
   
+  # Set map image dimensions (inches)
+  if (v == "LM") {plot.dim  <- c(7, 4, 1.75)} else {plot.dim <- c(5.5, 8, 1.5)}
+  
   # Compute the boundary extents for the current vessel sets
   map.bounds.seine <- set.pie %>%
     filter(str_detect(key.set, v)) %>%                    # Retain sets for current vessel
@@ -33,7 +36,8 @@ for (v in seine.vessels) {
                       values = unname(pie.colors[names(pie.colors) %in% pie.spp.seine.vessel])) +
     
     # Plot empty sets as dots
-    geom_point(data = filter(set.zero, str_detect(key.set, v)), aes(X, Y)) +
+    geom_point(data = filter(set.zero, str_detect(key.set, v)), aes(X, Y),
+               shape = 21, fill = 'black', colour = 'white') +
     
     # Configure coordinate system
     coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
@@ -42,10 +46,50 @@ for (v in seine.vessels) {
   
   # Save plot
   ggsave(set.pies, filename = paste0(here("Figs/fig_seine_proportion_set_wt_"), v, ".png"),
-         height = 10, width = 6)
+         height = plot.dim[1], width = plot.dim[2])
   
   # Create figure variable specific to current vessel
   assign(paste0("fig.seine.", v), set.pies)
+  
+  # Select plot levels for backscatter data
+  nasc.plot.ns.sub <- filter(nasc.plot.ns, str_detect(transect.name, v))
+  
+  nasc.levels.all <- sort(unique(nasc.plot.ns.sub$bin.level))
+  nasc.labels.all <- nasc.labels[nasc.levels.all]
+  nasc.sizes.all  <- nasc.sizes[nasc.levels.all]
+  nasc.colors.all <- nasc.colors[nasc.levels.all]
+  
+  # Map backscatter
+  nasc.map.ns <- base.map +
+    # Plot NASC data
+    geom_path(data = nasc.plot.ns.sub, 
+              aes(X, Y, group = transect.name),
+              colour = "gray50", linewidth = 0.5, alpha = 0.5) +
+    # Plot NASC data
+    geom_point(data = nasc.plot.ns.sub, aes(X, Y, size = bin, fill = bin),
+               shape = 21, alpha = 0.75) +
+    # Configure size and colour scales
+    scale_size_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                      values = nasc.sizes.all,labels = nasc.labels.all) +
+    scale_fill_manual(name = bquote(atop(italic(s)[A], ~'(m'^2 ~'nmi'^-2*')')),
+                      values = nasc.colors.all,labels = nasc.labels.all) +
+    # Configure legend guides
+    guides(fill = guide_legend(), size = guide_legend()) +
+    # Plot title
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = c(map.bounds.seine["xmin"]-xbuff[1], map.bounds.seine["xmax"]+xbuff[2]),
+             ylim = c(map.bounds.seine["ymin"]-ybuff[1], map.bounds.seine["ymax"]+ybuff[2]))
+  
+  ggsave(nasc.map.ns, filename = here("Figs", paste0("fig_backscatter_cps_", v, ".png")),
+         height = plot.dim[1], width = plot.dim[2])
+  
+  # Combine purse seine and backscatter data for each vessel
+  nasc.set.wt.combo <- cowplot::plot_grid(nasc.map.ns, set.pies, nrow = 1, align = "hv",
+                                          labels = c("a)", "b)"))
+  
+  # Save combined figure
+  ggsave(nasc.set.wt.combo, filename = here("Figs", paste0("fig_nasc_seine_proportion_set_wt_", v, ".png")),
+         height = plot.dim[1], width = plot.dim[2]*plot.dim[3])
 }
 
 #### Plot the vessels combined
