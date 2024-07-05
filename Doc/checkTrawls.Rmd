@@ -61,7 +61,7 @@ dir_create(here(c("Figs", "Output")))
 ```{r user-settings}
 # User-specified settings
 get.db     <- T # Extract data from trawl database (F for testing)
-get.nav    <- F # Download NOAA Ship nav data
+get.nav    <- T # Download NOAA Ship nav data
 get.nav.sh <- F # Download NOAA Ship nav data
 nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 ```
@@ -142,7 +142,10 @@ if (trawl.source == "Access") {
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
       TRUE ~ haulBackTime)) %>% 
-    rename(duration = Duration)
+    rename(duration = Duration) %>% 
+    mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
+           recoveryTime = difftime(netOnDeckTime, haulBackTime, units = "mins"),
+           evolutionTime = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -165,7 +168,10 @@ if (trawl.source == "Access") {
     arrange(haul) %>% 
     mutate(
       equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime))
+      haulBackTime    = ymd_hms(haulBackTime)) %>% 
+    mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
+           recoveryTime = difftime(netOnDeckTime, haulBackTime, units = "mins"),
+           evolutionTime = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
 }
 
 # Select bad trawls
@@ -1226,6 +1232,31 @@ haul %>%
                 full_width = FALSE) %>%
   row_spec(0, align = c("c")) %>% 
   scroll_box(height = "500px")
+```
+
+Trawl durations are examined to look at trends in deployment, recovery, and total evolution times. The top panel shows total evolution time (from netOnDeckTime - netInWaterTime; green), while the bottom panel shows the deployment time (equilibriumTime - netInWaterTime, blue), fishing time (haulBackTime - equilbriumTime), and recovery time (netOnDeckTime - haulBackTime, red).
+
+```{r check-trawl-duration-all}
+# Plot trawl durations
+plot.evolution <- ggplot() + 
+  geom_line(data = haul, aes(haul, as.numeric(evolutionTime)), colour = "green") +
+  geom_point(data = haul, aes(haul, as.numeric(evolutionTime)), shape = 21, fill = "white", colour = "green") +
+  labs(x = "Haul", y = "Duration (mins)", title = "Evolution Time")
+
+plot.deployment <- ggplot() + 
+  geom_line(data = haul, aes(haul, as.numeric(deploymentTime)), colour = "blue") +
+  geom_point(data = haul, aes(haul, as.numeric(deploymentTime)), shape = 21, fill = "white", colour = "blue") +
+  geom_line(data = haul, aes(haul, as.numeric(recoveryTime)), colour = "red") +
+  geom_point(data = haul, aes(haul, as.numeric(recoveryTime)), shape = 21, fill = "white", colour = "red") +
+  geom_line(data = haul, aes(haul, as.numeric(duration)), colour = "black") +
+  geom_point(data = haul, aes(haul, as.numeric(duration)), shape = 21, fill = "white", colour = "black") +
+  labs(x = "Haul", y = "Duration (mins)", title = "Deployment/Fishing/Recovery Time")
+
+plot.duration.all <-  plot_grid(plot.evolution, plot.deployment, ncol = 1) 
+
+ggsave(plot.duration.all, filename = here("Figs/fig_trawl_evoution.png"))
+
+include_graphics(here("Figs/fig_trawl_evoution.png"))
 ```
 
 ## Haul paths
