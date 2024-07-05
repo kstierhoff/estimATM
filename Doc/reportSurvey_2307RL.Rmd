@@ -93,7 +93,7 @@ overwrite.csv   <- T # overwrite existing CSV files when copying
 overwrite.files <- T # overwrite non-CSV files when copying
 download.hab    <- F # download habitat map from ERDDAP (F if using temporal aggregate map)
 save.figs       <- T # draw new plots and maps, or use existing saved copies
-get.db          <- F # import trawl data from database (if F will load existing RData file)
+get.db          <- T # import trawl data from database (if F will load existing RData file)
 process.scs     <- F # process SCS logs, or load processed data
 get.nav         <- F # download nav data from ERDDAP (if F will load from RData file)
 get.nav.sh      <- F # download nav data from ERDDAP (if F will load from RData file)
@@ -573,6 +573,7 @@ if (process.cal.FM) {
   if (save.figs) {
     # Plot FM calibration results
     source(here("Code/plot_CalFM_2207RL.R"))
+    # source(here("Code/plot_CalFM_2307RL.R"))
   }  
 }
 ```
@@ -727,9 +728,15 @@ if (process.scs) {
 
 # Read CSV containing centerboard times, then create new columns with new time
 # formats
-cb.position <- read_csv(here("Data/SCS/Centerboard/CB_Changes.csv")) %>% 
+cb.position <- read_csv(here("Data/SCS/Centerboard/CB_Changes.csv")) %>%
   mutate(time = mdy_hms(paste(Date, Time_UTC)),
          datetime = format(time, format = "%m/%d/%Y %H:%M"))
+
+# cb.position <- filter(bridge.snap, 
+#                  Button %in% c("Retracted (5 m)","Intermediate (7 m)","Extended (9 m)")) %>% 
+#   select(datetime, Button, Lat, Lon) %>% 
+#   rename(`Date Time` = datetime, `Position (depth)` = Button, 
+#          `Latitude` = Lat, `Longitude` = Lon)
 
 # # Find data files in Centerboard directory
 # cb.files <- list.files(here("Data/SCS/Centerboard"), pattern = ".CALC.log",
@@ -1061,6 +1068,9 @@ haul.pie <- haul.summ.wt %>%
   select(haul, long, lat, Anchovy, JackMack, RndHerring,
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
   
+  # Define sample type
+  mutate(sample.type = "Trawl") %>% 
+  
   # Bin according to weight groups
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
@@ -1085,6 +1095,9 @@ cluster.pie <- cluster.summ.wt %>%
   # Select CPS weights
   select(cluster, long, lat, Anchovy, JackMack, RndHerring,
          Jacksmelt, PacHerring, PacMack, Sardine, AllCPS) %>% 
+  
+    # Define sample type
+  mutate(sample.type = "Trawl") %>%
   
   # Bin according to weight groups
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
