@@ -367,6 +367,10 @@ if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
+} else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
+  survey.dir           <- c(RL  = "C:/Users/Survey.RL/Desktop/2407RL_SWFSC",
+                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
@@ -598,10 +602,18 @@ cufes.vessels          <- c("RL")
 # Trawl data
 trawl.source           <- "Access"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
-trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
 trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
+
+# Location of trawl Access database
+if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
+  trawl.dir.access <- "DATA/BIOLOGICAL/HAUL"
+} else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
+  trawl.dir.access <- ""
+} else {
+  trawl.dir.access <- "DATA/BIOLOGICAL/HAUL"
+}
 
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
