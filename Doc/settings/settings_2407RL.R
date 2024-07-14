@@ -295,7 +295,7 @@ pie.colors <- c("Engraulis mordax" = anchovy.color, "Trachurus symmetricus" = ja
 nasc.breaks        <- c(0, 1, 200, 500, 2000, 5000, 20000, 50000, 20000000)
 nasc.labels        <- c("0","1-200", "200-500", "500-2000", "2000-5000", 
                         "5000-20,000", "20,000-50,000", ">50,000")
-nasc.scale         <- 0.55 # Scale percentage (smaller for larger scale)
+nasc.scale         <- 1.5#0.55 # Scale percentage (smaller for larger scale)
 nasc.sizes         <- c(0.1, 0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
 nasc.colors        <- c("#000000", "#C2E6F2", "#1E90FF", "#FFFF00", "#FF8C00", 
                         "#FF0000", "#FFC0CB", "#FFFFFF")
