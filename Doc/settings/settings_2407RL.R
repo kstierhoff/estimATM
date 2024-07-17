@@ -295,7 +295,7 @@ pie.colors <- c("Engraulis mordax" = anchovy.color, "Trachurus symmetricus" = ja
 nasc.breaks        <- c(0, 1, 200, 500, 2000, 5000, 20000, 50000, 20000000)
 nasc.labels        <- c("0","1-200", "200-500", "500-2000", "2000-5000", 
                         "5000-20,000", "20,000-50,000", ">50,000")
-nasc.scale         <- 0.55 # Scale percentage (smaller for larger scale)
+nasc.scale         <- 1.5#0.55 # Scale percentage (smaller for larger scale)
 nasc.sizes         <- c(0.1, 0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
 nasc.colors        <- c("#000000", "#C2E6F2", "#1E90FF", "#FFFF00", "#FF8C00", 
                         "#FF0000", "#FFC0CB", "#FFFFFF")
@@ -365,6 +365,10 @@ sounder.type           <- c(RL  = "EK80",
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
+                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
+} else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
+  survey.dir           <- c(RL  = "C:/Users/Survey.RL/Desktop/2407RL_SWFSC",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else {
@@ -598,10 +602,18 @@ cufes.vessels          <- c("RL")
 # Trawl data
 trawl.source           <- "Access"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
-trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
 trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
+
+# Location of trawl Access database
+if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
+  trawl.dir.access <- "DATA/BIOLOGICAL/HAUL"
+} else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
+  trawl.dir.access <- ""
+} else {
+  trawl.dir.access <- "DATA/BIOLOGICAL/HAUL"
+}
 
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
@@ -610,9 +622,10 @@ ctd.cast.pattern       <- ".*_processed.asc"
 ctd.cast.depth         <- 350
 
 # UCTD data   
-uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/PROCESSED")
-uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.*.asc"
-uctd.cast.pattern      <- ".*_processed.asc"
+uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD/Valeport")
+uctd.type              <- "Valeport" # "Valeport" or "Oceansciences"
+uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.*.vp2"
+uctd.cast.pattern      <- ".*UCTD\\d{3}-\\d{1}.*.vp2"
 uctd.cast.depth        <- 350
 
 # TDR data
@@ -620,7 +633,7 @@ tdr.dir.kite           <- here("Data/TDR/Kite")
 tdr.dir.foot           <- here("Data/TDR/Footrope")
 tdr.dir.stbd           <- here("Data/TDR/Starboard")
 tdr.dir.port           <- here("Data/TDR/Port")
-tdr.pattern            <- "2406RL*.*rsk"
+tdr.pattern            <- "2407RL*.*rsk"
 tdr.recurse            <- TRUE # Recursively search TDR directory
 tdr.tz                 <- "America/Los_Angeles" # Time zone setting for TDRs
 # Time offset, in hours (usually -1, diff between PDT and PST in summer)
@@ -630,7 +643,7 @@ tdr.offset             <- rep(-1, 100)
 tdr.offset             <- setNames(tdr.offset, 1:length(tdr.offset)) # Add names from haul numbers
 tdr.nav.source         <- "ERDDAP"
 tdr.trawl.source       <- "Access"
-tdr.cruise             <- c("202406","202407") # Cruise name(s) for TDR files
+tdr.cruise             <- c("202407") # Cruise name(s) for TDR files
 
 # Biomass estimation settings ------------------------------------------
 # Length bins and labels for calculating length frequencies 
