@@ -66,7 +66,7 @@ nav.source      <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 
 save.figs       <- T # create new figures
 get.map         <- F # download map from rnaturalearth
-resize.map      <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+resize.map      <- T # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
 ```{r copy-files, include=F}
@@ -75,22 +75,31 @@ if (copy.files) {
   dir_create(here("Data", c("CTD","UCTD")))
   
   if (dir.exists(uctd.dir)) {
-    # Copy UCTD data ------------------------------------
-    # Location of header files on survey directory
-    uctd.hdr <- dir_ls(uctd.dir, regexp = uctd.hdr.pattern, recurse = TRUE) %>% 
-      path_filter(regexp = "_processed", invert = TRUE)
-    
-    # Copy files to plotCTD directory
-    file_copy(uctd.hdr, here("Data/UCTD"), 
-              overwrite = overwrite.files)
-    
-    # Location of processed UCTD files on survey directory
-    uctd.proc <- dir_ls(uctd.dir, regexp = uctd.cast.pattern, recurse = TRUE) %>% 
-      path_filter(regexp = "_processed")
-    
-    # Copy files to plotCTD directory
-    file_copy(uctd.proc, here("Data/UCTD"), 
-              overwrite = overwrite.files)
+    if (uctd.type == "Valeport") {
+      # Location of header files on survey directory
+      uctd.files <- dir_ls(uctd.dir, regexp = uctd.cast.pattern, recurse = TRUE) 
+      
+      # Copy files to estimATM directory
+      file_copy(uctd.files, here("Data/UCTD"), 
+                overwrite = overwrite.files) 
+    } else {
+      # Copy Oceansciences UCTD data ------------------------------------
+      # Location of header files on survey directory
+      uctd.hdr <- dir_ls(uctd.dir, regexp = uctd.hdr.pattern, recurse = TRUE) %>% 
+        path_filter(regexp = "_processed", invert = TRUE)
+      
+      # Copy files to estimATM directory
+      file_copy(uctd.hdr, here("Data/UCTD"), 
+                overwrite = overwrite.files)
+      
+      # Location of processed UCTD files on survey directory
+      uctd.proc <- dir_ls(uctd.dir, regexp = uctd.cast.pattern, recurse = TRUE) %>% 
+        path_filter(regexp = "_processed")
+      
+      # Copy files to estimATM directory
+      file_copy(uctd.proc, here("Data/UCTD"), 
+                overwrite = overwrite.files)      
+    }
   }
   
   if (dir.exists(ctd.dir)) {
@@ -191,8 +200,7 @@ if (length(uctd.hdr) == 0) {
     
     # Process UCTD cast files --------------------------------------------------
     # List processed UCTD cast files
-    uctd.proc <- dir_ls(here("Data/UCTD"), pattern = uctd.cast.pattern) %>% 
-      path_filter(regexp = "_processed")
+    uctd.proc <- dir_ls(here("Data/UCTD"), regexp = uctd.cast.pattern, recurse = TRUE) 
     
     # create a data frame for storing results
     all.uctd.casts <- data.frame()
@@ -207,6 +215,7 @@ if (length(uctd.hdr) == 0) {
     all.uctd.casts <- arrange(all.uctd.casts, cast, scan) %>% 
       filter(between(S, min.S, max.S)) %>%  # Remove bad salinity data
       filter(dZt < 7)
+    
     # Save results
     save(all.uctd.casts, all.uctd.hdr, uctd.hdr, uctd.proc,
          file = here("Data/UCTD/uctd_data.Rdata"))
@@ -522,7 +531,7 @@ i.map <- leaflet() %>%
 Summary of underway CTD (UCTD) casts conducted during the `r survey.name` aboard _`r survey.vessel`_. 
 
 ```{r uctd-summary, include=TRUE}
-if (length(uctd.hdr) > 0) {
+if (length(uctd.summ) > 0) {
   # make a copy of uctd.summ
   uctd.table <- uctd.summ %>% 
     arrange(cast.date) %>% 
@@ -540,11 +549,6 @@ if (length(uctd.hdr) > 0) {
 } else {
   cat("No UCTD casts processed.")
 }
-
-# # Summarize UCTD casts by leg
-# uctd.table %>% 
-#   group_by(Leg) %>% 
-#   tally()
 ```  
 
 ## Unprocessed UCTD casts  
@@ -643,11 +647,11 @@ i.map.uctd <- i.map %>%
   # Add nav data
   addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>% 
-      addPolylines(data = transects.sf, color = ~txPal(Type),
-                   weight = 3, opacity = 0.5,
-                   label = ~label,
-                   popup = ~popup,
-                   group = "Transects") %>% 
+  addPolylines(data = transects.sf, color = ~txPal(Type),
+               weight = 3, opacity = 0.5,
+               label = ~label,
+               popup = ~popup,
+               group = "Transects") %>% 
   # Add layer controls
   addLayersControl(
     overlayGroups = c("UCTD Casts-Unprocessed", "UCTD Casts", 
@@ -742,8 +746,8 @@ if (exists("all.uctd.casts")) {
         scale_colour_viridis("Vessel\nspeed (kt)\n", option = "plasma") +
         facet_wrap(~leg, ncol = 2) +
         theme_bw() + 
-        theme(panel.grid.major     = element_line(size = 0.75),
-              legend.position      = c(1,1),
+        theme(panel.grid.major     = element_line(linewidth = 0.75),
+              legend.position.inside = c(1,1),
               legend.justification = c(1,1),
               legend.background    = element_blank(),
               strip.background.x = element_blank(),
@@ -1009,11 +1013,11 @@ i.map.ctd <- i.map %>%
   # Add nav data
   addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
                label = ~leg, group = "Vessel Track") %>% 
-      addPolylines(data = transects.sf, color = ~txPal(Type),
-                   weight = 3, opacity = 0.5,
-                   label = ~label,
-                   popup = ~popup,
-                   group = "Transects") %>% 
+  addPolylines(data = transects.sf, color = ~txPal(Type),
+               weight = 3, opacity = 0.5,
+               label = ~label,
+               popup = ~popup,
+               group = "Transects") %>% 
   # Add layer controls
   addLayersControl(
     overlayGroups = c("CTD Casts-Unprocessed", "CTD Casts", 
