@@ -30,7 +30,7 @@ atm::extract_cps_nasc(
   path.out    = "C:\\SURVEY\\2407RL\\PROCESSED\\EV\\CSV", # Processed file destination
   suffix.out  = "_nasc_cps.csv",             # Suffix applied to processed CSV files
   path.img    = "C:\\SURVEY\\2407RL\\PROCESSED\\EV\\Exported_Images", # Location of exported image files, or NULL
-  pattern.img = "-38 kHz CPS for Image Export.png", # Exported image regex
+  pattern.img = "-38 Remove Passive Pings.png", # Exported image regex
   # Lesser used options --------------------------------------------------------
   expansion   = 2,     # Constant for expanding axes
   max.range   = 350,   # Depth range for bubble plots
