@@ -1852,6 +1852,66 @@ if (nrow(gonad.check2) > 0) {
 }
 ```
 
+## Catch weight summary
+
+```{r plot-weight-summary}
+# Format data for plotting
+catch.bar <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
+  filter(!presenceAbsenceOnly == "Y") %>%
+  left_join(select(haul, haul, cluster, datetime = equilibriumTime)) %>% 
+  mutate(key = paste(haul, scientificName),
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum = (subSampleCount/subSampleWtkg)*totalWeight, 
+         group = case_when(
+           scientificName %in% c(cps.spp, "Merluccius productus") ~ scientificName,
+           TRUE ~ "Other")) %>% 
+  # Summarize non-CPS and hake weights
+  group_by(haul, group, datetime) %>% 
+  summarise(totalWeight = sum(totalWeight, na.rm = TRUE),
+            totalNum = sum(totalNum, na.rm = TRUE)) %>% 
+  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, 
+                   include.lowest = TRUE, labels = FALSE), 
+         leg = paste("Leg", leg)) %>% 
+  arrange(haul, totalWeight)
+
+# Species labels
+bar.labs <- c("Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring",
+              "Engraulis mordax" = "Anchovy", "Etrumeus acuminatus" = "R. herring", 
+              "Merluccius productus" = "P. hake", "Other" = "Other",
+              "Sardinops sagax" = "Sardine", "Scomber japonicus" = "P. mackerel", 
+              "Trachurus symmetricus" = "J. Mackerel")
+               
+# Species colors
+bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color,
+                "Engraulis mordax" = anchovy.color, "Etrumeus acuminatus" = rnd.herring.color,
+                "Merluccius productus" = "purple", "Other" = "gray70",
+                "Sardinops sagax" = sardine.color, "Scomber japonicus" = pac.mack.color, 
+                "Trachurus symmetricus" = jack.mack.color) 
+
+bar.spp <- sort(unique(catch.bar$group))
+
+# Plot catch 
+catch.bar.plot <- ggplot(catch.bar, aes(factor(haul), totalWeight, fill = group)) +
+  geom_bar(colour = "black", position = "stack", stat = "identity") + 
+  facet_wrap(~leg, scales = "free", ncol = 1) +
+  scale_fill_manual(name = 'Species',
+                    labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
+                    values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
+  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold")) +
+  labs(x = "Haul number", y = "Total  Weight (kg)")
+
+ggsave(catch.bar.plot, file = here("Figs/fig_catch_weight_leg.png"),
+       width = 12, height = 8)
+
+# Display plot
+catch.bar.plot
+```
+
+
 # Maps
 ## Southern CA Bight
 
