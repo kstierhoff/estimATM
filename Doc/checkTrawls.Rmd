@@ -1,5 +1,5 @@
 ---
-title: "Trawl Specimen Explorer"
+title: "Trawl Database Explorer"
 author: "Kevin Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
@@ -211,6 +211,7 @@ catch <- catch.all %>%
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
+  filter(!presenceAbsenceOnly == "Y") %>%
   left_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg,
@@ -226,17 +227,20 @@ if (nrow(catch) > 0) {
   # and no longer needs to have all species present for plotting to work.
   
   # Add species with zero total weight
-  if (!"Engraulis mordax" %in% names(haul.summ.wt))            {haul.summ.wt$`Engraulis mordax`      <- 0}
-  if (!"Sardinops sagax" %in% names(haul.summ.wt))             {haul.summ.wt$`Sardinops sagax`       <- 0}
-  if (!"Scomber japonicus" %in% names(haul.summ.wt))           {haul.summ.wt$`Scomber japonicus`     <- 0}
-  if (!"Trachurus symmetricus" %in% names(haul.summ.wt))       {haul.summ.wt$`Trachurus symmetricus` <- 0}
-  if (!"Clupea pallasii" %in% names(haul.summ.wt))             {haul.summ.wt$`Clupea pallasii`       <- 0}
-  if (!"Atherinopsis californiensis" %in% names(haul.summ.wt)) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
-  if (!"Etrumeus acuminatus" %in% names(haul.summ.wt))         {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+  if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}
+  if (!has_name(haul.summ.wt, "Sardinops sagax"))       {haul.summ.wt$`Sardinops sagax`       <- 0}
+  if (!has_name(haul.summ.wt, "Scomber japonicus"))     {haul.summ.wt$`Scomber japonicus`     <- 0}
+  if (!has_name(haul.summ.wt, "Trachurus symmetricus")) {haul.summ.wt$`Trachurus symmetricus` <- 0}
+  if (!has_name(haul.summ.wt, "Clupea pallasii"))       {haul.summ.wt$`Clupea pallasii`       <- 0}
+  if (!has_name(haul.summ.wt, "Atherinopsis californiensis")) {haul.summ.wt$`Atherinopsis californiensis` <- 0}
+  if (!has_name(haul.summ.wt, "Etrumeus acuminatus"))   {haul.summ.wt$`Etrumeus acuminatus` <- 0}
+  if (!has_name(haul.summ.wt, "Other"))                 {haul.summ.wt$`Other` <- 0}
   
   # Calculate total weight of all CPS species
   haul.summ.wt <- haul.summ.wt %>% 
-    mutate(AllCPS = rowSums(.[, 3:ncol(.)]))
+    replace(is.na(.), 0) %>%
+    mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>% 
+    arrange(haul)
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
@@ -246,13 +250,15 @@ if (nrow(catch) > 0) {
     mutate(AllCPS = rowSums(.[, 2:ncol(.)])) %>% 
     right_join(cluster.mid) %>% 
     rename(any_of(pie.spp)) %>% 
-    replace(is.na(.), 0)
-  
+    replace(is.na(.), 0) %>% 
+    arrange(cluster)
+
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
     right_join(haul.mid) %>% 
     rename(any_of(pie.spp)) %>%
-    replace(is.na(.), 0)
+    replace(is.na(.), 0) %>% 
+    arrange(haul)
   
 } else {
   # Summarize trawl catch by species
