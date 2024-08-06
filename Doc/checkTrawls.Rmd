@@ -1296,7 +1296,8 @@ include_graphics(here("Figs/fig_LW_plots_final.png"))
 
 
 # Data checks
-## Removed hauls  
+## Hauls
+### Removed hauls  
 
 Hauls removed due to trawl performance issues (e.g., aborted, bad, poor, etc.).
 
@@ -1308,7 +1309,7 @@ haul.bad %>%
   datatable(rownames = FALSE)
 ```
 
-## Hauls distances
+### Hauls distances
 
 Trawl distances are examined to look for data entry errors. Trawls longer than 5 nmi are highlighted orange.
 
@@ -1328,7 +1329,7 @@ haul.paths %>%
   scroll_box(height = "500px")
 ```
 
-## Hauls durations
+### Hauls durations
 
 Trawl durations are examined to look for data entry errors. Trawls longer than 50 min are highlighted orange.
 
@@ -1353,19 +1354,22 @@ Trawl durations are examined to look at trends in deployment, recovery, and tota
 
 ```{r check-trawl-duration-all}
 # Plot trawl durations
-plot.evolution <- ggplot() + 
-  geom_line(data = haul, aes(haul, as.numeric(evolutionTime)), colour = "green") +
-  geom_point(data = haul, aes(haul, as.numeric(evolutionTime)), shape = 21, fill = "white", colour = "green") +
-  labs(x = "Haul", y = "Duration (mins)", title = "Evolution Time")
+plot.evolution <- ggplot(data = haul) + 
+  geom_line(aes(haul, as.numeric(evolutionTime)), colour = "green") +
+  geom_point(aes(haul, as.numeric(evolutionTime)), shape = 21, fill = "white", colour = "green") +
+  labs(x = "Haul", y = "Duration (mins)", title = "Evolution Time") + 
+  scale_x_continuous(breaks = seq(0, 500, 5))
 
-plot.deployment <- ggplot() +
-  geom_line(data = haul, aes(haul, as.numeric(deploymentTime), color = "Deployment")) +
-  geom_point(data = haul, aes(haul, as.numeric(deploymentTime)), shape = 21, fill = "white", colour = "blue") +
-  geom_line(data = haul, aes(haul, as.numeric(recoveryTime), color = "Recovery")) +
-  geom_point(data = haul, aes(haul, as.numeric(recoveryTime)), shape = 21, fill = "white", colour = "red") +
-  geom_line(data = haul, aes(haul, as.numeric(duration), color = "Fishing")) +
-  geom_point(data = haul, aes(haul, as.numeric(duration)), shape = 21, fill = "white", colour = "black") +
+plot.deployment <- ggplot(data = haul) +
+  geom_line(aes(haul, as.numeric(deploymentTime), color = "Deployment")) +
+  geom_point(aes(haul, as.numeric(deploymentTime)), 
+             shape = 21, fill = "white", colour = "blue") +
+  geom_line(aes(haul, as.numeric(recoveryTime), color = "Recovery")) +
+  geom_point(aes(haul, as.numeric(recoveryTime)), shape = 21, fill = "white", colour = "red") +
+  geom_line(aes(haul, as.numeric(duration), color = "Fishing")) +
+  geom_point(aes(haul, as.numeric(duration)), shape = 21, fill = "white", colour = "black") +
   scale_color_manual(values = c("Deployment" = "blue", "Recovery" = "red", "Fishing" = "black")) +
+  scale_x_continuous(breaks = seq(0, 500, 5)) +
   labs(x = "Haul", y = "Duration (mins)", title = "Deployment/Fishing/Recovery Time", color = NULL) +
   theme(legend.position = c(1,1),
         legend.justification = c("right", "top"),
@@ -1380,10 +1384,9 @@ plot.duration.all <-  plot_grid(plot.evolution, plot.deployment, ncol = 1)
 ggsave(plot.duration.all, filename = here("Figs/fig_trawl_evoution.png"))
 
 include_graphics(here("Figs/fig_trawl_evoution.png"))
-# ggplotly(plot.duration.all, dynamicTicks = TRUE) 
 ```
 
-## Haul paths
+### Haul paths
 
 ```{r map-hauls,out.height="8in",out.width="100%"}
 # Provider tiles info: http://leaflet-extras.github.io/leaflet-providers/preview/index.html
@@ -1439,7 +1442,7 @@ if (exists("nav.paths.sf")) {
 }
 ```
 
-## Haul clusters
+### Haul clusters
 
 Trawl haul information is summarized by cluster. Those clusters where the difference in equilibrium time between the first and last haul in a cluster is $\geq$ 12 h are highlighted in yellow and should be examined in the Haul table of the Trawl database.  
 
@@ -1473,7 +1476,8 @@ cluster.check %>%
   scroll_box(height = "500px")
 ```
 
-## Catch data
+## Catches
+### Catch data - All
 
 In the catch table, `TotalWtKg` should equal the sum of `subSampleWtkg` and `remainingSubSampleWtkg`. Occasionally, when specimen errors are corrected, `TotalWtKg` does not get updated. Also, the `TotalNum` is estimated from product of the average weight of all specimens and the total weight (i.e., `(subSampleCount/subSampleWtkg)*TotalWtKg)`).  
 
@@ -1515,7 +1519,7 @@ catch.comp %>%
   scroll_box(height = "500px")  
 ```
 
-## Catch errors
+### Catch errors
 
 This table includes only those hauls where `diffWt` are not equal to zero.
 
@@ -1540,8 +1544,100 @@ if (nrow(catch.comp.errors) > 0) {
   print("Hooray, no (obvious) errors!")
 }
 ```
+### Catch weight summary
+#### All catch
 
-## Specimen data
+Note: log(Total Weight) is presented given large total catches in some hauls.  
+
+```{r plot-weight-summary-all}
+# Format data for plotting
+catch.bar <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
+  filter(!presenceAbsenceOnly == "Y") %>%
+  left_join(select(haul, haul, cluster, datetime = equilibriumTime)) %>% 
+  mutate(key = paste(haul, scientificName),
+         totalWeight = subSampleWtkg + remainingSubSampleWtkg,
+         totalNum = (subSampleCount/subSampleWtkg)*totalWeight, 
+         group = case_when(
+           scientificName %in% c(cps.spp, "Merluccius productus") ~ scientificName,
+           TRUE ~ "Other")) %>% 
+  # Summarize non-CPS and hake weights
+  group_by(haul, group, datetime) %>% 
+  summarise(totalWeight = sum(totalWeight, na.rm = TRUE),
+            totalNum = sum(totalNum, na.rm = TRUE)) %>% 
+  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, 
+                   include.lowest = TRUE, labels = FALSE), 
+         leg = paste("Leg", leg)) %>% 
+  arrange(haul, totalWeight)
+
+# Species labels
+bar.labs <- c("Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring",
+              "Engraulis mordax" = "Anchovy", "Etrumeus acuminatus" = "R. herring", 
+              "Merluccius productus" = "P. hake", "Other" = "Other",
+              "Sardinops sagax" = "Sardine", "Scomber japonicus" = "P. mackerel", 
+              "Trachurus symmetricus" = "J. mackerel")
+               
+# Species colors
+bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color,
+                "Engraulis mordax" = anchovy.color, "Etrumeus acuminatus" = rnd.herring.color,
+                "Merluccius productus" = "purple", "Other" = "gray70",
+                "Sardinops sagax" = sardine.color, "Scomber japonicus" = pac.mack.color, 
+                "Trachurus symmetricus" = jack.mack.color) 
+
+bar.spp <- sort(unique(catch.bar$group))
+
+# Plot catch 
+catch.bar.plot.all <- ggplot(catch.bar, aes(factor(haul), log(totalWeight+1), fill = group)) +
+  geom_bar(colour = "black", position = "stack", stat = "identity") + 
+  facet_wrap(~leg, scales = "free", ncol = 1) +
+  scale_fill_manual(name = 'Species',
+                    labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
+                    values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
+  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold")) +
+  labs(x = "Haul number", y = "log(Total  Weight) (kg)")
+
+ggsave(catch.bar.plot.all, file = here("Figs/fig_catch_weight_leg.png"),
+       width = 12, height = 8)
+
+# Display plot
+catch.bar.plot.all
+```
+
+#### CPS only
+
+Note: log(Total Weight) is presented given large total catches in some hauls.  
+
+```{r plot-weight-summary}
+# Format data for plotting
+catch.bar.cps <- catch.bar %>% 
+  filter(group %in% c(cps.spp, "Merluccius productus"))
+
+bar.spp.cps <- sort(unique(catch.bar.cps$group))
+
+# Plot catch 
+catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(factor(haul), log(totalWeight + 1), fill = group)) +
+  geom_bar(colour = "black", position = "stack", stat = "identity") + 
+  facet_wrap(~leg, scales = "free", ncol = 1) +
+  scale_fill_manual(name = 'Species',
+                    labels = unname(bar.labs[names(bar.labs) %in% bar.spp.cps]),
+                    values = unname(bar.colors[names(bar.colors) %in% bar.spp.cps])) +
+  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold")) +
+  labs(x = "Haul number", y = "log(Total  Weight) (kg)")
+
+ggsave(catch.bar.plot.cps, file = here("Figs/fig_catch_weight_leg_cps.png"),
+       width = 12, height = 8)
+
+# Display plot
+catch.bar.plot.cps
+```
+
+## Specimens
+### Specimen data - All
 
 The subsampled weight from the **Catch** table (`subSampleWtkg`) should equal the summed weight of subsampled individuals in the **Specimen** table (`totalWtSpecimens`; i.e., `diffWt` == 0), and the subsample count from the **Catch** table (`subSampleCount`) should equal the number of subsampled individuals in the **Specimen** table (`totalCtSpecimens`; i.e., `diffCt` == 0). Hauls with unequal values are in **bold**;  count differences are highlighted in yellow and weight differences are highlighted in orange. Hauls with missing specimen lengths our counts are highlighted in red. Hauls where binned lengths were present are highlighted in green.
 
@@ -1598,7 +1694,7 @@ specimen.comp %>%
   scroll_box(height = "500px")
 ```
 
-## Specimen errors
+### Specimen errors
 
 This table includes only those hauls where `diffWt` and `diffCt` are not equal to zero.
 
@@ -1645,7 +1741,7 @@ if (nrow(specimen.comp.errors) > 0) {
 }
 ```
 
-## Duplicated bar codes
+### Duplicated bar codes
 
 Display specimens with duplicated bar codes (i.e., `individual_ID`).
 
@@ -1670,7 +1766,7 @@ if (length(duplicate.ids) > 0) {
 }
 ```
 
-## Otolith samples
+### Otolith samples
 
 Length distributions of all target CPS specimens (gray bars) vs. specimens from which otoliths were collected (colored bars). Ideally, the length distributions of specimens from which otoliths were collected reflect the length distribution of all specimens collected. The dashed line represents a general aim (n = 50) for the number of otoliths collected per length bin. Focus should be given to ensuring otoliths from the tail ends of the distribution are collected.
 
@@ -1744,7 +1840,7 @@ if (nrow(filter(otoliths, scientificName %in% c("Scomber japonicus","Trachurus s
 }
 ```
 
-### Standard Length ($L_s$) Specimens
+#### Standard Length ($L_s$) Specimens
 
 ```{r otoliths-sl}
 if (file.exists(here("Figs/fig_otolith_sample_distribution-SL.png"))) {
@@ -1756,7 +1852,7 @@ if (file.exists(here("Figs/fig_otolith_sample_distribution-SL.png"))) {
 ```
 
 
-### Fork Length ($L_f$) Specimens
+#### Fork Length ($L_f$) Specimens
 
 ```{r otoliths-fl}
 if (file.exists(here("Figs/fig_otolith_sample_distribution-FL.png"))) {
@@ -1767,7 +1863,34 @@ if (file.exists(here("Figs/fig_otolith_sample_distribution-FL.png"))) {
 }
 ```
 
-## DNA Samples
+### DNA Samples
+#### Duplicated trays
+
+Identify duplicated DNA tray and vial combinations.  
+
+```{r find-duplicated-dna-trays}
+# Create key to detect and identify duplicated DNA trays
+duplicated.dna <- lengths %>%
+  # Create key to look for duplicates
+  mutate(key = paste(DNAtrayNumber, DNAvialNumber)) %>% 
+  # Remove rows with no DNA data
+  filter(!is.na(DNAtrayNumber)) %>% 
+  filter(duplicated(key)) %>% 
+  select(scientificName, DNAtrayNumber, DNAvialNumber)
+
+if (nrow(duplicated.dna) > 0) {
+  # Format and print table
+  duplicated.dna %>% 
+    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+          align = c("c","c","c")) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+    column_spec(1, italic = TRUE)   
+} else {
+  print("Hooray, no duplicated DNA trays!")
+}
+```
+
+#### Sample counts  
 
 Tally the total number of DNA samples collected for each of the target CPS species. **<span style="color:red">Red</span>** values indicate that the number of vials is not equal to the number of trays.  
 
@@ -1805,8 +1928,8 @@ if (nrow(dna.summ) > 0) {
 }
 ```
 
-## Gonad samples
-### Gonads saved
+### Gonad samples
+#### Gonads saved
 
 This bar code type indicates that isGonadSaved should be "Y" so please confirm.
 
@@ -1829,7 +1952,7 @@ if (nrow(gonad.check) > 0) {
 }
 ```
 
-### Gonads NOT saved
+#### Gonads NOT saved
 
 This barcode type indicates that isGonadSaved should be "N" so please confirm.  
 
@@ -1851,68 +1974,7 @@ if (nrow(gonad.check2) > 0) {
   print("Hooray, no incorrect barcodes!")
 }
 ```
-
-## Catch weight summary
-
-```{r plot-weight-summary}
-# Format data for plotting
-catch.bar <- catch.all %>% 
-  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-  filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
-  filter(!presenceAbsenceOnly == "Y") %>%
-  left_join(select(haul, haul, cluster, datetime = equilibriumTime)) %>% 
-  mutate(key = paste(haul, scientificName),
-         totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-         totalNum = (subSampleCount/subSampleWtkg)*totalWeight, 
-         group = case_when(
-           scientificName %in% c(cps.spp, "Merluccius productus") ~ scientificName,
-           TRUE ~ "Other")) %>% 
-  # Summarize non-CPS and hake weights
-  group_by(haul, group, datetime) %>% 
-  summarise(totalWeight = sum(totalWeight, na.rm = TRUE),
-            totalNum = sum(totalNum, na.rm = TRUE)) %>% 
-  mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, 
-                   include.lowest = TRUE, labels = FALSE), 
-         leg = paste("Leg", leg)) %>% 
-  arrange(haul, totalWeight)
-
-# Species labels
-bar.labs <- c("Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring",
-              "Engraulis mordax" = "Anchovy", "Etrumeus acuminatus" = "R. herring", 
-              "Merluccius productus" = "P. hake", "Other" = "Other",
-              "Sardinops sagax" = "Sardine", "Scomber japonicus" = "P. mackerel", 
-              "Trachurus symmetricus" = "J. Mackerel")
-               
-# Species colors
-bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color,
-                "Engraulis mordax" = anchovy.color, "Etrumeus acuminatus" = rnd.herring.color,
-                "Merluccius productus" = "purple", "Other" = "gray70",
-                "Sardinops sagax" = sardine.color, "Scomber japonicus" = pac.mack.color, 
-                "Trachurus symmetricus" = jack.mack.color) 
-
-bar.spp <- sort(unique(catch.bar$group))
-
-# Plot catch 
-catch.bar.plot <- ggplot(catch.bar, aes(factor(haul), totalWeight, fill = group)) +
-  geom_bar(colour = "black", position = "stack", stat = "identity") + 
-  facet_wrap(~leg, scales = "free", ncol = 1) +
-  scale_fill_manual(name = 'Species',
-                    labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
-                    values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
-  scale_x_discrete(breaks = seq(0, 500, 2)) +
-  theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold")) +
-  labs(x = "Haul number", y = "Total  Weight (kg)")
-
-ggsave(catch.bar.plot, file = here("Figs/fig_catch_weight_leg.png"),
-       width = 12, height = 8)
-
-# Display plot
-catch.bar.plot
-```
-
-
-# Maps
+# Survey Area Maps
 ## Southern CA Bight
 
 ```{r survey-map-scb}

@@ -1,6 +1,8 @@
 # Batch process uCTD data files from the Valeport probe, then create an Echoview
 # .ecs file that contains a sound speed profile
 
+# To run in Rstudio, press the Source button or Ctrl + Shift + S
+
 # Load required packages ---------------
 #-----------------------------------
 
