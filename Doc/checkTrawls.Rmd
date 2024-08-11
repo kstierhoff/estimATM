@@ -144,8 +144,8 @@ if (trawl.source == "Access") {
       TRUE ~ haulBackTime)) %>% 
     rename(duration = Duration) %>% 
     mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
-           recoveryTime = difftime(netOnDeckTime, haulBackTime, units = "mins"),
-           evolutionTime = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
+           recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
+           evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
   
   # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
   eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
@@ -170,8 +170,8 @@ if (trawl.source == "Access") {
       equilibriumTime = ymd_hms(equilibriumTime),
       haulBackTime    = ymd_hms(haulBackTime)) %>% 
     mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
-           recoveryTime = difftime(netOnDeckTime, haulBackTime, units = "mins"),
-           evolutionTime = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
+           recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
+           evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
 }
 
 # Select bad trawls
@@ -186,9 +186,9 @@ haul.all <- haul.all %>%
 
 # Get only hauls from current survey
 haul <- filter(haul.all, cruise %in% cruise.name) %>% 
+  filter(!collection %in% haul.bad$collection) %>% 
   mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) %>% # Assign cluster
-  filter(!collection %in% haul.bad$collection)
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
 
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 

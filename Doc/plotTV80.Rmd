@@ -1,5 +1,5 @@
 ---
-title: "Simrad TV80 Data Explorer"
+title: "plotTV80: Simrad TV80 Data Explorer"
 author: "Kevin Stierhoff"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
@@ -21,6 +21,10 @@ pacman::p_load_gh("SWFSC/surveyR")
 
 # Plotting preferences
 theme_set(theme_bw())
+
+# Knitr options
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      out.width = "90%")
 ```
 
 ```{r user-input, include=FALSE}
@@ -34,23 +38,121 @@ settings.files <- dir(here("Doc/settings"))
 prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
 
 source(here("Doc/settings", prj.settings))
+
+# User settings
+copy.files       <- T
+sampling.tv80    <- T
+process.tv80     <- T
+process.tv80.all <- F
 ```
 
-```{r list-measurement-files}
-# List measurement files
-meas.files <- fs::dir_ls(here("data/TV80"), 
-                        recurse = TRUE,
-                        regexp = "*.measurements.csv")
-
-print(as.character(meas.files))
-
-cat("Type the order of the file you want to integrate:\n")
-file.1 <- scan(n = 1)
+```{r copy-files}
+if (copy.files) {
+  # Create directory for TV80 files
+  dir_create(here("Data/TV80"))
+  
+  # Copy trawl Access database
+  tv80.files <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/TV80"),
+                           regexp = "*measurements.csv", recurse = TRUE)
+  
+  # Copy files where file is empty (size > 0 bytes)
+  file_copy(tv80.files[file_info(tv80.files)$size>0], here("Data/TV80"), overwrite = TRUE)
+}
 ```
 
-```{r extract-measurement-data}
-dat <- atm::extract_tv80(file = meas.files[file.1])
+```{r process-tv80}
+if (sampling.tv80) {
+  # Get fileSnapshot at the beginning of the knit, to compare with the end of the last knit
+  tv80.snapshot.start <- fileSnapshot(here("Data/TV80"), full.names = FALSE)
+  
+  # Load fileSnapshot from last knit, or make equal to the start
+  if (file.exists(here("Output/tv80_snapshot_end.rds"))){
+    # saveRDS(csv.snapshot.start, here("Output/csv_snapshot_end.rds"))
+    tv80.snapshot.end <- readRDS(here("Output/tv80_snapshot_end.rds"))
+  } else {
+    tv80.snapshot.end <- tv80.snapshot.start
+  }
+  
+  # Identify new and changed files
+  tv80.changed    <- changedFiles(tv80.snapshot.end, tv80.snapshot.start) 
+  # List files that need to be processed
+  tv80.to.process <- c(tv80.changed$changed, tv80.changed$added)
+  
+  if (process.tv80) {
+    # Process added and changed CSV files --------------------------
+    # List TV80 measurement files
+    tv80.files <- fs::dir_ls(here("Data/TV80"), 
+                             recurse = TRUE,
+                             regexp = "*.measurements.csv")
+    
+    if (process.tv80.all) {
+      print("Processing all TV80 data.")
+      
+      # Create an empty data frame
+      tv80.meas <- data.frame()
+      
+    } else {
+      if (file.exists(here("Output/tv80_measurements.Rdata"))) {
+        # Load data frame with already processed backscatter data
+        load(here("Output/tv80_measurements.Rdata")) 
+        
+        if (length(tv80.changed$changed) > 0) {
+          # If files have changed, remove those data
+          tv80.meas <- tv80.meas %>% 
+            filter(!path_file(filename) %in% path_file(fs_path(tv80.changed$changed))) 
+        }
+      } else {
+        # Create an empty data frame
+        tv80.meas <- data.frame()
+      }
+      
+      if (length(tv80.to.process) > 0) {
+        # List only new TV80 files
+        tv80.files <- tv80.files[fs::path_file(tv80.files) %in% 
+                                         path_file(fs_path(tv80.to.process))]  
+      } else {
+        print("No new/changed TV80 data.")
+        
+        # Set length of tv80.files to zero
+        tv80.files <- character(0)
+      }
+    }
+    
+    if (length(tv80.files) > 0) {
+      print("Processing new/changed TV80 data.")
 
-print(paste("Extracted data from file:", meas.files[file.1]))
+      # Configure progress bar
+      pb <- winProgressBar(title = "TV80 File Processing Progress", 
+                           label = "0% done", min = 0, max = 100, initial = 0)
+      
+      # Process all TV80 measurement files
+      for (i in 1:length(tv80.files)) {
+        # Process i-th file
+        tv80.meas <- bind_rows(tv80.meas,
+                         atm::extract_tv80(file = tv80.files[i]))
+        
+        # Update the progress bar
+        info <- sprintf("%d%% done", round((i / length(tv80.files)) * 100))
+        setWinProgressBar(pb, round((i / length(tv80.files)) * 100), label = info)
+      }
+      close(pb)
+      
+      # Save results
+      save(tv80.meas, file = here("Output/tv80_measurements.Rdata"))
+      write_csv(tv80.meas, file = here("Output/tv80_measurements.csv"))
+    }
+    
+    # Save snapshot
+    saveRDS(tv80.snapshot.start, here("Output/tv80_snapshot_end.rds"))
+    
+  } else {
+    print ("Loading processed TV80 data.")
+    load(here("Output/tv80_measurements.Rdata"))
+  }
+}
+```
+
+```{r plot-tv80}
+print("Done processing files")
 ```
 

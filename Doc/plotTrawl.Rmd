@@ -1,5 +1,5 @@
 ---
-title: "TDR Data Explorer"
+title: "plotTrawl: Trawl Data Explorer"
 author: "Kevin Stierhoff (maintainer)"
 date: '`r format(Sys.time(), format = "%F %T", tz = "UTC", usetz = TRUE)`'
 output:
@@ -48,11 +48,16 @@ dir_create(here(c("Figs/TDR", "Output")))
 
 ```{r user-settings}
 # User-specified settings
-copy.files  <- T # Copy TDR files
-process.rsk <- T # Process RBR Duet^3^ TDR files (.rsk format)
-process.asc <- F # Process Seabird TDR files (.asc format)
-process.all <- F # Process all TDR files
-asc.offset  <- 0 # Ascii file time offset, in hours
+copy.files   <- T # Copy TDR files
+process.rsk  <- T # Process RBR Duet^3^ TDR files (.rsk format)
+process.asc  <- F # Process Seabird TDR files (.asc format)
+asc.offset   <- 0 # ASCII file time offset, in hours
+process.tv80 <- T # Process Simrad TV80 data
+
+# Usually F; set T to reprocess all TDR/TV80 files
+process.tdr.all   <- T # Process all TDR files 
+process.tv80.all  <- F # Process all TV80 files
+
 get.db      <- T # Extract data from trawl database (F for testing)
 get.nav     <- T # Download NOAA Ship nav data
 get.nav.sh  <- F # Download NOAA Ship nav data
@@ -60,10 +65,10 @@ get.nav.sh  <- F # Download NOAA Ship nav data
 
 ```{r copy-files}
 if (copy.files) {
-  # Create directory for TDR files
+  # Create directory for TDR files -------------------------------------------------
   dir_create(here("Data/TDR", c("Kite","Footrope")))
   
-  # Copy trawl Access database
+  # Copy TDR files
   tdr.files.kite <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/TDR/Kite"),
                            regexp = tdr.pattern)
   file_copy(tdr.files.kite, here("Data/TDR/Kite"), overwrite = TRUE)
@@ -71,6 +76,16 @@ if (copy.files) {
   tdr.files.foot <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/TDR/Footrope"),
                            regexp = tdr.pattern)
   file_copy(tdr.files.foot, here("Data/TDR/Footrope"), overwrite = TRUE)
+  
+  # Create directory for TV80 files -------------------------------------------------
+  dir_create(here("Data/TV80"))
+  
+  # Copy TV80 files
+  tv80.files <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/TV80"),
+                           regexp = "*measurements.csv", recurse = TRUE)
+  
+  # Copy files where file is empty (size > 0 bytes)
+  file_copy(tv80.files[file_info(tv80.files)$size>0], here("Data/TV80"), overwrite = TRUE)
 }
 ```
 
@@ -128,7 +143,7 @@ if (get.db) {
 }
 ```
 
-```{r modify-data}
+```{r format-trawl-data}
 # Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (tdr.trawl.source == "Access") {
   # Reformat haul data to match SQL
@@ -196,7 +211,7 @@ cluster.mid <- haul.mid %>%
     long = mean(long))
 ```
 
-```{r read-rsk}
+```{r process-tdr-rsk}
 # Calculate mean latitude for computing depth from pressure
 # Could be improved (marginally) by extracting the latitude for each haul
 mean.lat <- mean(haul$startLatDecimal)
@@ -235,7 +250,7 @@ if (process.rsk) {
   rsk.files.foot <- dir_ls(tdr.dir.foot, 
                            recurse = tdr.recurse, regexp = tdr.pattern)
   
-  if (process.all) {
+  if (process.tdr.all) {
     # If processing all files, create empty tibbles for TDR data
     tbl.all <- tibble()
     
@@ -340,7 +355,7 @@ if (process.rsk) {
 }
 ```
 
-```{r process-asc}
+```{r process-tdr-asc}
 # Process .asc files from Seabird TDRs
 if (process.asc) {
   # List all kite files
@@ -408,12 +423,105 @@ if (process.asc) {
 }
 ```
 
+```{r process-tv80}
+if (process.tv80) {
+  # Get fileSnapshot at the beginning of the knit, to compare with the end of the last knit
+  tv80.snapshot.start <- fileSnapshot(here("Data/TV80"), full.names = FALSE)
+  
+  # Load fileSnapshot from last knit, or make equal to the start
+  if (file.exists(here("Output/tv80_snapshot_end.rds"))){
+    # saveRDS(csv.snapshot.start, here("Output/csv_snapshot_end.rds"))
+    tv80.snapshot.end <- readRDS(here("Output/tv80_snapshot_end.rds"))
+  } else {
+    tv80.snapshot.end <- tv80.snapshot.start
+  }
+  
+  # Identify new and changed files
+  tv80.changed    <- changedFiles(tv80.snapshot.end, tv80.snapshot.start) 
+  # List files that need to be processed
+  tv80.to.process <- c(tv80.changed$changed, tv80.changed$added)
+  
+  if (process.tv80) {
+    # Process added and changed CSV files --------------------------
+    # List TV80 measurement files
+    tv80.files <- fs::dir_ls(here("Data/TV80"), 
+                             recurse = TRUE,
+                             regexp = "*.measurements.csv")
+    
+    if (process.tv80.all) {
+      print("Processing all TV80 data.")
+      
+      # Create an empty data frame
+      tv80.meas <- data.frame()
+      
+    } else {
+      if (file.exists(here("Output/tv80_measurements.Rdata"))) {
+        # Load data frame with already processed backscatter data
+        load(here("Output/tv80_measurements.Rdata")) 
+        
+        if (length(tv80.changed$changed) > 0) {
+          # If files have changed, remove those data
+          tv80.meas <- tv80.meas %>% 
+            filter(!path_file(filename) %in% path_file(fs_path(tv80.changed$changed))) 
+        }
+      } else {
+        # Create an empty data frame
+        tv80.meas <- data.frame()
+      }
+      
+      if (length(tv80.to.process) > 0) {
+        # List only new TV80 files
+        tv80.files <- tv80.files[fs::path_file(tv80.files) %in% 
+                                         path_file(fs_path(tv80.to.process))]  
+      } else {
+        print("No new/changed TV80 data.")
+        
+        # Set length of tv80.files to zero
+        tv80.files <- character(0)
+      }
+    }
+    
+    if (length(tv80.files) > 0) {
+      print("Processing new/changed TV80 data.")
+
+      # Configure progress bar
+      pb <- winProgressBar(title = "TV80 File Processing Progress", 
+                           label = "0% done", min = 0, max = 100, initial = 0)
+      
+      # Process all TV80 measurement files
+      for (i in 1:length(tv80.files)) {
+        # Process i-th file
+        tv80.meas <- bind_rows(tv80.meas,
+                         atm::extract_tv80(file = tv80.files[i]))
+        
+        # Update the progress bar
+        info <- sprintf("%d%% done", round((i / length(tv80.files)) * 100))
+        setWinProgressBar(pb, round((i / length(tv80.files)) * 100), label = info)
+      }
+      close(pb)
+      
+      # Save results
+      save(tv80.meas, file = here("Output/tv80_measurements.Rdata"))
+      write_csv(tv80.meas, file = here("Output/tv80_measurements.csv"))
+    }
+    
+    # Save snapshot
+    saveRDS(tv80.snapshot.start, here("Output/tv80_snapshot_end.rds"))
+    
+  } else {
+    print ("Loading processed TV80 data.")
+    load(here("Output/tv80_measurements.Rdata"))
+  }
+}
+```
+
 ```{r plot-results}
 # Plot and save all new deployments
 if(nrow(tbl.all.new) > 0) {
   for (k in unique(tbl.all.new$haul)) {
     # Get TDR data from haul k
-    tdr.plot <- filter(tbl.all.new, haul == k) %>% mutate(time = time + hours(tdr.offset[k]))
+    tdr.plot <- filter(tbl.all.new, haul == k) %>% 
+      mutate(time = time + hours(tdr.offset[k]))
     
     # Get haul info from haul k
     trawl.window <- haul %>% 
@@ -432,6 +540,7 @@ if(nrow(tbl.all.new) > 0) {
                      min(trawl.text$time, na.rm = TRUE) - minutes(10), 
                      max(trawl.text$time, na.rm = TRUE) + minutes(10)))
     
+    # Extract TDR data for 30 min before and after haul 
     tdr.plot <- tdr.plot %>% 
       filter(between(time,  
                      min(trawl.text$time, na.rm = TRUE) - minutes(10), 
@@ -441,13 +550,15 @@ if(nrow(tbl.all.new) > 0) {
     plot.tdr <- ggplot() + 
       geom_line(data = tdr.plot,
                 aes(time, depth + 10, colour = loc)) + 
-      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "red",
+      scale_colour_manual(name = "Location", values = c(Footrope = "blue", Kite = "purple",
                                                         Starboard = "magenta", Port = "green"),
                           guide = guide_legend(reverse = TRUE)) +
       geom_hline(yintercept = 0, colour = "gray50") +
       # ylim(min(tdr.plot$depth), 10) +
-      scale_y_continuous(limits = c(min(tdr.plot$depth),12), 
-                         breaks = c(-50, -40, -30, -20, -10, seq(0, 12,4))) +
+      scale_y_continuous(limits = c(-60, 12), 
+                         breaks = c(-60, -50, -40, -30, -20, -10, seq(0, 12,4))) +
+      # scale_y_continuous(limits = c(min(tdr.plot$depth), 12), 
+      #                    breaks = c(-50, -40, -30, -20, -10, seq(0, 12,4))) +
       scale_x_datetime(date_breaks = "5 min", date_labels = "%R") +
       labs(x = "Time (PST)",
            y = "Depth (m)",
@@ -458,26 +569,6 @@ if(nrow(tbl.all.new) > 0) {
             legend.justification   = c(1,0),
             axis.text.x = element_text(angle = 45, vjust = 0.5)) 
     
-    # Add trawl window, if present
-    if (nrow(trawl.window) > 0) {
-      plot.tdr <- plot.tdr + 
-        geom_rect(data = trawl.window,
-                  aes(xmin = equilibriumTime,
-                      xmax = haulBackTime,
-                      ymin = min(tdr.plot$depth, na.rm = TRUE),
-                      ymax = 12),
-                  fill = 'gray70', alpha = 0.5) +
-        geom_rect(data = trawl.window,
-                  aes(xmin = netInWaterTime,
-                      xmax = netOnDeckTime,
-                      ymin = min(tdr.plot$depth, na.rm = TRUE),
-                      ymax = 12), fill = NA,
-                  colour = 'gray50', linetype = "dashed", alpha = 0.5) +
-        geom_text(data = trawl.text,
-                  aes(time, min(tdr.plot$depth, na.rm = TRUE), label = event),
-                  size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1)
-    }
-    
     # Add SOG if present
     if (nrow(trawl.nav) > 0) {
       plot.tdr <- plot.tdr + 
@@ -486,6 +577,49 @@ if(nrow(tbl.all.new) > 0) {
         geom_line(data = trawl.nav,
                   aes(time, SOG),
                   colour = "black") 
+    }
+    
+    # Add TV80 data, if present
+    if(exists("tv80.meas")) {
+      # Extract TV80 data for 30 min before and after haul
+      trawl.tv80 <- tv80.meas %>% 
+        mutate(datetime = with_tz(datetime, tzone = tdr.tz) + hours(-1))  %>%
+        filter(between(datetime,  
+                       min(trawl.text$time, na.rm = TRUE) - minutes(10), 
+                       max(trawl.text$time, na.rm = TRUE) + minutes(10))) %>% 
+        filter(DOR_Depth_Prt < 100, DOR_Depth_Std < 100, VES_Speed < 10)
+      
+      # Add TV80 data to plot
+      if (nrow(trawl.tv80) > 0) {
+        plot.tdr <- plot.tdr + 
+          geom_line(data = trawl.tv80,
+                    aes(datetime, VES_Speed), colour = "gray50", alpha = 0.5) +
+          geom_line(data = trawl.tv80, aes(datetime, -DOR_Depth_Prt), colour = "green") +
+          geom_line(data = trawl.tv80, aes(datetime, -DOR_Depth_Std), colour = "red") 
+      }
+    }
+    
+    # Add trawl window, if present
+    if (nrow(trawl.window) > 0) {
+      plot.tdr <- plot.tdr + 
+        geom_rect(data = trawl.window,
+                  aes(xmin = equilibriumTime,
+                      xmax = haulBackTime,
+                      ymin = -60,
+                      # ymin = min(tdr.plot$depth, na.rm = TRUE),
+                      ymax = 12),
+                  fill = 'gray70', alpha = 0.5) +
+        geom_rect(data = trawl.window,
+                  aes(xmin = netInWaterTime,
+                      xmax = netOnDeckTime,
+                      ymin = -60,
+                      # ymin = min(tdr.plot$depth, na.rm = TRUE),
+                      ymax = 12), fill = NA,
+                  colour = 'gray50', linetype = "dashed", alpha = 0.5) +
+        geom_text(data = trawl.text,
+                  aes(time, -60, label = event),
+                  # aes(time, min(tdr.plot$depth, na.rm = TRUE), label = event),
+                  size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1)
     }
     
     # Save plot
@@ -502,7 +636,6 @@ if(nrow(tbl.all.new) > 0) {
   
 }
 ```
-
 # Plots
 
 Below are TDR data for the last three trawl hauls. **<span style="color: black;">Black</span>** lines are vessel speed over ground (SOG, knots), **<span style="color: red;">red</span>** is kite depth, and **<span style="color: blue;">blue</span>** is footrope depth. The dashed lines indicate the time between net deployment (or net in water) and retrieval (or net on deck), and the shaded **<span style="color: gray50;">gray</span>** region indicates the time during which the net was fishing (equilibrium until haul back).  

@@ -643,17 +643,38 @@ txPal    <- colorFactor(wpt.colors, wpt.types)
 
 # Map casts
 # Add nav data
-i.map.uctd <- i.map %>% 
-  # Add nav data
-  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
-               label = ~leg, group = "Vessel Track") %>% 
+i.map.uctd <- i.map %>%
+  # Enable tile caching
+  enableTileCaching() %>%
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Esri.NatGeoWorldMap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$Esri.OceanBasemap, group = "Esri.OceanBasemap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$Esri.WorldStreetMap, group = "Esri.WorldStreetMap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Esri.WorldImagery",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$OpenStreetMap.Mapnik, group = "OpenStreetMap.Mapnik",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  # Add transects
   addPolylines(data = transects.sf, color = ~txPal(Type),
                weight = 3, opacity = 0.5,
                label = ~label,
                popup = ~popup,
                group = "Transects") %>% 
+  # Add nav data
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") %>% 
   # Add layer controls
   addLayersControl(
+    baseGroups = c("Esri.NatGeoWorldMap", "Esri.OceanBasemap",
+                   "Esri.WorldImagery","Esri.WorldStreetMap","OpenStreetMap.Mapnik"),
     overlayGroups = c("UCTD Casts-Unprocessed", "UCTD Casts", 
                       "Transects","Vessel Track"),
     options = layersControlOptions(collapsed = FALSE))
@@ -687,7 +708,7 @@ i.map.uctd
 
 Descent rate of the UCTD by depth and vessel speed.  
 
-```{r uctd-dZt-plot,out.width="100%",out.height="10in"}
+```{r uctd-dZt-plot,out.width="100%",out.height="6in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -729,7 +750,7 @@ if (exists("all.uctd.casts")) {
 
 The dashed line represent the Loess-smoothed depth profiles.  
 
-```{r uctd-depth-time-plot,out.width="100%",out.height="10in"}
+```{r uctd-depth-time-plot,out.width="100%",out.height="6in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -770,7 +791,7 @@ if (exists("all.uctd.casts")) {
 
 ## Temperature v. Depth plot
 
-```{r uctd-temp-depth-plot,out.width="100%",out.height="10in"}
+```{r uctd-temp-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -806,7 +827,7 @@ if (exists("all.uctd.casts")) {
 
 ## Salinity v. Depth plot
 
-```{r uctd-sal-depth-plot,out.width="100%",out.height="10in"}
+```{r uctd-sal-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -844,7 +865,7 @@ if (exists("all.uctd.casts")) {
 
 ## Sound speed v. Depth plot
 
-```{r uctd-sv-depth-plot,out.width="100%",out.height="10in"}
+```{r uctd-sv-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (save.figs) {
@@ -883,7 +904,7 @@ if (exists("all.uctd.casts")) {
 
 ## Chlorophyll-a v. Depth plot
 
-```{r uctd-chl-depth-plot,out.width="100%",out.height="10in"}
+```{r uctd-chl-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.uctd.casts")) {
   if (length(all.uctd.casts) > 0) {
     if (has_name(all.uctd.casts, "ChlA")) {
@@ -892,20 +913,20 @@ if (exists("all.uctd.casts")) {
         uctd.chl <- ggplot(data = all.uctd.casts, aes(ChlA, Z, group = cast, colour = factor(cast))) + 
           geom_path(alpha = 0.75) +
           xlab("\nChlorophyll-a (ug/L)") + ylab("Depth (m)\n") +
-          scale_x_continuous(limits = c(round(min(all.uctd.casts$ChlA), 0) - 1, 
-                                        round(max(all.uctd.casts$ChlA), 0) + 1),
-                             breaks = seq(round(min(all.uctd.casts$ChlA),0) - 1, 
-                                          round(max(all.uctd.casts$ChlA),0) + 1, 10),
-                             expand = c(0,0)) +  
+          # scale_x_continuous(limits = c(round(min(all.uctd.casts$ChlA), 0) - 1, 
+          #                               round(max(all.uctd.casts$ChlA), 0) + 1),
+          #                    breaks = seq(round(min(all.uctd.casts$ChlA),0) - 1, 
+          #                                 round(max(all.uctd.casts$ChlA),0) + 1, 10),
+          #                    expand = c(0,0)) +  
           scale_y_continuous(limits = c(round(min(all.uctd.casts$Z), digits = -1), 0),
                              breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
                              expand = c(0,0)) + 
-          facet_wrap(~leg, ncol = 2) +
+          facet_wrap(~leg, ncol = 2, scales = "free_x") +
           theme_bw() +
           theme(panel.grid.major = element_line(size = 0.75), 
-                legend.position = "none",
+                legend.position  = "none",
                 strip.background.x = element_blank(),
-                strip.text.x = element_text(face = "bold"))
+                strip.text.x     = element_text(face = "bold"))
         
         # save plot
         ggsave(uctd.chl, file = here("Figs/fig_uctd_ChlA_v_Z.png"))
@@ -1052,16 +1073,37 @@ if (save.figs) {
 # Add nav data
 # Add nav data
 i.map.ctd <- i.map %>% 
-  # Add nav data
-  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
-               label = ~leg, group = "Vessel Track") %>% 
+  # Enable tile caching
+  enableTileCaching() %>%
+  # Add provider tiles; # http://leaflet-extras.github.io/leaflet-providers/preview/index.html
+  addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Esri.NatGeoWorldMap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$Esri.OceanBasemap, group = "Esri.OceanBasemap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$Esri.WorldStreetMap, group = "Esri.WorldStreetMap",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Esri.WorldImagery",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  addProviderTiles(providers$OpenStreetMap.Mapnik, group = "OpenStreetMap.Mapnik",
+                   options = tileOptions(useCache = useCachedTile,
+                                         crossOrigin = useCrossOrigin)) %>%
+  # Add transects
   addPolylines(data = transects.sf, color = ~txPal(Type),
                weight = 3, opacity = 0.5,
                label = ~label,
                popup = ~popup,
                group = "Transects") %>% 
+  # Add nav data
+  addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
+               label = ~leg, group = "Vessel Track") %>% 
   # Add layer controls
   addLayersControl(
+    baseGroups = c("Esri.NatGeoWorldMap", "Esri.OceanBasemap",
+                   "Esri.WorldImagery","Esri.WorldStreetMap","OpenStreetMap.Mapnik"),
     overlayGroups = c("CTD Casts-Unprocessed", "CTD Casts", 
                       "Transects", "Vessel Track"),
     options = layersControlOptions(collapsed = FALSE))
@@ -1126,7 +1168,7 @@ if (save.figs) {
 
 ## Temperature v. Depth plot
 
-```{r ctd-temp-depth-plot,out.width="100%",out.height="10in"}
+```{r ctd-temp-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
@@ -1166,7 +1208,7 @@ if (exists("all.ctd.casts")) {
 
 ## Salinity v. Depth plot
 
-```{r ctd-sal-depth-plot,out.width="100%",out.height="10in"}
+```{r ctd-sal-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
@@ -1204,7 +1246,7 @@ if (exists("all.ctd.casts")) {
 
 ## Sound speed v. Depth plot
 
-```{r ctd-sv-depth-plot,out.width="100%",out.height="10in"}
+```{r ctd-sv-depth-plot,out.width="100%",out.height="6in"}
 if (exists("all.ctd.casts")) {
   if (length(all.ctd.casts) > 0) {
     if (save.figs) {
