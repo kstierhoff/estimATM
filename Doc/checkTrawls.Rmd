@@ -1547,7 +1547,7 @@ if (nrow(catch.comp.errors) > 0) {
 ### Catch weight summary
 #### All catch
 
-Note: log(Total Weight) is presented given large total catches in some hauls.  
+Summary of catch weight by haul (kg), including CPS and all other species weighed.
 
 ```{r plot-weight-summary-all}
 # Format data for plotting
@@ -1588,7 +1588,32 @@ bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasi
 bar.spp <- sort(unique(catch.bar$group))
 
 # Plot catch 
-catch.bar.plot.all <- ggplot(catch.bar, aes(factor(haul), log(totalWeight+1), fill = group)) +
+catch.bar.plot.all <- ggplot(catch.bar, aes(factor(haul), totalWeight, fill = group)) +
+  geom_bar(colour = "black", position = "stack", stat = "identity") + 
+  geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
+  facet_wrap(~leg, scales = "free", ncol = 1) +
+  scale_fill_manual(name = 'Species',
+                    labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
+                    values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
+  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  theme(strip.background.x = element_blank(),
+        strip.text.x       = element_text(face = "bold")) +
+  labs(x = "Haul number", y = "Total Weight (kg)")
+
+ggsave(catch.bar.plot.all, file = here("Figs/fig_catch_weight_summ.png"),
+       width = 12, height = 8)
+
+# Display plot
+catch.bar.plot.all
+```
+
+#### All catch (Log-transformed)
+
+Summary of log-transformed catch weight by haul (log(kg)), including CPS and all other species weighed. Catches are log-transformed so larger catches do not obscure smaller ones.  
+
+```{r plot-weight-summary-all-log}
+# Plot catch 
+catch.bar.plot.all.log <- ggplot(catch.bar, aes(factor(haul), log(totalWeight + 1), fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
   geom_hline(yintercept = log(150), linetype = "dashed", colour = "gray50") +
   facet_wrap(~leg, scales = "free", ncol = 1) +
@@ -1600,18 +1625,18 @@ catch.bar.plot.all <- ggplot(catch.bar, aes(factor(haul), log(totalWeight+1), fi
         strip.text.x       = element_text(face = "bold")) +
   labs(x = "Haul number", y = "log(Total  Weight) (kg)")
 
-ggsave(catch.bar.plot.all, file = here("Figs/fig_catch_weight_leg.png"),
+ggsave(catch.bar.plot.all.log, file = here("Figs/fig_catch_weight_summ_log.png"),
        width = 12, height = 8)
 
 # Display plot
-catch.bar.plot.all
+catch.bar.plot.all.log
 ```
 
 #### CPS only
 
-Note: log(Total Weight) is presented given large total catches in some hauls.  
+Summary of catch weight (CPS only) by haul (kg).
 
-```{r plot-weight-summary}
+```{r plot-weight-summary-cps}
 # Format data for plotting
 catch.bar.cps <- catch.bar %>% 
   filter(group %in% c(cps.spp, "Merluccius productus"))
@@ -1619,9 +1644,9 @@ catch.bar.cps <- catch.bar %>%
 bar.spp.cps <- sort(unique(catch.bar.cps$group))
 
 # Plot catch 
-catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(factor(haul), log(totalWeight + 1), fill = group)) +
+catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(factor(haul), totalWeight, fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
-  geom_hline(yintercept = log(150), linetype = "dashed", colour = "gray50") +
+  geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
   facet_wrap(~leg, scales = "free", ncol = 1) +
   facet_wrap(~leg, scales = "free", ncol = 1) +
   scale_fill_manual(name = 'Species',
@@ -1630,9 +1655,9 @@ catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(factor(haul), log(totalWeight + 
   scale_x_discrete(breaks = seq(0, 500, 2)) +
   theme(strip.background.x = element_blank(),
         strip.text.x       = element_text(face = "bold")) +
-  labs(x = "Haul number", y = "log(Total  Weight) (kg)")
+  labs(x = "Haul number", y = "Total Weight (kg)")
 
-ggsave(catch.bar.plot.cps, file = here("Figs/fig_catch_weight_leg_cps.png"),
+ggsave(catch.bar.plot.cps, file = here("Figs/fig_catch_weight_summ_cps.png"),
        width = 12, height = 8)
 
 # Display plot
