@@ -391,11 +391,11 @@ nasc.pattern.cps       <- c(RL  = "Final 38 kHz CPS_nasc_cps.csv",
                             SD  = "Final 38 kHz CPS_nasc_cps.csv",
                             SH  = "Final 38 kHz CPS_nasc_cps.csv")
 # Regex pattern for identifying krill CSV files
-nasc.pattern.krill     <- c(RL  = "KRILL-Juan Krill Final 120.csv",
-                            LM  = "Krill-Juan Krill Final 120.csv",
-                            LBC = "Krill-Juan Krill Final 120.csv",
-                            SD  = "Krill-Juan Krill Final 120.csv",
-                            SH  = "KRILL-Juan Krill Final 120.csv")
+nasc.pattern.krill     <- c(RL  = "Juan Krill Final 120.csv",
+                            LM  = "Juan Krill Final 120.csv",
+                            LBC = "Juan Krill Final 120.csv",
+                            SD  = "Juan Krill Final 120.csv",
+                            SH  = "Juan Krill Final 120.csv")
 # Regex pattern for identifying nearshore transects
 nasc.pattern.nearshore <- c(RL  = "\\d{3}N",
                             LM  = "\\d{3}N",
