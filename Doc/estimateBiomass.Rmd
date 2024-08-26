@@ -91,18 +91,19 @@ source(here("Doc/settings", prj.settings))
 ```{r user-controls, echo = TRUE}
 # Processing controls (T/F) ---------------------------------------------------
 ### Usually TRUE
-get.db            <- F # Download data from databases (fast; generally TRUE)
-get.nav           <- F # Download primary vessel nav data from ERDDAP
+get.db            <- T # Download data from databases (fast; generally TRUE)
+get.nav           <- T # Download primary vessel nav data from ERDDAP
 nav.source        <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 get.nav.sh        <- F # Download NOAA Ship nav data
-copy.files        <- F # Copy data files to local directory 
+copy.files        <- T # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
+
 
 ### Sometimes FALSE
 do.imap           <- T # Create interactive Leaflet map
@@ -111,11 +112,12 @@ overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
+process.cufes     <- F # Process CUFES data (no CUFES sampling post-2023)
 process.cal       <- T # Process calibration results
 process.ctd       <- T # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
-get.bathy         <- F # Extract ETOPO1 bathymetry data in the survey footprint
+get.bathy         <- T # Extract ETOPO1 bathymetry data in the survey footprint
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
@@ -269,22 +271,6 @@ if (copy.files) {
 }
 ```  
 
-## Get habitat map  
-
-Potential sardine habitat maps for the survey period are downloaded and assembled from the SWFSC website [link](http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat).  
-
-```{r download-habitat-maps}
-if (download.hab) {
-  source(here("Code/plot_sardine_habitat.R"))
-}
-
-if(file.exists(here("Figs/fig_habitat_map.png"))) {
-  include_graphics(here("Figs/fig_habitat_map.png"))
-} else {
-  cat("No sardine habitat map available.")
-}
-```
-
 # Process vessel data  
 
 Vessel (e.g., lat/long, speed-over-ground, heading, etc.) and underway oceanographic data are available for all NOAA FSVs from ERDDAP in "near real time" during surveys (generally with a ~1 d lag, assuming an internet connection is available) or quality-assured (generally after the completion of survey legs). These data are logged continuously and averaged over 1-minute intervals. These data are relatively error-free and adhere to a strict format and are, therefore, more reliably and easily processed than the SCS event log (.elg) files provided to the Chief Scientist following a survey. Date ranges and desired variables are configured in the **`settings*.R`** files, and are used to assemble the URL used to download the data from ERDDAP.
@@ -356,6 +342,22 @@ nav.now <- tail(nav, 1) %>%
   mutate(label = paste("Last position:", time, "UTC"),
          popup = paste0('<b>Vessel name: </b>', survey.vessel, '<br/>',
                         '<b>Last position: </b>', time, ' UTC<br/>'))
+```
+
+## Get habitat map  
+
+Potential sardine habitat maps for the survey period are downloaded and assembled from the SWFSC website [link](http://swfscdata.nmfs.noaa.gov/AST/sardineHabitat).  
+
+```{r download-habitat-maps}
+if (download.hab) {
+  source(here("Code/plot_sardine_habitat.R"))
+}
+
+if(file.exists(here("Figs/fig_habitat_map.png"))) {
+  include_graphics(here("Figs/fig_habitat_map.png"))
+} else {
+  cat("No sardine habitat map available.")
+}
 ```
 
 ```{r configure-base-map, include=FALSE}
@@ -1454,7 +1456,7 @@ if (get.db) {
   haul.all       <- tbl(trawl.con, "Haul") %>% collect()
   lengths.all    <- tbl(trawl.con, "Specimen") %>% collect()
   if (dbExistsTable(trawl.con, "LengthFrequency"))
-      lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
+    lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
   spp.codes      <- tbl(trawl.con, "SpeciesCodes") %>% collect()
   
   # Close database channel
@@ -1464,13 +1466,13 @@ if (get.db) {
   spp.codes$scientificName[spp.codes$species == 161743] <- "Etrumeus teres"
   
   # Save imported database data to .Rdata file
-    if (exists("lengthFreq.all")) {
-      save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
+  if (exists("lengthFreq.all")) {
+    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
          file = here("Data/Trawl/trawl_data.Rdata"))
-    } else {
-      save(catch.all, haul.all, lengths.all, spp.codes,  
+  } else {
+    save(catch.all, haul.all, lengths.all, spp.codes,  
          file = here("Data/Trawl/trawl_data.Rdata"))
-    }
+  }
   
   # Save species codes
   save(spp.codes, file = here("Output/species_codes.Rdata"))
@@ -1635,8 +1637,8 @@ if (survey.name %in% c("2207RL")) {
   
   # The two options that used catch data for 2019 or 2021 to represent catch N of Cape Mendocino
   # was abandoned due to significant differences between results using those two data sets
-
-    # # Get Lasker data from 2021, to replace purse seine catch from Lisa Marie
+  
+  # # Get Lasker data from 2021, to replace purse seine catch from Lisa Marie
   # haul.2021 <- readRDS("C:/KLS/CODE/Github/estimATM/2107RL/Output/haul_info.rds") %>%
   #   # Remove hauls south of northernmost RL trawl from 2022
   #   filter(startLatDecimal >= 40.42) %>%
@@ -1650,12 +1652,12 @@ if (survey.name %in% c("2207RL")) {
   #   filter(startLatDecimal >= 40.42) %>%
   #   mutate(haul = haul + max.haul.rl,
   #          cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1 + max.cluster.rl)
-
+  
   # Combine haul data
   haul <- bind_rows(haul, select(haul.lm.2022, -key.set))
   # haul <- bind_rows(haul, haul.2021)
   # haul <- bind_rows(haul, haul.2019)
-
+  
   # ggplot(haul, aes(startLongDecimal, startLatDecimal, colour = ship)) +
   #   geom_text(aes(label = cluster)) +
   #   coord_map() 
@@ -1806,6 +1808,7 @@ catch <- catch.all %>%
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
+  filter(!presenceAbsenceOnly == "Y") %>%
   inner_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          sample.type = "Trawl")
@@ -1924,7 +1927,7 @@ if (survey.name %in% c("2207RL")) {
   #     key      = paste(haul, scientificName)) %>%
   #   left_join(select(haul, haul, cluster)) %>%
   #   filter(haul %in% hauls.2022)
-
+  
   # Combine catch data from each vessel
   catch <- bind_rows(catch, catch.lm.2022)
   # catch <- bind_rows(catch, catch.2021)
@@ -1935,9 +1938,13 @@ if (survey.name %in% c("2207RL")) {
 saveRDS(catch, file = here("Output/catch_info.rds"))
 
 if (nrow(catch) > 0) {
-  haul.summ.wt <- catch %>%
-    select(haul, cluster, sample.type, scientificName, totalWeight) %>%
-    tidyr::spread(scientificName, totalWeight)
+  haul.summ.wt <- catch %>% 
+    select(haul, cluster, sample.type, scientificName, totalWeight) %>% 
+    pivot_wider(names_from = scientificName, values_from = totalWeight, values_fn = sum, values_fill = 0)
+  
+  # haul.summ.wt <- catch %>%
+  #   select(haul, cluster, sample.type, scientificName, totalWeight) %>%
+  #   tidyr::spread(scientificName, totalWeight)
   
   # Add species with zero total weight
   if (!has_name(haul.summ.wt, "Engraulis mordax"))      {haul.summ.wt$`Engraulis mordax`      <- 0}
@@ -1950,18 +1957,25 @@ if (nrow(catch) > 0) {
   if (!has_name(haul.summ.wt, "Other"))                 {haul.summ.wt$`Other` <- 0}
   
   # Calculate total weight of all CPS species
-  haul.summ.wt <- haul.summ.wt %>%  
-    replace(is.na(.), 0) %>% 
+  haul.summ.wt <- haul.summ.wt %>% 
+    replace(is.na(.), 0) %>%
     mutate(AllCPS = rowSums(select(., -haul, -cluster, -sample.type))) %>%
-    # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
-    rename("Jacksmelt"  = "Atherinopsis californiensis",
-           "PacHerring" = "Clupea pallasii",
-           "Anchovy"    = "Engraulis mordax",
-           "Sardine"    = "Sardinops sagax",
-           "PacMack"    = "Scomber japonicus",
-           "JackMack"   = "Trachurus symmetricus",
-           "RndHerring" = "Etrumeus acuminatus",
-           "Other"      = "Other") 
+    arrange(haul)
+  
+  # haul.summ.wt <- haul.summ.wt %>%  
+  #   replace(is.na(.), 0) %>% 
+  #   mutate(AllCPS = rowSums(select(., -haul, -cluster, -sample.type))) %>%
+  #   # mutate(AllCPS = rowSums(.[, 3:ncol(.)])) %>%
+  #   rename("Jacksmelt"  = "Atherinopsis californiensis",
+  #          "PacHerring" = "Clupea pallasii",
+  #          "Anchovy"    = "Engraulis mordax",
+  #          "Sardine"    = "Sardinops sagax",
+  #          "PacMack"    = "Scomber japonicus",
+  #          "JackMack"   = "Trachurus symmetricus",
+  #          "RndHerring" = "Etrumeus acuminatus",
+  #          "Other"      = "Other") 
+  
+  # RESUME HERE ---------------------------------------
   
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
@@ -1970,12 +1984,15 @@ if (nrow(catch) > 0) {
     summarise_all(list(sum)) %>% 
     mutate(AllCPS = rowSums(select(., -cluster))) %>% 
     right_join(cluster.mid) %>% 
+    rename(any_of(pie.spp)) %>% 
     replace(is.na(.), 0)
   
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
     right_join(haul.mid) %>% 
-    replace(is.na(.), 0)
+    rename(any_of(pie.spp)) %>%
+    replace(is.na(.), 0) %>% 
+    arrange(haul)
   
 } else {
   # Summarize trawl catch by species
@@ -2005,9 +2022,10 @@ if (nrow(catch) > 0) {
 # Prepare catch data for plotting ----------------------------------------------
 # Select and rename trawl data for pie charts
 haul.pie <- haul.summ.wt %>% 
-  select(haul, long, lat, Anchovy, JackMack, 
-         Jacksmelt, Other, PacHerring, PacMack, 
-         RndHerring, Sardine, AllCPS, sample.type) %>% 
+  # select(haul, long, lat, Anchovy, JackMack, 
+  #        Jacksmelt, Other, PacHerring, PacMack, 
+  #        RndHerring, Sardine, AllCPS, sample.type) %>% 
+  select(haul, long, lat, any_of(names(pie.spp)), AllCPS, sample.type) %>%
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   arrange(haul) %>% 
@@ -2021,13 +2039,13 @@ haul.pie <- haul.summ.wt %>%
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
                   'R. herring:', RndHerring, 'kg<br/>',
-                  'Other:', Other, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 cluster.pie <- cluster.summ.wt %>% 
-  select(cluster, long, lat, Anchovy, JackMack, 
-         Jacksmelt, Other, PacHerring, PacMack, 
-         RndHerring, Sardine, AllCPS, sample.type) %>% 
+  # select(cluster, long, lat, Anchovy, JackMack, 
+  #        Jacksmelt, Other, PacHerring, PacMack, 
+  #        RndHerring, Sardine, AllCPS, sample.type) %>%
+  select(cluster, long, lat, any_of(names(pie.spp)), AllCPS, sample.type) %>%
   mutate(bin       = cut(AllCPS, trawl.breaks, include.lowest = TRUE),
          bin.level = as.numeric(bin)) %>% 
   project_df(to = crs.proj) %>% 
@@ -2040,7 +2058,6 @@ cluster.pie <- cluster.summ.wt %>%
                   'P. herring:', PacHerring, 'kg<br/>',
                   'P. mackerel:', PacMack, 'kg<br/>',
                   'R. herring:', RndHerring, 'kg<br/>',
-                  'Other:', Other, 'kg<br/>',
                   'All CPS:', AllCPS, 'kg'))
 
 # Filter for empty trawls
@@ -2453,7 +2470,7 @@ lengths.all <- lengths.all  %>%
 # Append expanded binned lengths, if any
 if (exists("lengths.expanded.final")) {
   lengths.all <- lengths.all %>% 
-  bind_rows(lengths.expanded.final)
+    bind_rows(lengths.expanded.final)
 }
 
 lengths.all <- lengths.all %>% 
@@ -2510,7 +2527,7 @@ lengths.all  <- lengths.all %>%
         convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Etrumeus acuminatus" ~ 
         convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL")))
-    
+
 if ("mantleLength_mm" %in% names(lengths.all)) {
   lengths.all <- lengths.all %>% 
     mutate(totalLength_mm = case_when(
@@ -2669,7 +2686,7 @@ if (survey.name %in% c("2207RL")) {
   #     haul    = haul + max.haul.rl) %>%
   #   # left_join(select(haul, haul, cluster)) %>%
   #   filter(haul %in% hauls.2022)
-
+  
   # Combine length data
   lengths <- bind_rows(lengths, lengths.lm.2022)
   # lengths <- bind_rows(lengths, lengths.2021)
@@ -3037,68 +3054,72 @@ include_graphics(here("Figs/fig_LW_plots.png"))
 During surveys, or for surveys for which CUFES data have not been verified and uploaded to SQL Server, data in SQLite format may be obtained by contacting [Amy Hays](Amy.Hays@NOAA.gov). To import from the SQL Server, a machine ODBC connection must be configured to the CUFES databases on the Estrella server (IP address: 161.55.235.187). To request access to the CUFES database, contact [Ed Weber](Ed.Weber@NOAA.gov). 
 
 ```{r import-cufes-data}
-if (get.db) {
-  if (cufes.source == "SQLite") {
-    # Configure ODBC connection to TRAWL database
-    cufes.filename <- path_file(dir_ls(here("Data/CUFES"), regexp = "*.sqlite"))
-    cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
-    # Create the pointer to the CUFES table
-    cufes.all <- tbl(cufes.con, "cufessqlite") %>% collect()
+if (process.cufes) {
+  if (get.db) {
+    if (cufes.source == "SQLite") {
+      # Configure ODBC connection to TRAWL database
+      cufes.filename <- path_file(dir_ls(here("Data/CUFES"), regexp = "*.sqlite"))
+      cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
+      # Create the pointer to the CUFES table
+      cufes.all <- tbl(cufes.con, "cufessqlite") %>% collect()
+      
+      # Close connection
+      dbDisconnect(cufes.con)  
+    } else if (cufes.source == "SQL") {
+      cufes.con  <- dbConnect(odbc::odbc(), 
+                              Driver = "SQL Server", 
+                              Server = "161.55.235.187", 
+                              Database = "CUFES", 
+                              Trusted_Connection = "True")
+      # Create the pointer to the CUFES table
+      cufes.all <- tbl(cufes.con, "CUFES") %>% collect()
+      
+      # Close connection
+      dbDisconnect(cufes.con)  
+    } else if (cufes.source == "CSV") {
+      # cufes.source = "CSV"
+      cufes.filename <- file.path(here("Data/CUFES", cufes.db.csv))
+      
+      cufes.all <- read_csv(cufes.filename) %>% 
+        mutate(Cruise = as.character(Cruise))
+      
+      if (is.null(cufes.all$Comments)) cufes.all$Comments <- NA_character_
+    }
     
-    # Close connection
-    dbDisconnect(cufes.con)  
-  } else if (cufes.source == "SQL") {
-    cufes.con  <- dbConnect(odbc::odbc(), 
-                            Driver = "SQL Server", 
-                            Server = "161.55.235.187", 
-                            Database = "CUFES", 
-                            Trusted_Connection = "True")
-    # Create the pointer to the CUFES table
-    cufes.all <- tbl(cufes.con, "CUFES") %>% collect()
+    # Read CUFES data
+    cufes.all <- cufes.all %>%
+      # collect() %>% 
+      mutate(
+        Start = case_when(
+          cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+          cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+        Stop = case_when(
+          cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+          cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
+        Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+        Year = year(Start),
+        AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+      filter(between(Start, date(cufes.start), date(cufes.end)),
+             Ship %in% cruise.ship) 
     
-    # Close connection
-    dbDisconnect(cufes.con)  
-  } else if (cufes.source == "CSV") {
-    # cufes.source = "CSV"
-    cufes.filename <- file.path(here("Data/CUFES", cufes.db.csv))
+    if (survey.name %in% c("1507SH")) {
+      cufes.all <- cufes.all %>% 
+        rename(lat = StopLatitude, long = StopLongitude) %>% 
+        project_df(to = crs.proj)
+    } else {
+      cufes.all <- cufes.all %>% 
+        rename(lat = StartLatitude, long = StartLongitude)%>% 
+        project_df(to = crs.proj)
+    }
     
-    cufes.all <- read_csv(cufes.filename) %>% 
-      mutate(Cruise = as.character(Cruise))
-    
-    if (is.null(cufes.all$Comments)) cufes.all$Comments <- NA_character_
-  }
-  
-  # Read CUFES data
-  cufes.all <- cufes.all %>%
-    # collect() %>% 
-    mutate(
-      Start = case_when(
-        cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
-        cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
-      Stop = case_when(
-        cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
-        cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
-      Duration = as.numeric(difftime(Stop, Start, units = "mins")),
-      Year = year(Start),
-      AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
-    filter(between(Start, date(cufes.start), date(cufes.end)),
-           Ship %in% cruise.ship) 
-  
-  if (survey.name %in% c("1507SH")) {
-    cufes.all <- cufes.all %>% 
-      rename(lat = StopLatitude, long = StopLongitude) %>% 
-      project_df(to = crs.proj)
+    # Save imported database data to .Rdata file
+    save(cufes.all, file = here("Data/CUFES/cufes_data.Rdata"))
   } else {
-    cufes.all <- cufes.all %>% 
-      rename(lat = StartLatitude, long = StartLongitude)%>% 
-      project_df(to = crs.proj)
+    # Load previously imported database data
+    load(here("Data/CUFES/cufes_data.Rdata"))
   }
-  
-  # Save imported database data to .Rdata file
-  save(cufes.all, file = here("Data/CUFES/cufes_data.Rdata"))
 } else {
-  # Load previously imported database data
-  load(here("Data/CUFES/cufes_data.Rdata"))
+  print("No CUFES data collected.")
 }
 ```  
 
@@ -3942,7 +3963,7 @@ for (i in unique(lengths$scientificName)) {
 }
 
 # In summer 2022, the clf files for sardine and jack mackerel were adjusted N of Cape Mendocino
-  # Read adjusted files from 
+# Read adjusted files from 
 if (survey.name == "2207RL") {
   cluster.final.sar.adj  <- read_csv(here("Output/cluster_length_frequency_Sardinops sagax_2207RL_JPZ.csv"))
   cluster.final.jack.adj <- read_csv(here("Output/cluster_length_frequency_Trachurus symmetricus_2207RL_JPZ.csv"))
@@ -6131,8 +6152,8 @@ cufes.squid.sf <- cufes %>%
 cufes.ofe.sf <- cufes %>% 
   filter(Density > 0, Species == "OtherFishEggs") %>%
   filter(str_detect(Comments, "Scomber japonicus")|
-         str_detect(Comments, "scomber japonicus")|
-         str_detect(Comments, "S. japonicus")) %>%
+           str_detect(Comments, "scomber japonicus")|
+           str_detect(Comments, "S. japonicus")) %>%
   mutate(
     spp.label = case_when(
       Species == "OtherFishEggs" ~ "Other fish",
@@ -9109,7 +9130,7 @@ param.output <- cal.params %>%
 bm.output <- bm.res %>% 
   pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
   pivot_wider(names_from = Frequency, values_from = value)
- 
+
 # add a column with parameter units
 param.units <- as.data.frame(c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
                                "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
