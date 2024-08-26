@@ -18,7 +18,7 @@ if (!require("pak")) install.packages("pak")
 pacman::p_load(tidyverse, here, fs)
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("kstierhoff/atm")
-# If pacman fails
+# If pacman fails, use pak instead
 # pak::pkg_install("kstierhoff/atm")
 
 # Close any open graphics windows
