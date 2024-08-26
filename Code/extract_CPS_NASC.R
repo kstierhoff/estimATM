@@ -12,11 +12,14 @@ rm(list = ls())
 # To specify file paths by copy/paste from Windows Explorer, put path in r"(PATH)"
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
+if (!require("pak")) install.packages("pak")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse, here, fs)
 # Install and load required packages from Github -------------------------------
 pacman::p_load_gh("kstierhoff/atm")
+# If pacman fails
+# pak::pkg_install("kstierhoff/atm")
 
 # Close any open graphics windows
 graphics.off()

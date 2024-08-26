@@ -1,12 +1,12 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
-process.seine     <- T # Process purse seine data, if present
-process.nearshore <- T # Process near backscatter data; typically TRUE
-estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.seine     <- F # Process purse seine data, if present
+process.nearshore <- F # Process near backscatter data; typically TRUE
+estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
@@ -326,10 +326,10 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL", "LBC", "LM", "SH") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
 nasc.vessels.nearshore <- c("LBC","LM")
-nasc.vessels.krill     <- c("RL", "SH")
+nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
 # Options include 0-100 (by 5), 100, 150, 250, and 350 m.
@@ -662,7 +662,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 5 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
