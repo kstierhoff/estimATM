@@ -113,8 +113,8 @@ overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
 process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
 process.cufes     <- F # Process CUFES data (no CUFES sampling post-2023)
-process.cal       <- T # Process calibration results
-process.ctd       <- T # Process CTD and UCTD casts
+process.cal       <- F # Process calibration results
+process.ctd       <- F # Process CTD and UCTD casts
 copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- T # Extract ETOPO1 bathymetry data in the survey footprint
@@ -3126,81 +3126,85 @@ if (process.cufes) {
 ## Process CUFES data
 
 ```{r process-cufes-data}
-# For Summer 2021, remove CUFES counts from Mexico that include positive sardine eggs
-if (survey.name %in% c("2107RL")) {
-  cufes.all$SardineEggs[date(cufes.all$Start) >= date("2021-10-07")] <- 0
-}
-
-# Convert cufes to long format for plotting
-cufes <- cufes.all %>% 
-  select(
-    SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
-    SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
-    Comments) %>%
-  gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
-         -lat, -long, -X, -Y, -Duration, -Comments) %>% 
-  mutate(Density = Counts/Duration/0.64,
-         # Create bins for defining point size in NASC plots
-         bin = cut(Density, cufes.breaks, include.lowest = T),
-         bin.level = as.numeric(bin)) %>% 
-  left_join(select(cufes.all, SampleNumber, Start, Stop)) 
-
-if (survey.name %in% c("2107RL")) {
-  # Import and format CUFES data from Carranza
-  cufes.jcf.all <- read_csv(here("Data/CUFES/cufes_jcfinp2110_rev.csv")) %>% 
-    mutate(Start = with_tz(dmy_hms(paste(date, startLocalTime), tz = "America/Los_Angeles"), tzone = "UTC"),
-           Stop  = with_tz(dmy_hms(paste(date, stopLocalTime), tz = "America/Los_Angeles"), tzone = "UTC"),
-           Ship  = "JCF",
-           Cruise = as.character(cruise.name),
-           Duration = as.numeric(difftime(Stop, Start, units = "mins")),
-           Year = year(Start),
-           AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
-    rename(lat = startLatDecimal,
-           long = startLongDecimal) %>% 
-    project_df(to = crs.proj) 
+if (process.cufes) {
+  # For Summer 2021, remove CUFES counts from Mexico that include positive sardine eggs
+  if (survey.name %in% c("2107RL")) {
+    cufes.all$SardineEggs[date(cufes.all$Start) >= date("2021-10-07")] <- 0
+  }
   
-  # Convert to long form
-  cufes.jcf <- cufes.jcf.all %>% 
+  # Convert cufes to long format for plotting
+  cufes <- cufes.all %>% 
     select(
       SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
       SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
-      Comments) %>% 
+      Comments) %>%
     gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
            -lat, -long, -X, -Y, -Duration, -Comments) %>% 
     mutate(Density = Counts/Duration/0.64,
            # Create bins for defining point size in NASC plots
            bin = cut(Density, cufes.breaks, include.lowest = T),
            bin.level = as.numeric(bin)) %>% 
-    left_join(select(cufes.jcf.all, SampleNumber, Start, Stop))
+    left_join(select(cufes.all, SampleNumber, Start, Stop)) 
   
-  # Combine with CUFES data from Lasker
-  cufes     <- bind_rows(cufes, cufes.jcf)
-  cufes.all <- bind_rows(cufes.all, cufes.jcf.all)
+  if (survey.name %in% c("2107RL")) {
+    # Import and format CUFES data from Carranza
+    cufes.jcf.all <- read_csv(here("Data/CUFES/cufes_jcfinp2110_rev.csv")) %>% 
+      mutate(Start = with_tz(dmy_hms(paste(date, startLocalTime), tz = "America/Los_Angeles"), tzone = "UTC"),
+             Stop  = with_tz(dmy_hms(paste(date, stopLocalTime), tz = "America/Los_Angeles"), tzone = "UTC"),
+             Ship  = "JCF",
+             Cruise = as.character(cruise.name),
+             Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+             Year = year(Start),
+             AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+      rename(lat = startLatDecimal,
+             long = startLongDecimal) %>% 
+      project_df(to = crs.proj) 
+    
+    # Convert to long form
+    cufes.jcf <- cufes.jcf.all %>% 
+      select(
+        SampleNumber, Year, Ship, Cruise, lat, long, X, Y, Duration, 
+        SardineEggs, AnchovyEggs, JackMackerelEggs, SquidEggs, HakeEggs, OtherFishEggs,
+        Comments) %>% 
+      gather(Species, Counts, -SampleNumber, -Year, -Ship, -Cruise, 
+             -lat, -long, -X, -Y, -Duration, -Comments) %>% 
+      mutate(Density = Counts/Duration/0.64,
+             # Create bins for defining point size in NASC plots
+             bin = cut(Density, cufes.breaks, include.lowest = T),
+             bin.level = as.numeric(bin)) %>% 
+      left_join(select(cufes.jcf.all, SampleNumber, Start, Stop))
+    
+    # Combine with CUFES data from Lasker
+    cufes     <- bind_rows(cufes, cufes.jcf)
+    cufes.all <- bind_rows(cufes.all, cufes.jcf.all)
+    
+    # ggplot(cufes, aes(long, lat, colour = Ship)) + geom_point() + coord_map()
+  }
   
-  # ggplot(cufes, aes(long, lat, colour = Ship)) + geom_point() + coord_map()
+  # Select CUFES data from CPS
+  cufes.plot <- cufes %>% 
+    filter(Density > 0, Species %in% cufes.plot.spp) %>%
+    arrange(desc(Density))
+  
+  # Select CUFES sample with zero density for plotting
+  cufes.neg <- filter(cufes.all, AllEggs == 0) %>%
+    filter(Cruise %in% cruise.name,
+           Ship %in% cufes.vessels,
+           AllEggs == 0, !is.na(Duration)) %>%
+    mutate(bin.level = 1) %>% 
+    select(X, Y, SampleNumber)
+  
+  # Identify bad CUFES samples
+  cufes.bad <- filter(cufes.all, Duration <= 0)
+  
+  save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
+  
+  # Write CUFES data from current survey to CSV
+  write.csv(cufes, file = here("Output/cufes_data.csv"), 
+            row.names = FALSE, quote = FALSE)
+} else {
+  print("No CUFES data to process.")
 }
-
-# Select CUFES data from CPS
-cufes.plot <- cufes %>% 
-  filter(Density > 0, Species %in% cufes.plot.spp) %>%
-  arrange(desc(Density))
-
-# Select CUFES sample with zero density for plotting
-cufes.neg <- filter(cufes.all, AllEggs == 0) %>%
-  filter(Cruise %in% cruise.name,
-         Ship %in% cufes.vessels,
-         AllEggs == 0, !is.na(Duration)) %>%
-  mutate(bin.level = 1) %>% 
-  select(X, Y, SampleNumber)
-
-# Identify bad CUFES samples
-cufes.bad <- filter(cufes.all, Duration <= 0)
-
-save(cufes.bad, file = here("Output/cufes_bad.Rdata"))
-
-# Write CUFES data from current survey to CSV
-write.csv(cufes, file = here("Output/cufes_data.csv"), 
-          row.names = FALSE, quote = FALSE)
 ```  
 
 ## Map CUFES egg densities 
@@ -3208,18 +3212,22 @@ write.csv(cufes, file = here("Output/cufes_data.csv"),
 (ref:cufes-egg-densities) Egg densities (eggs m^-3^) for anchovy, jack mackerel, and sardine from the CUFES. Crosses indicate CUFES samples with no eggs from any CPS species. Point size indicates egg density and point color indicates species.
 
 ```{r map-cufes-egg-density,fig.cap='(ref:cufes-egg-densities)'}
-if (save.figs) {
-  # Plot CUFES for sardine, anchovy, and jack mackerel -------------------------  
-  source(here("Code/plot_cufes.R"))
+if (process.cufes) {
+  if (save.figs) {
+    # Plot CUFES for sardine, anchovy, and jack mackerel -------------------------  
+    source(here("Code/plot_cufes.R"))
+    
+    save(cufes.density.all, cufes.density.facet,
+         file = here("Output/cufes_egg_density_maps.Rdata"))
+    
+  } else {
+    load(here("Output/cufes_egg_density_maps.Rdata"))
+  }
   
-  save(cufes.density.all, cufes.density.facet,
-       file = here("Output/cufes_egg_density_maps.Rdata"))
-  
+  include_graphics(here("Figs/fig_cufes_egg_density.png"))
 } else {
-  load(here("Output/cufes_egg_density_maps.Rdata"))
+  print("No CUFES data to display")
 }
-
-include_graphics(here("Figs/fig_cufes_egg_density.png"))
 ```  
 
 ## Combine backscatter, CUFES, and species proportion plots  
@@ -3229,25 +3237,48 @@ include_graphics(here("Figs/fig_cufes_egg_density.png"))
 ```{r nasc-cufes-trawl-wt,fig.cap='(ref:nasc-cufes-trawl-wt)'}
 if (save.figs) {
   # Combine backscatter, CUFES, and trawl maps
-  nasc.cufes.trawl.plot      <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
-                                          nrow = 1, labels = c("a)", "b)", "c)"))
+  if (exists("nasc.map.cps") & exists("cufes.density.all") & exists("trawl.pie.haul.wt")) {
+    nasc.cufes.haul.wt      <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
+                                         nrow = 1, labels = c("a)", "b)", "c)"))
+    
+    nasc.cufes.haul.wt.long <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
+                                         ncol = 1, labels = c("a)", "b)", "c)"))
+    # Save maps
+    ggsave(nasc.cufes.haul.wt, 
+           filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
+           width = map.width*3, height = map.height)
+    
+    ggsave(nasc.cufes.haul.wt.long, 
+           filename = here("Figs/fig_nasc_cufes_haul_wt_long.png"),
+           width = map.width, height = map.height*3)
+    
+    save(nasc.cufes.haul.wt, nasc.cufes.haul.wt.long, 
+         file = here("Output/nasc_cufes_trawl_map.Rdata"))
+    
+    include_graphics(here("Figs/fig_nasc_cufes_haul_wt_long.png")) 
+  }
   
-  nasc.cufes.trawl.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, trawl.pie.haul.wt,
-                                          ncol = 1, labels = c("a)", "b)", "c)"))
-  # Save maps
-  ggsave(nasc.cufes.trawl.plot, 
-         filename = here("Figs/fig_nasc_cufes_haul_wt.png"),
-         width = map.width*3, height = map.height)
-  
-  ggsave(nasc.cufes.trawl.plot.long, 
-         filename = here("Figs/fig_nasc_cufes_haul_wt_long.png"),
-         width = map.width, height = map.height*3)
-  
-  save(nasc.cufes.trawl.plot, nasc.cufes.trawl.plot.long, 
-       file = here("Output/nasc_cufes_trawl_map.Rdata"))
+  # Combine backscatter and trawl
+  if (exists("nasc.map.cps") & exists("trawl.pie.haul.wt")) {
+    nasc.haul.wt <- plot_grid(nasc.map.cps, trawl.pie.haul.wt, 
+                              nrow = 1, labels = c("a)", "b)")) 
+    
+    nasc.haul.wt.long <- plot_grid(nasc.map.cps, trawl.pie.haul.wt, 
+                                   ncol = 1, labels = c("a)", "b)")) 
+    
+    # Save composite plot
+    ggsave(nasc.haul.wt,
+           filename = here("Figs/fig_nasc_haul_wt.png"),
+           width = map.width*2, height = map.height) 
+    
+    # Save composite plot
+    ggsave(nasc.haul.wt.long,
+           filename = here("Figs/fig_nasc_haul_wt_long.png"),
+           width = map.width*2, height = map.height*3) 
+    
+    include_graphics(here("Figs/fig_nasc_haul_wt_long.png")) 
+  }  
 }
-
-include_graphics(here("Figs/fig_nasc_cufes_haul_wt_long.png"))
 ```
 
 # Calculate target strengths (TS) from lengths 
@@ -3798,33 +3829,41 @@ acoustic.prop.cluster.final <- base.map +
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 if (save.figs) {
-  nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
-                                         nrow = 1, labels = c("a)", "b)", "c)"))
-  
-  nasc.cufes.prop.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
-                                         ncol = 1, labels = c("a)", "b)", "c)"))
-  
-  # Plot trawl clusters and acoustic proportions
-  nasc.trawl.acoustic.prop <- plot_grid(nasc.cluster.plot, acoustic.prop.cluster.final,
-                                        nrow = 1, labels = c("a)", "b)"))
-  # Save maps
-  ggsave(nasc.cufes.prop.plot, 
-         filename = here("Figs/fig_nasc_cufes_acoustic_cluster.png"),
-         width = map.width*3, height = map.height)
-  
-  ggsave(nasc.cufes.prop.plot.long, 
-         filename = here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"),
-         width = map.width, height = map.height*3)  
-  
-  ggsave(nasc.trawl.acoustic.prop, 
-         filename = here("Figs/fig_nasc_acoustic_cluster.png"),
-         width = map.width*2, height = map.height)
-  
-  save(nasc.cufes.prop.plot, nasc.cufes.prop.plot.long, nasc.trawl.acoustic.prop,
-       file = here("Output/nasc_cufes_prop_map.Rdata"))
+  if (exists("nasc.map.cps") & exists("cufes.density.all") & exists("trawl.pie.haul.wt")) {
+    nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
+                                           nrow = 1, labels = c("a)", "b)", "c)"))
+    
+    nasc.cufes.prop.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
+                                           ncol = 1, labels = c("a)", "b)", "c)"))
+    
+    # Save maps
+    ggsave(nasc.cufes.prop.plot, 
+           filename = here("Figs/fig_nasc_cufes_acoustic_cluster.png"),
+           width = map.width*3, height = map.height)
+    
+    ggsave(nasc.cufes.prop.plot.long, 
+           filename = here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"),
+           width = map.width, height = map.height*3)  
+    
+    save(nasc.cufes.prop.plot, nasc.cufes.prop.plot.long, nasc.trawl.acoustic.prop,
+         file = here("Output/nasc_cufes_prop_map.Rdata"))
+    
+    include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"))
+  } else {
+    # Plot trawl clusters and acoustic proportions
+    nasc.trawl.acoustic.prop <- plot_grid(nasc.cluster.plot, acoustic.prop.cluster.final,
+                                          nrow = 1, labels = c("a)", "b)"))
+    
+    ggsave(nasc.trawl.acoustic.prop, 
+           filename = here("Figs/fig_nasc_acoustic_cluster.png"),
+           width = map.width*2, height = map.height)
+    
+    save(nasc.trawl.acoustic.prop,
+         file = here("Output/nasc_prop_map.Rdata"))
+    
+    include_graphics(here("Figs/fig_nasc_acoustic_cluster.png")) 
+  }
 }
-
-include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"))
 ```
 
 ## Create final cluster-length-frequency files  
@@ -5624,7 +5663,7 @@ if (exists("all.uctd.casts")) {
                        breaks = seq(round(min(all.uctd.casts$Z), digits = -1), 0, 25),
                        expand = c(0,0)) +
     theme_bw() +
-    theme(panel.grid.major = element_line(size = 0.75),
+    theme(panel.grid.major = element_line(linewidth = 0.75),
           legend.position  = "none") +
     ggtitle("Temperature")
   
@@ -5644,7 +5683,7 @@ if (exists("all.uctd.casts")) {
                        breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
                        expand = c(0,0)) + 
     theme_bw() +
-    theme(panel.grid.major = element_line(size = 0.75),
+    theme(panel.grid.major = element_line(linewidth = 0.75),
           legend.position  = "none") +
     ggtitle("Salinity")
   
@@ -5664,7 +5703,7 @@ if (exists("all.uctd.casts")) {
                        breaks = seq(round(min(all.uctd.casts$Z),digits = -1),0,25),
                        expand = c(0,0)) + 
     theme_bw() +
-    theme(panel.grid.major = element_line(size = 0.75),
+    theme(panel.grid.major = element_line(linewidth = 0.75),
           legend.position  = "none") +
     ggtitle("Sound speed")
   
@@ -5874,7 +5913,7 @@ if (exists("all.ctd.casts")) {
                          breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
                          expand = c(0,0)) +
       theme_bw() +
-      theme(panel.grid.major = element_line(size = 0.75),
+      theme(panel.grid.major = element_line(linewidth = 0.75),
             legend.position  = "none") +
       ggtitle("Temperature")
     
@@ -5894,7 +5933,7 @@ if (exists("all.ctd.casts")) {
                          breaks = seq(round(min(all.ctd.casts$Z),digits = -1), 0, 25),
                          expand = c(0,0)) + 
       theme_bw() +
-      theme(panel.grid.major = element_line(size = 0.75),
+      theme(panel.grid.major = element_line(linewith = 0.75),
             legend.position  = "none") +
       ggtitle("Salinity")
     
@@ -5914,7 +5953,7 @@ if (exists("all.ctd.casts")) {
                          breaks = seq(round(min(all.ctd.casts$Z),digits = -1),0,25),
                          expand = c(0,0)) + 
       theme_bw() +
-      theme(panel.grid.major = element_line(size = 0.75),
+      theme(panel.grid.major = element_line(linewidth = 0.75),
             legend.position  = "none") +
       ggtitle("Sound speed")
     
@@ -6126,50 +6165,52 @@ nasc.super.clusters <- nasc.super.clusters %>%
   left_join(select(cluster.pie, cluster, label, popup))
 
 # Convert CUFES data to sf -----------------------------------
-cufes.sf <- cufes %>% 
-  filter(Density > 0, Species %in% cufes.plot.spp) %>%
-  mutate(
-    spp.label = case_when(
-      Species == "SardineEggs" ~ "Sardine",
-      Species == "AnchovyEggs" ~ "Anchovy",
-      Species == "JackMackerelEggs"~ "Jack mackerel",
-      TRUE ~ Species),
-    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>%
-  arrange(desc(Density))
-
-cufes.squid.sf <- cufes %>% 
-  filter(Density > 0, Species == "SquidEggs") %>%
-  mutate(
-    spp.label = case_when(
-      Species == "SquidEggs" ~ "Squid",
-      TRUE ~ Species),
-    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-cufes.ofe.sf <- cufes %>% 
-  filter(Density > 0, Species == "OtherFishEggs") %>%
-  filter(str_detect(Comments, "Scomber japonicus")|
-           str_detect(Comments, "scomber japonicus")|
-           str_detect(Comments, "S. japonicus")) %>%
-  mutate(
-    spp.label = case_when(
-      Species == "OtherFishEggs" ~ "Other fish",
-      TRUE ~ Species),
-    label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
-    popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup><br/>", 
-                  '</b>Comment:</b>', Comments)) %>%
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-# Convert negative CUFES samples to sf; CRS - 4326
-cufes.neg.sf <- cufes %>% 
-  filter(Density == 0, Species %in% cufes.plot.spp) %>%
-  mutate(
-    label = paste(round(Density, 1), " eggs/cubic m", sep = ""),
-    popup = label) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog)
+if (process.cufes) {
+  cufes.sf <- cufes %>% 
+    filter(Density > 0, Species %in% cufes.plot.spp) %>%
+    mutate(
+      spp.label = case_when(
+        Species == "SardineEggs" ~ "Sardine",
+        Species == "AnchovyEggs" ~ "Anchovy",
+        Species == "JackMackerelEggs"~ "Jack mackerel",
+        TRUE ~ Species),
+      label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+      popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>%
+    arrange(desc(Density))
+  
+  cufes.squid.sf <- cufes %>% 
+    filter(Density > 0, Species == "SquidEggs") %>%
+    mutate(
+      spp.label = case_when(
+        Species == "SquidEggs" ~ "Squid",
+        TRUE ~ Species),
+      label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+      popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup>")) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+  
+  cufes.ofe.sf <- cufes %>% 
+    filter(Density > 0, Species == "OtherFishEggs") %>%
+    filter(str_detect(Comments, "Scomber japonicus")|
+             str_detect(Comments, "scomber japonicus")|
+             str_detect(Comments, "S. japonicus")) %>%
+    mutate(
+      spp.label = case_when(
+        Species == "OtherFishEggs" ~ "Other fish",
+        TRUE ~ Species),
+      label = paste(spp.label, " eggs: ", round(Density, 1), " /cubic m", sep = ""),
+      popup = paste('<b>Species:', spp.label, '</b><br/>', round(Density, 1),"eggs m<sup>3</sup><br/>", 
+                    '</b>Comment:</b>', Comments)) %>%
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+  
+  # Convert negative CUFES samples to sf; CRS - 4326
+  cufes.neg.sf <- cufes %>% 
+    filter(Density == 0, Species %in% cufes.plot.spp) %>%
+    mutate(
+      label = paste(round(Density, 1), " eggs/cubic m", sep = ""),
+      popup = label) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog)
+}
 
 # Convert biomass density to sf ------------------------------
 nasc.density.sf <- nasc.density.plot.all %>% 
@@ -6234,8 +6275,10 @@ all.mpa.types <- as.factor(c(unique(as.character(ca_mpas$Type)),
 
 mpaPal  <- colorFactor(topo.colors(10), all.mpa.types)
 
-# Create color pallette for CUFES
-cufesPal <- colorFactor(cufes.colors, cufes.sf$Species)
+if (process.cufes) {
+  # Create color pallette for CUFES
+  cufesPal <- colorFactor(cufes.colors, cufes.sf$Species)  
+}
 
 # Create color pallette for CPS species
 cpsPal <- colorFactor(
@@ -6511,46 +6554,49 @@ if (do.imap) {
                 group = "Biomass (R. herring)")
   
   # Add CUFES data
-  if (nrow(cufes.neg.sf) > 0)
-    i.map <- i.map %>% 
-      addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
-                       fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
-                       group = "CUFES (Negative)")
+  if (process.cufes) {
+    if (nrow(cufes.neg.sf) > 0)
+      i.map <- i.map %>% 
+        addCircleMarkers(data = cufes.neg.sf, radius = ~bin.level*2, color = "#000414", stroke = FALSE, weight = 1,
+                         fillOpacity = 0.50, fillColor =  "#000414", label = ~htmlEscape(SampleNumber),
+                         group = "CUFES (Negative)")
+    
+    if (nrow(filter(cufes.sf, Species == "AnchovyEggs")) > 0)
+      i.map <- i.map %>% 
+        addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                         popup = ~popup, group = "CUFES Egg Density")
+    
+    if (nrow(filter(cufes.sf, Species == "JackMackerelEggs")) > 0)
+      i.map <- i.map %>% 
+        addCircleMarkers(data = filter(cufes.sf, Species == "JackMackerelEggs"),
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                         popup = ~popup, group = "CUFES Egg Density")
+    
+    if (nrow(filter(cufes.sf, Species == "SardineEggs")) > 0)
+      i.map <- i.map %>% 
+        addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
+                         popup = ~popup, group = "CUFES Egg Density")
+    
+    if (nrow(cufes.squid.sf) > 0)
+      i.map <- i.map %>% 
+        addCircleMarkers(data = cufes.squid.sf,
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
+                         popup = ~popup, group = "CUFES Egg Density-Squid")
+    
+    if (nrow(cufes.ofe.sf) > 0)
+      i.map <- i.map %>% 
+        addCircleMarkers(data = cufes.ofe.sf,
+                         radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
+                         fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
+                         popup = ~popup, group = "CUFES Egg Density-Other")  
+  }
   
-  if (nrow(filter(cufes.sf, Species == "AnchovyEggs")) > 0)
-    i.map <- i.map %>% 
-      addCircleMarkers(data = filter(cufes.sf, Species == "AnchovyEggs"),
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                       popup = ~popup, group = "CUFES Egg Density")
-  
-  if (nrow(filter(cufes.sf, Species == "JackMackerelEggs")) > 0)
-    i.map <- i.map %>% 
-      addCircleMarkers(data = filter(cufes.sf, Species == "JackMackerelEggs"),
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                       popup = ~popup, group = "CUFES Egg Density")
-  
-  if (nrow(filter(cufes.sf, Species == "SardineEggs")) > 0)
-    i.map <- i.map %>% 
-      addCircleMarkers(data = filter(cufes.sf, Species == "SardineEggs"),
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor =  ~cufesPal(Species), label = ~label,
-                       popup = ~popup, group = "CUFES Egg Density")
-  
-  if (nrow(cufes.squid.sf) > 0)
-    i.map <- i.map %>% 
-      addCircleMarkers(data = cufes.squid.sf,
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor =  "#FFFFFF", label = ~label,
-                       popup = ~popup, group = "CUFES Egg Density-Squid")
-  
-  if (nrow(cufes.ofe.sf) > 0)
-    i.map <- i.map %>% 
-      addCircleMarkers(data = cufes.ofe.sf,
-                       radius = ~bin.level*2, color = "#000414", stroke = TRUE, weight = 1,
-                       fillOpacity = 0.75, fillColor =  pac.mack.color, label = ~label,
-                       popup = ~popup, group = "CUFES Egg Density-Other") 
   
   # Add backscatter data
   if (nrow(filter(nasc.plot.sf, NASC < 200)) > 0)
@@ -9061,124 +9107,130 @@ if (save.figs) {
 }
 ```  
 
-```{r process-cal,eval=FALSE}
-# Get results from current survey ---------------------------------------------
-cal.res <- cal.res.all %>% 
-  mutate(cal_date = mdy(cal_date)) %>% 
-  filter(between(cal_date,
-                 ymd(cal.plot.date) - days(cal.window),
-                 ymd(cal.plot.date) + days(cal.window))) %>% 
-  arrange(txdr_freq)
-
-
-# create data frame for calibration parameters
-cal.params <- cal.res %>% 
-  select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
-         txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
-         txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
-         txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
-         txdr_alon_oa,txdr_athw_oa,target_ts) 
-
-# add noise estimates
-# if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
-if (is.na(cal.noise[survey.vessel.primary])) { 
-  cal.params$noise <- rep("N/A", nrow(cal.res))
-}else{
-  cal.params$noise <- unlist(cal.noise[cal.vessels])
+```{r process-cal}
+if (exists("cal.res.all")) {
+  # Get results from current survey ---------------------------------------------
+  cal.res <- cal.res.all %>% 
+    mutate(cal_date = mdy(cal_date)) %>% 
+    filter(between(cal_date,
+                   ymd(cal.plot.date) - days(cal.window),
+                   ymd(cal.plot.date) + days(cal.window))) %>% 
+    arrange(txdr_freq)
+  
+  
+  # create data frame for calibration parameters
+  cal.params <- cal.res %>% 
+    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
+           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
+           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
+           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
+           txdr_alon_oa,txdr_athw_oa,target_ts) 
+  
+  # add noise estimates
+  # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
+  if (is.na(cal.noise[survey.vessel.primary])) { 
+    cal.params$noise <- rep("N/A", nrow(cal.res))
+  }else{
+    cal.params$noise <- unlist(cal.noise[cal.vessels])
+  }
+  
+  # create data frame for beam model results
+  bm.res <- cal.res %>% 
+    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
+           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
+  
+  # create a data frame for echosounder settings
+  echo.settings <- cal.res %>% 
+    select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
+  
+  # create names for cal parameters and beam model results
+  names(cal.params) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
+                         "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
+                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
+                         "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
+                         "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
+                         "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
+                         "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
+                         "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
+                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                         "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
+                         "Theoretical TS ($TS_\\mathrm{theory}$)",
+                         "Ambient Noise")
+  
+  names(bm.res) <- c("Frequency","On-axis Gain ($G_0$)",
+                     "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
+                     "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
+                     "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
+                     "Angle Offset Along. ($\\alpha_{0}$)",
+                     "Angle Offset Athw. ($\\beta_{0}$)")
+  
+  names(echo.settings) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
+                            "Bandwidth (Hz)","Transmit Power (W)",
+                            "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
+  
+  # cast output by frequency and transducer model number
+  param.output <- cal.params %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  bm.output <- bm.res %>% 
+    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
+    pivot_wider(names_from = Frequency, values_from = value)
+  
+  # add a column with parameter units
+  param.units <- as.data.frame(c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
+                                 "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
+                                 "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
+  
+  # add a column with beam model units
+  bm.units <- as.data.frame(c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
+  
+  # add label for first column
+  names(param.units) <- "Units"
+  names(bm.units)    <- "Units"
+  
+  # add units to output and arrange columns
+  param.output <- bind_cols(param.output, param.units) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  bm.output <- bind_cols(bm.output, bm.units) %>% 
+    select(variable, Units, everything()) %>% 
+    rename("Frequency ($f$, kHz)" = variable)
+  
+  # combine results data frames
+  all.output <- rbind(param.output, bm.output) %>% 
+    rename(" " = "Frequency ($f$, kHz)")
+  
+  # save output to .Rdata and CSV
+  save(all.output,
+       file = here("Output/cal_output_table.Rdata"))
+  
+  write.csv(all.output,
+            file = here("Output/cal_output_table.csv"), 
+            quote = FALSE, row.names = FALSE)
 }
-
-# create data frame for beam model results
-bm.res <- cal.res %>% 
-  select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
-         bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
-
-# create a data frame for echosounder settings
-echo.settings <- cal.res %>% 
-  select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
-
-# create names for cal parameters and beam model results
-names(cal.params) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
-                       "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
-                       "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
-                       "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
-                       "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
-                       "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
-                       "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
-                       "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
-                       "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                       "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                       "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
-                       "Theoretical TS ($TS_\\mathrm{theory}$)",
-                       "Ambient Noise")
-
-names(bm.res) <- c("Frequency","On-axis Gain ($G_0$)",
-                   "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
-                   "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                   "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                   "Angle Offset Along. ($\\alpha_{0}$)",
-                   "Angle Offset Athw. ($\\beta_{0}$)")
-
-names(echo.settings) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
-                          "Bandwidth (Hz)","Transmit Power (W)",
-                          "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
-
-# cast output by frequency and transducer model number
-param.output <- cal.params %>% 
-  pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
-  pivot_wider(names_from = Frequency, values_from = value)
-
-bm.output <- bm.res %>% 
-  pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
-  pivot_wider(names_from = Frequency, values_from = value)
-
-# add a column with parameter units
-param.units <- as.data.frame(c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
-                               "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
-                               "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
-
-# add a column with beam model units
-bm.units <- as.data.frame(c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
-
-# add label for first column
-names(param.units) <- "Units"
-names(bm.units)    <- "Units"
-
-# add units to output and arrange columns
-param.output <- bind_cols(param.output, param.units) %>% 
-  select(variable, Units, everything()) %>% 
-  rename("Frequency ($f$, kHz)" = variable)
-
-bm.output <- bind_cols(bm.output, bm.units) %>% 
-  select(variable, Units, everything()) %>% 
-  rename("Frequency ($f$, kHz)" = variable)
-
-# combine results data frames
-all.output <- rbind(param.output, bm.output) %>% 
-  rename(" " = "Frequency ($f$, kHz)")
-
-# save output to .Rdata and CSV
-save(all.output,
-     file = here("Output/cal_output_table.Rdata"))
-
-write.csv(all.output,
-          file = here("Output/cal_output_table.csv"), 
-          quote = FALSE, row.names = FALSE)
 ```
 
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80).
 
-```{r cal-results, results='asis',eval=FALSE}
-if (doc.type == "docx") {
-  # create kable object (for Word)
-  pander(all.output)
+```{r cal-results, results='asis'}
+if (exists("all.output")) {
+  if (doc.type == "docx") {
+    # create kable object (for Word)
+    pander(all.output)
+  } else {
+    # print LaTeX table for HTML or PDF
+    kable(all.output, format = knitr.format, align = c("l","l",rep("c",ncol(all.output) - 2)),
+          booktabs = T, escape = FALSE,
+          caption = '(ref:cal-results)') %>% 
+      kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>% 
+      row_spec(18, hline_after = T) %>% 
+      add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
+  }  
 } else {
-  # print LaTeX table for HTML or PDF
-  kable(all.output, format = knitr.format, align = c("l","l",rep("c",ncol(all.output) - 2)),
-        booktabs = T, escape = FALSE,
-        caption = '(ref:cal-results)') %>% 
-    kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>% 
-    row_spec(18, hline_after = T) %>% 
-    add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
+  print("No calibration results to display.")
 }
 ```  
 

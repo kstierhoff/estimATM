@@ -278,6 +278,11 @@ pie.cols <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "JackMac
                  "Scomber japonicus" = "PacMack", "Etrumeus acuminatus" = "RndHerring", 
                  "Sardinops sagax" = "Sardine")
 
+pie.cols.prop <- c("Engraulis mordax" = "prop.anch", "Trachurus symmetricus" = "prop.jack", 
+                   "Atherinopsis californiensis" = "prop.jsmelt", "Clupea pallasii" = "prop.her", 
+                   "Scomber japonicus" = "prop.mack", "Etrumeus acuminatus" = "prop.rher", 
+                   "Sardinops sagax" = "prop.sar")
+
 # Species labels
 pie.labs <- c("Engraulis mordax" = "Anchovy", "Trachurus symmetricus" = "J. Mackerel", 
                 "Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring", 
@@ -681,7 +686,7 @@ nIndiv.min    <- 1
 nClusters.min <- 1
 
 # Use manually defined strata?
-stratify.manually    <- TRUE
+stratify.manually    <- FALSE
 stratify.manually.os <- FALSE
 stratify.manually.ns <- FALSE
 
