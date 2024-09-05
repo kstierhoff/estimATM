@@ -608,7 +608,7 @@ cufes.vessels          <- c("RL")
 trawl.source           <- "Access"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
-trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
+trawl.performance      <- c("Aborted") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
 
 # Location of trawl Access database
