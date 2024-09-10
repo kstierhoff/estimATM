@@ -582,7 +582,7 @@ length.min <- 1 # Minimum length bin for length frequencies
 length.max <- data.frame("species" = c("Clupea pallasii","Engraulis mordax",
                                        "Sardinops sagax", "Scomber japonicus",
                                        "Trachurus symmetricus","Etrumeus acuminatus"),
-                         "sl" = c(30,20,30,40,60,30))
+                         "sl" = c(30,20,30,50,60,30))
 
 # Species to generate point estimates
 point.est.spp          <- c("Clupea pallasii","Engraulis mordax","Sardinops sagax",
