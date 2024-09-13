@@ -378,7 +378,7 @@ if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
                             LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
                             SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
-                            SH  = "//swc-astnas1-s/AST-DATA/20231010_SHIMADA_SummerCPS")   
+                            SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
@@ -606,10 +606,18 @@ cufes.vessels          <- c("RL")
 # Trawl data
 trawl.source           <- "Access"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
-trawl.dir.access       <- file.path(survey.dir, "DATA/BIOLOGICAL/HAUL")
 trawl.db.access        <- "TrawlDataEntry2307RL.accdb"
 trawl.performance      <- c("Aborted", "Poor") # Character vector; trawl performance to exclude
 trawl.haul.exclude     <- NA # Numeric vector; haul numbers to exclude (e.g., for incomplete catch, etc.; NA if include all)
+
+# Location of trawl Access database
+if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
+  trawl.dir.access <- "DATA/BIOLOGICAL/HAUL"
+} else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
+  trawl.dir.access <- ""
+} else {
+  trawl.dir.access <- "DATA/BIOLOGICAL/HAUL"
+}
 
 # CTD data
 ctd.dir                <- file.path(survey.dir[survey.vessel.primary],"DATA/CTD")
