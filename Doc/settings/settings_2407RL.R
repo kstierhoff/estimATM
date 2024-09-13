@@ -673,7 +673,7 @@ boot.num <- 1000 # 1000 during final
 do.lf    <- TRUE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core", "Nearshore") 
+estimate.regions   <- c("Core") 
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata
