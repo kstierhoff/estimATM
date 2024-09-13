@@ -112,7 +112,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2024-06-24" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
@@ -129,7 +129,7 @@ leg.breaks.sh <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
                                              "2024-09-30")))
 
 # Define ERDDAP data variables for Shimada
-erddap.vessel.sh        <- "WTEDnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel.sh        <- "WTED"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start.sh  <- "2023-10-09" # Start of survey for ERDDAP vessel data query
 erddap.survey.end.sh    <- "2023-11-04" # End of survey for ERDDAP vessel data query
 erddap.flags.sh         <- c('"ZZZZ.Z.Z..Z.*"')
