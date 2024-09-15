@@ -112,7 +112,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2024-06-24" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
@@ -878,8 +878,10 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL","LBC","LM","SH")
-cal.dir            <- "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20240703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS"
+cal.vessels        <- c("RL","LBC","LM")
+cal.dir            <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/SURVEYS/20240703_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
+                        LBC = "38, 70, 120, and 200",
+                        LM  = "38, 70, 120, and 200") # list of calibration directories
 cal.datetime       <- "27 June"    # Date/time of calibration
 cal.plot.date      <- "2023-06-27" # Date of the calibration, used to plot cal time series
 cal.window         <- 75           # Number of days around calibration date to look for results
