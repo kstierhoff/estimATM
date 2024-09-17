@@ -82,7 +82,8 @@ panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOption
 combine.regions  <- F # Combine core and nearshore biomass plots
 plot.time.series <- T # Plot biomass time series 
 get.db           <- T # Query biomass estimates from AST database
-save.figs        <- T
+process.cal      <- T # Process, format, and plot echosounder calibration results
+save.figs        <- T # Save figures
 ```
 
 ```{r user-input, include=FALSE}
@@ -327,403 +328,112 @@ include_graphics(here("Images/img_carnage_mta4.jpg"))
 include_graphics(here("Images/img_lisa-marie_transducer-blister.png"))
 ``` 
 
+```{r process-cal}
+# Process calibration results from CW- and FM-mode calibrations. Vessel, procedure, and directory info is configured in the settings file for each survey.
+
+if (process.cal) {
+  # Plot CW calibration results
+  source(here("Code/processCal-CW.R"))
+  
+  # Plot FM calibration results
+  source(here("Code/processCal-FM.R"))
+  
+} else {
+  # Load CW results
+  load(here("Output/cal_results_CW.Rdata"))
+  
+  # Load FM results
+  load(here("Output/cal_results_FM.Rdata"))
+  
+}
+```
+
+```{r process-cal-saildrone, eval=FALSE}
+# # Create a column with beam model units
+# bm.units.sd <- data.frame(Units = c("",                 # Echosounder serial #
+#                                     "",                 # Transducer serial #
+#                                     "C",                # Temperature
+#                                     "ppt",              # Salinity
+#                                     "m s$^{-1}$",       # Sound speed
+#                                     "dB re 1 sr",       # Equivalent two-way beam angle
+#                                     "dB re 1",          # Gain
+#                                     "dB re 1",          # Sa_correction
+#                                     "deg",              # Alongship beamwidth
+#                                     "deg",              # Athwartship beamwidth
+#                                     "deg",              # Alongship offset angle
+#                                     "deg",              # Athwartship offset angle
+#                                     "dB"))              # RMS
+# 
+# all.output.sd <- tibble::tribble(
+#   ~" ", ~"1048 (38)", ~"1048 (200)", ~"1060 (38)", ~"1060 (200)", ~"1096 (38)", ~"1096 (200)",
+#   "Echosounder SN", "264028", "264028", "719362", "719362", "268636", "268636",
+#   "Transducer SN", "126", "126", "131", "131", "136", "136",
+#   "Temperature", "15.9", "15.9", "17.4", "17.4", "18.4", "18.4",
+#   "Salinity", "21.9", "21.9", "23.9", "23.9", "23.3", "23.3",
+#   "Sound speed", "1494.3", "1494.3", "1501.4", "1501.4", "1503.6", "1503.6",
+#   "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",                 "-12.4", "-11.2", "-12.6", "-12.0", "-12.5", "-11.5",
+#   "On-axis Gain ($G_0$)",                                        "19.10", "19.45", "19.04", "19.44", "18.96", "19.50",
+#   "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",  "0.04", "0.00", "-0.04", "-0.05", "0.03", "0.12",
+#   "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",            "18.3", "20.6", "17.8", "19.8", "18.1", "20.3",
+#   "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",              "18.2", "21.5", "17.8", "18.6", "18.2", "20.4",
+#   "Angle Offset Along. ($\\alpha_{0}$)",                         "0.3", "0.2", "0.2", "0.5", "0.0", "0.6",
+#   "Angle Offset Athw. ($\\beta_{0}$)",                           "0.1", "-0.1", "-0.6", "-0.3", "-0.4", "0.1",
+#   "RMS",                                                         "0.21", "0.50", "0.16", "0.44", "0.20", "0.42"
+# ) %>% 
+#   bind_cols(bm.units.sd) %>% 
+#   select(1, Units, everything())
+# 
+# # save output to .Rdata and CSV
+# save(all.output.sd,
+#      file = here("Output/cal_output_table_Saildrone.Rdata"))
+# 
+# write.csv(all.output.sd,
+#           file = here("Output/cal_output_table_Saildrone.csv"), 
+#           quote = F, row.names = F)
+```
+
 \newpage
 
 #### Echosounder calibrations {#methods-echosounder-calibration}  
 ##### _`r survey.vessel`_
 
-The echosounder systems aboard _`r survey.vessel`_ were calibrated on `r cal.datetime` while the vessel was docked at `r cal.loc` (`r cal.lat.dd` $^{\circ}\textrm{N}$, `r cal.lon.dd` $^{\circ}\textrm{W}$) using the standard sphere technique [@Foote1987; @Demer2015]. Each WBT was calibrated in both CW (i.e., continuous wave or narrowband mode) and FM mode (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere`; for FM mode, additional calibrations were conducted for the 120, 200, and 333-kHz echosounders using a 25-mm WC sphere (WC25). Prior to the calibrations, temperature and salinity were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) to estimate sound speeds at the transducer and sphere depths, and the time-averaged sound speed and absorption coefficients for the range between them. The theoretical target strength ($TS$; dB re 1 m^2^) of the sphere was calculated using values for the sphere, sound-pulse, and seawater properties. The sphere was positioned throughout the main lobe of each of the transducer beams using three motorized downriggers, two on one side of the vessel and one on the other. The WBTs were configured using the calibration results via the control software (Simrad EK80 `r ek80.version`; Kongsberg; **Table \@ref(tab:cal-results)**). Calibration results for WBTs in FM mode are presented in the survey report [@Renfree2024].  
-
-```{r process-cal}
-# Currently, the process-cal-all section must be run first to either extract all
-# calibration results from a SQL database or load it from an .Rdata file. This
-# section then pulls out the results for the current survey then formats it into
-# a data frame for displaying the results. This is then done separately for each
-# survey vessel. This should be updated so that it loops through each survey
-# vessel, obtains the calibration info, then formats it for displaying in a
-# table
-
-# Cycle through each vessel
-for (i in cal.vessels) {
-  
-  # Define directory with calibration files for current vessel
-  cal.dir <- paste(here("Data/Calibration"), i, sep = '/')
-  
-  # Get list of calibration files for that vessel
-  cal.files <- sort(list.files(cal.dir, pattern = ".xml", 
-                               full.names = TRUE))
-  
-  # Initialize data frames for storing results
-  cal.res   <- data.frame()
-  cal.info  <- data.frame()
-  cal.pings <- data.frame()
-  
-  # Cycle through each calibration file (frequency)
-  for (j in cal.files) {
-  
-    # Extract calibration info for that frequency
-    cal <- extract_cal(j)
-    
-    # Append to data frames
-    cal.res <- bind_rows(cal.res,   cal$cal.res)
-    cal.info <- bind_rows(cal.info,  cal$cal.info)
-    cal.pings <- bind_rows(cal.pings, cal$cal.pings)
-  }
-  
-  # Now read calibration results from ECS file
-  cal.ECS <- list.files(cal.dir, pattern = ".ecs$", 
-                        full.names = TRUE) %>%
-    atm::extract_cal_ecs() %>% 
-    arrange(Frequency)
-  
-  # create data frame of important echosounder parameters
-  cal.params <- cal.res %>% 
-    arrange(txdr_freq) %>% 
-    select(txdr_freq,  # Transducer frequency
-           txdr_type,  # Transducer model
-           txdr_sn,    # Transducer serial number
-           gpt_power,  # Transmit power
-           gpt_pd)     # Pulse duration
-
-  # Specify names for echosounder parameters 
-  names(cal.params) <- c("Frequency",
-                         "Model",
-                         "Serial Number",
-                         "Transmit Power ($p_\\mathrm{et}$)",
-                         "Pulse Duration ($\\tau$)")
-
-
-  # create data frame of beam model results
-  bm.res <- select(cal.ECS,
-                   Temperature,
-                   Salinity,
-                   SoundSpeed,
-                   Frequency, 
-                   Gain, 
-                   Sa_correction, 
-                   Beamwidth_alongship, 
-                   Beamwidth_athwartship,
-                   OffsetAngle_alongship, 
-                   OffsetAngle_athwartship,
-                   TwoWayBeamAngle) %>% 
-    mutate(RMS = cal.rms[[i]])
-  
-  # Specify number of significant digits for certain parameters
-  bm.res$Temperature             <- formatC(bm.res$Temperature, format="f", digits=1)
-  bm.res$Salinity                <- formatC(bm.res$Salinity, format="f", digits=1)
-  bm.res$SoundSpeed              <- formatC(bm.res$SoundSpeed, format="f", digits=1)
-  bm.res$Frequency               <- formatC(bm.res$Frequency, format="d", digits=0)
-  bm.res$Gain                    <- formatC(bm.res$Gain, format="f", digits=2)
-  bm.res$Sa_correction           <- formatC(bm.res$Sa_correction, format="f", digits=2)
-  bm.res$Beamwidth_alongship     <- formatC(bm.res$Beamwidth_alongship, format="f", digits=2)
-  bm.res$Beamwidth_athwartship   <- formatC(bm.res$Beamwidth_athwartship, format="f", digits=2)
-  bm.res$OffsetAngle_alongship   <- formatC(bm.res$OffsetAngle_alongship, format="f", digits=2)
-  bm.res$OffsetAngle_athwartship <- formatC(bm.res$OffsetAngle_athwartship, format="f", digits=2)
-  bm.res$TwoWayBeamAngle         <- formatC(bm.res$TwoWayBeamAngle, format="f", digits=2)
-  bm.res$RMS                     <- formatC(bm.res$RMS, format="f", digits=2)
-
-  # Specify names for beam model results
-  names(bm.res) <- c("Temperature",
-                     "Salinity",
-                     "Sound speed",
-                     "Frequency",
-                     "On-axis Gain ($G_0$)",
-                     "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
-                     "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                     "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                     "Angle Offset Along. ($\\alpha_{0}$)",
-                     "Angle Offset Athw. ($\\beta_{0}$)",
-                     "Equivalent Two-way Beam Angle ($\\Psi$)",
-                     "RMS")
-  
-  # Sort data frames by frequency
-  param.output <- cal.params %>% 
-    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
-    pivot_wider(names_from = Frequency, values_from = value)
-  
-  bm.output <- bm.res %>% 
-    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
-    pivot_wider(names_from = Frequency, values_from = value)
-
-  # Create column defining parameter units
-  param.units <- data.frame(Units = c(" ",                 # Model number
-                                      " ",                 # Serial number
-                                      "W",                 # Transmit power
-                                      "ms"))               # Pulse duration
-                                      
-  # Create column defining beam model units
-  bm.units <- data.frame(Units = c("C",                    # Temperature
-                                   "ppt",                  # Salinity
-                                   "m s$^{-1}$",               # Sound speed
-                                   "dB re 1",              # Transducer gain
-                                   "dB re 1",              # Sa correction factor
-                                   "deg",                  # Alongship beamwidth
-                                   "deg",                  # Athwartship beamwidth
-                                   "deg",                  # Alongship offset angle
-                                   "deg",                  # Athwartship offset angle
-                                   "dB re 1 sr",           # Equivalent two-way beam angle
-                                   "db"))                  # RMS
-
-  # Add units column to parameter data frame
-  param.output <- bind_cols(param.output, param.units) %>% 
-    select(variable, Units, everything()) %>% 
-    rename("Frequency ($f$, kHz)" = variable)
-
-  # Add units column to beam model results data frame
-  bm.output <- bind_cols(bm.output, bm.units) %>% 
-    select(variable, Units, everything()) %>% 
-    rename("Frequency ($f$, kHz)" = variable)
-
-  # combine the parameters and results data frames
-  all.output <- rbind(param.output, bm.output) %>% 
-    rename(" " = "Frequency ($f$, kHz)")
-  
-  # Store in data frame specific to the current vessel
-  assign(paste("all.output.", i, sep = ""), all.output)
-
-  # save output to .Rdata and CSV
-  save(all.output,
-       file = here(paste("Output/cal_output_table_", i, ".Rdata", sep = '')))
-
-  write.csv(all.output,
-            file = here(paste("Output/cal_output_table_", i, ".csv", sep = '')),
-            quote = F, row.names = F)
-
-  # If saving figures, then plot and save calibration polar plots
-  if (save.figs) {
-  
-    # Format ping data for plotting
-    cal.pings <- cal.pings %>% 
-      mutate(cal_date = date(date_time)) %>% 
-      filter(between(cal_date,
-                     ymd(cal.plot.date) - days(cal.window),
-                     ymd(cal.plot.date) + days(cal.window))) %>% 
-      arrange(txdr_freq, ping_num)
-  
-    # Set axis limits based on range of ping angles
-    cal.lim.tmp <- round(max(max(cal.pings$along), max(cal.pings$athw))) 
-  
-    if (cal.lim.tmp %% 2) {
-      # If range is odd, add 1 to make axis ticks look nice
-      cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
-    } else {
-      cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
-    }
-  
-    # subset only outlier points
-    outliers <- filter(cal.pings, outlier == 1)
-  
-    cal.pings <- cal.pings %>% 
-      left_join(select(cal.res,txdr_freq,txdr_type,target_ts,
-                       txdr_gain,bm_txdr_gain,
-                       bm_alon_ba,bm_athw_ba,
-                       bm_alon_oa,bm_athw_oa)) %>% 
-      mutate(
-        txdr_type      = fct_reorder(txdr_type, txdr_freq),
-        TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
-        alpha          = along - bm_alon_oa,
-        beta           = athw - bm_athw_oa,
-        x              = (2*alpha) / bm_alon_ba,
-        y              = (2*beta) / bm_athw_ba,
-        B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
-        TS_c_new       = TS_u_new + B,
-        relTS_c        = TS_c_new - target_ts,
-        relTS_c_scaled = case_when(
-          relTS_c >= 1 ~ 1,
-          relTS_c <= -1 ~-1,
-          between(relTS_c,-1,1) ~ relTS_c))
-    
-    if (cal.scales == "fixed") {
-      # Plot beam-uncompensated target strength data #####
-      tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
-        geom_point(aes(colour = TS_u)) + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
-                   shape = "+", size = 1, alpha = 0.7) +
-        facet_wrap(~txdr_type, scales = cal.scales) +
-        scale_colour_viridis_c(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                             option = "magma") +
-        scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
-                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-        scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-        guides(size =  "none") + theme_bw() + 
-        theme(panel.spacing    = unit(1, "lines"),
-              strip.background = element_rect(fill = "white"),
-              strip.text.x     = element_text(face = "bold")) + 
-        coord_equal()
-      
-      # Plot beam-compensated target strength data #####
-      tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
-        geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
-                   shape = "+", size = 4) +
-        facet_wrap(~txdr_type, scales = cal.scales) + 
-        scale_fill_distiller(name = expression(italic(TS)[rel]),
-                             type = "div", palette = "RdBu", limits = c(-1,1)) +
-        scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
-                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-        scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-        theme_bw() + 
-        theme(panel.spacing = unit(1, "lines"),
-              strip.background = element_rect(fill = "white"),
-              strip.text.x = element_text(face = "bold")) +
-        coord_equal()
-      
-    } else {
-      # Plot beam-uncompensated target strength data #####
-      tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
-        geom_point(aes(colour = TS_u)) + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
-                   shape = "+", size = 1, alpha = 0.7) +
-        facet_wrap(~txdr_type, scales = cal.scales) +
-        scale_colour_viridis_c(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                             option = "magma") +
-        scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-        scale_y_continuous('Alongship Beam Angle (deg)\n') +
-        guides(size =  "none") + theme_bw() + 
-        theme(panel.spacing    = unit(1, "lines"),
-              strip.background = element_rect(fill = "white"),
-              strip.text.x     = element_text(face = "bold")) 
-      
-      # Plot beam-compensated target strength data #####
-      tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
-        geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
-                   shape = "+", size = 4) +
-        facet_wrap(~txdr_type, scales = cal.scales) + 
-        scale_fill_distiller(name = expression(italic(TS)[rel]),
-                             type = "div", palette = "RdBu", limits = c(-1,1)) +
-        scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-        scale_y_continuous('Alongship Beam Angle (deg)\n') +
-        theme_bw() + 
-        theme(panel.spacing = unit(1, "lines"),
-              strip.background = element_rect(fill = "white"),
-              strip.text.x = element_text(face = "bold")) 
-    }
-    
-    # Define figure widths based on vessel so that plots are relatively square
-    fig.width <- switch(i,
-                        "RL" = 10,
-                        "LM" = 11.5,
-                        "LBC" = 7,
-                        "SH"  = 10)
-    
-    # Save TS_c plot 
-    ggsave(tsu.scatter, filename = here(paste("Figs/fig_cal_TSu_scatter_", i, ".png", sep = '')),  
-           width = fig.width, height = 6)
-    
-    # Save TS_c plot 
-    ggsave(here(paste("Figs/fig_cal_TSrel_scatter_", i, ".png", sep = '')), tsc.scatter,
-           width = fig.width, height = 6)
-  }
-}
-```
-
-```{r process-cal-saildrone}
-# Create a column with beam model units
-bm.units.sd <- data.frame(Units = c("",                 # Echosounder serial #
-                                    "",                 # Transducer serial #
-                                    "C",                # Temperature
-                                    "ppt",              # Salinity
-                                    "m s$^{-1}$",       # Sound speed
-                                    "dB re 1 sr",       # Equivalent two-way beam angle
-                                    "dB re 1",          # Gain
-                                    "dB re 1",          # Sa_correction
-                                    "deg",              # Alongship beamwidth
-                                    "deg",              # Athwartship beamwidth
-                                    "deg",              # Alongship offset angle
-                                    "deg",              # Athwartship offset angle
-                                    "dB"))              # RMS
-
-all.output.sd <- tibble::tribble(
-  ~" ", ~"1048 (38)", ~"1048 (200)", ~"1060 (38)", ~"1060 (200)", ~"1096 (38)", ~"1096 (200)",
-  "Echosounder SN", "264028", "264028", "719362", "719362", "268636", "268636",
-  "Transducer SN", "126", "126", "131", "131", "136", "136",
-  "Temperature", "15.9", "15.9", "17.4", "17.4", "18.4", "18.4",
-  "Salinity", "21.9", "21.9", "23.9", "23.9", "23.3", "23.3",
-  "Sound speed", "1494.3", "1494.3", "1501.4", "1501.4", "1503.6", "1503.6",
-  "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",                 "-12.4", "-11.2", "-12.6", "-12.0", "-12.5", "-11.5",
-  "On-axis Gain ($G_0$)",                                        "19.10", "19.45", "19.04", "19.44", "18.96", "19.50",
-  "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",  "0.04", "0.00", "-0.04", "-0.05", "0.03", "0.12",
-  "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",            "18.3", "20.6", "17.8", "19.8", "18.1", "20.3",
-  "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",              "18.2", "21.5", "17.8", "18.6", "18.2", "20.4",
-  "Angle Offset Along. ($\\alpha_{0}$)",                         "0.3", "0.2", "0.2", "0.5", "0.0", "0.6",
-  "Angle Offset Athw. ($\\beta_{0}$)",                           "0.1", "-0.1", "-0.6", "-0.3", "-0.4", "0.1",
-  "RMS",                                                         "0.21", "0.50", "0.16", "0.44", "0.20", "0.42"
-) %>% 
-  bind_cols(bm.units.sd) %>% 
-  select(1, Units, everything())
-
-# save output to .Rdata and CSV
-save(all.output.sd,
-     file = here("Output/cal_output_table_Saildrone.Rdata"))
-
-write.csv(all.output.sd,
-          file = here("Output/cal_output_table_Saildrone.csv"), 
-          quote = F, row.names = F)
-```
+The echosounder systems aboard _`r survey.vessel`_ were calibrated on `r cal.datetime["RL"]` while the vessel was docked at `r cal.loc["RL"]` (`r cal.lat.dd["RL"]` $^{\circ}\textrm{N}$, `r cal.lon.dd["RL"]` $^{\circ}\textrm{W}$) using the standard sphere technique [@Foote1987; @Demer2015]. Each WBT was calibrated in both CW (i.e., continuous wave or narrowband mode) and FM mode (i.e., frequency modulation or broadband mode). The reference target was a `r cal.sphere["RL"]`; for FM mode, additional calibrations were conducted for the 120, 200, and 333-kHz echosounders using a 25-mm WC sphere (WC25). Prior to the calibrations, temperature and salinity were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) to estimate sound speeds at the transducer and sphere depths, and the time-averaged sound speed and absorption coefficients for the range between them. The theoretical target strength ($TS$; dB re 1 m^2^) of the sphere was calculated using values for the sphere, sound-pulse, and seawater properties. The sphere was positioned throughout the main lobe of each of the transducer beams using three motorized downriggers, two on one side of the vessel and one on the other. The WBTs were configured using the calibration results via the control software (Simrad EK80 `r ek80.version`; Kongsberg; **Table \@ref(tab:cal-results)**). Calibration results for WBTs in FM mode are presented in the survey report [@Renfree2024].  
 
 (ref:cal-results) Wide-Bandwidth Transceiver (Simrad EK80 WBT; Kongsberg) information, pre-calibration settings, and post-calibration beam model results (below the horizontal line) estimated from calibration of the echosounders aboard _`r survey.vessel`_ using a WC38.1 standard sphere. Prior to the survey, on-axis gain ($G_0$), beam angles, angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into the WBT control software (Simrad EK80; Kongsberg).
 
 ```{r cal-results, results='asis'}
-# Copy calibration results
-cal.results <- all.output.RL 
-
-# Get number of columns for table formatting
-cal.cols <- ncol(cal.results)
-
-if (doc.type == "docx") {
-  # create kable object (for Word)
-  regulartable(cal.results)
+if (exists("all.output.RL")) {
+  # Copy calibration results
+  cal.results <- all.output.RL 
+  
+  # Get number of columns for table formatting
+  cal.cols <- ncol(cal.results)
+  
+  if (doc.type == "docx") {
+    # create kable object (for Word)
+    regulartable(cal.results)
+  } else {
+    # print LaTeX table for HTML or PDF
+    kable(cal.results, 
+          format = knitr.format, 
+          align = c("l","l",rep("c", cal.cols - 2)),
+          booktabs = TRUE, linesep = "", escape = FALSE,
+          caption = '(ref:cal-results)') %>% 
+      kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>%
+      add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
+      row_spec(7, hline_after = TRUE)
+  }
 } else {
-  # print LaTeX table for HTML or PDF
-  kable(cal.results, 
-        format = knitr.format, 
-        align = c("l","l",rep("c", cal.cols - 2)),
-        booktabs = TRUE, linesep = "", escape = FALSE,
-        caption = '(ref:cal-results)') %>% 
-    kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>%
-    add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
-    row_spec(7, hline_after = TRUE)
+  print("No calibration results to present.")
 }
+
 ```  
 
 \newpage  
 
-##### _Shimada_  
-
-The echosounder systems aboard _Shimada_ were calibrated by the NWFSC on 9 September after completing the Integrated Ecosystem and Pacific Hake Acoustic-Trawl Survey. The calibration was conducted using the standard sphere technique [@Foote1987; @Demer2015] while the vessel was on anchor near Seattle, WA. Each WBT was calibrated in CW (i.e., continuous wave or narrowband mode) mode. The reference target was a `r cal.sphere`. Prior to the calibrations, temperature and salinity were measured to a depth of 10 m using a handheld probe (Pro2030, YSI) to estimate sound speeds at the transducer and sphere depths, and the time-averaged sound speed and absorption coefficients for the range between them. The theoretical target strength ($TS$; dB re 1 m^2^) of the sphere was calculated using values for the sphere, sound-pulse, and seawater properties. The sphere was positioned throughout the main lobe of each of the transducer beams using three motorized downriggers, two on one side of the vessel and one on the other. The WBTs were configured using the calibration results via the control software (Simrad EK80; Kongsberg; **Table \@ref(tab:cal-results-sh)**).
-
-(ref:cal-results-sh) Wideband Transceiver (Simrad EK80 WBT; Kongsberg) and transducer information (above horizontal line) and beam model results (below horizontal line) estimated from calibration of the echosounders aboard _Shimada_ using a WC38.1 standard sphere. Prior to the survey, on-axis gain ($G_0$), beam angles, angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into the WBT control software (Simrad EK80; Kongsberg).
-
-```{r cal-results-sh,results='asis'}
-# Copy calibration results
-cal.results <- all.output.SH 
-
-# Get number of columns for table formatting
-cal.cols <- ncol(cal.results)
-
-if (doc.type == "docx") {
-  # create kable object (for Word)
-  pander(cal.results)
-} else {
-  kable(cal.results, 
-        format = knitr.format, 
-        align = c("l","l",rep("c", cal.cols - 2)),
-        booktabs = TRUE, linesep = "", escape = FALSE,
-        caption = '(ref:cal-results-sh)') %>% 
-    kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>%
-    add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
-    row_spec(7, hline_after = TRUE)
-}
-```  
-
-\newpage
-
 ##### _Lisa Marie_  
 
-The WBTs aboard _Lisa Marie_ were calibrated on 12 June using the standard sphere technique [@Foote1987; @Demer2015], while the vessel was anchored in Gig Harbor, WA (47.32212 N, 122.57275 W). Calibration results for _Lisa Marie_ are presented in **Table \@ref(tab:cal-results-lm)**.  
+The WBTs aboard _Lisa Marie_ were calibrated on `r cal.datetime["LM"]` using the standard sphere technique [@Foote1987; @Demer2015], while the vessel was anchored in `r cal.loc["LM"]` (`r cal.lat.dd["LM"]` $^{\circ}\textrm{N}$, `r cal.lon.dd["LM"]` $^{\circ}\textrm{W}$) . Calibration results for _Lisa Marie_ are presented in **Table \@ref(tab:cal-results-lm)**.  
 
 (ref:cal-results-lm) Wideband Transceiver (Simrad EK80 WBT; Kongsberg) and transducer information (above horizontal line) and beam model results (below horizontal line) estimated from calibration of the echosounders aboard _Lisa Marie_ using a WC38.1 standard sphere. Prior to the survey, on-axis gain ($G_0$), beam angles, angle offsets, and $S_A$ Correction ($S_\mathrm{A}\mathrm{corr}$) values from calibration results were entered into the WBT control software (Simrad EK80; Kongsberg).
 
@@ -1875,7 +1585,7 @@ if ("Sardinops sagax" %in% unique(abund.summ.all$Species)) {
         align(align = "center",part = "header") %>% 
         autofit()
     } else {
-     kable(abund.summ.table, format = "latex", booktabs = FALSE,
+      kable(abund.summ.table, format = "latex", booktabs = FALSE,
             escape = FALSE, longtable = TRUE,
             digits = c(0),
             format.args = list(big.mark = ","),
