@@ -516,7 +516,8 @@ tx.rm                  <- list(SH  = NA,
 # Minimum acoustic transect length (nmi)
 min.tx.length          <- c(SH  = 15,
                             LM  = 1,
-                            LBC = 1)
+                            LBC = 1,
+                            SD  = 1)
 
 # Enforce nearest trawl cluster distance limits?
 limit.cluster.dist     <- c(OS  = FALSE,
