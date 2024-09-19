@@ -102,8 +102,7 @@ save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- T # Generate bootstrap estimates
-
+do.bootstrap      <- F # Generate bootstrap estimates
 
 ### Sometimes FALSE
 do.imap           <- T # Create interactive Leaflet map
@@ -1974,9 +1973,7 @@ if (nrow(catch) > 0) {
   #          "JackMack"   = "Trachurus symmetricus",
   #          "RndHerring" = "Etrumeus acuminatus",
   #          "Other"      = "Other") 
-  
-  # RESUME HERE ---------------------------------------
-  
+
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS, -sample.type) %>% 
@@ -2989,7 +2986,7 @@ lw.plot <- ggplot() +
   geom_point(data = lengths, 
              aes(totalLength_mm, weightg,group = sex, fill = sex), 
              shape = 21, alpha = 0.9) + 
-  scale_fill_manual(name = "Sex", values = c("pink","lightblue","green")) +
+  scale_fill_manual(name = "Sex", values = c("pink","lightblue","white")) +
   # Plot individuals with missing lengths and weights
   geom_point(data = filter(lengths, missing.length == TRUE), 
              aes(totalLength_mm, weightg),
@@ -3829,6 +3826,7 @@ acoustic.prop.cluster.final <- base.map +
            ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
 if (save.figs) {
+  # Plot backscatter, CUFES, and acoustic proportion map
   if (exists("nasc.map.cps") & exists("cufes.density.all") & exists("trawl.pie.haul.wt")) {
     nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.final,
                                            nrow = 1, labels = c("a)", "b)", "c)"))
@@ -3850,19 +3848,31 @@ if (save.figs) {
     
     include_graphics(here("Figs/fig_nasc_cufes_acoustic_cluster_long.png"))
   } else {
-    # Plot trawl clusters and acoustic proportions
-    nasc.trawl.acoustic.prop <- plot_grid(nasc.cluster.plot, acoustic.prop.cluster.final,
+    # Plot backscatter, CUFES, and acoustic proportion map
+    nasc.prop.plot <- plot_grid(nasc.map.cps, acoustic.prop.cluster.final,
                                           nrow = 1, labels = c("a)", "b)"))
     
-    ggsave(nasc.trawl.acoustic.prop, 
-           filename = here("Figs/fig_nasc_acoustic_cluster.png"),
+    ggsave(nasc.prop.plot, 
+           filename = here("Figs/fig_nasc_acoustic_proportion.png"),
            width = map.width*2, height = map.height)
     
-    save(nasc.trawl.acoustic.prop,
-         file = here("Output/nasc_prop_map.Rdata"))
+    save(nasc.prop.plot,
+         file = here("Output/nasc_acoustic_proportion.Rdata"))
     
-    include_graphics(here("Figs/fig_nasc_acoustic_cluster.png")) 
+    # Display map
+    include_graphics(here("Figs/fig_nasc_acoustic_proportion.png")) 
   }
+  
+  # Plot trawl clusters and acoustic proportions
+    nasc.cluster.prop.plot <- plot_grid(nasc.cluster.plot, acoustic.prop.cluster.final,
+                                          nrow = 1, labels = c("a)", "b)"))
+    
+    ggsave(nasc.cluster.prop.plot, 
+           filename = here("Figs/fig_nasc_cluster_acoustic_proportion.png"),
+           width = map.width*2, height = map.height)
+    
+    save(nasc.cluster.prop.plot,
+         file = here("Output/nasc_cluster_acoustic_proportion.Rdata"))
 }
 ```
 
