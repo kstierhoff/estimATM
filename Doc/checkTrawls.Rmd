@@ -1357,8 +1357,10 @@ Trawl durations are examined to look at trends in deployment, recovery, and tota
 plot.evolution <- ggplot(data = haul) + 
   geom_line(aes(haul, as.numeric(evolutionTime)), colour = "green") +
   geom_point(aes(haul, as.numeric(evolutionTime)), shape = 21, fill = "white", colour = "green") +
-  labs(x = "Haul", y = "Duration (mins)", title = "Evolution Time") + 
-  scale_x_continuous(breaks = seq(0, 500, 5))
+  labs(x = "\nHaul", y = "Duration (mins)", title = "Evolution Time") + 
+  scale_x_continuous(breaks = seq(0, 500, 5)) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+  
 
 plot.deployment <- ggplot(data = haul) +
   geom_line(aes(haul, as.numeric(deploymentTime), color = "Deployment")) +
@@ -1370,13 +1372,14 @@ plot.deployment <- ggplot(data = haul) +
   geom_point(aes(haul, as.numeric(duration)), shape = 21, fill = "white", colour = "black") +
   scale_color_manual(values = c("Deployment" = "blue", "Recovery" = "red", "Fishing" = "black")) +
   scale_x_continuous(breaks = seq(0, 500, 5)) +
-  labs(x = "Haul", y = "Duration (mins)", title = "Deployment/Fishing/Recovery Time", color = NULL) +
-  theme(legend.position = c(1,1),
+  labs(x = "\nHaul", y = "Duration (mins)", title = "Deployment/Fishing/Recovery Time", color = NULL) +
+  theme(legend.position      = c(1,1),
         legend.justification = c("right", "top"),
-        legend.margin = margin(-3, 7, 2, 2),
-        legend.background = element_rect(fill = "white", color = "black", size = 0.2),
-        legend.key = element_rect(fill = "white", color = NA),
-        legend.text = element_text(size = 6)) +
+        legend.margin        = margin(-3, 7, 2, 2),
+        legend.background    = element_rect(fill = "white", color = "black", size = 0.2),
+        legend.key           = element_rect(fill = "white", color = NA),
+        legend.text          = element_text(size = 6),
+        axis.text.x          = element_text(angle = 45, vjust = 0.5)) +
   guides(color = guide_legend(nrow = 1))
 
 plot.duration.all <-  plot_grid(plot.evolution, plot.deployment, ncol = 1) 
@@ -1546,8 +1549,8 @@ if (nrow(catch.comp.errors) > 0) {
 ```
 ### Catch weight summary
 #### All catch
-
-Summary of catch weight by haul (kg), including CPS and all other species weighed.
+ 
+Summary of catch weight by haul (kg), including CPS and all other species weighed. The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
 
 ```{r plot-weight-summary-all}
 # Format data for plotting
@@ -1588,53 +1591,55 @@ bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasi
 bar.spp <- sort(unique(catch.bar$group))
 
 # Plot catch 
-catch.bar.plot.all <- ggplot(catch.bar, aes(factor(haul), totalWeight, fill = group)) +
+catch.bar.plot.all <- ggplot(catch.bar, aes(haul, totalWeight, fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
   geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
   facet_wrap(~leg, scales = "free", ncol = 1) +
   scale_fill_manual(name = 'Species',
                     labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
                     values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
-  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  scale_x_continuous(breaks = seq(0, 500, 2)) +
   theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold")) +
-  labs(x = "Haul number", y = "Total Weight (kg)")
+        strip.text.x       = element_text(face = "bold"),
+        axis.text.x        = element_text(angle = 45, size = 10, vjust = 0.5)) +
+  labs(x = "\nHaul number", y = "Total Weight (kg)")
 
 ggsave(catch.bar.plot.all, file = here("Figs/fig_catch_weight_summ.png"),
-       width = 12, height = 8)
+       width = 10, height = 6)
 
 # Display plot
-catch.bar.plot.all
+include_graphics(here("Figs/fig_catch_weight_summ.png"))
 ```
 
 #### All catch (Log-transformed)
 
-Summary of log-transformed catch weight by haul (log(kg)), including CPS and all other species weighed. Catches are log-transformed so larger catches do not obscure smaller ones.  
+Summary of log-transformed catch weight by haul (log(kg)), including CPS and all other species weighed. Catches are log-transformed so larger catches do not obscure smaller ones. The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
 
 ```{r plot-weight-summary-all-log}
 # Plot catch 
-catch.bar.plot.all.log <- ggplot(catch.bar, aes(factor(haul), log(totalWeight + 1), fill = group)) +
+catch.bar.plot.all.log <- ggplot(catch.bar, aes(haul, log(totalWeight + 1), fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
   geom_hline(yintercept = log(150), linetype = "dashed", colour = "gray50") +
   facet_wrap(~leg, scales = "free", ncol = 1) +
   scale_fill_manual(name = 'Species',
                     labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
                     values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
-  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  scale_x_continuous(breaks = seq(0, 500, 2)) +
   theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold")) +
-  labs(x = "Haul number", y = "log(Total  Weight) (kg)")
+        strip.text.x       = element_text(face = "bold"),
+        axis.text.x        = element_text(angle = 45, size = 10, vjust = 0.5)) +
+  labs(x = "\nHaul number", y = "log(Total  Weight) (kg)")
 
 ggsave(catch.bar.plot.all.log, file = here("Figs/fig_catch_weight_summ_log.png"),
-       width = 12, height = 8)
+       width = 10, height = 6)
 
 # Display plot
-catch.bar.plot.all.log
+include_graphics(here("Figs/fig_catch_weight_summ_log.png"))
 ```
 
 #### CPS only
 
-Summary of catch weight (CPS only) by haul (kg).
+Summary of catch weight (CPS only) by haul (kg). The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
 
 ```{r plot-weight-summary-cps}
 # Format data for plotting
@@ -1644,7 +1649,7 @@ catch.bar.cps <- catch.bar %>%
 bar.spp.cps <- sort(unique(catch.bar.cps$group))
 
 # Plot catch 
-catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(factor(haul), totalWeight, fill = group)) +
+catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(haul, totalWeight, fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
   geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
   facet_wrap(~leg, scales = "free", ncol = 1) +
@@ -1652,16 +1657,17 @@ catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(factor(haul), totalWeight, fill 
   scale_fill_manual(name = 'Species',
                     labels = unname(bar.labs[names(bar.labs) %in% bar.spp.cps]),
                     values = unname(bar.colors[names(bar.colors) %in% bar.spp.cps])) +
-  scale_x_discrete(breaks = seq(0, 500, 2)) +
+  scale_x_continuous(breaks = seq(0, 500, 2)) +
   theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold")) +
-  labs(x = "Haul number", y = "Total Weight (kg)")
+        strip.text.x       = element_text(face = "bold"),
+        axis.text.x        = element_text(angle = 45, size = 10, vjust = 0.5)) +
+  labs(x = "\nHaul number", y = "Total Weight (kg)")
 
 ggsave(catch.bar.plot.cps, file = here("Figs/fig_catch_weight_summ_cps.png"),
-       width = 12, height = 8)
+       width = 10, height = 6)
 
 # Display plot
-catch.bar.plot.cps
+include_graphics(here("Figs/fig_catch_weight_summ_cps.png"))
 ```
 
 ## Specimens
