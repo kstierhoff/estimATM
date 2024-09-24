@@ -534,6 +534,13 @@ if(nrow(tbl.all.new) > 0) {
              'Haul back' = haulBackTime, 'Net on deck' = netOnDeckTime) %>% 
       pivot_longer(cols = 'Net in water':'Net on deck', names_to = "event", values_to = "time") 
     
+    # Get date range to set x-axis limits
+    tdr.date.lims <- range(trawl.text$time)
+    
+    # Buffer lims to show geom_rect
+    tdr.date.lims[1] <- tdr.date.lims[1] - minutes(2)
+    tdr.date.lims[2] <- tdr.date.lims[2] + minutes(2)
+    
     # Extract nav data for 30 min before and after haul
     trawl.nav <- nav %>% 
       mutate(time = with_tz(time, tzone = tdr.tz) + hours(-1))  %>%
@@ -567,7 +574,8 @@ if(nrow(tbl.all.new) > 0) {
       geom_hline(yintercept = 0, colour = "gray50") +
       scale_y_continuous(limits = c(-60, 12), 
                          breaks = c(-60, -50, -40, -30, -20, -10, seq(0, 12,4))) +
-      scale_x_datetime(date_breaks = "5 min", date_labels = "%R") +
+      scale_x_datetime(date_breaks = "5 min", date_labels = "%R",
+                       limits = tdr.date.lims) +
       labs(x = "Time (PST)",
            y = "Depth (m)",
            title = paste("Cruise:", unique(tdr.plot$cruise), 
@@ -576,9 +584,6 @@ if(nrow(tbl.all.new) > 0) {
       theme(legend.position.inside = c(0.99,0.01),
             legend.justification   = c(1,0),
             axis.text.x = element_text(angle = 45, vjust = 0.5)) 
-    
-    # Get date limits for additional plots
-    date.lims <- layer_scales(plot.tdr)$x$range$range
     
     # Add SOG if present
     if (nrow(trawl.nav) > 0) {
@@ -597,7 +602,7 @@ if(nrow(tbl.all.new) > 0) {
                   show.legend = FALSE) +
         geom_hline(yintercept = 20, linetype = "dashed") +
         scale_x_datetime(date_breaks = "5 min", date_labels = "%R",
-                         limits = c(as.POSIXct(date.lims[1]), as.POSIXct(date.lims[2]))) +
+                         limits = tdr.date.lims) +
         scale_colour_viridis_c(option = "plasma") +
         theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
         labs(x = "Time (PST)", y = "Height (m)")  
@@ -631,7 +636,7 @@ if(nrow(tbl.all.new) > 0) {
                     show.legend = FALSE) +
           geom_hline(yintercept = 65, linetype = "dashed") +
           scale_x_datetime(date_breaks = "5 min", date_labels = "%R",
-                           limits = c(as.POSIXct(date.lims[1]), as.POSIXct(date.lims[2]))) +
+                           limits = tdr.date.lims) +
           scale_colour_viridis_c(option = "plasma") +
           theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
           labs(x = "Time (PST)", y = "Door spread (m)")  
@@ -669,13 +674,8 @@ if(nrow(tbl.all.new) > 0) {
                     aes(xmin = netInWaterTime,
                         xmax = netOnDeckTime,
                         ymin = 0,
-                        # ymin = min(tdr.plot$depth, na.rm = TRUE),
                         ymax = 45), fill = NA,
-                    colour = 'gray50', linetype = "dashed", alpha = 0.5) #+
-        # geom_text(data = trawl.text,
-        #           aes(time, 35, label = event),
-        #           # aes(time, min(tdr.plot$depth, na.rm = TRUE), label = event),
-        #           size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1)  
+                    colour = 'gray50', linetype = "dashed", alpha = 0.5) 
       }
       
       if (exists("plot.spread")) {
@@ -691,10 +691,7 @@ if(nrow(tbl.all.new) > 0) {
                         xmax = netOnDeckTime,
                         ymin = 0,
                         ymax = ceiling(max(trawl.tv80$DOR_Spread))), fill = NA,
-                    colour = 'gray50', linetype = "dashed", alpha = 0.5) #+
-        # geom_text(data = trawl.text,
-        #           aes(time, ceiling(max(trawl.tv80$DOR_Spread))-20, label = event),
-        #           size = 3, angle = 90, hjust = 0, vjust = -0.3, nudge_y = 1) 
+                    colour = 'gray50', linetype = "dashed", alpha = 0.5) 
       }
     }
     
