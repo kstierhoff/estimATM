@@ -13,23 +13,23 @@ library(psych)    # For computing harmonic mean
 
 # Directory of CTD files to process
 # dir.CTD <- 'C:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\'
-dir.CTD <- 'C:\\SURVEY\\2407LBC\\DATA\\UCTD\\CTD_to_Process\\'
+dir.CTD <- 'C:\\SURVEY\\2407LM\\DATA\\UCTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2407LBC\\DATA\\UCTD\\PROCESSED\\'
+dir.output <- 'C:\\SURVEY\\2407LM\\DATA\\UCTD\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 # dir.PSA <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PSA\\'
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2407LBC\\DATA\\UCTD\\UCTD.con'
+file.con <- 'C:\\SURVEY\\2407LM\\DATA\\UCTD\\19-8196_2022_cal2024_07_02.xmlcon'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2407LBC\\PROCESSED\\EV\\ECS\\_2407LBC_Template.ecs'
+ECS.template <- 'C:\\SURVEY\\2407LM\\PROCESSED\\EV\\ECS\\_2407LBC_Template.ecs'
 
 # ECS output directory
 dir.ECS <- 'C:\\SURVEY\\2407LBC\\PROCESSED\\EV\\ECS\\'
@@ -44,6 +44,21 @@ pause <- 2
 tx.depth <- 2
 
 
+# Read template ECS file --------------------------------------------------
+
+# Read template file
+ECS <- read_file(ECS.template)
+
+# Get sound speed from template
+c_0 <- as.numeric(str_match(ECS, "SoundSpeed\\s*=\\s*([^\\s]+)")[,2])
+
+# Get calibration parameters that can be adjusted with sound speed
+g_0 <- as.numeric(str_match_all(ECS, "TransducerGain\\s*=\\s*([^\\s]+)")[[1]][,2])
+EBA_0 <- as.numeric(str_match_all(ECS, "TwoWayBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+BW_minor_0 <- as.numeric(str_match_all(ECS, "MinorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+BW_major_0 <- as.numeric(str_match_all(ECS, "MajorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
+
+
 # Process CTD data --------------------------------------------------------
 
 # Find all raw data files in CTD directory
@@ -51,10 +66,6 @@ files.CTD <- list.files(path = dir.CTD, pattern = "*.asc")
 
 # Loop through each file
 for (i in files.CTD) {
-  
-
-  # Process CTD data --------------------------------------------------------
-
   
   # Retain just the file name (i.e., remove extension)
   file.name <- tools::file_path_sans_ext(i)
@@ -165,7 +176,6 @@ for (i in files.CTD) {
   # Intermediate position) in order to compensate calibration parameters
   idx <- which.min(abs(data$DepSM - tx.depth))
   txdcr.c <- data$SvCM[idx]
-  
   
   
   # Create ECS file ---------------------------------------------------------
