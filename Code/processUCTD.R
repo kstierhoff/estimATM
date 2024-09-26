@@ -7,36 +7,42 @@
 
 library(readr)    # For reading and writing plain text files
 library(stringr)  # For processing strings
+library(psych)    # For computing harmonic mean
 
 # User Settings -----------------------------------------------------------
 
 # Directory of CTD files to process
 # dir.CTD <- 'C:\\SURVEYS\\20220627_LASKER_SummerCPS\\DATA\\UCTD\\CTD_to_Process\\'
-dir.CTD <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\CTD_to_Process\\'
+dir.CTD <- 'C:\\SURVEY\\2407LBC\\DATA\\UCTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PROCESSED\\'
+dir.output <- 'C:\\SURVEY\\2407LBC\\DATA\\UCTD\\PROCESSED\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 # dir.PSA <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\PSA\\'
 dir.PSA <- paste0(normalizePath(file.path(getwd(), 'CODE/PSA/')),'\\')
 
 # CTD configuration file
-file.con <- 'C:\\SURVEY\\2307RL\\DATA\\UCTD\\UCTD.con'
+file.con <- 'C:\\SURVEY\\2407LBC\\DATA\\UCTD\\UCTD.con'
 
 # Directory of Seabird SBEDataProcessing programs
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\_2307RL_Template.ecs'
+ECS.template <- 'C:\\SURVEY\\2407LBC\\PROCESSED\\EV\\ECS\\_2407LBC_Template.ecs'
 
 # ECS output directory
-dir.ECS <- 'C:\\SURVEY\\2307RL\\PROCESSED\\EV\\ECS\\'
+dir.ECS <- 'C:\\SURVEY\\2407LBC\\PROCESSED\\EV\\ECS\\'
 
 # Time to pause between SBADataProcessing programs, in seconds. If this time is
 # set too short, the current processing step will not finish before the next one
 # begins.
 pause <- 2
+
+# Define transducer depth. This will be used to estimate the sound speed at the
+# transducer for compensating the calibration parameters
+tx.depth <- 2
+
 
 # Process CTD data --------------------------------------------------------
 
@@ -155,41 +161,17 @@ for (i in files.CTD) {
   idx <- data$DepSM < 0 | data$Tnc90C <= 0 | data$Sal00 < 0
   data[idx,] <- NA
   
-  # For CPS, take the average sound velocity at 70 m then calculate the average
-  # temperature, salinity, and depth
-  idx <- data$DepSM <= 70
-  avgSoundSpeed.CPS <- tail(data$AvgsvCM[idx], n = 1)
-  avgTemperature.CPS <- mean(data$Tnc90C[idx], na.rm = T)
-  avgSalinity.CPS <- mean(data$Sal00[idx], na.rm = T)
-  avgDepth.CPS <- mean(data$DepSM[idx], na.rm = T)
-  
-  # For krill, take the average sound velocity at 350 m then calculate the
-  # average temperature, salinity, and depth
-  idx <- data$DepSM <= 350
-  avgSoundSpeed.Krill <- tail(data$AvgsvCM[idx], n = 1)
-  avgTemperature.Krill <- mean(data$Tnc90C[idx], na.rm = T)
-  avgSalinity.Krill <- mean(data$Sal00[idx], na.rm = T)
-  avgDepth.Krill <- mean(data$DepSM[idx], na.rm = T)
+  # Obtain the sound speed at the transducer depth (typically 7.35 m for
+  # Intermediate position) in order to compensate calibration parameters
+  idx <- which.min(abs(data$DepSM - tx.depth))
+  txdcr.c <- data$SvCM[idx]
   
   
   
   # Create ECS file ---------------------------------------------------------
   
-  # Read template ECS file
-  ECS <- read_file(ECS.template)
-  
-  # Get sound speed from template
-  c_0 <- as.numeric(str_match(ECS, "SoundSpeed\\s*=\\s*([^\\s]+)")[,2])
-  
-  # Get calibration parameters that can be adjusted with sound speed
-  g_0 <- as.numeric(str_match_all(ECS, "TransducerGain\\s*=\\s*([^\\s]+)")[[1]][,2])
-  EBA_0 <- as.numeric(str_match_all(ECS, "TwoWayBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
-  BW_minor_0 <- as.numeric(str_match_all(ECS, "MinorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
-  BW_major_0 <- as.numeric(str_match_all(ECS, "MajorAxis3dbBeamAngle\\s*=\\s*([^\\s]+)")[[1]][,2])
-  
-  # Create CPS and Krill-specific ECS files
-  ECS.CPS <- ECS
-  ECS.Krill <- ECS
+  # Copy template ECS file
+  ECS.new <- ECS
   
   # For both CPS and Krill, replace the calibration parameters by compensating
   # for changes in sound speed
@@ -198,96 +180,64 @@ for (i in files.CTD) {
     # Compensate gain
     pattern <- paste("(?s)SourceCal T", j, 
                      ".*?TransducerGain\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
-    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
-    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(g_0[j] + 20*log10(c_0 / avgSoundSpeed.CPS), fmt = '%#.4f'),
-                  str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
-    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
-    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
-                      sprintf(g_0[j] + 20*log10(c_0 / avgSoundSpeed.Krill), fmt = '%#.4f'),
-                      str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.new, perl = TRUE)       # Find match
+    ECS.new <- paste0(str_sub(ECS.new, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(g_0[j] + 20*log10(c_0 / txdcr.c), fmt = '%#.4f'),
+                      str_sub(ECS.new, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate EBA
     pattern <- paste("(?s)SourceCal T", j, 
                      ".*?TwoWayBeamAngle\\s*=\\s*(-\\d*\\.*\\d*)", sep = '')
-    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
-    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(EBA_0[j] + 20*log10(avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
-                  str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
-    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
-    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(EBA_0[j] + 20*log10(avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
-                  str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.new, perl = TRUE)       # Find match
+    ECS.new <- paste0(str_sub(ECS.new, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(EBA_0[j] + 20*log10(txdcr.c / c_0), fmt = '%#.4f'),
+                      str_sub(ECS.new, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Alongship (Minor) Beamwidth
     pattern <- paste("(?s)SourceCal T", j, 
                      ".*?MinorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
-    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
-    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(BW_minor_0[j] * (avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
-                  str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
-    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
-    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
-                      sprintf(BW_minor_0[j] * (avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
-                      str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.new, perl = TRUE)       # Find match
+    ECS.new <- paste0(str_sub(ECS.new, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(BW_minor_0[j] * (txdcr.c / c_0), fmt = '%#.4f'),
+                      str_sub(ECS.new, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
     
     # Compensate Athwarthip (Major) Beamwidth
     pattern <- paste("(?s)SourceCal T", j, 
                      ".*?MajorAxis3dbBeamAngle\\s*=\\s*(\\d*\\.*\\d*)", sep = '')
-    temp <- regexec(pattern, ECS.CPS, perl = TRUE)       # Find match
-    ECS.CPS <- paste0(str_sub(ECS.CPS, 1, temp[[1]][2]-1),   # Insert new value
-                  sprintf(BW_major_0[j] * (avgSoundSpeed.CPS / c_0), fmt = '%#.4f'),
-                  str_sub(ECS.CPS, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
-    temp <- regexec(pattern, ECS.Krill, perl = TRUE)       # Find match
-    ECS.Krill <- paste0(str_sub(ECS.Krill, 1, temp[[1]][2]-1),   # Insert new value
-                      sprintf(BW_major_0[j] * (avgSoundSpeed.Krill / c_0), fmt = '%#.4f'),
-                      str_sub(ECS.Krill, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
+    temp <- regexec(pattern, ECS.new, perl = TRUE)       # Find match
+    ECS.new <- paste0(str_sub(ECS.new, 1, temp[[1]][2]-1),   # Insert new value
+                      sprintf(BW_major_0[j] * (txdcr.c / c_0), fmt = '%#.4f'),
+                      str_sub(ECS.new, temp[[1]][2]+attr(temp[[1]], "match.length")[2]))
   }
-
-  # Replace the sound speed
-  ECS.CPS <- gsub('SoundSpeed\\s*=\\s*[^#]*', 
-                  sprintf('SoundSpeed = %.2f ', avgSoundSpeed.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('SoundSpeed\\s*=\\s*[^#]*', 
-                    sprintf('SoundSpeed = %.2f ', avgSoundSpeed.Krill),
-                    ECS.Krill)
   
-  # Replace the temperature
-  ECS.CPS <- gsub('Temperature\\s*=\\s*[^#]*', 
-                  sprintf('Temperature = %.3f ', avgTemperature.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('Temperature\\s*=\\s*[^#]*', 
-                    sprintf('Temperature = %.3f ', avgTemperature.Krill),
-                    ECS.Krill)
+  # Replace the sound speed profile parameters
+  ECS.new <- gsub('CtdDepthProfile\\s*=\\s*[^#]*', 
+                  paste('CtdDepthProfile = ', paste(sprintf("%.2f", data$DepSM), collapse = ';')),
+                  ECS.new)
+  ECS.new <- gsub('SoundSpeedProfile\\s*=\\s*[^#]*', 
+                  paste('SoundSpeedProfile = ', paste(sprintf("%.2f", data$SvCM), collapse = ';')),
+                  ECS.new)
   
-  # Replace the salinity
-  ECS.CPS <- gsub('Salinity\\s*=\\s*[^#]*', 
-                  sprintf('Salinity = %.3f ', avgSalinity.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('Salinity\\s*=\\s*[^#]*', 
-                    sprintf('Salinity = %.3f ', avgSalinity.Krill),
-                    ECS.Krill)
+  # Temperature, salinity, and absorption depth are used to compute absorption
+  # coefficients, so compute the average over the cast depth
+  ECS.new <- gsub('Temperature\\s*=\\s*[^#]*', 
+                  sprintf('Temperature = %.2f ', mean(data$Tnc90C)),
+                  ECS.new)
+  ECS.new <- gsub('Salinity\\s*=\\s*[^#]*', 
+                  sprintf('Salinity = %.2f ', mean(data$Sal00)),
+                  ECS.new)
+  ECS.new <- gsub('AbsorptionDepth\\s*=\\s*[^#]*', 
+                  sprintf('AbsorptionDepth = %.2f ', mean(data$Depth)),
+                  ECS.new)
   
-  # Replace the average absorption depth
-  ECS.CPS <- gsub('AbsorptionDepth\\s*=\\s*[^#]*', 
-                  sprintf('AbsorptionDepth = %.3f ', avgDepth.CPS),
-                  ECS.CPS)
-  ECS.Krill <- gsub('AbsorptionDepth\\s*=\\s*[^#]*', 
-                    sprintf('AbsorptionDepth = %.3f ', avgDepth.Krill),
-                    ECS.Krill)
+  # Also replace the single sound speed value with the harmonic mean of the
+  # sound speed
+  ECS.new <- gsub('SoundSpeed\\s*=\\s*[^#]*', 
+                  sprintf('SoundSpeed = %.2f ', harmonic.mean(data$SvCM)),
+                  ECS.new)
   
   # Write new ECS files
-  # write_file(ECS, paste(dir.ECS, file.name, "_CPS.ecs", sep = ''))
-  write_file(ECS.CPS, paste(dir.ECS, file.name, "_CPS.ecs", sep = ''))
-  write_file(ECS.Krill, paste(dir.ECS, file.name, "_Krill.ecs", sep = ''))
-  
-  # Write simple text file describing differences in CPS and Krill sound speeds
-  # and the ratio to use for adjusting the Integration Stop line in Echoview
-  tmp <- paste(sprintf('CPS average sound speed = %.2f m/s\n', avgSoundSpeed.CPS),
-               sprintf('Krill average sound speed = %.2f m/s\n', avgSoundSpeed.Krill),
-               sprintf('Krill/CPS sound speed ratio = %.6f', avgSoundSpeed.Krill/avgSoundSpeed.CPS),
-               sep = '')
-  write_file(tmp, paste(dir.output, file.name, '_SoundSpeedRatio.txt', sep = ''))
+  write_file(ECS.new, paste(dir.ECS, file.name, '.ecs', sep = ''))
   
   # Copy CTD file to the PROCESSED directory
   file.copy(file.path(dir.CTD, i), dir.output)
