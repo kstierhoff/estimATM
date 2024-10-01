@@ -67,10 +67,13 @@ nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 ```
 
 ```{r get-nav}
-# Source code to get nav data from ERDDAP or SCS
+# Get nav data
 if (nav.source == "ERDDAP") {
+  # Source code to get nav data from ERDDAP
   source(here("Code/get_nav_erddap.R"))
 } else if (nav.source == "SCS") {
+  # Source code to get nav data from SCS
+  # Not working with SCS post-2022 (new HTML-based SCS on FSVs); must update
   source(here("Code/get_nav_scs.R"))
 }
 
@@ -82,54 +85,17 @@ if (get.nav.sh) {
 
 ```{r get-trawl-data}
 if (get.db) {
-  if (trawl.source == "SQL") {
-    # Configure ODBC connection to TRAWL database
-    trawl.con  <- dbConnect(odbc(), 
-                            Driver = "SQL Server", 
-                            Server = "161.55.235.187", 
-                            Database = "Trawl", 
-                            Trusted_Connection = "True")
-  } else if (trawl.source == "Access") {
-    # Copy trawl Access database
-    haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary],
-                                trawl.dir.access),
-                      regexp = trawl.db.access)
-    
-    file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
-    
-    # Configure ODBC connection to TRAWL database
-    trawl.con  <- dbConnect(odbc(), 
-                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                            DBQ = file.path(here("Data/Trawl"),trawl.db.access))
-  }
-  # Import trawl database tables
-  catch.all	     <- tbl(trawl.con,"Catch") %>% collect()
-  haul.all       <- tbl(trawl.con,"Haul") %>% collect()
-  lengths.all    <- tbl(trawl.con,"Specimen") %>% collect()
-  if (dbExistsTable(trawl.con, "LengthFrequency"))
-    lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
-  spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
   
-  # Close database channel
-  dbDisconnect(trawl.con)
-  
-  # Save imported database data to .Rdata file
-  if (exists("lengthFreq.all")) {
-    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
-         file = here("Data/Trawl/checkTrawl_data.Rdata"))
-  } else {
-    save(catch.all, haul.all, lengths.all, spp.codes,  
-         file = here("Data/Trawl/checkTrawl_data.Rdata"))
-  }
 } else {
   # Load trawl data
-  load(here("Data/Trawl/checkTrawl_data.Rdata"))
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
   
 }
 ```
 
 ```{r modify-data}
-# Create startLatitudeDecimal and startLongitudeDecimal for Access data
 if (trawl.source == "Access") {
   # Reformat haul data to match SQL
   haul.all <- haul.all %>% 
