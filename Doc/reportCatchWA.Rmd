@@ -1,7 +1,12 @@
 ---
 title: "WA Scientific Collection Permit Reporting"
 author: "Kevin Stierhoff"
-output: html_document
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+css: css/ast.css
 ---
 
 ```{r set-up, error=FALSE, message=FALSE, warning=FALSE, echo=F}
@@ -58,104 +63,116 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r user-controls}
-get.nav    <- F
-save.figs  <- F
-resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+# Processing settings
+get.db     <- T
+get.nav    <- T
 do.spatial <- T
+nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
+save.figs  <- T
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+# Sampling settings
+sampling.cufes <- F
 ```
 
-```{r get-data}
-# Copy trawl Access database
-haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
-                  regexp = trawl.db.access)
+```{r get-trawl-data}
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
+  
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+  
+}
+```
 
-file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
 
-if (trawl.source == "SQL") {
-  # Configure ODBC connection to TRAWL database
-  trawl.con  <- dbConnect(odbc(), 
-                          Driver = "SQL Server", 
-                          Server = "161.55.235.187", 
-                          Database = "Trawl", 
-                          Trusted_Connection = "True")
-} else if (trawl.source == "Access") {
-  trawl.con  <- dbConnect(odbc(), 
-                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                          DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+```{r process-trawl-data}
+# Classify hauls by season (spring or summer)
+haul.all <- haul.all %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>% 
+  # Remove trawls from other surveys
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul.all %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Create haul paths from starts and ends
+haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+```
+
+```{r filter-trawl-data, include=FALSE}
+# Load spatial files
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(4326)
+
+# Create State Waters shapefile -------------------------------
+wa <- ne_states(country = 'United States of America', returnclass = 'sf') %>% 
+  filter(name == "Washington")
+
+wa_waters <- wa %>% 
+  # Convert to meters for accurate buffer
+  st_transform(crs = 3310) %>% 
+  st_buffer(dist = 1852*12) %>% 
+  # Transform back to WGS84 for mapping
+  st_transform(4326)
+
+if (do.spatial) {
+  # Find hauls in WA waters
+  haul.wa <- haul.mid %>% 
+    # Filter hauls N of the WA/OR border
+    filter(lat >= 46.23622) %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    # Find hauls in the US EEZ
+    st_intersection(eez_usa)
+  
+  # Find hauls within 12 nmi
+  haul.wa.12 <- haul.wa %>% 
+    st_intersection(wa_waters)
+  
+  save(haul.wa, haul.wa.12, file = here("Output/haul_data_reportCatchWa.Rdata"))
+} else {
+  load(here("Output/haul_data_reportCatch.Rdata"))
 }
 
-# Import trawl database tables
-catch.all	     <- tbl(trawl.con,"Catch") %>% collect() %>% filter(cruise == cruise.name)
-haul.all       <- tbl(trawl.con,"Haul") %>% collect() %>% filter(cruise == cruise.name)
-lengths.all    <- tbl(trawl.con,"Specimen") %>% collect() %>% filter(cruise == cruise.name)
-lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect() %>% filter(cruise == cruise.name)
-spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
-
-# Close database channel
-dbDisconnect(trawl.con)
+# Filter hauls in WA waters
+haul.out <- haul.mid %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  filter(!haul %in% haul.wa$haul)
 ```
 
 ```{r process-nav,include=FALSE}
-if (get.nav) {
-  # Load existing nav data
-  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
-    load(here("Data/Nav/nav_data.Rdata"))
-    
-    # Calculate difference between max nav time and now
-    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
-    
-    # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time)) - days(1)
-  }
-  
-  if (nav.lag > 24) {
-    # Generate ERDDAP URL
-    dataURL <- URLencode(paste(
-      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-      erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
-      sep = ""))
-    
-    # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                                    row.names = NULL, skip = 0))
-    names(nav.temp) <- erddap.headers
-    
-    # Filter to remove bad SST values
-    nav.temp <- nav.temp %>% 
-      mutate(long     = long - 360,
-             SOG      = SOG * 1.94384,
-             datetime = ymd_hms(time),
-             SST      = na_if(SST, NaN),
-             leg      = paste("Leg", cut(as.numeric(date(time)), 
-                                         leg.breaks, labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
-             between(lat, min(survey.lat), max(survey.lat)), 
-             between(long, min(survey.long), max(survey.long)))
-    
-    # Append new nav data
-    if (exists("nav")) {
-      nav <- bind_rows(nav, nav.temp) %>% 
-        distinct()
-    } else {
-      nav <- nav.temp
-    }
-  }
-  
-  # Convert nav to spatial
-  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  
-  nav.paths.sf <- nav.sf %>% 
-    group_by(leg) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("LINESTRING")
-  
-  # Save results
-  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
-} else {
-  # Load nav data
-  load(here("Data/NAV/nav_data.Rdata"))
+# Source code to get nav data from ERDDAP or SCS
+if (nav.source == "ERDDAP") {
+  source(here("Code/get_nav_erddap.R"))
+} else if (nav.source == "SCS") {
+  source(here("Code/get_nav_scs.R"))
 }
 
 # Read transect waypoints
@@ -211,7 +228,6 @@ locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.li
 # Get state data
 states <- ne_states(country = 'United States of America', returnclass = 'sf')
 ca     <- filter(states, name == "California")
-wa     <- filter(states, name == "Washington")
 
 # Get countries
 countries <- ne_countries(scale = "large", returnclass = "sf") %>%
@@ -252,18 +268,6 @@ ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>%
 ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>%
   st_transform(4326) %>%
   mutate(MPA = paste(NAME, Type))
-
-# Create State Waters shapefile -------------------------------
-wa_waters <- wa %>% 
-  # Convert to meters for accurate buffer
-  st_transform(crs = 3310) %>% 
-  st_buffer(dist = 1852*12) %>% 
-  # Transform back to WGS84 for mapping
-  st_transform(4326)
-
-# Read EEZ shapefiles -----------------------------------------
-eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
-  st_transform(4326)
 
 # Set padding around data  
 if (resize.map) {
@@ -324,122 +328,6 @@ base.map + geom_sf(data = wa_waters, colour = "red", fill = NA) +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 ```
 
-```{r modify-data}
-# Create startLatitudeDecimal and startLongitudeDecimal for Access data
-if (trawl.source == "Access") {
-  # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)),
-      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$EquilibriumTime, 
-                                                format = "%H:%M:%S"))),
-      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$haulbackTime,
-                                                format = "%H:%M:%S")))) %>% 
-    mutate(haulBackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes,
-           totalWeight = TotalWtKg, totalNum = TotalNum)
-  
-  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
-  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-  
-  # Correct equilibriumTime or haulBackTime
-  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  
-  # Reformat length frequency data to match SQL
-  lengths.all <- lengths.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, species = Species)
-  
-  # Reformat length frequency data to match SQL
-  lengthFreq.all <- lengthFreq.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
-           species = Species, length = Length, lengthType = LengthType, 
-           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
-           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
-           subSampleNumber = SubSampleNumber)
-  
-} else if (trawl.source == "SQL") {
-  haul.all <- haul.all %>% 
-    mutate(
-      equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime))
-  
-  # Compute totalWeight and totalNum, which only exist in the Access database
-  catch.all <- catch.all %>% 
-    mutate(
-      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
-}
-
-# Classify hauls by season (spring or summer)
-haul.all <- haul.all %>% 
-  # Remove bad trawls
-  filter(!trawlPerformance %in% trawl.performance) %>% 
-  mutate(season = case_when(
-    month(equilibriumTime) < 6 ~ "spring",
-    TRUE ~ "summer"),
-    duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-    cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
-
-# Find midpoint of each haul as the mean lat/lon
-haul.mid <- haul.all %>% 
-  group_by(cluster, haul) %>% 
-  summarise(
-    lat  = mean(c(startLatDecimal, stopLatDecimal)),
-    long = mean(c(startLongDecimal, stopLongDecimal))) 
-
-# Find midpoint of each haul cluster as the average of haul midpoints
-cluster.mid <- haul.mid %>% 
-  group_by(cluster) %>% 
-  summarise(
-    lat  = mean(lat),
-    long = mean(long))
-
-# Create haul paths from starts and ends
-haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
-  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
-  arrange(haul) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(haul) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
-```
-
-```{r filter-trawl-data}
-if (do.spatial) {
-  # Find hauls in WA waters
-  haul.wa <- haul.mid %>% 
-    # Filter hauls N of the WA/OR border
-    filter(lat >= 46.23622) %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    # Find hauls in the US EEZ
-    st_intersection(eez_usa)
-  
-  # Find hauls within 12 nmi
-  haul.wa.12 <- haul.wa %>% 
-    st_intersection(wa_waters)
-
-  save(haul.wa, haul.wa.12, file = here("Output/haul_data_reportCatchWa.Rdata"))
-} else {
-  load(here("Output/haul_data_reportCatch.Rdata"))
-}
-
-# Filter hauls in WA waters
-haul.out <- haul.mid %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(!haul %in% haul.wa$haul)
-```
-
 ```{r wa-hauls-map, eval=F}
 # Add CA state waters layer
 base.map + 
@@ -460,8 +348,6 @@ catch.wa <- catch.all %>%
 ```{r process-catch}
 # Summarize species catch by weight and number
 catch.summary <- catch.wa %>% 
-  mutate(totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-         totalNum = totalWeight/(subSampleWtkg/subSampleCount)) %>%
   group_by("Scientific Name" = scientificName, 
            "Common Name" = commonName) %>% 
   summarise("Total weight (kg)" = round(sum(totalWeight), 2),
@@ -478,9 +364,6 @@ write_csv(catch.summary,
 A map showing all trawl hauls (white points), trawls in WA State waters (withing the U.S. EEZ; red points), and trawls occurring in WA MPAs (blue markers; **need WA MPA shapefiles, if any**). Hovering over shaded polygons will show MPA names, and over points will show the trawl number, which includes the cruise, ship, haul, and collection.  
 
 ```{r catch-map-leaflet}
-# Configure palette for MPAs
-# factpal <- colorFactor(topo.colors(10), ca_mpas$MPA)
-
 # Create leaflet map
 if (nrow(haul.wa) > 0) {
   leaflet() %>% 
@@ -544,7 +427,8 @@ Catch for all trawl samples in  are summarized in the table below. Species are l
 ```{r catch-summary}
 if (nrow(catch.wa) > 0) {
   catch.summary %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          digits = c(0)) %>% 
     kable_styling(bootstrap_options = c("striped","hover","condensed"), 
                   full_width = FALSE) %>%
     row_spec(0, align = c("c")) %>% 
@@ -557,7 +441,7 @@ if (nrow(catch.wa) > 0) {
 
 ## By haul
 
-Catch for each trawl sample by species.
+Catch for each trawl sample by species.  
 
 ```{r catch-hauls}
 if (nrow(catch.wa) > 0) {
@@ -569,17 +453,19 @@ if (nrow(catch.wa) > 0) {
            "Total number (n)" = totalNum) %>% 
     arrange(Haul, desc(`Total weight (kg)`))
   
+  write_csv(catch.all,
+            here("Output/catch_table_WDFW.csv"),
+            na = "") 
+  
   catch.all %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          digits = c(0)) %>% 
     kable_styling(bootstrap_options = c("striped","hover","condensed"), 
                   full_width = FALSE) %>%
     row_spec(0, align = c("c")) %>% 
     column_spec(2, italic = T) %>% 
     scroll_box(height = "500px")
   
-  write_csv(catch.all,
-            here("Output/catch_table_WDFW.csv"),
-            na = "") 
 } else {
   cat("No catch in Washington")
 }
