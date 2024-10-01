@@ -83,7 +83,7 @@ if (get.nav.sh) {
 }
 ```
 
-```{r get-trawl-data}
+```{r collect-trawl-data}
 if (get.db) {
   # Source script to collect data from trawl database
   source(here("Code/collect_trawl_database.R"))
@@ -95,60 +95,15 @@ if (get.db) {
 }
 ```
 
-```{r modify-data}
-if (trawl.source == "Access") {
-  # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
-    arrange(haul) %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>%
-    mutate(haulBackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>% 
-    rename(duration = Duration) %>% 
-    mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
-           recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
-           evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
-  
-  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
-  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-  
-  # Correct equilibriumTime or haulBackTime
-  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  
-  # Reformat length frequency data to match SQL
-  if (exists("lengthFreq.all")) {
-    lengthFreq.all <- lengthFreq.all %>% 
-      rename(length = Length, lengthType = LengthType, 
-             sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
-             inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
-             subSampleNumber = SubSampleNumber)
-  }
-} else if (trawl.source == "SQL") {
-  haul.all <- haul.all %>% 
-    arrange(haul) %>% 
-    mutate(
-      equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime)) %>% 
-    mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
-           recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
-           evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
-}
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
 
+```{r process-haul-data}
 # Select bad trawls
 haul.bad <- haul.all %>% 
   filter(trawlPerformance %in% trawl.performance) 
-
-# Classify hauls by season (spring or summer)
-haul.all <- haul.all %>% 
-  mutate(season = case_when(
-    month(equilibriumTime) < 6 ~ "spring",
-    TRUE ~ "summer"))
 
 # Get only hauls from current survey
 haul <- filter(haul.all, cruise %in% cruise.name) %>% 
@@ -218,7 +173,7 @@ if (nrow(catch) > 0) {
     rename(any_of(pie.spp)) %>% 
     replace(is.na(.), 0) %>% 
     arrange(cluster)
-
+  
   # Add lat/long to haul summary for plotting
   haul.summ.wt <- haul.summ.wt %>% 
     right_join(haul.mid) %>% 
@@ -254,19 +209,6 @@ if (nrow(catch) > 0) {
 catch.pie <- cluster.summ.wt %>% 
   select(cluster, long, lat, any_of(names(pie.spp))) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
-
-# Two alternative methods for selecting columns; leaving until testing is completed.
-
-# catch.pie <- cluster.summ.wt %>% 
-#   select(cluster, long, lat, Anchovy, JackMack, 
-#          Jacksmelt, PacHerring, PacMack, RndHerring, Sardine, AllCPS) %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
-# 
-# catch.pie <- cluster.summ.wt %>% 
-#   select(cluster, long, lat, any_of(c("Anchovy", "JackMack", 
-#          "Jacksmelt", "PacHerring", "PacMack", "RndHerring", 
-#          "Sardine", "AllCPS"))) %>% 
-#   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
 # Project pie data
 catch.pie <- project_sf(catch.pie, crs.proj) 
@@ -1326,7 +1268,7 @@ plot.evolution <- ggplot(data = haul) +
   labs(x = "\nHaul", y = "Duration (mins)", title = "Evolution Time") + 
   scale_x_continuous(breaks = seq(0, 500, 5)) + 
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
-  
+
 
 plot.deployment <- ggplot(data = haul) +
   geom_line(aes(haul, as.numeric(deploymentTime), color = "Deployment")) +
@@ -1515,7 +1457,7 @@ if (nrow(catch.comp.errors) > 0) {
 ```
 ### Catch weight summary
 #### All catch
- 
+
 Summary of catch weight by haul (kg), including CPS and all other species weighed. The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
 
 ```{r plot-weight-summary-all}
@@ -1546,7 +1488,7 @@ bar.labs <- c("Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "
               "Merluccius productus" = "P. hake", "Other" = "Other",
               "Sardinops sagax" = "Sardine", "Scomber japonicus" = "P. mackerel", 
               "Trachurus symmetricus" = "J. mackerel")
-               
+
 # Species colors
 bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasii" = pac.herring.color,
                 "Engraulis mordax" = anchovy.color, "Etrumeus acuminatus" = rnd.herring.color,
