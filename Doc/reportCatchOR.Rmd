@@ -1,7 +1,12 @@
 ---
 title: "OR Scientific Collection Permit Reporting"
 author: "Kevin Stierhoff"
-output: html_document
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+css: css/ast.css
 ---
 
 ```{r set-up, error=FALSE, message=FALSE, warning=FALSE, echo=F}
@@ -59,105 +64,113 @@ source(here("Doc/settings", prj.settings))
 ```
 
 ```{r user-controls}
-get.db         <- T
-get.nav        <- F
-sampling.cufes <- T # Were CUFES data collected?
-resize.map     <- F # Resize map during survey; if T, uses anticipated bounds of survey area
-do.spatial     <- T
+# Processing settings
+get.db     <- T
+get.nav    <- T
+do.spatial <- T
+nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+# Sampling settings
+sampling.cufes <- F
 ```
 
-```{r get-data}
-# Copy trawl Access database
-haul.db <- dir_ls(file.path(survey.dir[survey.vessel.primary], "DATA/BIOLOGICAL/HAUL"),
-                  regexp = trawl.db.access)
+```{r get-trawl-data}
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
+  
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+  
+}
+```
 
-file_copy(haul.db, here("Data/Trawl"), overwrite = TRUE)
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
 
-if (trawl.source == "SQL") {
-  # Configure ODBC connection to TRAWL database
-  trawl.con  <- dbConnect(odbc(), 
-                          Driver = "SQL Server", 
-                          Server = "161.55.235.187", 
-                          Database = "Trawl", 
-                          Trusted_Connection = "True")
-} else if (trawl.source == "Access") {
-  trawl.con  <- dbConnect(odbc(), 
-                          Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                          DBQ = file.path(here("Data/Trawl"),trawl.db.access))
+```{r process-trawl-data}
+# Further process haul data --------------------------------------
+haul.all <- haul.all %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>% 
+  # Remove trawls from other surveys
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul.all %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Create haul paths from starts and ends
+haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
+  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
+  arrange(haul) %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  group_by(haul) %>% 
+  summarise(do_union = F) %>% 
+  st_cast("LINESTRING")
+```
+
+```{r filter-trawl-data, include=FALSE}
+# Load spatial files
+oregon <- ne_states(country = 'United States of America', returnclass = 'sf') %>% 
+  filter(name == "Oregon")
+
+## Read State Waters shapefiles -------------------------------
+or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>%
+  st_transform(4326)
+
+# Create State Waters shapefile -------------------------------
+or_waters_12 <- oregon %>% 
+  # Convert to meters for accurate buffer
+  st_transform(crs = 3310) %>% 
+  st_buffer(dist = 1852*12) %>% 
+  # Transform back to WGS84 for mapping
+  st_transform(4326)
+
+if (do.spatial) {
+  # Find hauls in WA waters
+  haul.or <- haul.mid %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    # Find hauls in OR state waters
+    st_intersection(or_waters)
+  
+  # Find hauls within 12 nmi
+  haul.or.12 <- haul.or %>% 
+    st_intersection(or_waters_12)
+  
+  save(haul.or, haul.or.12, file = here("Output/haul_data_reportCatchOr.Rdata"))
+} else {
+  load(here("Output/haul_data_reportCatchOr.Rdata"))
 }
 
-# Import trawl database tables
-catch.all	     <- tbl(trawl.con,"Catch") %>% collect() %>% filter(cruise == cruise.name)
-haul.all       <- tbl(trawl.con,"Haul") %>% collect() %>% filter(cruise == cruise.name)
-lengths.all    <- tbl(trawl.con,"Specimen") %>% collect() %>% filter(cruise == cruise.name)
-lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect() %>% filter(cruise == cruise.name)
-spp.codes      <- tbl(trawl.con,"SpeciesCodes") %>% collect()
-
-# Close database channel
-dbDisconnect(trawl.con)
+# Filter hauls in WA waters
+haul.out <- haul.mid %>% 
+  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  filter(!haul %in% haul.or$haul)
 ```
 
 ```{r process-nav,include=FALSE}
-if (get.nav) {
-  # Load existing nav data
-  if (file.exists(here("Data/Nav/nav_data.Rdata"))) {
-    load(here("Data/Nav/nav_data.Rdata"))
-    
-    # Calculate difference between max nav time and now
-    nav.lag <- difftime(now(tzone = "UTC"), max(ymd_hms(nav$time)), units = "hours")
-    
-    # Get new erddap start date from max date
-    erddap.survey.start <- max(date(nav$time)) - days(1)
-  }
-  
-  if (nav.lag > 24) {
-    # Generate ERDDAP URL
-    dataURL <- URLencode(paste(
-      "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip",
-      erddap.vessel, ".csv0?", erddap.vars,
-      "&time>=", erddap.survey.start, "&time<=", erddap.survey.end,
-      sep = ""))
-    
-    # Download and parse ERDDAP nav data
-    nav.temp <- data.frame(read.csv(dataURL, header = F, colClasses = erddap.classes, 
-                                    row.names = NULL, skip = 0))
-    names(nav.temp) <- erddap.headers
-    
-    # Filter to remove bad SST values
-    nav.temp <- nav.temp %>% 
-      mutate(long     = long - 360,
-             SOG      = SOG * 1.94384,
-             datetime = ymd_hms(time),
-             SST      = na_if(SST, NaN),
-             leg      = paste("Leg", cut(as.numeric(date(time)), 
-                                         leg.breaks, labels = F))) %>%
-      filter(is.nan(SOG) == F, SOG > 0, SOG < 15,
-             between(lat, min(survey.lat), max(survey.lat)), 
-             between(long, min(survey.long), max(survey.long)))
-    
-    # Append new nav data
-    if (exists("nav")) {
-      nav <- bind_rows(nav, nav.temp) %>% 
-        distinct()
-    } else {
-      nav <- nav.temp
-    }
-  }
-  
-  # Convert nav to spatial
-  # nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  nav.sf <- st_as_sf(nav, coords = c("long","lat"), crs = crs.geog) 
-  
-  nav.paths.sf <- nav.sf %>% 
-    group_by(leg) %>% 
-    summarise(do_union = F) %>% 
-    st_cast("LINESTRING")
-  
-  # Save results
-  save(nav, nav.sf, nav.paths.sf, file = here("Data/Nav/nav_data.Rdata"))
-} else {
-  # Load nav data
-  load(here("Data/NAV/nav_data.Rdata"))
+# Source code to get nav data from ERDDAP or SCS
+if (nav.source == "ERDDAP") {
+  source(here("Code/get_nav_erddap.R"))
+} else if (nav.source == "SCS") {
+  source(here("Code/get_nav_scs.R"))
 }
 
 # Read transect waypoints
@@ -214,7 +227,6 @@ locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.li
 states <- ne_states(country = 'United States of America', returnclass = 'sf')
 ca     <- filter(states, name == "California")
 wa     <- filter(states, name == "Washington")
-oregon <- filter(states, name == "Oregon")
 
 # Get countries
 countries <- ne_countries(scale = "large", returnclass = "sf") %>%
@@ -249,17 +261,6 @@ write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
 
 # Read State Waters shapefiles -------------------------------
 ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>%
-  st_transform(4326)
-
-or_waters <- st_read(here("Data/GIS/or_state_waters.shp")) %>%
-  st_transform(4326)
-
-# Create State Waters shapefile -------------------------------
-or_waters_12 <- oregon %>% 
-  # Convert to meters for accurate buffer
-  st_transform(crs = 3310) %>% 
-  st_buffer(dist = 1852*12) %>% 
-  # Transform back to WGS84 for mapping
   st_transform(4326)
 
 # Read CA MPAs shapefile --------------------------------------
@@ -330,120 +331,6 @@ base.map + geom_sf(data = or_waters, colour = "red", fill = NA) +
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 ```
 
-```{r modify-data}
-# Create startLatitudeDecimal and startLongitudeDecimal for Access data
-if (trawl.source == "Access") {
-  # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)),
-      equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$EquilibriumTime, 
-                                                format = "%H:%M:%S"))),
-      haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                         format(haul.all$haulbackTime,
-                                                format = "%H:%M:%S")))) %>% 
-    mutate(haulBackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes,
-           totalWeight = TotalWtKg, totalNum = TotalNum)
-  
-  # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-  eq.fix <- which(c(0, diff(haul.all$equilibriumTime)) < 0)
-  hb.fix <- which(c(0, diff(haul.all$haulBackTime)) < 0)
-  
-  # Correct equilibriumTime or haulBackTime
-  haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-  haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  
-  # Reformat length frequency data to match SQL
-  lengths.all <- lengths.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, species = Species)
-  
-  # Reformat length frequency data to match SQL
-  lengthFreq.all <- lengthFreq.all %>% 
-    rename(cruise = Cruise, ship = Ship, haul = Haul, collection = Collection, 
-           species = Species, length = Length, lengthType = LengthType, 
-           sexUnknown = NotDetermined, male = Male, activeFemale = ActiveFemale, 
-           inactiveFemale = InactiveFemale, totalFemale = TotalFemale, 
-           subSampleNumber = SubSampleNumber)
-  
-} else if (trawl.source == "SQL") {
-  haul.all <- haul.all %>% 
-    mutate(
-      equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime))
-  
-  # Compute totalWeight and totalNum, which only exist in the Access database
-  catch.all <- catch.all %>% 
-    mutate(
-      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
-}
-
-# Classify hauls by season (spring or summer)
-haul.all <- haul.all %>% 
-  # Remove bad trawls
-  filter(!trawlPerformance %in% trawl.performance) %>% 
-  mutate(season = case_when(
-    month(equilibriumTime) < 6 ~ "spring",
-    TRUE ~ "summer"),
-    duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
-    cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
-
-# Find midpoint of each haul as the mean lat/lon
-haul.mid <- haul.all %>% 
-  group_by(cluster, haul) %>% 
-  summarise(
-    lat  = mean(c(startLatDecimal, stopLatDecimal)),
-    long = mean(c(startLongDecimal, stopLongDecimal))) 
-
-# Find midpoint of each haul cluster as the average of haul midpoints
-cluster.mid <- haul.mid %>% 
-  group_by(cluster) %>% 
-  summarise(
-    lat  = mean(lat),
-    long = mean(long))
-
-# Create haul paths from starts and ends
-haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
-  bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
-  arrange(haul) %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(haul) %>% 
-  summarise(do_union = F) %>% 
-  st_cast("LINESTRING")
-```
-
-```{r filter-trawl-data}
-if (do.spatial) {
-  # Find hauls in WA waters
-  haul.or <- haul.mid %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    # Find hauls in OR state waters
-    st_intersection(or_waters)
-  
-  # Find hauls within 12 nmi
-  haul.or.12 <- haul.or %>% 
-    st_intersection(or_waters_12)
-  
-  save(haul.or, haul.or.12, file = here("Output/haul_data_reportCatchOr.Rdata"))
-} else {
-  load(here("Output/haul_data_reportCatchOr.Rdata"))
-}
-
-# Filter hauls in WA waters
-haul.out <- haul.mid %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(!haul %in% haul.or$haul)
-```
-
 ```{r wa-hauls-map, eval=F}
 # Add CA state waters layer
 base.map + 
@@ -504,86 +391,6 @@ specimen.summ <- specimens.or %>%
 # Save specimen summary to CSV
 write_csv(specimen.summ, here("Output/specimen_table_ODFW.csv"), na = "")
 ```
-
-```{r import-cufes-data}
-if (sampling.cufes) {
-  if (get.db) {
-    if (cufes.source == "SQLite") {
-      # Configure ODBC connection to TRAWL database
-      cufes.filename <- path_file(dir_ls(here("Data/CUFES"), regexp = "*.sqlite"))
-      cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
-      # Create the pointer to the CUFES table
-      cufes.all <- tbl(cufes.con, "cufessqlite") %>% collect()
-      
-      # Close connection
-      dbDisconnect(cufes.con)  
-    } else if (cufes.source == "SQL") {
-      cufes.con  <- dbConnect(odbc::odbc(), 
-                              Driver = "SQL Server", 
-                              Server = "161.55.235.187", 
-                              Database = "CUFES", 
-                              Trusted_Connection = "True")
-      # Create the pointer to the CUFES table
-      cufes.all <- tbl(cufes.con, "CUFES") %>% collect()
-      
-      # Close connection
-      dbDisconnect(cufes.con)  
-    } else if (cufes.source == "CSV") {
-      # cufes.source = "CSV"
-      cufes.filename <- file.path(here("Data/CUFES", cufes.db.csv))
-      
-      cufes.all <- read_csv(cufes.filename) %>% 
-        mutate(Cruise = as.character(Cruise))
-      
-      if (is.null(cufes.all$Comments)) cufes.all$Comments <- NA_character_
-    }
-    
-    # Read CUFES data
-    cufes.all <- cufes.all %>%
-      # collect() %>% 
-      mutate(
-        Start = case_when(
-          cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
-          cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
-        Stop = case_when(
-          cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
-          cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
-        Duration = as.numeric(difftime(Stop, Start, units = "mins")),
-        Year = year(Start),
-        AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
-      filter(between(Start, date(cufes.start), date(cufes.end)),
-             Ship %in% cruise.ship) 
-    
-    if (survey.name %in% c("1507SH")) {
-      cufes.all <- cufes.all %>% 
-        rename(lat = StopLatitude, long = StopLongitude) %>% 
-        project_df(to = crs.proj)
-    } else {
-      cufes.all <- cufes.all %>% 
-        rename(lat = StartLatitude, long = StartLongitude)%>% 
-        project_df(to = crs.proj)
-    }
-    
-    # Save imported database data to .Rdata file
-    save(cufes.all, file = here("Data/CUFES/cufes_data.Rdata"))
-  } else {
-    # Load previously imported database data
-    load(here("Data/CUFES/cufes_data.Rdata"))
-  }
-  
-  cufes.sf <- cufes.all %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    st_intersection(or_waters)
-  
-  cufes.all %>% 
-    filter(SampleNumber %in% cufes.sf$SampleNumber) %>% 
-    select(SampleNumber, Start, lat, long, SardineEggs, AnchovyEggs,
-           JackMackerelEggs, HakeEggs, SquidEggs, OtherFishEggs, Comments) %>% 
-    write_csv(here("Output/cufes_table_ODFW.csv"))
-} else {
-  print("No CUFES data collected.")
-}
-``` 
 
 # Interactive trawl plot
 
@@ -699,16 +506,103 @@ if (nrow(catch.or) > 0) {
 
 # Specimen summary
 
-A summary of samples taken from specimens collected in CA.
+A summary of samples taken from specimens collected in Oregon.
 
 ```{r specimen-summary}
-specimen.summ %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  column_spec(3, italic = T) %>% 
-  scroll_box(height = "500px")
+if (nrow(specimens.or) > 0) {
+  specimen.summ %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    column_spec(3, italic = T) %>% 
+    scroll_box(height = "500px")  
+} else {
+  cat("No specimens in Oregon.")
+}
 ```
 
+# CUFES samples
+
+```{r import-cufes-data}
+if (sampling.cufes) {
+  if (get.db) {
+    if (cufes.source == "SQLite") {
+      # Configure ODBC connection to TRAWL database
+      cufes.filename <- path_file(dir_ls(here("Data/CUFES"), regexp = "*.sqlite"))
+      cufes.con      <- dbConnect(SQLite(), dbname = here("Data/CUFES", cufes.filename))
+      # Create the pointer to the CUFES table
+      cufes.all <- tbl(cufes.con, "cufessqlite") %>% collect()
+      
+      # Close connection
+      dbDisconnect(cufes.con)  
+    } else if (cufes.source == "SQL") {
+      cufes.con  <- dbConnect(odbc::odbc(), 
+                              Driver = "SQL Server", 
+                              Server = "161.55.235.187", 
+                              Database = "CUFES", 
+                              Trusted_Connection = "True")
+      # Create the pointer to the CUFES table
+      cufes.all <- tbl(cufes.con, "CUFES") %>% collect()
+      
+      # Close connection
+      dbDisconnect(cufes.con)  
+    } else if (cufes.source == "CSV") {
+      # cufes.source = "CSV"
+      cufes.filename <- file.path(here("Data/CUFES", cufes.db.csv))
+      
+      cufes.all <- read_csv(cufes.filename) %>% 
+        mutate(Cruise = as.character(Cruise))
+      
+      if (is.null(cufes.all$Comments)) cufes.all$Comments <- NA_character_
+    }
+    
+    # Read CUFES data
+    cufes.all <- cufes.all %>%
+      # collect() %>% 
+      mutate(
+        Start = case_when(
+          cufes.date.format == "mdy" ~ mdy_hms(Start), #"06/01/2019-15:43:00"
+          cufes.date.format == "ymd" ~ ymd_hms(Start)),#"1996-03-15 15:43:00 -08:00"
+        Stop = case_when(
+          cufes.date.format == "mdy" ~ mdy_hms(Stop), #"06/01/2019-15:43:00"
+          cufes.date.format == "ymd" ~ ymd_hms(Stop)),#"1996-03-15 15:43:00 -08:00"
+        Duration = as.numeric(difftime(Stop, Start, units = "mins")),
+        Year = year(Start),
+        AllEggs = SardineEggs + AnchovyEggs + JackMackerelEggs) %>% 
+      filter(between(Start, date(cufes.start), date(cufes.end)),
+             Ship %in% cruise.ship) 
+    
+    if (survey.name %in% c("1507SH")) {
+      cufes.all <- cufes.all %>% 
+        rename(lat = StopLatitude, long = StopLongitude) %>% 
+        project_df(to = crs.proj)
+    } else {
+      cufes.all <- cufes.all %>% 
+        rename(lat = StartLatitude, long = StartLongitude)%>% 
+        project_df(to = crs.proj)
+    }
+    
+    # Save imported database data to .Rdata file
+    save(cufes.all, file = here("Data/CUFES/cufes_data.Rdata"))
+  } else {
+    # Load previously imported database data
+    load(here("Data/CUFES/cufes_data.Rdata"))
+  }
+  
+  cufes.sf <- cufes.all %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    st_intersection(or_waters)
+  
+  cufes.all %>% 
+    filter(SampleNumber %in% cufes.sf$SampleNumber) %>% 
+    select(SampleNumber, Start, lat, long, SardineEggs, AnchovyEggs,
+           JackMackerelEggs, HakeEggs, SquidEggs, OtherFishEggs, Comments) %>% 
+    write_csv(here("Output/cufes_table_ODFW.csv"))
+} else {
+  print("No CUFES data collected.")
+}
+``` 
+
 For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
+
