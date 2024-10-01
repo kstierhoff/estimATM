@@ -19,7 +19,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
-               png,devtools,kableExtra,forcats,jpeg,bookdown,bookdownplus,magick,
+               png,devtools,kableExtra,forcats,jpeg,bookdown,magick,
                odbc,cowplot,mapview,fs,sf)
 
 # Install and load required packages from Github -------------------------------
@@ -64,50 +64,107 @@ prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", pr
 source(here("Doc/settings", prj.settings))
 ```
 
-```{r load-catch-data}
-# Load haul and catch data
-load(here("Data/Trawl/trawl_data.Rdata"))
+```{r user-controls}
+# Processing settings
+get.db     <- T
+get.nav    <- T
+do.spatial <- T
+nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
+save.figs  <- T
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+# Sampling settings
+sampling.cufes <- F
 ```
 
-```{r load-spatial-data, include = FALSE}
-# Read EEZ shapefiles -----------------------------------------
-eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
-  st_transform(crs.geog) %>% 
-  select(geometry)
-```
-
-```{r process-hauls}
-# Create startLatitudeDecimal and startLongitudeDecimal for Access data
-if (trawl.source == "Access") {
-  # Reformat haul data to match SQL
-  haul.all <- haul.all %>% 
-    mutate(
-      startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-      startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-      stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-      stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-      haulBackTime     = haulbackTime,
-      equilibriumTime  = EquilibriumTime) %>% 
-    mutate(haulbackTime = case_when(
-      haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-      TRUE ~ haulBackTime)) %>%
-    rename(cruise = Cruise, ship = Ship, haul = Haul, 
-           collection = Collection, notes = Notes)
+```{r get-trawl-data}
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
   
-  
-} else if (trawl.source == "SQL") {
-  haul.all <- haul.all %>% 
-    mutate(
-      equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime))
-  
-  # Compute totalWeight and totalNum, which only exist in the Access database
-  catch.all <- catch.all %>% 
-    mutate(
-      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
   
 }
+```
+
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
+
+```{r process-trawl-data}
+# if (trawl.source == "Access") {
+#   if (year(haul.all$netInWaterTime[1]) >= 2021) {
+#     haul.all <- haul.all %>% 
+#       mutate(
+#         startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+#         startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+#         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+#         stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>% 
+#       filter(cruise %in% cruise.name & ship %in% cruise.ship)
+#     
+#   } else {
+#     haul.all <- haul.all %>% 
+#       arrange(haul) %>% 
+#       mutate(
+#         startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
+#         startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
+#         stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
+#         stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
+#         equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
+#                                            format(haul.all$EquilibriumTime,
+#                                                   format = "%H:%M:%S"))),
+#         haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
+#                                            format(haul.all$haulbackTime,
+#                                                   format = "%H:%M:%S")))) %>%
+#       mutate(haulBackTime = case_when(
+#         haulBackTime < equilibriumTime ~ haulBackTime + days(1),
+#         TRUE ~ haulBackTime)) %>%
+#       rename(cruise = Cruise, ship = Ship, haul = Haul,
+#              collection = Collection, notes = Notes) %>%
+#       filter(cruise %in% cruise.name & ship %in% cruise.ship) 
+#     
+#     # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
+#     eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
+#     hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
+#     
+#     # Correct equilibriumTime or haulBackTime
+#     haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
+#     haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
+#   }
+#   
+# } else if (trawl.source == "SQL") {
+#   # Filter haul data for current survey
+#   haul.all <- haul.all %>% 
+#     arrange(haul) %>% 
+#     mutate(equilibriumTime = ymd_hms(equilibriumTime),
+#            haulBackTime    = ymd_hms(haulBackTime)) %>% 
+#     select(cruise,ship,haul,collection,startLatDecimal,startLongDecimal,stopLatDecimal,
+#            stopLongDecimal,equilibriumTime,haulBackTime,trawlPerformance,notes) %>% 
+#     filter(cruise %in% cruise.name & ship %in% cruise.ship) 
+#   
+# } else if (trawl.source == "Excel") {
+#   # Format haul data
+#   haul.all <- haul.all %>% 
+#     mutate(
+#       startLatDecimal  =   DecLatitude,
+#       startLongDecimal =   DecLongitude,
+#       stopLatDecimal   =   DecLatitude,
+#       stopLongDecimal  =   DecLongitude,
+#       equilibriumTime  =   mdy_hms(paste(as.character(trawlDate),
+#                                          format(haul.all$EquilibriumTime, 
+#                                                 format = "%H:%M:%S"))),
+#       haulBackTime     =   equilibriumTime + minutes(`Duration(dec)`*60))
+#   
+#   # Filter haul data for current survey
+#   haul.all <- haul.all %>% 
+#     select(cruise = Cruise,ship = Ship,haul = Haul,collection = Collection,
+#            startLatDecimal,startLongDecimal,stopLatDecimal,
+#            stopLongDecimal,equilibriumTime,haulBackTime) %>% 
+#     filter(cruise %in% cruise.name & ship %in% cruise.ship)
+# }
 
 # Filter haul data for current survey
 haul <- haul.all %>% 
@@ -116,11 +173,6 @@ haul <- haul.all %>%
          trawlPerformance) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship) 
 
-write_csv(haul, 
-          here("Output/haul_table_ONMS.csv"))
-```
-
-```{r process-catch}
 # Filter and format catch data
 catch <- catch.all %>% 
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
@@ -129,11 +181,9 @@ catch <- catch.all %>%
 
 # Summarize species catch by weight and number
 catch.summary <- catch %>% 
-  mutate(totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-         totalNum = totalWeight/(subSampleWtkg/subSampleCount)) %>%
-  group_by(haul, scientificName, commonName) %>% 
-  summarise(totalWeight = sum(totalWeight),
-            totalNum    = sum(totalNum)) %>% 
+  # Subset columns
+  select(haul, scientificName, commonName,
+         totalWeight, totalNum) %>% 
   arrange(haul, desc(totalWeight)) %>% 
   # Add position data
   left_join(select(haul, haul, Latitude = startLatDecimal, 
@@ -144,8 +194,17 @@ names(catch.summary) <- c("Haul","Scientific Name","Common Name",
                           "Total weight (kg)","Total number (n)",
                           "Latitude","Longitude")
 
+# Write output files
+write_csv(haul, here("Output/haul_table_ONMS.csv"))
 write_csv(catch.summary, 
           here("Output/catch_table_ONMS.csv"))
+```
+
+```{r load-spatial-data, include = FALSE}
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  select(geometry)
 ```
 
 \blandscape  
@@ -159,6 +218,7 @@ _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", u
 Catch for all trawl samples are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
 
 ```{r catch-table}
+# Convert to datatable to allow for sorting/filtering?
 kable(catch.summary, format = knitr.format, booktabs = TRUE, 
       escape = FALSE, longtable = TRUE,
       align           = c(rep("l", 3), rep("r", ncol(catch.summary) - 3)),
