@@ -559,7 +559,7 @@ nav.summ %>%
          "Distance (km)"  = dist_km,
          "Distance (nmi)" = dist_nmi,
          Pings            = pings_ek) %>%  
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("c"), digits = c(0),
         format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
@@ -571,7 +571,7 @@ nav.summ %>%
 In addition to the total kilometers, the ship often requests a summary of transect distance sampled by the ship during each leg.
 
 ```{r transect-summary}
-if (exists(here("Data/Backscatter/nasc_all.Rdata"))) {
+if (file.exists(here("Data/Backscatter/nasc_all.Rdata"))) {
   # Load backscatter data
   load(here("Data/Backscatter/nasc_all.Rdata"))
   
@@ -671,7 +671,7 @@ if (exists("nav.summ.sd")) {
 }
 ```
 
-```{r create-basemap,include=F}
+```{r create-basemap, include=F}
 # Configure base map options -----------------
 # Import landmarks
 locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>%
@@ -972,75 +972,50 @@ if (get.db) {
 }
 ``` 
 
-```{r process-trawl-haul-data}
-# Create startLatitudeDecimal and startLongitudeDecimal for Access data
-if (trawl.source == "Access") {
-  if (year(haul.all$netInWaterTime[1]) >= 2021) {
-    haul.all <- haul.all %>% 
-      arrange(haul) %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) 
-    
-    catch.all <- catch.all %>% 
-      rename(totalWeight = TotalWtKg,
-             totalNum    = TotalNum)
-    
-  } else {
-    haul.all <- haul.all %>% 
-      arrange(haul) %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                           format(haul.all$EquilibriumTime,
-                                                  format = "%H:%M:%S"))),
-        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                           format(haul.all$haulbackTime,
-                                                  format = "%H:%M:%S")))) %>%
-      mutate(haulBackTime = case_when(
-        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-        TRUE ~ haulBackTime)) %>%
-      rename(cruise = Cruise, ship = Ship, haul = Haul,
-             collection = Collection, notes = Notes)
-    
-    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-    eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
-    hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
-    
-    # Correct equilibriumTime or haulBackTime
-    haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-    haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  }
-} else if (trawl.source == "SQL") {
-  haul.all <- haul.all %>% 
-    arrange(haul) %>% 
-    mutate(
-      netInWaterTime  = ymd_hms(netInWaterTime),
-      equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime),
-      netOnDeckTime   = ymd_hms(netOnDeckTime))
+```{r collect-trawl-data}
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
   
-  # Compute totalWeight and totalNum, which only exist in the Access database
-  catch.all <- catch.all %>% 
-    # replace_na(list(subSampleWtkg = 0, 
-    #                 subSampleCount = 0,
-    #                 remainingSubSampleWtkg = 0)) %>% 
-    mutate(
-      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+  
 }
+```
 
-# Classify hauls by season (spring or summer)
-haul.all <- haul.all %>% 
-  mutate(season = case_when(
-    month(equilibriumTime) < 6 ~ "spring",
-    TRUE ~ "summer"))
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
 
+```{r process-haul-data}
+# Select bad trawls
+haul.bad <- haul.all %>% 
+  filter(trawlPerformance %in% trawl.performance) 
+
+# Get only hauls from current survey
+haul <- filter(haul.all, cruise %in% cruise.name) %>% 
+  filter(!collection %in% haul.bad$collection) %>% 
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Find midpoint of each haul as the mean lat/lon
+haul.mid <- haul %>% 
+  group_by(cluster, haul) %>% 
+  summarise(
+    lat  = mean(c(startLatDecimal, stopLatDecimal)),
+    long = mean(c(startLongDecimal, stopLongDecimal))) 
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+```
+
+```{r process-trawl-haul-data}
 # Filter haul data for current survey
 haul <- haul.all %>% 
   select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 

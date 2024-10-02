@@ -16,7 +16,7 @@ if (trawl.source == "Access") {
     mutate(haulBackTime = case_when(
       haulBackTime < equilibriumTime ~ haulBackTime + days(1),
       TRUE ~ haulBackTime)) %>% 
-    rename(duration = Duration) %>% 
+    rename(duration = Duration, notes = Notes) %>% 
     mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
            recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
            evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
