@@ -1,4 +1,4 @@
-# Map Long Beach Carnage and Lisa Marie transects for Summer 2022 CCE Survey (2207RL)
+# Map Long Beach Carnage and Lisa Marie transects for Summer 2024 CCE Survey (2407RL)
 lbc.transects <- c(1:65, 332:395)
 lm.transects  <- c(66:171)
 
