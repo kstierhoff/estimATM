@@ -41,7 +41,7 @@ theme_set(theme_bw())
 copy.gpx           <- F # Copy GPX file from AST server
 process.transects  <- T # Usually T; Process GPX file using processTransects.R
 update.routes      <- T # Re-write route files after processing
-get.bathy          <- F # Get NOAA bathymetry (used to extract bathymetry)
+get.bathy          <- T # Get NOAA bathymetry (used to extract bathymetry)
 extract.bathy      <- T # Extract bathymetry profile along each transect
 
 # Create output directories, in case they don't exist from makeTransects.Rmd
@@ -174,8 +174,8 @@ reg.30 <- wpts %>%
   st_set_geometry(NULL)
 
 write_csv((select(ungroup(reg.30), Transect, lat, long)), 
-            file = here("Output", paste0("region_lines_30.csv")),
-            col_names = FALSE)
+          file = here("Output", paste0("region_lines_30.csv")),
+          col_names = FALSE)
 
 reg.60 <- reg.30 %>% 
   group_by(Transect, Type, key) %>% 
@@ -186,8 +186,8 @@ reg.60 <- reg.30 %>%
   select(Transect, Type, brg, lat = lat1, long = long1)
 
 write_csv(select(ungroup(reg.60), Transect, lat, long), 
-            file = here("Output", paste0("region_lines_60.csv")),
-            col_names = FALSE)
+          file = here("Output", paste0("region_lines_60.csv")),
+          col_names = FALSE)
 
 reg.90 <- reg.60 %>% 
   group_by(Transect, Type, key) %>% 
@@ -198,8 +198,8 @@ reg.90 <- reg.60 %>%
   select(Transect, Type, brg, lat = lat1, long = long1)
 
 write_csv(select(ungroup(reg.90), Transect, lat, long), 
-            file = here("Output", paste0("region_lines_90.csv")),
-            col_names = FALSE)
+          file = here("Output", paste0("region_lines_90.csv")),
+          col_names = FALSE)
 
 uctds.sf <- uctds %>% 
   as_tibble() %>% 
@@ -670,19 +670,23 @@ for (ii in unique(wpts$Region)) {
   
   polygon.temp <- wpts.e %>%
     rbind(wpts.w) %>% 
-    filter(Region == ii) %>% 
-    ungroup() %>% 
-    summarise(do_union = F) %>% 
-    st_cast("POLYGON") %>% 
-    mutate(Region = ii) %>% 
-    st_make_valid() %>% 
-    st_difference(inshore.clip) %>% 
-    mutate(area = st_area(.))
+    filter(Region == ii) 
   
-  if (exists("region.polygons")) {
-    region.polygons <- bind_rows(region.polygons, polygon.temp)
-  } else {
-    region.polygons <- polygon.temp
+  if (nrow(polygon.temp) >= 4) {
+    region.poly <- polygon.temp %>% 
+      ungroup() %>% 
+      summarise(do_union = F) %>% 
+      st_cast("POLYGON") %>% 
+      mutate(Region = ii) %>% 
+      st_make_valid() %>% 
+      st_difference(inshore.clip) %>% 
+      mutate(area = st_area(.))
+    
+    if (exists("region.polygons")) {
+      region.polygons <- bind_rows(region.polygons, region.poly)
+    } else {
+      region.polygons <- region.poly
+    } 
   }
 }
 
