@@ -790,13 +790,18 @@ if (update.routes) {
               col_names = FALSE)
   }
   
-  # Write route plans to CSV
+  # Write updated route plans to CSV
   write_csv(select(route.fsv, -X, -Y), 
             here("Output/routes_updated/route_plan_fsv.csv"))
   
   if(nrow(route.ns) > 0) {
     write_csv(select(route.ns, -X, -Y), 
               here("Output/routes_updated/route_plan_ns.csv"))
+  }
+  
+  if(nrow(route.sd) > 0) {
+    write_csv(select(route.sd, -X, -Y), 
+              here("Output/routes_updated/route_plan_sd.csv"))
   }
 }
 
