@@ -2,9 +2,9 @@
 title: "plotSurvey: Survey Data Visualizer"
 output:
   bookdown::html_document2:
-    toc: no
-    toc_float: no
-    number_sections: no
+    toc: yes
+    toc_float: yes
+    number_sections: yes
 css: css/ast.css
 ---
 
@@ -62,7 +62,7 @@ nasc.plot.min    <- 0
 
 ```{r processing-controls}
 # Control script behavior (usually T)
-get.nav            <- T # Download NOAA Ship nav data
+get.nav            <- F # Download NOAA Ship nav data
 get.nav.sd         <- F # Download Saildrone nav data from ERDDAP
 get.nav.sh         <- F # Download NOAA Ship nav data
 nav.source         <- "ERDDAP" # Navigation data source: ERDDAP or SCS
@@ -221,10 +221,10 @@ if (sampling.trawl) {
     # Save imported database data to .Rdata file
     if (exists("lengthFreq.all")) {
       save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
-         file = here("Data/Trawl/trawl_data.Rdata"))
+           file = here("Data/Trawl/trawl_data.Rdata"))
     } else {
       save(catch.all, haul.all, lengths.all, spp.codes,  
-         file = here("Data/Trawl/trawl_data.Rdata"))
+           file = here("Data/Trawl/trawl_data.Rdata"))
     }
     
   } else {
@@ -334,6 +334,20 @@ if (sampling.trawl) {
 }
 ```  
 
+```{r process-ctd-data, message=FALSE, include=FALSE}
+if (file.exists(here("Output/cast_summary_uctd.csv"))) {
+  # Load UCTD summary table
+  uctd.summ <- read_csv(here("Output/cast_summary_uctd.csv")) %>% 
+    project_df(to = crs.proj)
+}
+
+if (file.exists(here("Output/cast_summary_ctd.csv"))) {
+  # Load CTD summary table
+  ctd.summ <- read_csv(here("Output/cast_summary_ctd.csv")) %>% 
+    project_df(to = crs.proj)
+}
+```
+
 ```{r process-catch-data, message=FALSE}
 if (sampling.trawl) {
   # Filter catch data
@@ -415,7 +429,6 @@ if (sampling.trawl) {
       replace(is.na(.), 0)
   }
   
-  # Prepare catch data for plotting ----------------------------------------------
   # Select and rename trawl data for pie charts
   haul.pie <- haul.summ.wt %>% 
     select(haul, long, lat, Anchovy, JackMack, 
@@ -576,8 +589,8 @@ if (sampling.cufes) {
   cufes.plot.ofe <- cufes %>% 
     filter(Density > 0, Species == "OtherFishEggs") %>%
     filter(str_detect(Comments, "Scomber japonicus")|
-         str_detect(Comments, "scomber japonicus")|
-         str_detect(Comments, "S. japonicus")) %>% 
+             str_detect(Comments, "scomber japonicus")|
+             str_detect(Comments, "S. japonicus")) %>% 
     arrange(desc(Density))  
 }
 ```  
@@ -955,10 +968,10 @@ if (save.figs) {
   # Combine backscatter and trawl
   if (sampling.acoustics & sampling.trawl) {
     nasc.haul.wt <- plot_grid(nasc.map.cps, trawl.pie.haul.wt, 
-                                    nrow = 1, labels = c("a)", "b)")) 
+                              nrow = 1, labels = c("a)", "b)")) 
     
     nasc.cluster.wt <- plot_grid(nasc.map.cps, trawl.pie.cluster.wt, 
-                                    nrow = 1, labels = c("a)", "b)")) 
+                                 nrow = 1, labels = c("a)", "b)")) 
     
     # Save composite plot
     ggsave(nasc.haul.wt,
@@ -1115,8 +1128,8 @@ if (sampling.cufes) {
   cufes.ofe.sf <- cufes %>% 
     filter(Density > 0, Species == "OtherFishEggs") %>%
     filter(str_detect(Comments, "Scomber japonicus")|
-         str_detect(Comments, "scomber japonicus")|
-         str_detect(Comments, "S. japonicus")) %>% 
+             str_detect(Comments, "scomber japonicus")|
+             str_detect(Comments, "S. japonicus")) %>% 
     mutate(
       spp.label = case_when(
         Species == "OtherFishEggs" ~ "Other fish",
@@ -1699,7 +1712,73 @@ if (file.exists(here("Figs/fig_nasc_cufes_haul_wt.png"))) {
 }
 ```
 
-# Plot saildrone data
+# Map station sampling data
+
+A map showing the vessel track (gray lines), acoustic transects (black lines), and the locations of nighttime surface trawls (red), underway CTD (UCTD) casts (blue), and CTD casts (green, if present).  
+
+```{r map-station-ata}
+if (exists("uctd.summ")|exists("ctd.summ")) {
+  if (save.figs) {
+    # Create Saildrone map
+    sample.map <- base.map +
+      geom_sf(data = nav.paths.sf, colour = "gray70") +
+      coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+               xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+               ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    
+    if (exists("nasc.plot.cps")) {
+      # Add UCTD casts to map
+      sample.map <- sample.map +
+        geom_point(data = nasc.plot.cps, aes(X, Y), colour = "black", size = 0.01) +
+        coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    }
+    
+    if (exists("uctd.summ")) {
+      # Add UCTD casts to map
+      sample.map <- sample.map +
+        geom_point(data = uctd.summ, aes(X, Y), shape = 21, fill = "blue") +
+        coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    }
+    
+    if (exists("ctd.summ")) {
+      # Add CTD casts to map
+      sample.map <- sample.map +
+        geom_point(data = ctd.summ, aes(X, Y), shape = 21, fill = "green") +
+        coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    }
+    
+    if (exists("haul.mid")) {
+      haul.plot <- project_df(ungroup(haul.mid), to = crs.proj)
+      
+      # Add CTD casts to map
+      sample.map <- sample.map +
+        geom_point(data = haul.plot, aes(X, Y), shape = 21, fill = "red") +
+        coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+                 xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+                 ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+    }
+    
+    # Save map
+    ggsave(sample.map, file = here("Figs/fig_sample_map.png"),
+           height = map.height, width = map.width)
+  }
+}
+
+if (file.exists(here("Figs/fig_sample_map.png"))) {
+  include_graphics(here("Figs/fig_sample_map.png"))
+} else {
+  print("No station sample data yet.")
+}
+```
+
+
+# Map Saildrone data
 
 (ref:saildrone-transects) Transect sampled by Saildrone unmanned surface vehicles (USVs).
 
