@@ -37,8 +37,17 @@ set.clusters <- select(sets, key.set, date, datetime, vessel.name, lat, long, sa
   project_df(to = crs.proj)
 
 # Plot purse seine sets retained in the analysis
-# ggplot(set.clusters, aes(long, lat, colour = vessel.name)) + geom_point() + coord_map()
+set.map <- base.map + 
+  geom_point(data = set.clusters, aes(X, Y, colour = vessel.name)) + 
+  coord_sf(crs = crs.proj, 
+           xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
+           ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"])))
 
+ggsave(set.map, 
+       filename = here("Figs/fig_seine_sets.png"),
+       width = map.width, height = map.height)
+
+# Save set info
 save(sets, set.clusters, file = here("Output/purse_seine_sets.Rdata"))
 
 ## Import set catch data -----------------------------------------------------------
@@ -75,6 +84,7 @@ for (v in seine.vessels) {
   }
 }
 
+# Save set catch info
 save(set.catch, file = here("Output/purse_seine_catch.Rdata"))
 
 # Import set specimen data ----------------------------------------------------
@@ -127,7 +137,7 @@ for (v in seine.vessels) {
         totalLength_mm = case_when(
           is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
           TRUE ~ totalLength_mm),
-        K = round((weightg/totalLength_mm*10^3)*100))
+        K = round((weightg/totalLength_mm*10^3)*100)) 
     
     # Combine results
     if (exists("set.lengths")) {
@@ -138,18 +148,65 @@ for (v in seine.vessels) {
   }
 }
 
+# set.lengths.tmp %>% group_by(scientificName) %>% summarise(min.length = min(length_mm), max.length = max(length_mm))
+# set.lengths.tmp %>% group_by(scientificName) %>% summarise(min.w = min(weight_g), max.w = max(weight_g))
+# filter(set.lengths.tmp, is.na(forkLength_mm)) %>% group_by(scientificName) %>% tally()
+# filter(set.lengths.tmp, is.na(standardLength_mm)) %>% group_by(scientificName) %>% tally()
+
 save(set.lengths, file = here("Output/purse_seine_lengths.Rdata"))
 
-# # Plot lengths
-# length.plot.ns <- ggplot() +
-#   geom_point(data = set.lengths,
-#              aes(forkLength_mm, weightg, colour = vessel.name, label = key),
-#              fill = "green", shape = 21) +
-#   geom_point(data = set.lengths,
-#              aes(standardLength_mm, weightg, colour = vessel.name, label = key),
-#              fill = "blue", shape = 21) +
-#   facet_wrap(~scientificName, scales = "free")
-#   ggplotly(length.plot.ns)
+# Get max TL for plotting L/W models
+L.max.ns <- set.lengths %>% 
+  filter(scientificName %in% c(cps.spp, "Merluccius productus")) %>%
+  group_by(scientificName) %>% 
+  summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
+
+lw.df.ns <- data.frame()
+
+# Generate length/weight curves
+for (i in unique(L.max.ns$scientificName)) {
+  # Create a length vector for each species
+  totalLength_mm <- seq(0, L.max.ns$max.TL[L.max.ns$scientificName == i])
+  
+  # Calculate weights from lengths
+  weightg <- estimate_weight(i, totalLength_mm, season = tolower(survey.season))
+  
+  # Combine results
+  lw.df.ns <- bind_rows(lw.df.ns, data.frame(scientificName = i, weightg, totalLength_mm))
+}
+
+# Convert lengths for plotting
+lw.df.ns <- lw.df.ns %>% 
+  mutate(
+    forkLength_mm     = convert_length(scientificName, totalLength_mm, "TL", "FL"),
+    standardLength_mm = convert_length(scientificName, totalLength_mm, "TL", "SL")
+  ) %>% 
+  pivot_longer(totalLength_mm:standardLength_mm, names_to = "length_type", values_to = "length_mm")
+
+# Plot specimen lengths
+lw.plot.ns <- ggplot() +
+  # Plot seasonal length models for each species
+  geom_line(data = filter(lw.df.ns, scientificName %in% unique(set.lengths$scientificName)), 
+            aes(length_mm, weightg, group = length_type, linetype = length_type),
+            colour = "gray50", alpha = 0.5) +
+  geom_point(data = set.lengths,
+             aes(standardLength_mm, weightg, fill = sex, shape = vessel.name, label = label),
+             colour = "gray50", alpha = 0.9) +
+  geom_point(data = set.lengths,
+             aes(forkLength_mm, weightg, fill = sex, shape = vessel.name, label = label),
+             colour = "gray50", alpha = 0.9) +
+  scale_fill_manual(name = "Sex", values = c("pink","lightblue","orange","lightgreen")) +
+  scale_linetype_discrete(name = "Length type") +
+  scale_shape_manual(name = "Vessel", values = c(21, 23)) +
+  facet_wrap(~scientificName, scales = "free") +
+  xlab("Length (mm)") + ylab("Mass (g)") +
+  theme_bw() +
+  theme(strip.background.x = element_blank(),
+        strip.text.x = element_text(face = "italic")) 
+
+# save length/weight plot
+ggsave(lw.plot.ns, filename = here("Figs/fig_LW_plots_nearshore.png"),
+       width = 10, height = 7) 
 
 # Summarize catch data ------------------------------------------------
 set.catch.summ <- set.catch %>%
