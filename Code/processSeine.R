@@ -66,6 +66,7 @@ for (v in seine.vessels) {
                common_name == "Pacific Mackerel" ~ "Scomber japonicus",
                common_name == "Jack Mackerel" ~ "Trachurus symmetricus",
                common_name == "Northern Anchovy" ~ "Engraulis mordax",
+               common_name == "Round Herring" ~ "Etrumeus acuminatus",
                # common_name == "Jack Smelt" ~ "Atherinopsis californiensis",
                # common_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
                # common_name == "Pacific Hake" ~ "Merluccius productus",
@@ -104,15 +105,15 @@ for (v in seine.vessels) {
                common_name == "Pacific Mackerel" ~ "Scomber japonicus",
                common_name == "Jack Mackerel" ~ "Trachurus symmetricus",
                common_name == "Northern Anchovy" ~ "Engraulis mordax",
-               # common_name == "Jacksmelt" ~ "Atherinopsis californiensis",
-               # common_name == "Whitebait Smelt" ~ "Allosmerus elongatus",
+               common_name == "Round Herring" ~ "Etrumeus acuminatus",
                TRUE ~ NA_character_),
              missing.weight = case_when(is.na(weight_g)   ~ T, TRUE ~ FALSE),
              missing.length = case_when(is.na(length_mm) ~ T, TRUE ~ FALSE)) %>%
       mutate(
         weightg = weight_g,
         forkLength_mm = case_when(
-          scientificName %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ length_mm,
+          scientificName %in% c("Clupea pallasii","Scomber japonicus",
+                                "Trachurus symmetricus","Etrumeus acuminatus") ~ length_mm,
           TRUE ~ NA_real_),
         standardLength_mm = case_when(
           scientificName %in% c("Engraulis mordax","Sardinops sagax") ~ length_mm,
@@ -129,7 +130,9 @@ for (v in seine.vessels) {
           scientificName == "Scomber japonicus" ~
             convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
           scientificName == "Trachurus symmetricus" ~
-            convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"))) %>%
+            convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
+          scientificName == "Etrumeus acuminatus" ~ 
+            convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL"))) %>%
       mutate(
         weightg = case_when(
           is.na(weightg) ~ estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)),
@@ -575,7 +578,7 @@ clf.seine <- set.clusters %>%
   # Add herring TS estimates to clf
   left_join(ts.sub.her.seine, by  = c("cluster" = "cluster.her", "haul" = "haul.her")) %>%
   # Add round herring TS estimates to clf
-  left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher")) %>%
+  # left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher")) %>%
   # Add other TS estimates to clf
   left_join(ts.sub.other.seine, by = c("cluster" = "cluster.other", "haul" = "haul.other"))
 
@@ -634,7 +637,7 @@ clf.seine.deep <- set.clusters %>%
   # Add herring TS estimates to clf
   left_join(ts.sub.her.seine, by  = c("cluster" = "cluster.her", "haul" = "haul.her")) %>%
   # Add round herring TS estimates to clf
-  left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher")) %>%
+  # left_join(ts.sub.rher.seine, by = c("cluster" = "cluster.rher", "haul" = "haul.rher")) %>%
   # Add other TS estimates to clf
   left_join(ts.sub.other.seine, by = c("cluster" = "cluster.other", "haul" = "haul.other"))
 
