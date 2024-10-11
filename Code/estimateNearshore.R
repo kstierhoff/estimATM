@@ -527,33 +527,33 @@ if (use.seine.data) {
 }
 
 # Select only clusters assigned to nasc intervals and included in catch.source.ns
-cluster.pie.ns <- cluster.pie %>% 
+cluster.pie.ns <- cluster.pie %>%
   filter(cluster %in% unique(nasc.nearshore$cluster),
-         sample.type %in% catch.source.ns) 
+         sample.type %in% catch.source.ns)
 
 cluster.pos.ns <- filter(cluster.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
 # Select only hauls assigned to nasc intervals and included in catch.source.ns
-haul.pie.ns <- haul.pie %>% 
+haul.pie.ns <- haul.pie %>%
   filter(haul %in% unique(nasc.nearshore$haul),
-         sample.type %in% catch.source.ns) 
+         sample.type %in% catch.source.ns)
 
 haul.pos.ns <- filter(haul.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
 # Do deep data
-cluster.pie.ns.deep <- cluster.pie.deep %>% 
+cluster.pie.ns.deep <- cluster.pie.deep %>%
   filter(cluster %in% unique(nasc.nearshore$cluster.deep),
-         sample.type %in% catch.source.ns) 
+         sample.type %in% catch.source.ns)
 
 cluster.pos.ns.deep <- filter(cluster.pie.ns.deep, AllCPS > 0) %>% 
   arrange(desc(X))
 
 # Select only hauls assigned to nasc intervals and included in catch.source.ns
-haul.pie.ns.deep <- haul.pie.deep %>% 
+haul.pie.ns.deep <- haul.pie.deep %>%
   filter(haul %in% unique(nasc.nearshore$haul.deep),
-         sample.type %in% catch.source.ns) 
+         sample.type %in% catch.source.ns)
 
 haul.pos.ns.deep <- filter(haul.pie.ns.deep, AllCPS > 0) %>% 
   arrange(desc(X))
@@ -591,75 +591,16 @@ haul.zero.ns.deep    <- filter(haul.pie.ns.deep, AllCPS == 0)
 ## AFAIK, these figures are exploratory only, and do not appear in any reports
 ## KLS 2023-02-16
 if (save.figs) {
-  # Create trawl figure
-  # Use clustered trawl data (clf)
-  trawl.catch.plot.cluster.ns <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = cluster.pos.ns,
-                    aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
-                    cols = c("Anchovy","JackMack","Jacksmelt",
-                             "PacHerring","PacMack","Sardine"),
-                    alpha = 0.8) +
-    # Configure pie outline colors
-    scale_colour_manual(name = "Sample type", 
-                        labels = c("Purse seine", "Trawl"),
-                        values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
-                        guide = "none") +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty trawl locations
-    geom_point(data = cluster.zero.ns, aes(X, Y), 
-               size = 2, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    # ggtitle("CPS Species Proportions in Net Samples") +
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-  
-  # Use individual trawl haul data (hlf)
-  trawl.catch.plot.haul.ns <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = haul.pos.ns, 
-                    aes(X, Y, group = haul, r = pie.radius, colour = sample.type),
-                    cols = c("Anchovy","JackMack","Jacksmelt",
-                             "PacHerring","PacMack","Sardine"),
-                    alpha = 0.8) +
-    # Configure pie outline colors
-    scale_colour_manual(name = "Sample type", 
-                        labels = c("Purse seine", "Trawl"),
-                        values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
-                        guide = "none") +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty trawl locations
-    geom_point(data = haul.zero.ns, aes(X, Y), 
-               size = 2, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    # ggtitle("CPS Species Proportions in Net Samples") +
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  # Create trawl haul and cluster proportion figures
+  source(here("Code/plot_haul_proportion_wt_nearshore.R"))
+  source(here("Code/plot_cluster_proportion_wt_nearshore.R"))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, trawl.catch.plot.cluster.ns,
+  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
                                         nrow = 1, labels = c("a)", "b)"),
                                         align = "hv")
   
-  nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, trawl.catch.plot.haul.ns,
+  nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, set.pie.haul.wt,
                                      nrow = 1, labels = c("a)", "b)"),
                                      align = "hv")
   
