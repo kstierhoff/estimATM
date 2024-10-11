@@ -605,7 +605,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "Access"    # "SQL" or "Access"
+trawl.source           <- "SQL"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
 trawl.performance      <- c("Aborted") # Character vector; trawl performance to exclude

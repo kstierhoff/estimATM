@@ -132,7 +132,7 @@ catch <- catch.all %>%
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
            scientificName %in% cps.spp & netSampleType == 'codend') %>% 
-  filter(!presenceAbsenceOnly == "Y") %>%
+  filter(!presenceOnly == "Y") %>%
   left_join(select(haul, haul, cluster)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg,
@@ -340,7 +340,7 @@ lengths.all <- lengths.all %>%
   left_join(select(spp.codes, species, scientificName, commonName)) %>%
   # Filter for CPS species and market squid
   filter(scientificName %in% c(cps.spp, 
-                               "Doryteuthis (Loligo) opalescens", 
+                               "Doryteuthis opalescens", 
                                "Merluccius productus")) %>% 
   # Select desired columns
   select(cruise, ship, haul, collection, species, individual_ID, 
@@ -359,9 +359,9 @@ lengths.all <- lengths.all %>%
       is.na(standardLength_mm) & scientificName %in% c("Sardinops sagax", 
                                                        "Engraulis mordax") ~ TRUE,
       is.na(forkLength_mm) & scientificName %in% c("Scomber japonicus", "Trachurus symmetricus", 
-                                                   "Clupea pallasii", "Etrumeus acuminatus") ~ TRUE,
-      is.na(totalLength_mm) & scientificName %in% c("Merluccius productus") ~ TRUE,
-      is.na(mantleLength_mm) & scientificName %in% c("Doryteuthis (Loligo) opalescens") ~ TRUE,
+                                                   "Clupea pallasii", "Etrumeus acuminatus",
+                                                   "Merluccius productus") ~ TRUE,
+      is.na(mantleLength_mm) & scientificName %in% c("Doryteuthis opalescens") ~ TRUE,
       TRUE ~ NA),
     missing.weight = case_when(
       is.na(weightg) ~ TRUE,
@@ -370,15 +370,18 @@ lengths.all <- lengths.all %>%
   mutate(nativeLength_mm = case_when(
     scientificName %in% c("Sardinops sagax", "Engraulis mordax") ~ standardLength_mm,
     scientificName %in% c("Scomber japonicus", "Trachurus symmetricus", 
-                          "Clupea pallasii", "Etrumeus acuminatus") ~ forkLength_mm,
-    scientificName %in% c("Merluccius productus") ~ totalLength_mm,
-    scientificName == "Doryteuthis (Loligo) opalescens" ~ mantleLength_mm,
+                          "Clupea pallasii", "Etrumeus acuminatus",
+                          "Merluccius productus") ~ forkLength_mm,
+    scientificName == "Doryteuthis opalescens" ~ mantleLength_mm,
     TRUE ~ NA_integer_))
 
 if (exists("lengths.expanded.final")) {
   lengths.all <- lengths.all %>% 
     bind_rows(lengths.expanded.final)
 }
+
+# haul.unique <- haul.all[!which(duplicated(select(haul.all, cruise, ship, haul, season))),]
+# haul.unique <- distinct(haul.all)
 
 lengths.all <- lengths.all %>% 
   # Create unique key and replace unused sex categories
@@ -391,7 +394,7 @@ lengths.all <- lengths.all %>%
                         ", Flag: ", flaggedData)) %>%
   # Add season from haul
   left_join(select(haul.all, cruise, ship, haul, season)) %>%
-  filter(scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens", 
+  filter(scientificName %in% c(cps.spp, "Doryteuthis opalescens", 
                                "Merluccius productus"))
 
 # Convert lengths to total length for TS estimates ---------------------------
@@ -410,7 +413,8 @@ lengths.all  <- lengths.all %>%
         convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Etrumeus acuminatus" ~ 
         convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm),
+      scientificName == "Merluccius productus" ~ forkLength_mm, # There is no FL to TL conversion yet
+      scientificName == "Doryteuthis opalescens" ~  as.numeric(mantleLength_mm),
       TRUE ~ totalLength_mm)) %>% 
   mutate(totalLength_mm = round(totalLength_mm),
          mantleLength_mm = round(mantleLength_mm)) 
@@ -422,7 +426,7 @@ L.max <- lengths.all %>%
   summarise(max.TL = max(totalLength_mm, na.rm = TRUE))
 
 L.max.sq <- lengths.all %>% 
-  filter(scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  filter(scientificName == "Doryteuthis opalescens") %>% 
   group_by(scientificName) %>% 
   summarise(max.ML = max(mantleLength_mm, na.rm = TRUE))
 
@@ -459,21 +463,21 @@ lengths.all <- lengths.all %>%
       is.na(totalLength_mm) ~ estimate_length(.$scientificName, .$weightg, season = tolower(survey.season)),
       TRUE ~ totalLength_mm),
     K = case_when(
-      !scientificName == "Doryteuthis (Loligo) opalescens" ~ round((weightg/totalLength_mm*10^3)*100),
+      !scientificName == "Doryteuthis opalescens" ~ round((weightg/totalLength_mm*10^3)*100),
       TRUE ~ round((weightg/mantleLength_mm*10^3)*100)))
 
 # Filter samples with missing length AND weight measurements
 bad.lengths <-  lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens") & 
+           scientificName %in% c(cps.spp, "Doryteuthis opalescens") & 
            toupper(isRandomSample) == "Y") %>% 
   filter(is.na(totalLength_mm), is.na(weightg))
 
 # Filter length data for current cruise and vessel
 lengths <- lengths.all %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens", "Merluccius productus") & 
+           scientificName %in% c(cps.spp, "Doryteuthis opalescens", "Merluccius productus") & 
            toupper(isRandomSample) == "Y") 
 
 # Summarize Fulton's condition factor (K) for identifying outliers
@@ -487,7 +491,7 @@ K.summ <- lengths %>%
 # Filter binned lengths for the present survey
 lengths.binned <- lengths.all %>%
   filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           scientificName %in% c(cps.spp, "Doryteuthis (Loligo) opalescens", "Merluccius productus") & 
+           scientificName %in% c(cps.spp, "Doryteuthis opalescens", "Merluccius productus") & 
            binned == TRUE) 
 
 # If binned lengths are present, plot their distribution
@@ -543,7 +547,7 @@ View the length (cm) and weight (g) range for each species.
 ```{r length-summary}
 # Summarize lengths by species
 lengths %>% 
-  filter(!scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  filter(!scientificName == "Doryteuthis opalescens") %>% 
   group_by(scientificName) %>% 
   summarise(
     TL.min = round(min(totalLength_mm, na.rm = TRUE)/10,0),
@@ -563,7 +567,7 @@ lengths %>%
 ```{r length-summary-squid}
 # Summarize lengths by species
 lengths %>% 
-  filter(scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  filter(scientificName == "Doryteuthis opalescens") %>% 
   group_by(scientificName) %>% 
   summarise(
     ML.min = round(min(mantleLength_mm, na.rm = TRUE)/10,0),
@@ -601,7 +605,7 @@ View the distribution of Fulton's Condition Factor ($K = (w/TL^3)*100$) for each
 ```{r, fig.pos="hold"}
 # Plot lengths and bounds of outliers
 lengths %>% 
-  # filter(!scientificName == "Doryteuthis (Loligo) opalescens") %>% 
+  # filter(!scientificName == "Doryteuthis opalescens") %>% 
   ggplot(aes(K)) + geom_histogram() +
   geom_vline(data = K.summ, aes(xintercept =  K.lower), linetype = "dashed") +
   geom_vline(data = K.summ, aes(xintercept =  K.upper), linetype = "dashed") +
@@ -1084,7 +1088,7 @@ Mantle length (mm) vs. weight (g). Unlike other species, the dashed line represe
 
 ```{r squid-data}
 # Select species
-scientificName.sub <- "Doryteuthis (Loligo) opalescens"
+scientificName.sub <- "Doryteuthis opalescens"
 
 # Subset lengths and models
 lengths.sub     <- filter(lengths, scientificName == scientificName.sub)
@@ -1465,7 +1469,7 @@ Summary of catch weight by haul (kg), including CPS and all other species weighe
 catch.bar <- catch.all %>% 
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
-  filter(!presenceAbsenceOnly == "Y") %>%
+  filter(!presenceOnly == "Y") %>%
   left_join(select(haul, haul, cluster, datetime = equilibriumTime)) %>% 
   mutate(key = paste(haul, scientificName),
          totalWeight = subSampleWtkg + remainingSubSampleWtkg,

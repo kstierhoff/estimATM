@@ -63,7 +63,7 @@ lm.specimens <- read_csv(here("Data/Seine/lm_catch.csv"), lazy = FALSE) %>%
         convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Trachurus symmetricus" ~ 
         convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(alternateLength_mm))) %>% 
+      scientificName == "Doryteuthis opalescens" ~  as.numeric(alternateLength_mm))) %>% 
   filter(scientificName %in% cps.spp, !is.na(set)) %>% 
   mutate(
     weightg = case_when(

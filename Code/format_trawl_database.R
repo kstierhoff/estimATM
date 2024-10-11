@@ -42,8 +42,10 @@ if (trawl.source == "Access") {
   haul.all <- haul.all %>% 
     arrange(haul) %>% 
     mutate(
+      netInWaterTime  = ymd_hms(netInWaterTime),
       equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime)) %>% 
+      haulBackTime    = ymd_hms(haulBackTime),
+      netOnDeckTime   = ymd_hms(netOnDeckTime)) %>% 
     mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
            recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
            evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
