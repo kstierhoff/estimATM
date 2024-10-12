@@ -88,7 +88,7 @@ if (process.nearshore) {
   
   # For 2023, replace cps.nasc with NASC.30, to examine the contribution of deep anchovy schools to the sardine estimates
   # Ideally, provide variable for nasc.depth.deep (e.g., NASC20), but hard-coded for 2307RL
-  if (survey.name %in% c("2307RL")) {
+  if (survey.name %in% c("2307RL","2407RL")) {
     nasc.nearshore <- nasc.nearshore %>%
       # Retain original cps.nasc
       # Create deep backscatter variable
@@ -1383,7 +1383,8 @@ for (i in unique(nearshore.spp$scientificName)) {
         i == "Engraulis mordax" & lat.stock <  stock.break.anch ~ "Central",
         i == "Sardinops sagax"  & lat.stock >= stock.break.sar  ~ "Northern",
         i == "Sardinops sagax"  & lat.stock <  stock.break.sar  ~ "Southern",
-        i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
+        i %in% c("Clupea pallasii","Scomber japonicus",
+                 "Trachurus symmetricus","Etrumeus acuminatus") ~ "All"),
         scientificName = i) %>% 
       filter(!is.na(stratum)) %>% 
       select(vessel.name, transect.name, stock, scientificName, stratum) %>%
