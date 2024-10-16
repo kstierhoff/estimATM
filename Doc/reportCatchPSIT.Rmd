@@ -1,0 +1,210 @@
+---
+title: "PSIT Protected Species Catch and Specimen Reporting"
+author: "Kevin Stierhoff"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+css: css/ast.css
+---
+
+```{r set-up, error=FALSE, message=FALSE, warning=FALSE, echo=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,swfscMisc,lubridate,sp,mapview,RODBC,
+               knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs, RSQLite,
+               ggspatial,janitor,DT)
+
+# Install and load required packages from Github -------------------------------
+# surveyR
+pacman::p_load_gh("kstierhoff/surveyR")
+pacman::p_load_gh("kstierhoff/atm")
+
+
+# Define method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# Set global knitr chunk options
+if (.Platform$OS.type == "unix") {
+  # Do not specify Cairo device for MacOS
+  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', out.width = '100%', dev = "png", dpi = 150)
+} else {
+  knitr::opts_chunk$set(echo = F, warning = F, message = F,
+                        fig.align = 'center', out.width = '100%', dev = "png", dpi = 150,
+                        dev.args = list(type = "cairo"))
+}
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+```
+
+```{r project-info,include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r user-controls}
+# Processing settings
+get.db     <- T
+get.nav    <- T
+do.spatial <- T
+nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
+save.figs  <- T
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+# Sampling settings
+sampling.cufes <- F
+```
+
+```{r get-trawl-data}
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
+  
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+  
+}
+```
+
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
+
+```{r process-trawl-data}
+# Clean and format haul data ---------------------------
+haul.all <- haul.all %>% 
+  # Remove bad trawls
+  filter(!trawlPerformance %in% trawl.performance) %>%
+  # Remove trawls from other surveys
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) %>% 
+  mutate(duration = difftime(haulBackTime, equilibriumTime, units = "mins"), # Calculate duration
+         cluster  = cumsum(c(0, diff(equilibriumTime)) > 12) + 1) # Assign cluster
+
+# Filter catch and specimen data -------------------------------------
+catch.all   <- filter(catch.all, cruise %in% haul.all$cruise)
+lengths.all <- filter(lengths.all, cruise %in% haul.all$cruise)
+```
+
+```{r id-protected-spp}
+# Trout & salmon: Pacific salmon unid., pink, chum, coho, sockeye, Chinook, steelhead
+salmon   <- c(161931, 161974, 161975, 161976, 161977, 161979, 161980, 161989) 
+eulachon <-   162051
+
+# Filter non-protected species
+protected.spp <- filter(spp.codes, species %in% c(salmon, eulachon))
+```
+
+```{r extract-catch}
+# Extract catch containing protected species
+catch.psit <- catch.all %>% 
+  left_join(spp.codes) %>% 
+  left_join(select(haul.all, haul, orderOcc, netInWaterTime, lat = startLatDecimal, long = startLongDecimal,
+                   surfaceTempC, salinityPPM)) %>%
+  filter(species %in% protected.spp$species) %>% 
+  select(cruise,ship,haul,collection,species,commonName,scientificName,netInWaterTime,lat,long,
+         remainingSubSampleWtkg,subSampleWtkg,subSampleCount,totalNum,totalWeight,
+         isWtEstimated,hasLF,notes,netSampleType)
+
+# Output to CSV
+write_csv(catch.psit, 
+          file = here("Output", paste0(survey.name, "_ProtectedSpeciesCatch_to_report_Compliance.csv")),
+          na = "")
+```
+
+```{r extract-specimens}
+# Extract specimens from protected species
+lengths.psit <- lengths.all %>% 
+  left_join(spp.codes) %>% 
+  left_join(select(haul.all, haul, orderOcc, netInWaterTime, equilibriumTime, 
+                   lat = startLatDecimal, long = startLongDecimal,
+                   surfaceTempC, salinityPPM)) %>% 
+  filter(species %in% protected.spp$species) %>% 
+  select(cruise,ship,haul,collection,species,scientificName,commonName,specimenNumber,
+         orderOcc,netInWaterTime,equilibriumTime,lat,long,surfaceTempC,salinityPPM,individual_ID,
+         forkLength_mm,weightg,notes,wasFrozen,netSampleType,isAlive,
+         otolithNumber,DNAvialNumber,adiposeCondition,hasDNAfinClip,hasTag)
+
+# Output to CSV
+write_csv(lengths.psit, 
+          file = here("Output", paste0(survey.name, "_SalmonSpecimens_to_report_Compliance.csv")),
+          na = "")
+```
+
+# Catch summary
+
+A summary of catches from trawls containing protected species.
+
+# Protected species catch 
+## Catch summary
+
+A summary of catches from trawls containing protected species.
+
+```{r catch-table}
+catch.psit %>% 
+  select(cruise,ship,haul, netInWaterTime,commonName,scientificName,totalNum,totalWeight) %>% 
+  datatable(rownames = FALSE)
+```
+
+# Protected species specimens
+## Specimen info
+
+Specimen info for protected species.
+
+```{r specimen-table}
+lengths.psit %>% 
+  select(cruise,ship,haul,netInWaterTime,commonName,scientificName,specimenNumber,
+         forkLength_mm,weightg) %>% 
+  datatable(rownames = FALSE)
+```
+
+## Specimen summary
+
+Specimen summary for protected species
+
+```{r specimen-summary}
+# Summarize specimens
+lengths.psit.summary <- lengths.psit %>% 
+  # Select specimens where weights, otoliths, and/or DNA were taken
+  filter(!is.na(otolithNumber) | !is.na(DNAvialNumber) | 
+           !is.na(weightg)) %>% 
+  select(haul, commonName, scientificName, weightg, 
+         otolithNumber, DNAvialNumber, hasDNAfinClip, adiposeCondition) %>% 
+  group_by(haul, commonName, scientificName) %>% 
+  # !is.na(var) converts to logical then sum gives the total counts
+  summarise(measured = sum(!is.na(weightg)), 
+            otoliths = sum(!is.na(otolithNumber)),
+            DNA      = sum(!is.na(DNAvialNumber)),
+            adipose_intact  = sum(adiposeCondition == "intact", na.rm = TRUE),
+            adipose_clipped = sum(adiposeCondition == "clipped", na.rm = TRUE)) %>% 
+  arrange(scientificName, haul)
+
+# Output to CSV
+write_csv(lengths.psit.summary, 
+          file = here("Output", paste0(survey.name, "_ProtectedSpeciesSpecimenSummary_to_report_Compliance.csv")),
+          na = "")
+
+lengths.psit.summary %>% 
+  adorn_totals() %>% 
+  datatable(rownames = FALSE)
+```
+
