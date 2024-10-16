@@ -6,7 +6,7 @@ process.nearshore <- T # Process near backscatter data; typically TRUE
 estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
@@ -977,10 +977,10 @@ min.S <- 30
 max.S <- 35
 
 # Set limits for latitude and longitude ----------------------------------------
-min.lat  <-   31
+min.lat  <-   25
 max.lat  <-   52
 min.long <- -132
-max.long <- -117
+max.long <- -112
 
 # Files to manually exclude
 exclude.uctd <- c(NA)
