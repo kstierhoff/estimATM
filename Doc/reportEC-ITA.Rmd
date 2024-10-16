@@ -40,7 +40,10 @@ if (doc.type == "latex") {
 
 # knitr options
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, error = FALSE, warning = FALSE,
-                      fig.align = "center")
+                      fig.align = "center",knitr.kable.NA = "-")
+
+# Configure knitr options for displaying NA values
+options(knitr.kable.NA = '-')
 
 # Create output directories
 dir_create(here(), c("Data", "Figs", "Output"))
@@ -67,8 +70,8 @@ nav.source    <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sh    <- F # Download Shimada nav data from ERDDAP
 get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
 get.nav.ns    <- F # Process data from nearshore vessels
-get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
-extract.bathy <- T # Extract bathymetry for each nav point
+get.bathy     <- F # Download ETOPO1 bathymetry data in the survey footprint
+extract.bathy <- F # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
@@ -1033,6 +1036,16 @@ haul <- haul.all %>%
   mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1,
          sample.type = "Trawl") 
 
+# Filter catch data for current survey
+catch <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  left_join(select(haul, haul, equilibriumTime, startLatDecimal, startLongDecimal)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           netSampleType == 'codend') %>% 
+  inner_join(select(haul, haul, cluster)) %>% 
+  mutate(key = paste(haul, scientificName),
+         sample.type = "Trawl")
+
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
   group_by(cluster, haul, sample.type) %>% 
@@ -1073,6 +1086,12 @@ cluster.mid.sf <- cluster.mid %>%
 ### GPS data for each haul 
 
 ```{r trawl-haul-stats}
+# Output haul data to CSV
+haul %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         stopLatDecimal, stopLongDecimal) %>% 
+  write_csv(here("Output/haul_table_EC-ITA.csv"))
+
 haul %>% 
   select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
          stopLatDecimal, stopLongDecimal) %>%  
@@ -1082,32 +1101,28 @@ haul %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"),
                 full_width = F) %>% 
   scroll_box(height = "500px") 
-
-
-haul %>% 
-  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
-         stopLatDecimal, stopLongDecimal) %>% 
-  write_csv(here("Output/haul_table_EC-ITA.csv"))
 ```
 
 ### Detailed catch and weight for each haul 
 
 ```{r trawl-catch-stats}
-# Filter catch data
-catch <- catch.all %>% 
-  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-  left_join(select(haul, haul, equilibriumTime, startLatDecimal, startLongDecimal)) %>% 
-  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           netSampleType == 'codend') %>% 
-  inner_join(select(haul, haul, cluster)) %>% 
-  mutate(key = paste(haul, scientificName),
-         sample.type = "Trawl")
-
+# Output catch data to CSV
 catch %>% 
   select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
          scientificName, commonName, totalWeight, totalNum) %>% 
   arrange(haul, desc(totalWeight)) %>% 
   write_csv(here("Output/catch_table_EC-ITA.csv"))
+
+catch %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         scientificName, commonName, totalWeight, totalNum) %>% 
+  arrange(haul, desc(totalWeight)) %>%  
+  kable(format = knitr.format, booktabs = TRUE, escape = F,
+        align = c("c"), digits = c(4),
+        format.args = list(big.mark = ",")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = F) %>% 
+  scroll_box(height = "500px") 
 ```
 
 
