@@ -29,6 +29,12 @@ waypoint.file <- here("Data/Nav", "waypoints_2407RL.csv")
 # Extract route
 vessel.route <- tmaptools::read_GPX(gpx.file)
 
+ctds <- tmaptools::read_GPX(here::here("Data/Nav", "lm_ctds.gpx"))$waypoints %>% 
+  atm::project_sf(crs = 4326) %>% 
+  select(lon = X, lat = Y, name, time) %>% 
+  arrange(time) %>% 
+  st_as_sf(coords = c("lon","lat"), crs = 4326)
+
 # Convert to points
 vessel.points <- vessel.route$track_points %>% 
   atm::project_sf(crs = 4326) %>% 
@@ -69,7 +75,32 @@ transects.sf <- wpts.sf %>%
                      'Distance:', distance, 'nmi<br/>')
   )
 
+if (file.exists(here("Data/Map/basemap.Rdata"))) {
+  load(file = here("Data/Map/basemap.Rdata"))
+  load(file = here("Output/basemap_bounds.Rdata"))
+
+  sets.proj <- project_df(sets, to = 3310) %>%
+    filter(vessel.name == "LM")
+
+  lm.map.2407RL <- base.map +
+    geom_sf(data = vessel.points, size = 0.1, colour = "blue") +
+    geom_sf(data = ctds, shape = 23, fill = "red") +
+    geom_point(data = sets.proj, aes(X, Y), shape = 21, fill = "white") +
+    # Format axes and titles
+    xlab("Longitude") + ylab("Latitude") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])),
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"]))) +
+    theme_bw()
+
+  # Save the base map
+  ggsave(lm.map.2407RL,
+         file = here("Figs/fig_Lisa_Marie_nav_2407RL.png"),
+         height = map.height, width = map.width)
+
+}
+
 # Plot map
-mapview(transects.sf, zcol = "Type") + mapview(vessel.points)   
+mapview(transects.sf, zcol = "Type") + mapview(vessel.points) 
 ```
 
