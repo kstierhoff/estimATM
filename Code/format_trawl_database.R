@@ -79,6 +79,7 @@ haul.all <- haul.all %>%
 
 # Compute totalWeight and totalNum, which don't reliably exist in either database
 catch.all <- catch.all %>% 
+  replace_na(list(remainingSubSampleWtkg = 0)) %>% 
   mutate(
     totalWeight = subSampleWtkg + remainingSubSampleWtkg,
     totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
