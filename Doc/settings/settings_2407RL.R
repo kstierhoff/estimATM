@@ -13,7 +13,7 @@ combine.regions   <- T # Combine nearshore/offshore plots with those from the co
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns   <- 7 # For nearshore sampling
+tx.spacing.ns   <- NA # For nearshore sampling
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -554,7 +554,7 @@ use.tx.number          <- c(RL  = TRUE,
 tx.rm                  <- list(RL  = NA,
                                SH  = NA,
                                LM  = NA,
-                               LBC = NA,
+                               LBC = c(24,35,40),
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
@@ -584,8 +584,8 @@ cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 max.cluster.dist       <- 30
 
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0,  6, 15, 35, 70, 100)
-tx.spacing.dist <- c(5, 10, 20, 40, 80)
+tx.spacing.bins <- c(0, 3.5, 8, 15, 35, 70, 100)
+tx.spacing.dist <- c(2.5, 5, 10, 20, 40, 80)
 
 # SCS data
 scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
@@ -673,7 +673,7 @@ boot.num <- 1000 # 1000 during final
 do.lf    <- TRUE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core") 
+estimate.regions   <- c("Core", "Nearshore") 
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata

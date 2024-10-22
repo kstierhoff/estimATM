@@ -194,7 +194,7 @@ if (process.nearshore) {
     st_as_sf(coords = c("long", "lat"), crs = crs.geog)
   
   # During 2307RL, Lisa Marie extended transects and purse seine sampling well beyond
-  # the planned transects in the nearshore region. This section removes nearshore acoustic intervals 
+  # the planned transects in the nearshore region. This code section removes nearshore acoustic intervals 
   # that extend beyond the nearshore survey footprint for that survey only.
   if (survey.name %in% c("2307RL")) {
     # Buffer mainland by 7 nmi, which seems to encompass the footprint of the
@@ -847,10 +847,13 @@ tx.mid.ns <- nasc.nearshore %>%
     long = mean(long, na.rm = TRUE)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
+# Remove nearest neighbor calculations if they exist
+if (exists("tx.nn.ns")) rm(tx.nn.ns)
+
 for (i in unique(tx.mid.ns$transect.name)) {
   # Get the mid lat/long for each transect
   tx.nn.i      <- filter(tx.mid.ns, transect.name == i) 
-  # Get midpoint data for all other transects
+  # Get midpoint data for all other transectss
   tx.others <- filter(tx.mid.ns, transect.name != i, 
                       vessel.name %in% tx.nn.i$vessel.name) 
   # Get the transect info and spacing based on shortest distance
@@ -875,16 +878,19 @@ for (i in unique(tx.mid.ns$transect.name)) {
 # Bin transects by spacing
 tx.nn.ns <- tx.nn.ns %>% 
   mutate(dist.bin = cut(tx.nn.ns$min.dist, tx.spacing.bins),
-         spacing  = tx.spacing.dist[as.numeric(dist.bin)],
-         dist.cum = cumsum(spacing)) %>% 
-  arrange(transect.name)
+         spacing  = tx.spacing.dist[as.numeric(dist.bin)]) %>% 
+  mutate(spacing = case_when(
+    spacing > 6 ~ 5,
+    TRUE ~ spacing),
+    dist.cum = cumsum(spacing)) %>% 
+  arrange(transect)
 
-if (!is.na(tx.spacing.ns)) {
-  tx.nn.ns <- tx.nn.ns %>% 
-    mutate(spacing = tx.spacing.ns,
-           dist.bin = cut(spacing, tx.spacing.bins),
-           dist.cum = cumsum(spacing))
-}
+# if (!is.na(tx.spacing.ns)) {
+#   tx.nn.ns <- tx.nn.ns %>% 
+#     mutate(spacing = tx.spacing.ns,
+#            dist.bin = cut(spacing, tx.spacing.bins),
+#            dist.cum = cumsum(spacing))
+# }
 
 # Save nearest neighbor distance info
 save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
@@ -1673,8 +1679,8 @@ strata.summ.plot.ns <- strata.final.ns %>%
   summarise(
     start     = min(transect),
     end       = max(transect),
-    lat.start = min(lat),
-    lat.end   = max(lat),
+    lat.start = min(lat, na.rm = TRUE),
+    lat.end   = max(lat, na.rm = TRUE),
     nTx       = n()) %>% 
   arrange(scientificName, stratum)
 
@@ -1725,7 +1731,7 @@ nasc.density.ns.sf <- nasc.density.ns %>%
                    '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>')
   )
 
-# ns.spp <- "Engraulis mordax"
+# ns.spp <- "Sardinops sagax"
 # mapview(filter(strata.nearshore, scientificName == ns.spp)) +
 # mapview(filter(strata.nearshore, scientificName == ns.spp), zcol = "stock") +
 # mapview(filter(nasc.density.ns.sf, scientificName == ns.spp), cex = "bin.level", zcol = "bin.level")

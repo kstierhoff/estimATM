@@ -151,10 +151,10 @@ for (v in seine.vessels) {
   }
 }
 
-# set.lengths.tmp %>% group_by(scientificName) %>% summarise(min.length = min(length_mm), max.length = max(length_mm))
-# set.lengths.tmp %>% group_by(scientificName) %>% summarise(min.w = min(weight_g), max.w = max(weight_g))
-# filter(set.lengths.tmp, is.na(forkLength_mm)) %>% group_by(scientificName) %>% tally()
-# filter(set.lengths.tmp, is.na(standardLength_mm)) %>% group_by(scientificName) %>% tally()
+# set.lengths %>% group_by(scientificName) %>% summarise(min.length = min(length_mm, na.rm = T), max.length = max(length_mm, na.rm = T))
+# set.lengths %>% group_by(scientificName) %>% summarise(min.w = min(weight_g, na.rm = T), max.w = max(weight_g, na.rm = T))
+# filter(set.lengths, is.na(forkLength_mm)) %>% group_by(scientificName) %>% tally()
+# filter(set.lengths, is.na(standardLength_mm)) %>% group_by(scientificName) %>% tally()
 
 save(set.lengths, file = here("Output/purse_seine_lengths.Rdata"))
 
@@ -357,11 +357,13 @@ if (scale.pies) {
   set.pie.deep$r <- pie.radius.ns
 }
 
+# Extract sets with positive CPS catch
 set.pos      <- filter(set.pie, AllCPS > 0) %>% 
   arrange(desc(X))
 set.pos.deep <- filter(set.pie.deep, AllCPS > 0) %>% 
   arrange(desc(X))
 
+# Extract sets with zero CPS catch
 set.zero      <- filter(set.pie, AllCPS == 0)
 set.zero.deep <- filter(set.pie.deep, AllCPS == 0)
 

@@ -9,8 +9,8 @@ cal.plot <- cal.res.all %>%
 cal.plot.used <- cal.plot %>% 
   filter(vessel_name %in% survey.vessel.long,
          between(cal_date,
-                 ymd(cal.plot.date) - days(cal.window),
-                 ymd(cal.plot.date) + days(cal.window))) %>% 
+                 ymd(cal.plot.date[survey.vessel.primary]) - days(cal.window),
+                 ymd(cal.plot.date[survey.vessel.primary]) + days(cal.window))) %>% 
   arrange(txdr_type)
 
 bw_summ <- cal.plot %>% 

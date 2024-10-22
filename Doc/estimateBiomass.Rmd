@@ -109,12 +109,11 @@ do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
 process.cufes     <- F # Process CUFES data (no CUFES sampling post-2023)
 process.cal       <- F # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
-copy.bib          <- F # Copy bibliography files (requires connection to AST2)
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- T # Extract ETOPO1 bathymetry data in the survey footprint
 resize.map        <- F # Resize map during survey; if T, uses anticipated bounds of survey area
@@ -153,14 +152,6 @@ To more easily configure processing for different surveys and distribute updated
 Files are copied locally for processing to avoid slow results when working across the network (especially from remote locations or at sea). Controls in the User Settings section (above) determine whether files are copied locally (usually `TRUE` during the first run) and whether files are overwritten. If files are known to have changed, set `overwrite.files <- TRUE` to overwrite files already present, else files already present will be skipped and only new files copied to the local directory. If files have not changed, set `copy.files <- FALSE` to speed processing (`overwrite.files` will be ignored and may be left set to `TRUE`).
 
 ```{r copy-files,include=FALSE}
-# Copy bibliography and CSL files -------------------------------------------------------
-if (copy.bib) {
-  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/csl/ices-journal-of-marine-science.csl",
-            here("Doc/csl"), overwrite = TRUE)
-  file_copy("//swc-storage1.nmfs.local/AST1/LITERATURE/Rmarkdown/bib/ast_bib.bib",
-            here("Doc/bib"), overwrite = TRUE)    
-}
-
 if (copy.files) {
   # Create data directories
   dir_create(here("Data", c("Backscatter", "Calibration", "CTD", "CUFES", "Trawl", "UCTD")))
@@ -426,6 +417,8 @@ if (resize.map) {
       st_bbox()
   }
 }
+
+save(map.bounds, file = here("Output/basemap_bounds.Rdata"))
 
 # Determine map aspect ratio and set height and width
 map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
@@ -1435,123 +1428,27 @@ include_graphics(here("Figs/fig_nasc_summary_map_tx.png"))
 
 Trawl haul, catch, and length (both individual and binned lengths of CPS) data are imported from either an Access (at sea, generally) or SQL Server database (after the survey). To import from the SQL Server, a machine ODBC connection must be configured to the TRAWL and CUFES databases on the Estrella server (IP address: 161.55.235.187). For help configuring an ODBC connection, contact [Thanh Vu](Thanh.Vu@NOAA.gov) at the SWFSC. To request access to the Trawl database, contact [Yuhong Gu](Yuhong.Gu@NOAA.gov).  
 
-```{r import-trawl-data, include=FALSE}
+```{r collect-trawl-data}
 if (get.db) {
-  if (trawl.source == "SQL") {
-    # Configure ODBC connection to TRAWL database
-    trawl.con  <- dbConnect(odbc(), 
-                            Driver = "SQL Server", 
-                            Server = "161.55.235.187", 
-                            Database = "Trawl", 
-                            Trusted_Connection = "True")
-  } else if (trawl.source == "Access") {
-    trawl.con  <- dbConnect(odbc(), 
-                            Driver = "Microsoft Access Driver (*.mdb, *.accdb)", 
-                            DBQ = file.path(here("Data/Trawl"),trawl.db.access))
-  }
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
   
-  # Import trawl database tables
-  catch.all	     <- tbl(trawl.con, "Catch") %>% collect()
-  haul.all       <- tbl(trawl.con, "Haul") %>% collect()
-  lengths.all    <- tbl(trawl.con, "Specimen") %>% collect()
-  if (dbExistsTable(trawl.con, "LengthFrequency"))
-    lengthFreq.all <- tbl(trawl.con,"LengthFrequency") %>% collect()
-  spp.codes      <- tbl(trawl.con, "SpeciesCodes") %>% collect()
-  
-  # Close database channel
-  dbDisconnect(trawl.con)
-  
-  # Replace round herring in the database
-  spp.codes$scientificName[spp.codes$species == 161743] <- "Etrumeus teres"
-  
-  # Save imported database data to .Rdata file
-  if (exists("lengthFreq.all")) {
-    save(catch.all, haul.all, lengths.all, spp.codes, lengthFreq.all, 
-         file = here("Data/Trawl/trawl_data.Rdata"))
-  } else {
-    save(catch.all, haul.all, lengths.all, spp.codes,  
-         file = here("Data/Trawl/trawl_data.Rdata"))
-  }
-  
-  # Save species codes
-  save(spp.codes, file = here("Output/species_codes.Rdata"))
-  write_csv(spp.codes, here("Output/species_codes.csv"))
 } else {
-  # Load previously imported database data
-  load(here("Data/Trawl/trawl_data.Rdata"))
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+  
 }
-```  
+```
 
 ## Process trawl haul data  
 Haul data are filtered, formatted, and assigned to clusters, where a trawl cluster contains only trawls conducted on the same evening (i.e., the difference in equilibrium time between trawls in the same cluster is < 12 h).
 
-```{r process-trawl-haul-data}
-# Create startLatitudeDecimal and startLongitudeDecimal for Access data
-if (trawl.source == "Access") {
-  # The Access database format changed in 2022, so the steps below handle that format
-  if (year(haul.all$netInWaterTime[1]) >= 2021) {
-    haul.all <- haul.all %>% 
-      arrange(haul) %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60))) %>% 
-      rename(notes = Notes)
-    
-    catch.all <- catch.all %>% 
-      rename(totalWeight = TotalWtKg,
-             totalNum    = TotalNum)
-    
-  } else {
-    # Process using the >= 2022 Access format
-    haul.all <- haul.all %>% 
-      arrange(haul) %>% 
-      mutate(
-        startLatDecimal  =   startLatitudeDegrees + (startLatitudeMinutes/60),
-        startLongDecimal = -(startLongitudeDegrees + (startLongitudeMinutes/60)),
-        stopLatDecimal   =   stopLatitudeDegrees + (stopLatitudeMinutes/60),
-        stopLongDecimal  = -(stopLongitudeDegrees + (stopLongitudeMinutes/60)), 
-        equilibriumTime  =   ymd_hms(paste(as.character(trawlDate),
-                                           format(haul.all$EquilibriumTime,
-                                                  format = "%H:%M:%S"))),
-        haulBackTime     =   ymd_hms(paste(as.character(trawlDate),
-                                           format(haul.all$haulbackTime,
-                                                  format = "%H:%M:%S")))) %>%
-      mutate(haulBackTime = case_when(
-        haulBackTime < equilibriumTime ~ haulBackTime + days(1),
-        TRUE ~ haulBackTime)) %>%
-      rename(cruise = Cruise, ship = Ship, haul = Haul,
-             collection = Collection, notes = Notes)
-    
-    # Identify hauls where date of equilibriumTime or haulBackTime is incorrect
-    eq.fix <- which(c(0, diff(haul$equilibriumTime)) < 0)
-    hb.fix <- which(c(0, diff(haul$haulBackTime)) < 0)
-    
-    # Correct equilibriumTime or haulBackTime
-    haul.all$equilibriumTime[eq.fix] <- haul.all$equilibriumTime[eq.fix] + days(1)
-    haul.all$haulBackTime[eq.fix]    <- haul.all$haulBackTime[eq.fix] + days(1)
-  }
-} else if (trawl.source == "SQL") {
-  # Process the SQL data, which hasn't changed over time
-  haul.all <- haul.all %>% 
-    arrange(haul) %>% 
-    mutate(
-      netInWaterTime  = ymd_hms(netInWaterTime),
-      equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime),
-      netOnDeckTime   = ymd_hms(netOnDeckTime))
-  
-  # Compute totalWeight and totalNum, which only exist in the Access database
-  catch.all <- catch.all %>% 
-    # replace_na(list(subSampleWtkg = 0, 
-    #                 subSampleCount = 0,
-    #                 remainingSubSampleWtkg = 0)) %>% 
-    mutate(
-      totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-      totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)
-}
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
 
+```{r process-trawl-haul-data}
 # Classify hauls by season (spring or summer)
 haul.all <- haul.all %>% 
   mutate(season = case_when(
@@ -1854,7 +1751,7 @@ if (survey.name %in% c("2107RL")) {
           convert_length("Scomber japonicus", .$forkLength_mm, "FL", "TL"),
         scientificName == "Trachurus symmetricus" ~ 
           convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
-        scientificName == "Doryteuthis opalescens" ~  as.numeric(mantleLength_mm))) %>% 
+        scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm))) %>% 
     mutate(
       weightg = estimate_weight(.$scientificName, .$totalLength_mm, season = tolower(survey.season)))
   
@@ -2528,7 +2425,7 @@ lengths.all  <- lengths.all %>%
 if ("mantleLength_mm" %in% names(lengths.all)) {
   lengths.all <- lengths.all %>% 
     mutate(totalLength_mm = case_when(
-      scientificName == "Doryteuthis opalescens" ~  as.numeric(mantleLength_mm),
+      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm),
       TRUE ~ totalLength_mm))
 }
 
@@ -3863,16 +3760,16 @@ if (save.figs) {
     include_graphics(here("Figs/fig_nasc_acoustic_proportion.png")) 
   }
   
-  # Plot trawl clusters and acoustic proportions
-    nasc.cluster.prop.plot <- plot_grid(nasc.cluster.plot, acoustic.prop.cluster.final,
-                                          nrow = 1, labels = c("a)", "b)"))
-    
-    ggsave(nasc.cluster.prop.plot, 
-           filename = here("Figs/fig_nasc_cluster_acoustic_proportion.png"),
-           width = map.width*2, height = map.height)
-    
-    save(nasc.cluster.prop.plot,
-         file = here("Output/nasc_cluster_acoustic_proportion.Rdata"))
+  # # Plot trawl clusters and acoustic proportions
+  #   nasc.cluster.prop.plot <- plot_grid(nasc.cluster.plot, acoustic.prop.cluster.final,
+  #                                         nrow = 1, labels = c("a)", "b)"))
+  #   
+  #   ggsave(nasc.cluster.prop.plot, 
+  #          filename = here("Figs/fig_nasc_cluster_acoustic_proportion.png"),
+  #          width = map.width*2, height = map.height)
+  #   
+  #   save(nasc.cluster.prop.plot,
+  #        file = here("Output/nasc_cluster_acoustic_proportion.Rdata"))
 }
 ```
 
@@ -5251,7 +5148,7 @@ save(strata.primary,
 save(strata.nse.temp, 
      file = here("Output/strata_nse_raw.Rdata"))
 
-# Create sf used to remove nearshore portions of the core area tranects ---------------------------
+# Create sf used to remove nearshore portions of the core area transects ---------------------------
 # Convert nearshore transect ends to sf
 tx.ends.sf <- tx.ends %>% 
   st_as_sf(coords = c("long.i","lat.i"), crs = 4326) %>% 
@@ -5270,10 +5167,10 @@ na_buffer <- st_buffer(na_landmask, dist = dist.to.shore) %>%
   st_transform(crs.geog)
 
 # Preview results
-# mapview(na_buffer) + 
-#   mapview(filter(strata.primary, 
-#                  scientificName == "Sardinops sagax"), 
-#           zcol = "stratum") + 
+# mapview(na_buffer) +
+#   mapview(filter(strata.primary,
+#                  scientificName == "Clupea pallasii"),
+#           zcol = "stratum") +
 #   mapview(tx.ends.sf)
 
 # Clip primary polygons using the buffered landmask polygon -------------------------
@@ -5999,7 +5896,7 @@ if (exists("all.ctd.hdr")) {
 
 Profiles of a) temperature, b) salinity, and c) sound speed versus depth for all CTD casts.
 
-```{r plot-ctd-casts,eval=FALSE}
+```{r plot-ctd-casts}
 if (exists("all.ctd.casts")) {
   if (nrow(all.ctd.casts) > 0) {
     # Plot temperature data
@@ -6163,7 +6060,7 @@ if (exists("ctd.info.all")) {
 
 Maps of CTD (blue) and UCTD (purple) cast locations, labeled by a) cast number and b) sequential acoustic transect number (not transect names from Echoview templates). Panel b) is used to check whether CTD casts are being assigned to the appropriate acoustic transects.
 
-```{r map-ctd-casts,eval=FALSE}
+```{r map-ctd-casts}
 if (exists("ctd.info.all")) {
   if (save.figs) {
     # Plot all CTDs and UCTDs, labeled by cast number
@@ -6209,12 +6106,11 @@ if (exists("ctd.info.all")) {
 } else {
   print("No CTD casts present.")
 }
-
 ```  
 
 (ref:all-casts-mapview) An interactive map of CTD (purple) and UCTD (yellow) cast locations. Click points for more information about each cast.
 
-```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)',eval=FALSE}
+```{r map-ctd-casts-interactive,fig.cap='(ref:all-casts-mapview)'}
 if (exists("ctd.info.sf")) {
   # Create interactive map of CTD locations
   mapview(nav.paths.sf, color = "black", alpha = 0.5, 
@@ -8066,21 +7962,21 @@ if (combine.regions) {
     source(here("Code/plot_sA_CPS_combo.R"))
     source(here("Code/plot_acoustic_proportion_indiv_combo.R"))
     
-    # Update backscatter plot with data from nearshore and/or offshore regions
-    nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.combo.final,
-                                           nrow = 1, labels = c("a)", "b)", "c)"))
-    
-    nasc.cufes.prop.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.combo.final,
-                                           ncol = 1, labels = c("a)", "b)", "c)"))
-    
-    # Save maps
-    ggsave(nasc.cufes.prop.plot, 
-           filename = here("Figs/fig_nasc_cufes_acoustic_cluster_combo.png"),
-           width = map.width*3, height = map.height)
-    
-    ggsave(nasc.cufes.prop.plot.long, 
-           filename = here("Figs/fig_nasc_cufes_acoustic_cluster_combo_long.png"),
-           width = map.width, height = map.height*3) 
+    # # Update backscatter plot with data from nearshore and/or offshore regions
+    # nasc.cufes.prop.plot      <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.combo.final,
+    #                                        nrow = 1, labels = c("a)", "b)", "c)"))
+    # 
+    # nasc.cufes.prop.plot.long <- plot_grid(nasc.map.cps, cufes.density.all, acoustic.prop.cluster.combo.final,
+    #                                        ncol = 1, labels = c("a)", "b)", "c)"))
+    # 
+    # # Save maps
+    # ggsave(nasc.cufes.prop.plot, 
+    #        filename = here("Figs/fig_nasc_cufes_acoustic_cluster_combo.png"),
+    #        width = map.width*3, height = map.height)
+    # 
+    # ggsave(nasc.cufes.prop.plot.long, 
+    #        filename = here("Figs/fig_nasc_cufes_acoustic_cluster_combo_long.png"),
+    #        width = map.width, height = map.height*3) 
   }
 }
 ```
@@ -9230,11 +9126,29 @@ if (file.exists(here("Figs/fig_biomass_dens_nse_Etrumeus acuminatus-All.png"))) 
 # Appendices
 ## **Appendix A.** Acoustic calibration results.
 
-```{r process-cal-all,eval=FALSE}
+```{r process-cal-all}
+# Process calibration results from CW- and FM-mode calibrations. Vessel, procedure, and directory info is configured in the settings file for each survey.
+
 if (process.cal) {
+  # Plot CW calibration results
+  source(here("Code/processCal-CW.R"))
+  
+  # Plot FM calibration results
+  source(here("Code/processCal-FM.R"))
+  
+  # Extract calibration results from past surveys
   source(here("Code/extractCalAll.R"))
+  
 } else {
+  # Load CW results
+  load(here("Output/cal_results_CW.Rdata"))
+  
+  # Load FM results
+  load(here("Output/cal_results_FM.Rdata"))
+  
+  # Load CW calibration results from past surveys
   load(here("Data/Calibration/cal_results_all.Rdata"))
+  
 }
 
 if (save.figs) {
@@ -9248,8 +9162,8 @@ if (exists("cal.res.all")) {
   cal.res <- cal.res.all %>% 
     mutate(cal_date = mdy(cal_date)) %>% 
     filter(between(cal_date,
-                   ymd(cal.plot.date) - days(cal.window),
-                   ymd(cal.plot.date) + days(cal.window))) %>% 
+                   ymd(cal.plot.date[survey.vessel.primary]) - days(cal.window),
+                   ymd(cal.plot.date[survey.vessel.primary]) + days(cal.window))) %>% 
     arrange(txdr_freq)
   
   
