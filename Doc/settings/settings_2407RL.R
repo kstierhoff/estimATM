@@ -97,8 +97,8 @@ survey.end             <- "30 September"    # Survey end date
 survey.year            <- "2024"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 85              # Days at sea allocated
-survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
-survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
+survey.landmark.n      <- "Cape Scott, Vancouver Island, Canada" # Landmark - N extent of survey
+survey.landmark.s      <- "Punta Eugenia, Baja CA, Mexico" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
