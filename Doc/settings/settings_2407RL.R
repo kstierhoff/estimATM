@@ -879,26 +879,33 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 # # Calibration information ------------------------------------------------
 cal.vessels        <- c("RL", "LBC") # ,"LBC","LM"
 cal.vessels.fm     <- c("RL") 
-cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", # list of calibration directories
+# Named vector of EK80 CW-mode calibration directories
+cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
                         LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
                         LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS") 
+# Named vector of EK80 FM-mode calibration directories
 cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
+# Named vector of EK80 CW-mode calibration dates
 cal.datetime       <- c(RL  = "27 June", # Date/time of calibration
                         LBC = NA_character_,
-                        LM  = NA_character_)    
+                        LM  = NA_character_)
+# Named vector of calibration dates, used to plot calibration time series
 cal.plot.date      <- c(RL  = "2024-07-02",
                         LBC = "2024-07-02",
-                        LM  = "2024-07-02") # Date of the calibration, used to plot cal time series
-cal.window         <- 400           # Number of days around calibration date to look for results
+                        LM  = "2024-07-02") 
+# Number of days around calibration date to look for results
+cal.window         <- 400 
+# Group and personnel conducting the calibrations
 cal.group          <- c(RL  = "SWFSC",
                         LBC = "SWFSC",
-                        LM  = "SWFSC")      # Group conducting the calibration
+                        LM  = "SWFSC")      
 cal.personnel      <- c(RL  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions",
                         LBC = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions",
-                        LM  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions")# Calibration participants
+                        LM  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions")
+# Calibration location name, lat/long
 cal.loc            <- c(RL  = "10th Avenue Marine Terminal, San Diego Bay",
                         LBC = "SWFSC Technology Development Tank",
-                        LM  = "Gig Harbor, WA") # Location name
+                        LM  = "Gig Harbor, WA") 
 cal.lat.dd         <- c(RL  = 32.6956,
                         LBC = 32.6956,
                         LM  = 47.32212)    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
@@ -907,6 +914,7 @@ cal.lon.dd         <- c(RL  = -117.15278,
                         LM  = -122.57275)   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
+# Named vector of sphere type, name, and nominal depth below the transducer
 cal.sphere         <- c(RL  = "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)",
                         LBC = "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)",
                         LM  = "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)") # Cal sphere info
@@ -915,21 +923,22 @@ cal.sphere.name    <- c(RL  = "_Lasker_ sphere #1",
                         LM  = "_Lasker_ sphere #1")
 cal.sphere.z       <- c(RL  = 6,
                         LBC = 6,
-                        LM  = 6) # Nominal depth of calibration sphere below the transducer
+                        LM  = 6) 
+# Info about impedance analyzer
 cal.imp.anal       <- c(RL  = "Agilent 4294A Precision Impedance Analyzer",
                         LBC = "Agilent 4294A Precision Impedance Analyzer",
-                        LM  = "Agilent 4294A Precision Impedance Analyzer") # Info about impedance analyzer
+                        LM  = "Agilent 4294A Precision Impedance Analyzer") 
 # Other notes about calibration
 cal.notes          <- c(RL  = "Lasker calibration sphere #1",
                         LBC = "Lasker calibration sphere #1",
                         LM  = "Lasker calibration sphere #1")
 
 # Physical conditions during calibration
-cal.temp           <-   20.16  # enter water temperature at sphere depth
-cal.sal            <-   34.11  # enter salinity at sphere depth
-cal.c              <- 1520.8   # enter sound speed (m/s)
-cal.min.z          <-    6     # enter minimum water depth below transducers
-cal.max.z          <-   10     # enter maximum water depth below transducers
+cal.temp           <-   c(RL = 20.16)  # enter water temperature at sphere depth
+cal.sal            <-   c(RL = 34.11)  # enter salinity at sphere depth
+cal.c              <- c(RL = 1520.8)   # enter sound speed (m/s)
+cal.min.z          <-    c(RL = 6)     # enter minimum water depth below transducers
+cal.max.z          <-   c(RL = 10)     # enter maximum water depth below transducers
 
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
