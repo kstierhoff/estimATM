@@ -849,8 +849,11 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2407RL_EK80"
-raw.size      <- 1  # file size in megabytes (GB)
-raw.log.range <-  350  # depth of ER60 logging (m)
+raw.size      <- 500  # file size in megabytes (MB)
+raw.log.range <- c(RL  = "500, 500, 500, 300, and 200",
+                   LBC = "500, 500, 500, and 300",
+                   LM  = "500, 500, 500, and 300")  # depth of ER60 logging (m)
+raw.log.range.night <- c(RL = "100")  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
@@ -887,8 +890,8 @@ cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_Sum
 cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
 # Named vector of EK80 CW-mode calibration dates
 cal.datetime       <- c(RL  = "27 June", # Date/time of calibration
-                        LBC = NA_character_,
-                        LM  = NA_character_)
+                        LBC = "16 May",
+                        LM  = "4 June")
 # Named vector of calibration dates, used to plot calibration time series
 cal.plot.date      <- c(RL  = "2024-07-02",
                         LBC = "2024-07-02",
@@ -905,13 +908,13 @@ cal.personnel      <- c(RL  = "A. Beittel, D. Murfin, J. Renfree, and S. Session
 # Calibration location name, lat/long
 cal.loc            <- c(RL  = "10th Avenue Marine Terminal, San Diego Bay",
                         LBC = "SWFSC Technology Development Tank",
-                        LM  = "Gig Harbor, WA") 
-cal.lat.dd         <- c(RL  = 32.6956,
-                        LBC = 32.6956,
-                        LM  = 47.32212)    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
-cal.lon.dd         <- c(RL  = -117.15278,
-                        LBC = -117.15278,
-                        LM  = -122.57275)   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
+                        LM  = "Gray's Harbor, WA") 
+cal.lat.dd         <- c(RL  = 32.6936,
+                        LBC = 32.8701,
+                        LM  = 46.8885)    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
+cal.lon.dd         <- c(RL  = -117.1503,
+                        LBC = -117.2505,
+                        LM  = -124.1319)   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
 # Named vector of sphere type, name, and nominal depth below the transducer
@@ -934,8 +937,10 @@ cal.notes          <- c(RL  = "Lasker calibration sphere #1",
                         LM  = "Lasker calibration sphere #1")
 
 # Physical conditions during calibration
-cal.temp           <-   c(RL = 20.16)  # enter water temperature at sphere depth
-cal.sal            <-   c(RL = 34.11)  # enter salinity at sphere depth
+cal.temp           <-   c(RL = 20.16,
+                          LM = 12.3)  # enter water temperature at sphere depth
+cal.sal            <-   c(RL = 34.11,
+                          LM = 26.9)  # enter salinity at sphere depth
 cal.c              <- c(RL = 1520.8)   # enter sound speed (m/s)
 cal.min.z          <-    c(RL = 6)     # enter minimum water depth below transducers
 cal.max.z          <-   c(RL = 10)     # enter maximum water depth below transducers
@@ -947,9 +952,9 @@ cal.noise <- list(RL  = NA,
                   LBC = NA)
 
 # RMS error values from Echoview processing
-cal.rms <- list(RL  = rep(0, 6),
+cal.rms <- list(RL  = c(0.1018, 0.1057, 0.1384, 0.1128, 0.1945, 0.4646),
                 LM  = rep(0, 4),
-                LBC = rep(0, 4))
+                LBC = c(0.0967, 0.0875, 0.1295, 0.2589))
 
 # Axis options for calibration plots
 cal.scales    <- "free"  # fixed or free
