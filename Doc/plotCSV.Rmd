@@ -43,15 +43,19 @@ Files listed below are processed and plotted at any time, but ideally prior to b
 
 ```{r list-files, echo=TRUE}
 # Controls
-process.csv <- T
+process.csv <- F
 resize.map  <- F # Scale map to survey extent
 
 # Platform name, used to name resulting image file
 platform.name <- "LM"
 
-# List full file paths
-csv.paths <- c(dir_ls(here::here("\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV\\"), 
-                      regexp = "-Final 38 kHz CPS_nasc_cps.csv"))
+if (process.csv) {
+  # List full file paths
+  csv.paths <- c(dir_ls(
+    here::here("\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV\\"),
+    regexp = "-Final 38 kHz CPS_nasc_cps.csv"))  
+}
+
 ```
 
 ```{r other-paths, eval=FALSE, echo=FALSE}
@@ -133,7 +137,7 @@ nasc <- nasc %>%
 # Define cps.nasc
 nasc <- nasc %>% 
   mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
-               cps.nasc.source = nasc.depth.cps)
+         cps.nasc.source = nasc.depth.cps)
 
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ <- nasc %>%
@@ -220,7 +224,7 @@ wpts <- read_csv(here("Data/Nav", wpt.filename)) %>%
 wpts.sf <- wpts %>% 
   filter(Type %in% wpt.types) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-   mutate(
+  mutate(
     label    = paste("Transect", Transect),
     popup    = paste('<b>Transect:</b>', Transect, Type)
   )
@@ -235,7 +239,7 @@ transects.sf <- wpts.sf %>%
          brg      = 360 + stplanr::line_bearing(.),
          label    = paste("Transect", Transect),
          popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
-                       'Distance:', distance, 'nmi<br/>')) 
+                          'Distance:', distance, 'nmi<br/>')) 
 ```
 
 ```{r create-leaflet-map, out.width="100%", out.height="8in"}
