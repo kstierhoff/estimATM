@@ -4,8 +4,8 @@ author: "SWFSC Advanced Survey Technologies Group"
 date: 'Last updated: `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`'
 output:
   bookdown::html_document2:
-    toc: no
-    toc_float: no
+    toc: yes
+    toc_float: yes
     number_sections: no
 css: css/ast.css
 ---
@@ -16,7 +16,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,lubridate,here,sf,knitr,fs,leaflet,leaflet.extras,bookdown,
-               leafem,mapview,htmltools,rnaturalearth,stplanr)
+               leafem,mapview,htmltools,rnaturalearth,stplanr,ggrepel,plotly)
 
 # Install and load required packages from Github -------------------------------
 # rnaturalearth data
@@ -47,12 +47,12 @@ process.csv <- F # Process CSV files, or just re-generate HTML/plots
 resize.map  <- F # Scale map to survey extent
 
 # Platform name, used to name resulting image file
-platform.name <- "RL"
+platform.name <- "LBC"
 
 if (process.csv) {
   # List full file paths
   csv.paths <- c(dir_ls(
-    here::here("\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LASKER_SummerCPS\\PROCESSED\\EV\\CSV\\"),
+    here::here("\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV\\"),
     regexp = "-Final 38 kHz CPS_nasc_cps.csv"))  
 }
 
@@ -332,9 +332,9 @@ i.map <- leaflet() %>%
   # Add map coordinates
   leafem::addMouseCoordinates() %>% 
   # Add measurement tool
-  addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
-             primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
-             position = "topleft") %>% 
+  # addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+  #            primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+  #            position = "topleft") %>% 
   # Add layer controls
   addLayersControl(
     overlayGroups = c("Backscatter", "Backscatter (Small)", "Vessel Track",
@@ -344,6 +344,8 @@ i.map <- leaflet() %>%
   fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
             imap.bounds$range.lon[2], imap.bounds$range.lat[2])
 ```
+
+# Interactive map
 
 ```{r plot-leaflet-map, echo=F, out.height="8in", out.width="100%"}
 # Display map
@@ -402,10 +404,40 @@ img.filename <- paste0("fig_backscatter_", platform.name, ".png")
 source(here("Code/plot_sA_plotCSV.R"))
 ```
 
-```{r plot-backscatter,fig.cap='(ref:backscatter-map-cps)',out.width="100%"}
+# Backscatter plot
+
+```{r plot-backscatter,out.width="100%"}
 if (file.exists(here("Figs", img.filename))) {
   include_graphics(here("Figs", img.filename))
 } else {
   print("No backscatter plot.")
 }
 ```
+
+# Outlier plot
+
+```{r get-big-nasc, out.width="90%", out.width="100%"}
+if (exists("big.nasc")) {
+  # Create outlier plot
+  nasc.outlier.plot <- ggplot(big.nasc, aes(rank, NASC, ids = label, fill = type)) +
+    geom_point(shape = 21, size = 2, alpha = 0.7) +
+    geom_text_repel(data = top_n(big.nasc, 20, NASC), 
+                    aes(rank, NASC, label = label), size = 2) +
+    scale_fill_manual(name = "NASC\ntype", 
+                      values = c("CPS" = "blue", "Krill" = "yellow")) +
+    ylab("NASC / 19\n") + xlab("\nRank") +
+    theme_bw()
+  
+  # Create outlier plot for plotly
+  nasc.outlier.plotly <- ggplot(big.nasc, 
+                                aes(rank, NASC, ids = label, fill = type)) +
+    geom_point(shape = 21, size = 4, alpha = 0.7) +
+    scale_fill_manual(name = "NASC\ntype", 
+                      values = c("CPS" = "blue", "Krill" = "yellow")) +
+    ylab("NASC / 19\n") + xlab("\nRank") +
+    theme_bw()
+  
+  # Display plot
+  ggplotly(nasc.outlier.plotly)
+}
+```  
