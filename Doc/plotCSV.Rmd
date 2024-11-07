@@ -44,12 +44,12 @@ Specified files are processed and plotted at any time, but ideally prior to bein
 ```{r file-settings}
 # Controls
 ## Process CSV files, or just re-generate HTML/plots
-process.csv <- TRUE 
+process.csv <- FALSE 
 ## Scale map to survey extent
 resize.map  <- FALSE 
 
 # Vessel-specific info
-vessel.name = "RL"
+vessel.name = "LM"
 
 # File paths
 csv.paths <- c(RL  = "\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LASKER_SummerCPS\\PROCESSED\\EV\\CSV\\",
@@ -126,6 +126,16 @@ nasc <- nasc %>%
 nasc <- nasc %>% 
   mutate(cps.nasc = purrr::pluck(., nasc.depth.cps),
          cps.nasc.source = nasc.depth.cps)
+
+# Remove numbers from transect names (e.g., 105-1, 105-2, etc.)
+if (strip.tx.nums[vessel.name]) {
+  nasc$transect <- gsub(tx.num.pattern[vessel.name], "", nasc$transect)
+}
+
+# Remove letters from transect names (e.g., 105A, 105B, etc.)
+if (strip.tx.chars[vessel.name]) {
+  nasc$transect <- gsub(tx.char.pattern[vessel.name], "", nasc$transect)  
+}
 
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ <- nasc %>%
