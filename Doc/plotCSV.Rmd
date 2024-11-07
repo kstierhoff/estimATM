@@ -16,7 +16,7 @@ if (!require("pacman")) install.packages("pacman")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,lubridate,here,sf,knitr,fs,leaflet,leaflet.extras,bookdown,
-               leafem,mapview,htmltools,rnaturalearth,stplanr,ggrepel,plotly)
+               leafem,mapview,htmltools,rnaturalearth,stplanr,ggrepel,plotly, kableExtra)
 
 # Install and load required packages from Github -------------------------------
 # rnaturalearth data
@@ -32,58 +32,42 @@ doc.name <- knitr::current_input()
 if (is.null(doc.type)) {doc.type <- "html"}
 if (is.null(doc.name)) {doc.name <- "plotCSV.Rmd"}
 
-# global knitr chunk options
+# Global knitr chunk options
 knitr::opts_chunk$set(
   echo = FALSE, warning = FALSE, message = FALSE, 
   fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
 )
 ```
 
-Files listed below are processed and plotted at any time, but ideally prior to being processed using plotSurvey, estimateBiomass, etc. 
+Specified files are processed and plotted at any time, but ideally prior to being processed using plotSurvey, estimateBiomass, etc. 
 
-```{r list-files, echo=TRUE}
+```{r file-settings}
 # Controls
-process.csv <- T # Process CSV files, or just re-generate HTML/plots
-resize.map  <- F # Scale map to survey extent
+## Process CSV files, or just re-generate HTML/plots
+process.csv <- TRUE 
+## Scale map to survey extent
+resize.map  <- FALSE 
 
-# Platform name, used to name resulting image file
-platform.name <- "RL"
+# Vessel-specific info
+vessel.name = "RL"
 
-if (process.csv) {
-  # List full file paths
-  csv.paths <- c(dir_ls(
-    here::here("\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LASKER_SummerCPS\\PROCESSED\\EV\\CSV\\"),
-    regexp = "-Final 38 kHz CPS_nasc_cps.csv"))  
-}
+# File paths
+csv.paths <- c(RL  = "\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LASKER_SummerCPS\\PROCESSED\\EV\\CSV\\",
+               LBC = "\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV\\",
+               LM  = "\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV\\")
 
+csv.ext <- c(RL  = "-Final 38 kHz CPS_nasc_cps.csv",
+             LBC = "-Final 38 kHz CPS_nasc_cps.csv",
+             LM  = "-Final 38 kHz CPS_nasc_cps.csv")
 ```
 
-```{r other-paths, eval=FALSE, echo=FALSE}
-# Paths
-# 2024 Lasker
-"\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LASKER_SummerCPS\\PROCESSED\\EV\\CSV\\"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2024 Long Beach Carnage
-"\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV\\"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2024 Lisa Marie
-"\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV\\"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Lasker CCE
-"C:\\SURVEY\\2307RL\\PROCESSED\\EV\\CSV\\LASKER"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Shimada hake survey
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SHIMADA_SummerHake\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Long Beach Carnage
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230708_CARNAGE_SummerCPS\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Lisa Marie
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
-# 2023 Saildrone
-"\\\\swc-storage4-s\\AST4\\SURVEYS\\20230703_SAILDRONE_SummerCPS\\PROCESSED\\EV\\CSV"
-"-Final 38 kHz CPS_nasc_cps.csv"
+```{r list-files}
+if (process.csv) {
+  # List full file paths
+  csv.files <- c(dir_ls(
+    csv.paths[vessel.name],
+    regexp = csv.ext[vessel.name]))  
+}
 ```
 
 ```{r user-input}
@@ -108,13 +92,13 @@ if (process.csv) {
                        label = "0% done", min = 0, max = 100, initial = 0)
   
   # Process all .CSV files
-  for (i in 1:length(csv.paths)) {
+  for (i in 1:length(csv.files)) {
     # Process i-th file
-    nasc <- bind_rows(nasc, extract_csv(csv.paths[i]))
+    nasc <- bind_rows(nasc, extract_csv(csv.files[i]))
     
     # Update the progress bar
-    info <- sprintf("%d%% done", round((i / length(csv.paths)) * 100))
-    setWinProgressBar(pb, round((i / length(csv.paths)) * 100), label = info)
+    info <- sprintf("%d%% done", round((i / length(csv.files)) * 100))
+    setWinProgressBar(pb, round((i / length(csv.files)) * 100), label = info)
   }
   close(pb)
   
@@ -124,10 +108,11 @@ if (process.csv) {
                      labels = F, include.lowest = T))
   
   # Save results
-  save(nasc, file = here("Output/nasc_plotCSV.Rdata"))
-  write.csv(nasc, file = here("Output/nasc_plotCSV.csv"), row.names = F, quote = F)
+  save(nasc, file = here("Output", paste0("nasc_plotCSV_",vessel.name, ".Rdata")))
+  write_csv(nasc, file = here("Output", paste0("nasc_plotCSV_", vessel.name, ".csv")))
+
 } else {
-  load(here("Output/nasc_plotCSV.Rdata"))
+  load(here("Output", paste0("nasc_plotCSV_",vessel.name, ".Rdata")))
 }
 
 # Get intervals with bad lat/long values
@@ -144,14 +129,15 @@ nasc <- nasc %>%
 
 # average NASC.70 data over new intervals or number of intervals in a 2 km radius
 nasc.summ <- nasc %>%
-  group_by(transect, int) %>%
+  group_by(transect) %>%
   summarise(
     bins    = length(int),
     bin.mid = as.integer(round(bins / 2)),
     lat     = lat[1],
     long    = long[1],
     NASC    = mean(cps.nasc)
-  )
+  ) %>% 
+  arrange(desc(NASC))
 
 # Average cps.nasc over defined interval
 # Summarize by filename, not transect, so that renamed (i.e., strip.tx.chars == T) transects get included.
@@ -174,7 +160,6 @@ nasc.sf <- nasc %>%
   filter(!is.na(bin)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) 
 
-
 nasc.plot <- project_sf(nasc.sf, crs.proj)
 
 nasc.paths <- nasc %>% 
@@ -182,6 +167,8 @@ nasc.paths <- nasc %>%
   group_by(transect) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING") 
+
+
 ```
 
 ```{r find-big-nasc}
@@ -201,7 +188,7 @@ big.nasc <- nasc %>%
 
 # Save NASC outliers
 save(big.nasc, file = here("Output/nasc_big_plotCSV.Rdata"))
-write_csv(big.nasc, file = here("Output", paste0("nasc_big_plotCSV_", platform.name, ".csv")))
+write_csv(big.nasc, file = here("Output", paste0("nasc_big_plotCSV_", vessel.name, ".csv")))
 ```
 
 ```{r get-spatial-files,include=F}
@@ -399,7 +386,7 @@ ggsave(base.map, file = here("Figs/fig_basemap_plotCSV.png"),
 
 ```{r plot-sA-cps}
 # Image path and file name
-img.filename <- paste0("fig_backscatter_", platform.name, ".png")
+img.filename <- paste0("fig_backscatter_", vessel.name, ".png")
 
 # Plot CPS backscatter
 source(here("Code/plot_sA_plotCSV.R"))
@@ -413,6 +400,43 @@ if (file.exists(here("Figs", img.filename))) {
 } else {
   print("No backscatter plot.")
 }
+```
+
+# Backscatter 
+## NASC vs. latitude
+
+Plot of mean NASC by latitude. The top 10 transects are labeled with the transect name.  
+
+```{r nasc-summ-plot, out.width="100%"}
+nasc.plot.csv <- ggplot() + 
+  geom_line(data = nasc.summ, aes(lat, NASC)) + 
+  geom_point(data = nasc.summ, aes(lat, NASC),
+             shape = 21, fill = "white") + 
+  geom_text_repel(data = top_n(nasc.summ, 20, NASC), 
+                  aes(lat, NASC, label = transect), colour = "blue", size = 2) +
+  labs(y = "mean(NASC)", x = "Latitude") +
+  theme_bw()
+
+ggsave(nasc.plot.csv, 
+       filename = here("Figs","fig_nasc_summ_plotCSV.png"),
+       height = 4, width = 10)
+
+include_graphics(here("Figs","fig_nasc_summ_plotCSV.png"))
+```
+
+## NASC summary
+
+Table of mean NASC by transect, sorted (descending) by mean backscatter.  
+
+```{r nasc-summ}
+nasc.summ %>% 
+    kable(booktabs = TRUE, escape = FALSE,
+          digits = c(0,0,0,4,4,0)) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    # row_spec(0, align = c("c")) %>% 
+    # column_spec(1, italic = T) %>% 
+    scroll_box(height = "500px") 
 ```
 
 # Outlier plot
