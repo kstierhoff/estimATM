@@ -151,7 +151,8 @@ if (do.spatial) {
     st_intersection(or_waters)
   
   # Find hauls within 12 nmi
-  haul.or.12 <- haul.or %>% 
+  haul.or.12 <- haul.mid %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
     st_intersection(or_waters_12)
   
   save(haul.or, haul.or.12, file = here("Output/haul_data_reportCatchOr.Rdata"))
@@ -159,10 +160,10 @@ if (do.spatial) {
   load(here("Output/haul_data_reportCatchOr.Rdata"))
 }
 
-# Filter hauls in WA waters
+# Filter hauls in OR waters
 haul.out <- haul.mid %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(!haul %in% haul.or$haul)
+  filter(!haul %in% haul.or.12$haul)
 ```
 
 ```{r process-nav,include=FALSE}
@@ -324,18 +325,22 @@ ggsave(base.map.bw,
 ```
 
 ```{r ca-waters-map, eval=F}
-# Add CA state waters layer
-base.map + geom_sf(data = or_waters, colour = "red", fill = NA) +
+# Add OR state waters layer
+base.map + 
+  geom_sf(data = or_waters, colour = "red", fill = NA) +
+  geom_sf(data = or_waters_12, colour = "green", fill = NA) +
   coord_sf(crs = crs.proj, 
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
 ```
 
-```{r wa-hauls-map, eval=F}
-# Add CA state waters layer
+```{r or-hauls-map, eval=F}
+# Add OR state waters layer
 base.map + 
   geom_sf(data = or_waters, colour = "red", fill = NA) +
-  geom_sf(data = haul.or, colour = "blue", shape = 21) +
+  geom_sf(data = or_waters_12, colour = "green", fill = NA) +
+  geom_sf(data = haul.or, fill = "red", shape = 21) +
+  geom_sf(data = haul.or.12, fill = "green", shape = 21) +
   coord_sf(crs = crs.proj, 
            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
@@ -343,7 +348,7 @@ base.map +
 
 ```{r extract-catch}
 catch.or <- catch.all %>% 
-  filter(haul %in% haul.or$haul) %>% 
+  filter(haul %in% haul.or.12$haul) %>% 
   left_join(spp.codes) %>% 
   filter(!subSampleWtkg == 0) 
 ```
@@ -360,36 +365,42 @@ catch.summary <- catch.or %>%
   arrange(desc(`Total weight (kg)`)) 
 
 write_csv(catch.summary,
-          here("Output/catch_summary_ODFW.csv"),
+          here("Output", paste0(survey.name, "_catch_summary_ODFW.csv")),
           na = "")
 ```
 
 ```{r extract-specimens}
 # Extract specimens from hauls in CA waters
 specimens.or <- lengths.all %>% 
-  filter(haul %in% haul.or$haul) %>% 
+  filter(haul %in% haul.or.12$haul) %>% 
   # left_join(select(haul.ca, key, date_time)) %>% 
   left_join(spp.codes)
 
 # Write specimen level data to CSV
-write_csv(specimens.or, file = here("Output/specimen_info_OR.csv"))
+write_csv(specimens.or, 
+          file = here("Output", paste0(survey.name, "_specimen_info_ODFW.csv")))
 
 # Summarize specimens
 specimen.summ <- specimens.or %>% 
   # Select specimens where weights, otoliths, and/or DNA were taken
   filter(!is.na(otolithNumber) | !is.na(DNAvialNumber) | 
            !is.na(weightg)) %>% 
-  select(haul, commonName, scientificName, weightg, otolithNumber, DNAvialNumber, otolithNumber) %>% 
+  select(haul, commonName, scientificName, weightg, 
+         otolithNumber, DNAvialNumber, hasDNAfinClip, adiposeCondition) %>% 
   group_by(haul, commonName, scientificName) %>% 
   # !is.na(var) converts to logical then sum gives the total counts
   summarise(measured = sum(!is.na(weightg)), 
             otoliths = sum(!is.na(otolithNumber)),
-            DNA      = sum(!is.na(DNAvialNumber))) %>% 
-  arrange(scientificName, haul) %>% 
+            DNA      = sum(!is.na(DNAvialNumber)),
+            adipose_intact  = sum(adiposeCondition == "intact", na.rm = TRUE),
+            adipose_clipped = sum(adiposeCondition == "clipped", na.rm = TRUE)) %>% 
+  arrange(scientificName) %>% 
   adorn_totals()
 
 # Save specimen summary to CSV
-write_csv(specimen.summ, here("Output/specimen_table_ODFW.csv"), na = "")
+write_csv(specimen.summ, 
+          here("Output", paste0(survey.name, "_specimen_table_ODFW.csv")),
+          na = "")
 ```
 
 # Interactive trawl plot
@@ -401,13 +412,14 @@ A map showing all trawl hauls (white points), trawls in OR State waters (within 
 # factpal <- colorFactor(topo.colors(10), ca_mpas$MPA)
 
 # Create leaflet map
-if (nrow(haul.or) > 0) {
+if (nrow(haul.or) > 0 | nrow(haul.or.12) > 0) {
   leaflet() %>% 
     addProviderTiles(providers$Esri.OceanBasemap) %>%  
     # Add EEZs
     addPolylines(data = eez_usa, color = "#000414", weight = 3, 
                  label = "EEZ-U.S.") %>% 
     addPolygons(data = or_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolygons(data = or_waters_12, weight = 2, fillColor = "transparent") %>% 
     addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
                  popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
     addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
@@ -416,6 +428,10 @@ if (nrow(haul.or) > 0) {
                      popup = ~paste("Haul:", haul)) %>% 
     addCircleMarkers(data = haul.or, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
                      opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = haul.or.12, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "green",
                      label = ~paste("Haul:", haul),
                      popup = ~paste("Haul:", haul)) %>% 
     # Add scale bar
@@ -433,6 +449,7 @@ if (nrow(haul.or) > 0) {
     addPolylines(data = eez_usa, color = "#000414", weight = 3, 
                  label = "EEZ-U.S.") %>% 
     addPolygons(data = or_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolygons(data = or_waters_12, weight = 2, fillColor = "transparent") %>% 
     addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
                  popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
     addCircleMarkers(data = haul.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
@@ -441,6 +458,10 @@ if (nrow(haul.or) > 0) {
                      popup = ~paste("Haul:", haul)) %>% 
     addCircleMarkers(data = haul.or, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
                      opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Haul:", haul),
+                     popup = ~paste("Haul:", haul))  %>% 
+    addCircleMarkers(data = haul.or.12, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "green",
                      label = ~paste("Haul:", haul),
                      popup = ~paste("Haul:", haul))  %>% 
     # Add scale bar
@@ -488,7 +509,7 @@ if (nrow(catch.or) > 0) {
     arrange(Haul, desc(`Total weight (kg)`))
   
   write_csv(catch.all,
-            here("Output/catch_table_ODFW.csv"),
+            here("Output", paste0(survey.name, "_catch_table_ODFW.csv")),
             na = "")
   
   catch.all %>% 
@@ -598,7 +619,7 @@ if (sampling.cufes) {
     filter(SampleNumber %in% cufes.sf$SampleNumber) %>% 
     select(SampleNumber, Start, lat, long, SardineEggs, AnchovyEggs,
            JackMackerelEggs, HakeEggs, SquidEggs, OtherFishEggs, Comments) %>% 
-    write_csv(here("Output/cufes_table_ODFW.csv"))
+    write_csv(here("Output", paste0(survey.name, "_CUFES_table_ODFW.csv")),)
 } else {
   print("No CUFES data collected.")
 }
