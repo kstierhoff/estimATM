@@ -106,13 +106,6 @@ haul.mid <- haul.all %>%
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
     long = mean(c(startLongDecimal, stopLongDecimal))) 
 
-# Find midpoint of each haul cluster as the average of haul midpoints
-cluster.mid <- haul.mid %>% 
-  group_by(cluster) %>% 
-  summarise(
-    lat  = mean(lat),
-    long = mean(long))
-
 # Create haul paths from starts and ends
 haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
   bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
@@ -121,6 +114,17 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Filter specimens for this cruise
+lengths.all <- lengths.all %>% 
+  filter(cruise %in% cruise.name)
 ```
 
 ```{r filter-trawl-data,include=FALSE}

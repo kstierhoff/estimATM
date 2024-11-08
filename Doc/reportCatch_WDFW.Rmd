@@ -16,7 +16,8 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,sp,mapview,RODBC,leafem,
                knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
-               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial)
+               odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial,
+               janitor)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -109,13 +110,6 @@ haul.mid <- haul.all %>%
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
     long = mean(c(startLongDecimal, stopLongDecimal))) 
 
-# Find midpoint of each haul cluster as the average of haul midpoints
-cluster.mid <- haul.mid %>% 
-  group_by(cluster) %>% 
-  summarise(
-    lat  = mean(lat),
-    long = mean(long))
-
 # Create haul paths from starts and ends
 haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
   bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
@@ -124,6 +118,17 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Filter specimens for this cruise
+lengths.all <- lengths.all %>% 
+  filter(cruise %in% cruise.name)
 ```
 
 ```{r filter-trawl-data, include=FALSE}
@@ -355,7 +360,7 @@ catch.summary <- catch.wa %>%
   arrange(desc(`Total weight (kg)`)) 
 
 write_csv(catch.summary,
-          here("Output/catch_summary_WDFW.csv"),
+          here("Output", paste0(survey.name, "_catch_summary_WDFW.csv")),
           na = "")
 ```
 
@@ -454,7 +459,7 @@ if (nrow(catch.wa) > 0) {
     arrange(Haul, desc(`Total weight (kg)`))
   
   write_csv(catch.all,
-            here("Output/catch_table_WDFW.csv"),
+            here("Output", paste0(survey.name, "_catch_table_WDFW.csv")),
             na = "") 
   
   catch.all %>% 
@@ -468,6 +473,57 @@ if (nrow(catch.wa) > 0) {
   
 } else {
   cat("No catch in Washington")
+}
+```
+
+```{r extract-specimens}
+# Extract specimens from hauls in CA waters
+specimens.wa <- lengths.all %>% 
+  filter(haul %in% haul.wa$haul) %>% 
+  # left_join(select(haul.ca, key, date_time)) %>% 
+  left_join(spp.codes)
+
+# Write specimen level data to CSV
+write_csv(specimens.wa, 
+          file = here("Output", paste0(survey.name, "_specimen_info_WDFW.csv")))
+
+# Summarize specimens
+specimen.summ <- specimens.wa %>% 
+  # Select specimens where weights, otoliths, and/or DNA were taken
+  filter(!is.na(otolithNumber) | !is.na(DNAvialNumber) | 
+           !is.na(weightg)) %>% 
+  select(haul, commonName, scientificName, weightg, 
+         otolithNumber, DNAvialNumber, hasDNAfinClip, adiposeCondition) %>% 
+  group_by(haul, commonName, scientificName) %>% 
+  # !is.na(var) converts to logical then sum gives the total counts
+  summarise(measured = sum(!is.na(weightg)), 
+            otoliths = sum(!is.na(otolithNumber)),
+            DNA      = sum(!is.na(DNAvialNumber)),
+            adipose_intact  = sum(adiposeCondition == "intact", na.rm = TRUE),
+            adipose_clipped = sum(adiposeCondition == "clipped", na.rm = TRUE)) %>% 
+  arrange(scientificName, haul) %>% 
+  adorn_totals()
+
+# Save specimen summary to CSV
+write_csv(specimen.summ, 
+          here("Output", paste0(survey.name, "_specimen_table_WDFW.csv")),
+          na = "")
+```
+
+# Specimen summary
+A summary of samples taken from specimens collected in Oregon.
+
+```{r specimen-summary}
+if (nrow(specimens.wa) > 0) {
+  specimen.summ %>% 
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
+                  full_width = FALSE) %>%
+    row_spec(0, align = c("c")) %>% 
+    column_spec(3, italic = T) %>% 
+    scroll_box(height = "500px")  
+} else {
+  cat("No specimens in Oregon.")
 }
 ```
 
