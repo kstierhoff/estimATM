@@ -14,7 +14,7 @@ if (!require("pacman")) install.packages("pacman")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
                png,devtools,kableExtra,forcats,jpeg,bookdown,magick,
-               odbc,cowplot,mapview,fs,sf)
+               odbc,cowplot,mapview,fs,sf,rnaturalearth,ggspatial)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -62,6 +62,7 @@ source(here("Doc/settings", prj.settings))
 # Processing settings
 get.db     <- T
 get.nav    <- T
+get.seine  <- F
 do.spatial <- T
 nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 save.figs  <- T
@@ -81,6 +82,9 @@ if (get.db) {
   load(here("Data/Trawl/trawl_data_raw.Rdata"))
   
 }
+
+# Remove duplicate round herring entry 
+spp.codes <- filter(spp.codes, species != 161746)
 ```
 
 ```{r format-trawl-data}
@@ -104,13 +108,6 @@ haul.mid <- haul.all %>%
     lat  = mean(c(startLatDecimal, stopLatDecimal)),
     long = mean(c(startLongDecimal, stopLongDecimal))) 
 
-# Find midpoint of each haul cluster as the average of haul midpoints
-cluster.mid <- haul.mid %>% 
-  group_by(cluster) %>% 
-  summarise(
-    lat  = mean(lat),
-    long = mean(long))
-
 # Create haul paths from starts and ends
 haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDecimal) %>% 
   bind_rows(select(haul.all, haul, lat = stopLatDecimal, long = stopLongDecimal)) %>% 
@@ -119,6 +116,17 @@ haul.paths <- select(haul.all, haul, lat = startLatDecimal, long = startLongDeci
   group_by(haul) %>% 
   summarise(do_union = F) %>% 
   st_cast("LINESTRING")
+
+# Find midpoint of each haul cluster as the average of haul midpoints
+cluster.mid <- haul.mid %>% 
+  group_by(cluster) %>% 
+  summarise(
+    lat  = mean(lat),
+    long = mean(long))
+
+# Filter specimens for this cruise
+lengths.all <- lengths.all %>% 
+  filter(cruise %in% cruise.name)
 ```
 
 ```{r process-hauls,include=FALSE}
@@ -153,8 +161,8 @@ catch.summary <- catch %>%
   select(scientificName, commonName, totalWeight, totalNum) %>%
   # Summarize catch by weight and number
   group_by(scientificName, commonName) %>% 
-  summarize(totalWeight = sum(totalWeight),
-            totalNum    = sum(totalNum)) %>% 
+  summarize(totalWeight = sum(totalWeight, na.rm = TRUE),
+            totalNum    = sum(totalNum, na.rm = TRUE)) %>% 
   arrange(desc(totalWeight)) 
 
 # Rename columns
@@ -162,7 +170,145 @@ names(catch.summary) <- c("Scientific Name","Common Name",
                           "Total weight (kg)","Total number (n)")
 
 write_csv(catch.summary, 
-          here("Output/catch_table_WCRO.csv"))
+          here("Output", paste0(survey.name, "_catch_table_WCRO.csv")),
+          na = "")
+```
+
+```{r configure-base-map,include=F}
+# Get map data -------------------------------
+# Import landmarks
+locations <- filter(read.csv(here("Data/Map/locations.csv")), name %in% label.list) %>% 
+  project_df(to = crs.proj)
+
+# Get land features --------------------------
+# Get state data
+states <- ne_states(country = 'United States of America', returnclass = 'sf')
+ca     <- filter(states, name == "California")
+
+# Get countries
+countries <- ne_countries(scale = "large", returnclass = "sf") %>%
+  filter(subregion %in% c("Northern America","Central America"))
+
+# Read bathy contours shapefile 
+bathy <- st_read(here("Data/GIS/bathy_contours.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  rename(Depth = Contour)
+
+# Read isoline
+bathy_5m_line <- st_read(here("Data/GIS/bathy_us_wc_5m.shp")) %>% 
+  st_transform(4326) %>% 
+  rename(Depth = CONTOUR)
+
+# Read 5m bathymetry points shapefile
+bathy_5m_points <- st_read(here("Data/GIS/isobath_5m_final.shp"))
+
+# Read 5m bathymetry polygon
+bathy_5m_poly <- bathy_5m_points %>% 
+  summarise(do_union = F) %>% 
+  st_cast("POLYGON")
+
+# Create a reduced coastline for nearshore point estimation
+bathy_5m_df <- bathy_5m_points %>%
+  mutate(
+    long = as.data.frame(st_coordinates(.))$X,
+    lat = as.data.frame(st_coordinates(.))$Y) %>% 
+  st_set_geometry(NULL)
+
+write_csv(bathy_5m_df, here("Data/GIS/bathy_5m_final.csv"))
+
+# Read State Waters shapefiles -------------------------------
+ca_waters <- st_read(here("Data/GIS/ca_state_waters.shp")) %>%
+  st_transform(4326)
+
+# Read CA MPAs shapefile --------------------------------------
+ca_mpas <- st_read(here("Data/GIS/ca_mpas.shp")) %>%
+  st_transform(4326) %>%
+  mutate(MPA = paste(NAME, Type))
+
+# Read transect waypoints
+wpts <- read_csv(here("Data/Nav", wpt.filename))
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  filter(Type %in% wpt.types) %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+  mutate(
+    label = paste("Transect", Transect),
+    popup = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                     'Distance:', distance, 'nmi<br/>')
+  )
+
+# Set padding around data  
+if (resize.map) {
+  # Use nav data to resize map to survey progress
+  map.bounds <- nav.sf %>% 
+    st_transform(crs = crs.proj) %>%
+    st_bbox() 
+} else {
+  # Use transects to set map to survey extent
+  map.bounds <- transects.sf %>%
+    st_transform(crs = crs.proj) %>%
+    st_bbox()  
+}
+
+# Determine map aspect ratio and set height and width
+map.aspect <- (map.bounds$xmax - map.bounds$xmin)/(map.bounds$ymax - map.bounds$ymin)
+map.width  <- map.height*map.aspect
+
+# Create base map
+base.map <- get_basemap(nav.paths.sf, states, countries, locations, bathy, map.bounds, crs = crs.proj) +
+  # Add scalebar
+  annotation_scale(style = "ticks", location = "br", height = unit(0.15, "cm"))
+```
+
+```{r seine-catch}
+# Process seine data
+if (get.seine) {
+  source(here("Code/processSeine.R"))
+  
+  save(sets, set.catch, set.lengths,
+       file = here("Data/Seine/seine_data_WCRO.Rdata"))
+} else {
+  if (file.exists(here("Data/Seine/seine_data_WCRO.Rdata"))) {
+    load(here("Data/Seine/seine_data_WCRO.Rdata"))
+  }
+}
+```
+
+```{r process-catch-seine}
+if (exists("set.catch")) {
+  # Filter and format catch data
+  catch.set <- set.catch %>% 
+    left_join(select(spp.codes, scientificName, commonName)) 
+  
+  # Summarize species catch by weight and number
+  catch.set.summary <- catch.set %>%
+    select(scientificName, commonName, totalWeight, totalNum) %>%
+    # Summarize catch by weight and number
+    group_by(scientificName, commonName) %>% 
+    summarize(totalWeight = sum(totalWeight, na.rm = TRUE),
+              totalNum    = sum(totalNum, na.rm = TRUE)) %>% 
+    arrange(desc(totalWeight)) 
+  
+  # Rename columns
+  names(catch.set.summary) <- c("Scientific Name","Common Name",
+                                "Total weight (kg)","Total number (n)")
+  
+  write_csv(catch.set.summary, 
+            here("Output", paste0(survey.name, "_catch_table_nearshore_WCRO.csv")),
+            na = "")
+}
 ```
 
 \blandscape  
@@ -172,6 +318,8 @@ write_csv(catch.summary,
 ## NOAA Fisheries-Southwest Fisheries Science Center
 
 _**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = T)`
+
+# Trawl catch
 
 Catch for all trawl samples collected within the U.S. Exclusive Economic Zone (EEZ) are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.  
 
@@ -186,6 +334,29 @@ kable(catch.summary, format = knitr.format, booktabs = TRUE,
                 position = "center",
                 font_size = 8) %>%
   column_spec(1, italic = T) 
+```
+
+\newpage
+
+# Seine catch
+
+Catch for all purse seine samples collected within the U.S. Exclusive Economic Zone (EEZ) are summarized in the table below. Species are listed descending by weight.  
+
+```{r catch-table-seine}
+if (exists("catch.set.summary")) {
+  kable(catch.set.summary, format = knitr.format, booktabs = TRUE, 
+        escape = FALSE, longtable = TRUE,
+        align           = c(rep("l", 2), rep("r", ncol(catch.summary) - 2)),
+        digits          = c(0,0,3,0),
+        format.args     = list(big.mark = ",")) %>% 
+    kable_styling(latex_options = c("repeat_header","HOLD_position",
+                                    "scale_down"),
+                  position = "center",
+                  font_size = 8) %>%
+    column_spec(1, italic = T) 
+} else {
+  print("No seine data.")
+}
 ```
 
 For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
