@@ -354,7 +354,9 @@ catch.table <- catch.ca %>%
   mutate(date_time = format(date_time, "%m/%d/%Y"))
 
 # Save to CSV
-write_csv(catch.table, here("Output/catch_table_Project8.csv"), na = "")
+write_csv(catch.table, 
+          file = here("Output", paste0(survey.name, "_catch_table_Project8-CDFW.csv")),
+          na = "")
 ```
 
 ```{r extract-specimens}
@@ -369,16 +371,22 @@ specimen.summ <- specimens.ca %>%
   # Select specimens where weights, otoliths, and/or DNA were taken
   filter(!is.na(otolithNumber) | !is.na(DNAvialNumber) | 
            !is.na(weightg)) %>% 
-  select(haul, commonName, scientificName, weightg, otolithNumber, DNAvialNumber, otolithNumber) %>% 
+  select(haul, commonName, scientificName, weightg, 
+         otolithNumber, DNAvialNumber, hasDNAfinClip, adiposeCondition) %>% 
   group_by(haul, commonName, scientificName) %>% 
   # !is.na(var) converts to logical then sum gives the total counts
   summarise(measured = sum(!is.na(weightg)), 
             otoliths = sum(!is.na(otolithNumber)),
-            DNA      = sum(!is.na(DNAvialNumber))) %>% 
+            DNA      = sum(!is.na(DNAvialNumber)),
+            adipose_intact  = sum(adiposeCondition == "intact", na.rm = TRUE),
+            adipose_clipped = sum(adiposeCondition == "clipped", na.rm = TRUE)) %>% 
+  arrange(scientificName) %>% 
   adorn_totals()
 
 # Save to CSV
-write_csv(specimen.summ, here("Output/specimen_table_Project8.csv"), na = "")
+write_csv(specimen.summ, 
+          file = here("Output", paste0(survey.name, "_specimen_table_Project8-CDFW.csv")),
+          na = "")
 ```
 
 # Interactive trawl plot
