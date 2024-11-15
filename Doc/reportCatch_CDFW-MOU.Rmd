@@ -150,12 +150,54 @@ write_csv(lengths.psit,
           na = "")
 ```
 
+```{r seine-catch}
+# Load seine data
+if (file.exists(here("Output/purse_seine_sets.Rdata")))
+  load(here("Output/purse_seine_sets.Rdata"))
+if (file.exists(here("Output/purse_seine_catch.Rdata")))
+  load(here("Output/purse_seine_catch.Rdata"))
+if (file.exists(here("Output/purse_seine_lengths.Rdata")))
+  load(here("Output/purse_seine_lengths.Rdata"))
+```
+
+
+```{r extract-catch-seine}
+# Extract catch containing protected species
+catch.seine.psit <- set.catch %>% 
+  left_join(select(spp.codes, scientificName, commonName)) %>% 
+  left_join(select(sets, key.set, vessel.name, datetime, lat, long)) %>%
+  filter(scientificName %in% protected.spp$scientificName)
+
+if (nrow(catch.seine.psit) > 0) {
+  # Output to CSV
+  write_csv(catch.seine.psit, 
+            file = here("Output", paste0(survey.name, "_ProtectedSpeciesCatch_to_report_Compliance-Seine.csv")),
+            na = "")  
+}
+```
+
+```{r extract-specimens-seine}
+# Extract specimens from protected species
+lengths.seine.psit <- set.lengths %>% 
+  left_join(select(spp.codes, scientificName, commonName)) %>% 
+  left_join(select(sets, key.set, vessel.name, datetime, lat, long)) %>%
+  filter(scientificName %in% protected.spp$scientificName)
+
+if (nrow(lengths.seine.psit) > 0) {
+  # Output to CSV
+  write_csv(lengths.seine.psit, 
+            file = here("Output", paste0(survey.name, "_SalmonSpecimens_to_report_Compliance-Seine.csv")),
+            na = "")  
+}
+```
+
 # Catch summary
 
 A summary of catches from trawls containing protected species.
 
 # Protected species catch 
 ## Catch summary
+### Trawl
 
 A summary of catches from trawls containing protected species.
 
@@ -165,8 +207,19 @@ catch.psit %>%
   datatable(rownames = FALSE)
 ```
 
+### Seine
+
+A summary of catches from seines containing protected species.
+
+```{r catch-table-seine}
+catch.seine.psit %>% 
+  select(vessel.name,key.set,datetime,commonName,scientificName,totalNum,totalWeight) %>% 
+  datatable(rownames = FALSE) 
+```
+
 # Protected species specimens
 ## Specimen info
+### Trawl
 
 Specimen info for protected species.
 
@@ -177,9 +230,20 @@ lengths.psit %>%
   datatable(rownames = FALSE)
 ```
 
-## Specimen summary
+### Seine
 
-Specimen summary for protected species
+Specimen info for protected species.
+
+```{r specimen-table-seine}
+lengths.seine.psit %>% 
+  select(vessel.name, key.set, datetime,commonName,scientificName,forkLength_mm) %>% 
+  datatable(rownames = FALSE) 
+```
+
+## Specimen summary
+### Trawl
+
+Trawl specimen summary for protected species.
 
 ```{r specimen-summary}
 # Summarize specimens
