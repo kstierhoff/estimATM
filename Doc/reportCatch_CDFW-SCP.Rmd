@@ -123,8 +123,22 @@ cluster.mid <- haul.mid %>%
     long = mean(long))
 
 # Filter specimens for this cruise
+catch.all <- catch.all %>% 
+  filter(cruise %in% cruise.name)
+
+# Filter specimens for this cruise
 lengths.all <- lengths.all %>% 
   filter(cruise %in% cruise.name)
+```
+
+```{r seine-catch}
+# Load seine data
+if (file.exists(here("Output/purse_seine_sets.Rdata")))
+  load(here("Output/purse_seine_sets.Rdata"))
+if (file.exists(here("Output/purse_seine_catch.Rdata")))
+  load(here("Output/purse_seine_catch.Rdata"))
+if (file.exists(here("Output/purse_seine_lengths.Rdata")))
+  load(here("Output/purse_seine_lengths.Rdata"))
 ```
 
 ```{r filter-trawl-data,include=FALSE}
@@ -148,15 +162,39 @@ if (do.spatial) {
     st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
     st_intersection(ca_mpas) 
   
-  save(haul.ca, haul.mpa, file = here("Output/haul_data_reportCatch.Rdata"))
+  # Filter hauls in CA waters
+  haul.out <- haul.mid %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    filter(!haul %in% haul.ca$haul)
+  
+  save(haul.ca, haul.mpa, haul.out, file = here("Output/haul_data_reportCatch.Rdata"))
+  
+  # Find seine sets in CA waters
+  if (exists("sets")) {
+    sets.ca <- sets %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+      st_intersection(ca_waters)
+    
+    sets.mpa <- sets %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+      st_intersection(ca_mpas) 
+    
+    # Filter hauls in CA waters
+    sets.out <- sets %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+      filter(!key.set %in% sets.ca$key.set)
+    
+    save(sets.ca, sets.mpa, sets.out, file = here("Output/set_data_reportCatch.Rdata"))  
+  }
+  
 } else {
+  # Load existing data
   load(here("Output/haul_data_reportCatch.Rdata"))
+  
+  if (file.exists(here("Output/set_data_reportCatch.Rdata"))) {
+    load(here("Output/set_data_reportCatch.Rdata"))
+  }
 }
-
-# Filter hauls in CA waters
-haul.out <- haul.mid %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(!haul %in% haul.ca$haul)
 ```
 
 ```{r process-nav,include=FALSE}
@@ -363,6 +401,45 @@ write_csv(catch.table,
           na = "")
 ```
 
+```{r extract-catch-seine}
+set.catch.ca <- set.catch %>% 
+  filter(key.set %in% sets.ca$key.set) %>% 
+  # left_join(select(haul.ca, key, date_time)) %>% 
+  left_join(select(spp.codes, scientificName, commonName))
+
+set.catch.table <- set.catch.ca %>% 
+  left_join(select(sets, key.set, lat, long, datetime)) %>% 
+  left_join(select(as.data.frame(sets.mpa), key.set, MPA)) %>% 
+  mutate(county = NA,
+         utm_e = NA, 
+         utm_n = NA,
+         utm_zone = NA,
+         gps_datum = "WGS84",
+         map_scaling = "10K",
+         num_M = NA,
+         num_F = NA,
+         num_UNK = NA,
+         method = "Purse seine",
+         disposition = "S",
+         facility = "SWFSC",
+         totalWt = totalWeight,
+         meanWt = totalWeight/totalNum,
+         totalCt = round(totalWt/meanWt),
+         blank1 = NA,
+         blank2 = NA) %>% 
+  arrange(vessel.name, commonName) %>% 
+  select(key.set, commonName, blank1, scientificName, blank2, county, MPA, 
+         utm_e, utm_n, utm_zone, long, lat, gps_datum,
+         map_scaling, datetime, num_M, num_F, num_UNK, totalCt, 
+         method, disposition, facility) %>% 
+  mutate(datetime = format(datetime, "%m/%d/%Y"))
+
+# Save to CSV
+write_csv(set.catch.table, 
+          file = here("Output", paste0(survey.name, "_catch_table_seine_Project8-CDFW.csv")),
+          na = "")
+```
+
 ```{r extract-specimens}
 # Extract specimens from hauls in CA waters
 specimens.ca <- lengths.all %>% 
@@ -390,6 +467,30 @@ specimen.summ <- specimens.ca %>%
 # Save to CSV
 write_csv(specimen.summ, 
           file = here("Output", paste0(survey.name, "_specimen_table_Project8-CDFW.csv")),
+          na = "")
+```
+
+```{r extract-specimens-seine}
+# Extract specimens from sets in CA waters
+set.specimens.ca <- set.lengths %>% 
+  filter(key.set %in% sets.ca$key.set) %>% 
+  # left_join(select(haul.ca, key, date_time)) %>% 
+  left_join(select(spp.codes, scientificName, commonName))
+
+# Summarize specimens
+set.specimen.summ <- set.specimens.ca %>% 
+  # Select specimens where weights, otoliths, and/or DNA were taken
+  filter(!is.na(weight_g)) %>% 
+  select(vessel.name, key.set, commonName, scientificName, weight_g) %>% 
+  group_by(vessel.name, key.set, commonName, scientificName) %>% 
+  # !is.na(var) converts to logical then sum gives the total counts
+  summarise(measured = sum(!is.na(weight_g))) %>% 
+  arrange(vessel.name, scientificName) %>% 
+  adorn_totals()
+
+# Save to CSV
+write_csv(set.specimen.summ, 
+          file = here("Output", paste0(survey.name, "_specimen_table_seine_Project8-CDFW.csv")),
           na = "")
 ```
 
@@ -439,7 +540,53 @@ if (nrow(haul.mpa) > 0) {
 
 ```
 
+# Interactive seine plot
+
+A map showing all purse seine sets (black points), sets in CA State waters (red points), and sets occurring in CA MPAs (blue markers). Hovering over shaded polygons will show MPA names, and over points will show the set "key", which includes the vessel and set number.  
+
+```{r catch-map-leaflet-seine}
+# Configure palette for MPAs
+factpal <- colorFactor(topo.colors(10), ca_mpas$MPA)
+
+# Create leaflet map
+if (nrow(sets.mpa) > 0) {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.NatGeoWorldMap) %>%  
+    addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 0.5,
+                label = ~htmlEscape(MPA)) %>% 
+    # addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+    #              popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = sets.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) %>% 
+    addCircleMarkers(data = sets.ca, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) %>% 
+    addMarkers(data = sets.mpa, label = ~paste("Vessel/set:", key.set), popup = ~paste("Vessel/set:", key.set))  
+} else {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.NatGeoWorldMap) %>%  
+    addPolygons(data = ca_waters, weight = 2, fillColor = "transparent") %>% 
+    addPolygons(data = ca_mpas, color = "gray50", weight = 2, fillColor =  ~factpal(MPA), fillOpacity = 0.5,
+                label = ~htmlEscape(MPA)) %>% 
+    # addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
+    #              popup = ~~paste("Haul:", haul), label = ~paste("Haul:", haul)) %>% 
+    addCircleMarkers(data = sets.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) %>% 
+    addCircleMarkers(data = sets.ca, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) 
+}
+```
+
 # Catch summary
+## Trawl
 
 A summary of catches from trawls conducted in CA.
 
@@ -451,9 +598,22 @@ catch.table %>%
   datatable(rownames = FALSE)
 ```
 
-# Specimen summary
+## Seine
 
-A summary of samples taken from specimens collected in CA.
+A summary of catches from purse seines conducted in CA.
+
+```{r catch-summary-seine}
+set.catch.table %>% 
+  select(key.set, commonName, scientificName, MPA, long, lat, totalCt) %>% 
+  mutate(lat  = round(lat, 4),
+         long = round(long, 4)) %>% 
+  datatable(rownames = FALSE)
+```
+
+# Specimen summary
+## Trawl
+
+A summary of samples taken from trawl specimens collected in CA.
 
 ```{r specimen-summary}
 specimen.summ %>% 
