@@ -17,7 +17,7 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse,swfscMisc,lubridate,sp,mapview,RODBC,leafem,
                knitr,geosphere,ggrepel,cowplot,sf,leaflet, htmltools,
                odbc,kableExtra,rnaturalearth,shadowtext,here,fs,ggspatial,
-               janitor)
+               janitor,DT)
 
 # Install and load required packages from Github -------------------------------
 # surveyR
@@ -127,8 +127,21 @@ cluster.mid <- haul.mid %>%
     long = mean(long))
 
 # Filter specimens for this cruise
+catch.all <- catch.all %>% 
+  filter(cruise %in% cruise.name)
+
 lengths.all <- lengths.all %>% 
   filter(cruise %in% cruise.name)
+```
+
+```{r seine-catch}
+# Load seine data
+if (file.exists(here("Output/purse_seine_sets.Rdata")))
+  load(here("Output/purse_seine_sets.Rdata"))
+if (file.exists(here("Output/purse_seine_catch.Rdata")))
+  load(here("Output/purse_seine_catch.Rdata"))
+if (file.exists(here("Output/purse_seine_lengths.Rdata")))
+  load(here("Output/purse_seine_lengths.Rdata"))
 ```
 
 ```{r filter-trawl-data, include=FALSE}
@@ -161,15 +174,39 @@ if (do.spatial) {
   haul.wa.12 <- haul.wa %>% 
     st_intersection(wa_waters)
   
-  save(haul.wa, haul.wa.12, file = here("Output/haul_data_reportCatchWa.Rdata"))
+  # Filter hauls in WA waters
+  haul.out <- haul.mid %>% 
+    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+    filter(!haul %in% haul.wa$haul)
+  
+  save(haul.wa, haul.wa.12, haul.out, file = here("Output/haul_data_reportCatch_WDFW.Rdata"))
+  
+  # Find seine sets in CA waters
+  if (exists("sets")) {
+    sets.wa <- sets %>% 
+      # Filter hauls N of the WA/OR border
+      filter(lat >= 46.23622) %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+      st_intersection(eez_usa)
+    
+    sets.wa.12 <- sets %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+      st_intersection(wa_waters)
+    
+    # Filter hauls in CA waters
+    sets.out <- sets %>% 
+      st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+      filter(!key.set %in% sets.wa$key.set)
+    
+    save(sets.wa, sets.wa.12, sets.out, file = here("Output/set_data_reportCatch_WDFW.Rdata"))  
+  }
 } else {
-  load(here("Output/haul_data_reportCatch.Rdata"))
+  load(here("Output/haul_data_reportCatch_WDFW.Rdata"))
+  
+  if (file.exists(here("Output/set_data_reportCatch_WDFW.Rdata"))) {
+    load(here("Output/set_data_reportCatch_WDFW.Rdata"))
+  }
 }
-
-# Filter hauls in WA waters
-haul.out <- haul.mid %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  filter(!haul %in% haul.wa$haul)
 ```
 
 ```{r process-nav,include=FALSE}
@@ -350,6 +387,13 @@ catch.wa <- catch.all %>%
   filter(!subSampleWtkg == 0) 
 ```
 
+```{r extract-catch-seine}
+set.catch.wa <- set.catch %>% 
+  filter(key.set %in% sets.wa$key.set) %>% 
+  left_join(select(spp.codes, scientificName, commonName)) %>% 
+  filter(!totalWeight == 0) 
+```
+
 ```{r process-catch}
 # Summarize species catch by weight and number
 catch.summary <- catch.wa %>% 
@@ -359,9 +403,28 @@ catch.summary <- catch.wa %>%
             "Total number (n)"  = round(sum(totalNum), 0)) %>% 
   arrange(desc(`Total weight (kg)`)) 
 
-write_csv(catch.summary,
-          here("Output", paste0(survey.name, "_catch_summary_WDFW.csv")),
-          na = "")
+if (nrow(catch.summary)) {
+  write_csv(catch.summary,
+            here("Output", paste0(survey.name, "_catch_summary_WDFW.csv")),
+            na = "")  
+}
+
+```
+
+```{r process-catch-seine}
+# Summarize species catch by weight and number
+set.catch.summary <- set.catch.wa %>% 
+  group_by("Scientific Name" = scientificName, 
+           "Common Name" = commonName) %>% 
+  summarise("Total weight (kg)" = round(sum(totalWeight), 2),
+            "Total number (n)"  = round(sum(totalNum), 0)) %>% 
+  arrange(desc(`Total weight (kg)`)) 
+
+if (nrow(set.catch.summary)) {
+  write_csv(set.catch.summary,
+            here("Output", paste0(survey.name, "_catch_summary_seine_WDFW.csv")),
+            na = "")
+}
 ```
 
 # Interactive trawl plot
@@ -424,21 +487,84 @@ if (nrow(haul.wa) > 0) {
 
 ```
 
+# Interactive seine plot
+
+A map showing all purse seine sets (white points), sets in WA State waters (within the U.S. EEZ; red points), and trawls occurring in WA MPAs (blue markers; **need WA MPA shapefiles, if any**). Hovering over shaded polygons will show MPA names, and over points will show the trawl number, which includes the cruise, ship, haul, and collection.  
+
+```{r catch-map-leaflet-seine}
+# Create leaflet map
+if (nrow(sets.wa) > 0) {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
+    # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.") %>% 
+    addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
+    addCircleMarkers(data = sets.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) %>% 
+    addCircleMarkers(data = sets.wa, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft") 
+} else {
+  leaflet() %>% 
+    addProviderTiles(providers$Esri.OceanBasemap) %>%  
+    # Add EEZs
+    addPolylines(data = eez_usa, color = "#000414", weight = 3, 
+                 label = "EEZ-U.S.") %>% 
+    addPolygons(data = wa_waters, weight = 2, fillColor = "transparent") %>% 
+    addCircleMarkers(data = sets.out, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set)) %>% 
+    addCircleMarkers(data = sets.wa, radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     label = ~paste("Vessel/set:", key.set),
+                     popup = ~paste("Vessel/set:", key.set))  %>% 
+    # Add scale bar
+    addScaleBar(position = "bottomright") %>%
+    # Add map coordinates
+    addMouseCoordinates() %>% 
+    # Add measurement tool
+    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
+               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
+               position = "topleft")
+}
+```
+
 # Catch summary
 ## By species
+### Trawl
 
 Catch for all trawl samples in  are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
 
 ```{r catch-summary}
 if (nrow(catch.wa) > 0) {
   catch.summary %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          digits = c(0)) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                  full_width = FALSE) %>%
-    row_spec(0, align = c("c")) %>% 
-    column_spec(1, italic = T) %>% 
-    scroll_box(height = "500px") 
+    datatable(rownames = FALSE)
+} else {
+  cat("No catch in Washington")
+}
+```
+
+### Seine
+
+Catch for all purse seine samples in  are summarized in the table below. Species are listed descending by weight. 
+
+```{r catch-summary-seine}
+if (nrow(set.catch.wa) > 0) {
+  set.catch.summary %>% 
+    datatable(rownames = FALSE) 
 } else {
   cat("No catch in Washington")
 }
@@ -458,18 +584,43 @@ if (nrow(catch.wa) > 0) {
            "Total number (n)" = totalNum) %>% 
     arrange(Haul, desc(`Total weight (kg)`))
   
-  write_csv(catch.all,
-            here("Output", paste0(survey.name, "_catch_table_WDFW.csv")),
-            na = "") 
+  if (nrow(catch.all) > 0) {
+    write_csv(catch.all,
+              here("Output", paste0(survey.name, "_catch_table_WDFW.csv")),
+              na = "")   
+  }
   
   catch.all %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          digits = c(0)) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                  full_width = FALSE) %>%
-    row_spec(0, align = c("c")) %>% 
-    column_spec(2, italic = T) %>% 
-    scroll_box(height = "500px")
+    datatable(rownames = FALSE)
+  
+} else {
+  cat("No catch in Washington")
+}
+```
+
+## By set
+
+Catch for each purse seine sample by species.  
+
+```{r catch-hauls-seine}
+if (nrow(set.catch.wa) > 0) {
+  set.catch.all <- set.catch.wa %>% 
+    select(Vessel = vessel.name,
+           Key = key.set,
+           "Scientific Name" = scientificName,
+           "Common Name" = commonName,
+           "Total weight (kg)" = totalWeight, 
+           "Total number (n)" = totalNum) %>% 
+    arrange(Vessel, desc(`Total weight (kg)`))
+  
+  if (nrow(set.catch.all) > 0) {
+    write_csv(set.catch.all,
+              here("Output", paste0(survey.name, "_catch_table_seine_WDFW.csv")),
+              na = "")   
+  }
+  
+  set.catch.all %>% 
+    datatable(rownames = FALSE)
   
 } else {
   cat("No catch in Washington")
@@ -510,18 +661,62 @@ write_csv(specimen.summ,
           na = "")
 ```
 
+```{r extract-specimens-seine}
+# Extract specimens from hauls in CA waters
+set.specimens.wa <- set.lengths %>% 
+  filter(key.set %in% sets.wa$key.set) %>% 
+  # left_join(select(haul.ca, key, date_time)) %>% 
+  left_join(select(spp.codes, scientificName, commonName))
+
+if (nrow(set.specimens.wa) > 0) {
+  # Write specimen level data to CSV
+  write_csv(set.specimens.wa, 
+            file = here("Output", paste0(survey.name, "_specimen_info_seine_WDFW.csv")))  
+}
+
+# Summarize specimens
+set.specimen.summ <- set.specimens.wa %>% 
+  # Select specimens where weights, otoliths, and/or DNA were taken
+  filter(!is.na(weight_g)) %>% 
+  select(vessel.name, key.set, commonName, scientificName, weight_g) %>% 
+  group_by(vessel.name, key.set, commonName, scientificName) %>% 
+  # !is.na(var) converts to logical then sum gives the total counts
+  summarise(measured = sum(!is.na(weight_g))) %>% 
+  arrange(vessel.name, key.set, scientificName) %>% 
+  adorn_totals()
+
+if (nrow(set.specimen.summ) > 0) {
+  # Save specimen summary to CSV
+  write_csv(set.specimen.summ, 
+            here("Output", paste0(survey.name, "_specimen_table_seine_WDFW.csv")),
+            na = "")  
+}
+```
+
 # Specimen summary
-A summary of samples taken from specimens collected in Oregon.
+## Trawl
+
+A summary of trawl samples taken from specimens collected in Oregon.
 
 ```{r specimen-summary}
 if (nrow(specimens.wa) > 0) {
   specimen.summ %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), 
-                  full_width = FALSE) %>%
-    row_spec(0, align = c("c")) %>% 
-    column_spec(3, italic = T) %>% 
-    scroll_box(height = "500px")  
+    datatable(rownames = FALSE)
+  
+} else {
+  cat("No specimens in Oregon.")
+}
+```
+
+## Seine
+
+A summary of seine samples taken from specimens collected in Oregon.
+
+```{r specimen-summary-seine}
+if (nrow(set.specimens.wa) > 0) {
+  set.specimen.summ %>% 
+    datatable(rownames = FALSE)
+  
 } else {
   cat("No specimens in Oregon.")
 }
