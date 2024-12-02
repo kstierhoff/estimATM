@@ -558,8 +558,8 @@ tx.rm                  <- list(RL  = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 15,
-                            SH  = 15,
+min.tx.length          <- c(RL  = 12,
+                            SH  = 12,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
