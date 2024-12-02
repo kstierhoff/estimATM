@@ -112,7 +112,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2024-06-24" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
@@ -333,7 +333,7 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM","LBC") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- c("LBC") # "LM"
+nasc.vessels.nearshore <- c("LBC","LM") 
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -369,7 +369,7 @@ sounder.type           <- c(RL  = "EK80",
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
