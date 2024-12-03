@@ -13,7 +13,8 @@ combine.regions   <- T # Combine nearshore/offshore plots with those from the co
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns   <- NA # For nearshore sampling
+tx.spacing.ns   <- c("S" = 5, "N" = 7, "CI" = 2.5) # or NA
+tx.break.ns     <- 64 # Northernmost transect sampled by the southern F/V, 64 in 2024, near Carmel
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -558,7 +559,7 @@ tx.rm                  <- list(RL  = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 12,
+min.tx.length          <- c(RL  = 12, # Transect 149 off VI was 12.7 nmi and had been excluded
                             SH  = 12,
                             LM  = 1,
                             LBC = 1,
@@ -584,8 +585,8 @@ cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 max.cluster.dist       <- 30
 
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0, 3.5, 8, 15, 35, 70, 100)
-tx.spacing.dist <- c(2.5, 5, 10, 20, 40, 80)
+tx.spacing.bins <- c(0, 3, 6, 8, 15, 35, 70, 100)
+tx.spacing.dist <- c(2.5, 5, 7, 10, 20, 40, 80)
 
 # SCS data
 scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
@@ -667,7 +668,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 10 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE

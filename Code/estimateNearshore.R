@@ -309,7 +309,7 @@ if (process.nearshore) {
     bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance,
                                     cluster.deep, cluster.distance.deep, haul.deep, haul.distance.deep)) 
   
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = TRUE) + coord_map()
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
   #   geom_point(show.legend = FALSE) +
@@ -596,20 +596,20 @@ if (save.figs) {
   source(here("Code/plot_cluster_proportion_wt_nearshore.R"))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
+  nasc.seine.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
                                         nrow = 1, labels = c("a)", "b)"),
                                         align = "hv")
   
-  nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, set.pie.haul.wt,
+  nasc.seine.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, set.pie.haul.wt,
                                      nrow = 1, labels = c("a)", "b)"),
                                      align = "hv")
   
-  ggsave(nasc.trawl.cluster.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
+  ggsave(nasc.seine.cluster.wt.ns,
+         filename = here("Figs/fig_nasc_seine_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
   
-  ggsave(nasc.trawl.haul.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_haul_wt_ns.png"),
+  ggsave(nasc.seine.haul.wt.ns,
+         filename = here("Figs/fig_nasc_seine_haul_wt_ns.png"),
          width = map.width*2, height = map.height)
 }
 
@@ -875,22 +875,28 @@ for (i in unique(tx.mid.ns$transect.name)) {
   }
 }
 
-# Bin transects by spacing
-tx.nn.ns <- tx.nn.ns %>% 
-  mutate(dist.bin = cut(tx.nn.ns$min.dist, tx.spacing.bins),
-         spacing  = tx.spacing.dist[as.numeric(dist.bin)]) %>% 
-  mutate(spacing = case_when(
-    spacing > 6 ~ 5,
-    TRUE ~ spacing),
-    dist.cum = cumsum(spacing)) %>% 
-  arrange(transect)
-
-# if (!is.na(tx.spacing.ns)) {
-#   tx.nn.ns <- tx.nn.ns %>% 
-#     mutate(spacing = tx.spacing.ns,
-#            dist.bin = cut(spacing, tx.spacing.bins),
-#            dist.cum = cumsum(spacing))
-# }
+# If nearshore transect spacing is manually defined
+if (!is.na("tx.spacing.ns")) {
+  tx.nn.ns <- tx.nn.ns %>%
+    mutate(min.dist = case_when(
+      vessel.name == "LM" ~ tx.spacing.ns["N"],
+      vessel.name == "LBC" & transect <= tx.break.ns ~ tx.spacing.ns["S"],
+      vessel.name == "LBC" & transect > tx.break.ns ~ tx.spacing.ns["CI"],
+      TRUE ~ NA)) %>% 
+    mutate(dist.bin = cut(min.dist, tx.spacing.bins),
+           spacing  = tx.spacing.dist[as.numeric(dist.bin)],
+           dist.cum = cumsum(spacing))
+} else {
+  # Bin transects by spacing
+  tx.nn.ns <- tx.nn.ns %>% 
+    mutate(dist.bin = cut(min.dist, tx.spacing.bins),
+           spacing  = tx.spacing.dist[as.numeric(dist.bin)]) %>% 
+    mutate(spacing = case_when(
+      spacing > 6 ~ 5,
+      TRUE ~ spacing),
+      dist.cum = cumsum(spacing)) %>% 
+    arrange(transect)  
+}
 
 # Save nearest neighbor distance info
 save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
@@ -1247,6 +1253,10 @@ if (stratify.manually.ns) {
   
 } else {
   # Define strata automatically------------
+  
+  # Remove existing strata
+  if (exists("strata.final.ns")) rm("strata.final.ns")
+  
   # Define strata boundaries and transects for each species
   for (i in unique(nasc.density.summ.ns$scientificName)) {
     for (j in unique(nasc.density.summ.ns$vessel.name)) {
@@ -1261,9 +1271,15 @@ if (stratify.manually.ns) {
       
       if (nrow(temp.spp) > 0) {
         # Find the start of each positive stratum
-        spp.starts <- temp.spp %>%
-          # mutate(diff = c(1, diff(transect))) %>%
-          filter(diff > max.diff)
+        if (max(temp.spp$diff) != 1) {
+          # If more than one stratum
+          spp.starts <- temp.spp %>%
+            # mutate(diff = c(1, diff(transect))) %>%
+            filter(diff > max.diff)  
+        } else {
+          # If there's only one continuous stratum, select the first one
+          spp.starts <- slice(temp.spp, 1)
+        }
         
         if (nrow(spp.starts) > 0) {
           # If the start of the stratum == 1, stratum start is 1, else min transect number
@@ -1835,6 +1851,8 @@ strata.final.ns <- strata.final.ns %>%
   select(-stratum) %>% 
   left_join(strata.nearshore.fac) %>% 
   rename(stratum = strata.fac)
+
+# RESUME HERE
 
 # Remove point estimates, if they exist
 if(exists("point.estimates.ns")) rm(point.estimates.ns)
