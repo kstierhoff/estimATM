@@ -447,6 +447,9 @@ use.seine.data  <- TRUE
 # "Trawl" and/or "Seine"
 catch.source.ns <- c("Purse seine")
 
+# Vessels for which to correct deep nasc that may be anchovy
+deep.nasc.vessels <- c("LBC")
+
 # Define path to seine data directories for each vessel
 seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2307RL.xlsx"),
                       "LM" = file.path(survey.dir["LM"],  "DATA/SEINE/lm_data_2307RL.xlsx"))

@@ -445,9 +445,12 @@ seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
 # Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
 use.seine.data  <- TRUE
 
+# Vessels for which to correct deep nasc that may be anchovy
+deep.nasc.vessels <- c("LBC","LM")
+
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
-catch.source.ns <- c("Purse seine")
+catch.source.ns <- c("Purse seine", "Trawl")
 
 # Define path to seine data directories for each vessel
 seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2407RL.xlsx"),
@@ -844,7 +847,7 @@ stock.break.sar  <- c("Pt. Conception" = 34.7) # Latitude of Pt. Conception, bas
 
 # Transects used to define stock boundaries (primary or other)
 
-# Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
+# Used in estimateOffshore and estimateNearshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 
 
 # Data collection settings ------------------------------------------------
