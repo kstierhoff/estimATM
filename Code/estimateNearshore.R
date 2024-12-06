@@ -88,16 +88,16 @@ if (process.nearshore) {
   
   # For 2023, replace cps.nasc with NASC.30, to examine the contribution of deep anchovy schools to the sardine estimates
   # Ideally, provide variable for nasc.depth.deep (e.g., NASC20), but hard-coded for 2307RL
-  if (survey.name %in% c("2307RL","2407RL")) {
+  if (exists("deep.nasc.vessels")) {
     nasc.nearshore <- nasc.nearshore %>%
       # Retain original cps.nasc
       # Create deep backscatter variable
       mutate(cps.nasc.orig = cps.nasc) %>%
       # Create deep backscatter variable
       mutate(cps.nasc.deep = cps.nasc - NASC.20) %>% 
-      # Remove deep backscatter from 
+      # Remove deep backscatter from vessels defined in settings
       mutate(cps.nasc = case_when(
-        cps.nasc >= NASC.20 & vessel.orig == "LBC" ~ NASC.20,
+        cps.nasc >= NASC.20 & vessel.orig %in% deep.nasc.vessels ~ NASC.20,
         TRUE ~ cps.nasc
       ))
 
@@ -309,7 +309,7 @@ if (process.nearshore) {
     bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance,
                                     cluster.deep, cluster.distance.deep, haul.deep, haul.distance.deep)) 
   
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = TRUE) + coord_map()
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
   #   geom_point(show.legend = FALSE) +
@@ -596,20 +596,20 @@ if (save.figs) {
   source(here("Code/plot_cluster_proportion_wt_nearshore.R"))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
+  nasc.seine.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
                                         nrow = 1, labels = c("a)", "b)"),
                                         align = "hv")
   
-  nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, set.pie.haul.wt,
+  nasc.seine.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, set.pie.haul.wt,
                                      nrow = 1, labels = c("a)", "b)"),
                                      align = "hv")
   
-  ggsave(nasc.trawl.cluster.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
+  ggsave(nasc.seine.cluster.wt.ns,
+         filename = here("Figs/fig_nasc_seine_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
   
-  ggsave(nasc.trawl.haul.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_haul_wt_ns.png"),
+  ggsave(nasc.seine.haul.wt.ns,
+         filename = here("Figs/fig_nasc_seine_haul_wt_ns.png"),
          width = map.width*2, height = map.height)
 }
 
@@ -853,7 +853,7 @@ if (exists("tx.nn.ns")) rm(tx.nn.ns)
 for (i in unique(tx.mid.ns$transect.name)) {
   # Get the mid lat/long for each transect
   tx.nn.i      <- filter(tx.mid.ns, transect.name == i) 
-  # Get midpoint data for all other transectss
+  # Get midpoint data for all other transects
   tx.others <- filter(tx.mid.ns, transect.name != i, 
                       vessel.name %in% tx.nn.i$vessel.name) 
   # Get the transect info and spacing based on shortest distance
@@ -875,22 +875,28 @@ for (i in unique(tx.mid.ns$transect.name)) {
   }
 }
 
-# Bin transects by spacing
-tx.nn.ns <- tx.nn.ns %>% 
-  mutate(dist.bin = cut(tx.nn.ns$min.dist, tx.spacing.bins),
-         spacing  = tx.spacing.dist[as.numeric(dist.bin)]) %>% 
-  mutate(spacing = case_when(
-    spacing > 6 ~ 5,
-    TRUE ~ spacing),
-    dist.cum = cumsum(spacing)) %>% 
-  arrange(transect)
-
-# if (!is.na(tx.spacing.ns)) {
-#   tx.nn.ns <- tx.nn.ns %>% 
-#     mutate(spacing = tx.spacing.ns,
-#            dist.bin = cut(spacing, tx.spacing.bins),
-#            dist.cum = cumsum(spacing))
-# }
+# If nearshore transect spacing is manually defined
+if (!is.na("tx.spacing.ns")) {
+  tx.nn.ns <- tx.nn.ns %>%
+    mutate(min.dist = case_when(
+      vessel.name == "LM" ~ tx.spacing.ns["N"],
+      vessel.name == "LBC" & transect <= tx.break.ns ~ tx.spacing.ns["S"],
+      vessel.name == "LBC" & transect > tx.break.ns ~ tx.spacing.ns["CI"],
+      TRUE ~ NA)) %>% 
+    mutate(dist.bin = cut(min.dist, tx.spacing.bins),
+           spacing  = tx.spacing.dist[as.numeric(dist.bin)],
+           dist.cum = cumsum(spacing))
+} else {
+  # Bin transects by spacing
+  tx.nn.ns <- tx.nn.ns %>% 
+    mutate(dist.bin = cut(min.dist, tx.spacing.bins),
+           spacing  = tx.spacing.dist[as.numeric(dist.bin)]) %>% 
+    mutate(spacing = case_when(
+      spacing > 6 ~ 5,
+      TRUE ~ spacing),
+      dist.cum = cumsum(spacing)) %>% 
+    arrange(transect)  
+}
 
 # Save nearest neighbor distance info
 save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
@@ -955,7 +961,8 @@ for (v in unique(nasc.nearshore$vessel.name)) {
     filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max)) %>% 
     # mutate(transect = sprintf("%03d", Transect)) %>% 
     mutate(transect = as.numeric(Transect),
-           transect.name = paste(v, sprintf("%03d", transect))) 
+           transect.name = paste(v, sprintf("%03d", transect)),
+           wpt.num = as.numeric(str_replace(Waypoint, "N",""))) 
   
   # ggplot(region.wpts, aes(long, lat, colour = Region)) + geom_point() + coord_map()
   
@@ -967,7 +974,7 @@ for (v in unique(nasc.nearshore$vessel.name)) {
   
   # Extract shallowest waypoint from each transect
   region.wpts.i <- region.wpts %>% 
-    slice(which.min(depth)) %>% 
+    slice(which.min(wpt.num)) %>% 
     ungroup()
   
   # Add region to nasc by vessel
@@ -985,7 +992,8 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       # Get inshore nearshore waypoints
       tx.i.ns <- region.wpts %>%
         group_by(transect, transect.name) %>%
-        slice(which.min(abs(Depth))) %>% 
+        slice(which.min(wpt.num)) %>% 
+        # slice(which.min(abs(Depth))) %>% 
         mutate(grp = "original",
                loc = "inshore",
                key = paste(v, Region)) %>% 
@@ -995,7 +1003,8 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       # Get offshore nearshore waypoints
       tx.o.ns <- region.wpts %>%
         group_by(transect, transect.name) %>%
-        slice(which.max(abs(Depth))) %>% 
+        slice(which.max(wpt.num)) %>% 
+        # slice(which.max(abs(Depth))) %>%
         mutate(grp = "original",
                loc = "offshore",
                key = paste(v, Region)) %>% 
@@ -1246,32 +1255,39 @@ if (stratify.manually.ns) {
     mutate(stratum.orig = stratum)
   
 } else {
-  # Define strata automatically------------
+  # Define strata programmatically------------
+    # Remove existing strata
+  if (exists("strata.final.ns")) rm("strata.final.ns")
+  
   # Define strata boundaries and transects for each species
   for (i in unique(nasc.density.summ.ns$scientificName)) {
     for (j in unique(nasc.density.summ.ns$vessel.name)) {
       # Select positive transects and calculate differences between transect numbers
-      # diffs >= max.diff define stratum breaks
+      # diffs >= max.diff (usually 3 or more transects with zero biomass) define stratum breaks
       temp.spp <- nasc.density.summ.ns %>% 
         filter(scientificName == i, vessel.name == j, positive == TRUE) %>% 
         ungroup() %>% 
         mutate(diff = c(1, diff(transect)))
       
+      # Identify the first transect sampled by vessel j
+      min.tx.j <- min(nasc.density.summ.ns$transect[nasc.density.summ.ns$vessel.name == j])
+      
       strata.df <- data.frame()
       
       if (nrow(temp.spp) > 0) {
-        # Find the start of each positive stratum
+        # Get stratum starts for each spp
         spp.starts <- temp.spp %>%
-          # mutate(diff = c(1, diff(transect))) %>%
-          filter(diff > max.diff)
+          # Get first positive transect
+          slice(1) %>%
+          # Get all other postive transects that start a new stratum
+          bind_rows(filter(temp.spp, diff > max.diff)) %>% 
+          # If the start of the first stratum equals the first transect sampled by vessel j, 
+          # survey.start is the first transect, else the first transect - 1 
+          mutate(transect = case_when(
+            transect == min.tx.j ~ min.tx.j,
+            TRUE ~ transect - 1))
         
         if (nrow(spp.starts) > 0) {
-          # If the start of the stratum == 1, stratum start is 1, else min transect number
-          survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
-          
-          # A vector of stratum starts
-          stratum.start <- c(survey.start, spp.starts$transect - 1)
-          
           # If the end of the stratum is the last transect in the survey,
           # select the last, else the last transect + 1
           survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
@@ -1285,8 +1301,8 @@ if (stratify.manually.ns) {
           # Combine starts and ends in to a data frame for plotting and generating stratum vectors
           strata.spp <- data.frame(scientificName = i,
                                    vessel.name = j,
-                                   stratum = seq(1, length(stratum.start)),
-                                   start = stratum.start,
+                                   stratum = seq(1, nrow(spp.starts)),
+                                   start = spp.starts$transect,
                                    end = stratum.end) # %>% mutate(n.tx = end - start + 1)
           
           # Create stratum vectors
@@ -1472,7 +1488,7 @@ for (i in unique(nearshore.spp$scientificName)) {
         tx.i.ns <- region.wpts %>%
           group_by(transect, transect.name) %>%
           # slice(which.min(absDepth)) %>% 
-          slice(which.min(abs(Depth))) %>%
+          slice(which.min(wpt.num)) %>%
           mutate(grp = "original",
                  loc = "inshore",
                  key = paste(j, Region)) %>% 
@@ -1483,7 +1499,7 @@ for (i in unique(nearshore.spp$scientificName)) {
         tx.o.ns <- region.wpts %>%
           group_by(transect, transect.name) %>%
           # slice(which.max(wpt.num)) %>% 
-          slice(which.max(abs(Depth))) %>%
+          slice(which.max(wpt.num)) %>%
           mutate(grp = "original",
                  loc = "offshore",
                  key = paste(j, Region)) %>% 
@@ -1731,7 +1747,7 @@ nasc.density.ns.sf <- nasc.density.ns %>%
                    '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>')
   )
 
-# ns.spp <- "Sardinops sagax"
+# ns.spp <- "Clupea pallasii"
 # mapview(filter(strata.nearshore, scientificName == ns.spp)) +
 # mapview(filter(strata.nearshore, scientificName == ns.spp), zcol = "stock") +
 # mapview(filter(nasc.density.ns.sf, scientificName == ns.spp), cex = "bin.level", zcol = "bin.level")
@@ -1827,6 +1843,8 @@ save(nasc.nearshore,
 
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.nearshore, file = here("Output/nasc_nearshore_final.Rdata"))
+
+saveRDS(strata.final.ns, file = here("Output/strata_final_ns.rds"))
 
 # Add stock and revised strata designations to strata.final.ns
 strata.final.ns <- strata.final.ns %>% 

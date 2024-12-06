@@ -96,23 +96,23 @@ get.nav           <- T # Download primary vessel nav data from ERDDAP
 nav.source        <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sd        <- F # Download Saildrone nav data from ERDDAP
 get.nav.sh        <- F # Download NOAA Ship nav data
-copy.files        <- T # Copy data files to local directory 
+copy.files        <- F # Copy data files to local directory 
 process.csv       <- T # Process Echoview files
 save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- F # Generate bootstrap estimates
+do.bootstrap      <- T # Generate bootstrap estimates
 
 ### Sometimes FALSE
 do.imap           <- T # Create interactive Leaflet map
 save.imap         <- F # Save Leaflet maps
 overwrite.files   <- T # Overwrite files (TRUE if files have changed)
 overwrite.csv     <- T # Overwrite CSV files (TRUE if files have changed)
-process.csv.all   <- T # Process all acoustic backscatter files (F = new files only)
+process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 process.csv.krill <- T # Process krill backscatter data
 process.cufes     <- F # Process CUFES data (no CUFES sampling post-2023)
-process.cal       <- F # Process calibration results
+process.cal       <- T # Process calibration results
 process.ctd       <- F # Process CTD and UCTD casts
 match.intervals   <- F # Match intervals for comparing EK60 and EK80
 get.bathy         <- T # Extract ETOPO1 bathymetry data in the survey footprint
@@ -298,8 +298,7 @@ wpts.sf <- wpts %>%
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   mutate(
     label    = paste("Transect", Transect),
-    popup    = paste('<b>Transect:</b>', Transect, Type)
-  )
+    popup    = paste('<b>Transect:</b>', Transect, Type))
 
 if(is.null(wpts.sf$Region)) wpts.sf$Region = "All"
 
@@ -1135,7 +1134,7 @@ nasc.outlier.plot <- ggplot(big.nasc, aes(rank, cps.nasc, ids = label)) +
   scale_color_discrete("Vessel") +
   xlab("\nRank") + ylab(expression(italic(s)[A]/19)) +
   theme_bw() +
-  theme(legend.position      = c(0.95,0.95),
+  theme(legend.position.inside = c(0.95,0.95),
         legend.justification = c(1,1))
 
 # Create outlier plot
@@ -3397,7 +3396,7 @@ include_graphics(here("Figs/fig_sigma_comparisons_all.png"))
 
 ## Calculate acoustic proportion by weight  
 
-The mean weight of each species in each cluster is estimated by 1) estimatiing the expected weight of each fish in each trawl using the the length-to-weight relationship in the `estimate_ts` function, 2) calculating the mean weight per trawl using the expected weights in Step 1), and 3) calculating the mean weight per cluster as the weighted average of the the trawl mean weight (from Step 2) and using the number of fish per trawl for weighting.  
+The mean weight of each species in each cluster is estimated by 1) estimating the expected weight of each fish in each trawl using the the length-to-weight relationship in the `estimate_ts` function, 2) calculating the mean weight per trawl using the expected weights in Step 1), and 3) calculating the mean weight per cluster as the weighted average of the the trawl mean weight (from Step 2) and using the number of fish per trawl for weighting.  
 
 ```{r summarize-ts-by-weight}
 # Summarize target strength proportions by cluster and species
@@ -5513,8 +5512,7 @@ if (process.ctd) {
       
       # Process UCTD cast files --------------------------------------------------
       # List processed UCTD cast files
-      uctd.proc <- dir_ls(here("Data/UCTD"), pattern = uctd.cast.pattern) %>% 
-        path_filter(regexp = "_processed")
+      uctd.proc <- dir_ls(here("Data/UCTD"), regexp = uctd.cast.pattern, recurse = TRUE) 
       
       # create a data frame for storing results
       all.uctd.casts <- data.frame()

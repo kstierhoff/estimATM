@@ -13,7 +13,8 @@ combine.regions   <- T # Combine nearshore/offshore plots with those from the co
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns   <- NA # For nearshore sampling
+tx.spacing.ns   <- c("S" = 5, "N" = 7, "CI" = 2.5) # or NA
+tx.break.ns     <- 64 # Northernmost transect sampled by the southern F/V, 64 in 2024, near Carmel
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -112,7 +113,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2024-06-24" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
@@ -333,7 +334,7 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM","LBC") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- c("LBC") # "LM"
+nasc.vessels.nearshore <- c("LBC","LM") 
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -369,7 +370,7 @@ sounder.type           <- c(RL  = "EK80",
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
                             LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
@@ -444,9 +445,12 @@ seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
 # Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
 use.seine.data  <- TRUE
 
+# Vessels for which to correct deep nasc that may be anchovy
+deep.nasc.vessels <- c("LBC","LM")
+
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
-catch.source.ns <- c("Purse seine")
+catch.source.ns <- c("Purse seine", "Trawl")
 
 # Define path to seine data directories for each vessel
 seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2407RL.xlsx"),
@@ -558,8 +562,8 @@ tx.rm                  <- list(RL  = NA,
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 15,
-                            SH  = 15,
+min.tx.length          <- c(RL  = 12, # Transect 149 off VI was 12.7 nmi and had been excluded
+                            SH  = 12,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
@@ -584,8 +588,8 @@ cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 max.cluster.dist       <- 30
 
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0, 3.5, 8, 15, 35, 70, 100)
-tx.spacing.dist <- c(2.5, 5, 10, 20, 40, 80)
+tx.spacing.bins <- c(0, 3, 6, 8, 15, 35, 70, 100)
+tx.spacing.dist <- c(2.5, 5, 7, 10, 20, 40, 80)
 
 # SCS data
 scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
@@ -667,7 +671,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 10 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -843,7 +847,7 @@ stock.break.sar  <- c("Pt. Conception" = 34.7) # Latitude of Pt. Conception, bas
 
 # Transects used to define stock boundaries (primary or other)
 
-# Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
+# Used in estimateOffshore and estimateNearshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 
 
 # Data collection settings ------------------------------------------------
