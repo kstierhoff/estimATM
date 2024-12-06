@@ -1098,22 +1098,7 @@ be.table <- be  %>%
          "CI$_{U,95\\%}$" = upper.ci.B) %>% 
   select(-SD)  
 
-if (exists("be.table.os")) {
-  be.table.os <- be.os  %>%
-    rename(Name = Species,
-           Number           = Stratum,
-           Transects        = nTransects,
-           Clusters         = nClusters,
-           Individuals      = nIndiv,
-           "$\\hat{B}$"     = Biomass,
-           SD               = biomass.sd,
-           CV               = biomass.cv,
-           "CI$_{L,95\\%}$" = lower.ci.B,
-           "CI$_{U,95\\%}$" = upper.ci.B) %>%
-    select(-SD)  
-}
-
-if (exists("be.table.ns")) {
+if (exists("be.ns")) {
   be.table.ns <- be.ns  %>%
     rename(Name = Species,
            Number           = Stratum,
@@ -1128,7 +1113,7 @@ if (exists("be.table.ns")) {
     select(-SD)
 }
 
-if (exists("be.table.nse")) {
+if (exists("be.nse")) {
   be.table.nse <- be.nse  %>%
     rename(Name = Species,
            Number           = Stratum,
@@ -1141,6 +1126,21 @@ if (exists("be.table.nse")) {
            "CI$_{L,95\\%}$" = lower.ci.B,
            "CI$_{U,95\\%}$" = upper.ci.B) %>% 
     select(-SD)
+}
+
+if (exists("be.os")) {
+  be.table.os <- be.os  %>%
+    rename(Name = Species,
+           Number           = Stratum,
+           Transects        = nTransects,
+           Clusters         = nClusters,
+           Individuals      = nIndiv,
+           "$\\hat{B}$"     = Biomass,
+           SD               = biomass.sd,
+           CV               = biomass.cv,
+           "CI$_{L,95\\%}$" = lower.ci.B,
+           "CI$_{U,95\\%}$" = upper.ci.B) %>%
+    select(-SD)  
 }
 
 # Format summary table
@@ -1170,17 +1170,34 @@ The total estimated biomass of the northern stock of Northern Anchovy was `r pre
 (ref:biomass-anch-n) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for the northern stock of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions. Stratum areas are nmi^2^.
 
 ```{r biomass-anch-n}
+
 be.table.sub.all <- be.table.summ %>% 
   filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
   mutate(Region = "All")
 
 be.table.sub <- be.table %>% 
   filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
-  mutate(Region = "Core") %>% 
-  # bind_rows(be.table.sub.ns) %>% 
-  bind_rows(be.table.sub.all) %>% 
-  ungroup() %>% 
-  select(Region, everything(), -Name, -Stock)
+  mutate(Region = "Core") 
+
+if (exists("be.table.ns")) {
+  be.table.sub.ns <- be.table.ns %>%
+    filter(Name == "Engraulis mordax", Stock == "Northern") %>%
+    mutate(Region = "Nearshore")
+  
+  be.table.sub <- be.table %>% 
+    filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
+    mutate(Region = "Core") %>% 
+    bind_rows(be.table.sub.ns) %>% 
+    bind_rows(be.table.sub.all) %>% 
+    ungroup() %>% 
+    select(Region, everything(), -Name, -Stock)
+} else {
+  be.table.sub <- be.table %>% 
+    filter(Name == "Engraulis mordax", Stock == "Northern") %>% 
+    mutate(Region = "Core") %>% 
+    ungroup() %>% 
+    select(Region, everything(), -Name, -Stock)
+}
 
 if (nrow(be.table.sub) != 0) {
   if (doc.type == "docx") {
