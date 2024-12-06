@@ -26,6 +26,11 @@ for (v in seine.vessels) {
   }
 }
 
+# Manually remove "bad" sets (defined in settings)
+if(exists("key.set.rm")) {
+  sets <- filter(sets, !key.set %in% key.set.rm)
+}
+
 # Create set cluster file
 set.clusters <- select(sets, key.set, date, datetime, vessel.name, lat, long, sample.type) %>%
   filter(vessel.name %in% seine.vessels) %>% 
@@ -84,6 +89,9 @@ for (v in seine.vessels) {
     } 
   }
 }
+
+# Remove catch data from "bad" sets
+set.catch <- filter(set.catch, key.set %in% sets$key.set)
 
 # Save set catch info
 save(set.catch, file = here("Output/purse_seine_catch.Rdata"))
@@ -150,6 +158,9 @@ for (v in seine.vessels) {
     } 
   }
 }
+
+# Remove specimen data from "bad" sets
+set.lengths <- filter(set.lengths, key.set %in% sets$key.set)
 
 # set.lengths %>% group_by(scientificName) %>% summarise(min.length = min(length_mm, na.rm = T), max.length = max(length_mm, na.rm = T))
 # set.lengths %>% group_by(scientificName) %>% summarise(min.w = min(weight_g, na.rm = T), max.w = max(weight_g, na.rm = T))

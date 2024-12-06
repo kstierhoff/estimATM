@@ -577,9 +577,10 @@ limit.cluster.dist     <- c(OS  = FALSE,
 cluster.source <- c(OS = "cluster",
                     NS = "cluster")
 
-# Manually exclude hauls from the analysis
-# List hauls (e.g., c(1, 2...n)), else NA
+# Manually exclude hauls or purse seine sets from the analysis
+# List hauls or sets (e.g., c(1, 2...n)), else NA
 haul.rm <- NA
+key.set.rm  <- c("LBC 2024-07-16 25") # Set/landing 25/160 had no specimens due to a freezer failure
 
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
