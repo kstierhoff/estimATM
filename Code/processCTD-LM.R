@@ -20,7 +20,7 @@ library(psych)    # For computing harmonic mean
 dir.CTD <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\DATA\\CTD\\CTD_to_Process\\'
 
 # Directory to store processed data results
-dir.output <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\DATA\\CTD\\PROCESSED\\'
+dir.output <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\DATA\\CTD\\PROCESSED\\20241206\\'
 
 # Directory containing SBEDataProcessing Program Setup (.psa) files
 dir.PSA <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\DATA\\CTD\\PSA\\'
@@ -32,10 +32,10 @@ file.con <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\D
 dir.SBE <- 'C:\\Program Files (x86)\\Sea-Bird\\SBEDataProcessing-Win32\\'
 
 # Template ECS file
-ECS.template <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\ECS\\_2407LM_Post-Survey_Template.ecs'
+ECS.template <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\ECS\\_2407LM_Post-Survey_Reprocessed_Template.ecs'
 
 # ECS output directory
-dir.ECS <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\ECS\\'
+dir.ECS <- '\\\\swc-storage4-s\\AST5\\SURVEYS\\20240625_LISA-MARIE_SummerCPS\\PROCESSED\\EV\\ECS\\20241206\\'
 
 # Time to pause between SBADataProcessing programs, in seconds
 pause <- 1
