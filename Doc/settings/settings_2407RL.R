@@ -578,8 +578,9 @@ cluster.source <- c(OS = "cluster",
                     NS = "cluster")
 
 # Manually exclude hauls or purse seine sets from the analysis
-# List hauls or sets (e.g., c(1, 2...n)), else NA
-haul.rm <- NA
+# List trawl hauls (e.g., c(1, 2,...n)), else NA
+haul.rm     <- NA
+# List sets (e.g., c("LBC 2024-07-16 25",...n)), else NA
 key.set.rm  <- c("LBC 2024-07-16 25") # Set/landing 25/160 had no specimens due to a freezer failure
 
 # Maximum distance to trawl clusters
@@ -672,7 +673,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
