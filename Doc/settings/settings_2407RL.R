@@ -886,12 +886,12 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL", "LBC") # ,"LBC","LM"
+cal.vessels        <- c("RL", "LBC", "LM") # ,"LBC","LM"
 cal.vessels.fm     <- c("RL") 
 # Named vector of EK80 CW-mode calibration directories
 cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
                         LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
-                        LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS") 
+                        LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/RESULTS") 
 # Named vector of EK80 FM-mode calibration directories
 cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
 # Named vector of EK80 CW-mode calibration dates
