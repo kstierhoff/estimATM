@@ -93,14 +93,20 @@ if (process.nearshore) {
       # Retain original cps.nasc
       # Create deep backscatter variable
       mutate(cps.nasc.orig = cps.nasc) %>%
-      # Create deep backscatter variable
-      mutate(cps.nasc.deep = cps.nasc - NASC.20) %>% 
-      # Remove deep backscatter from vessels defined in settings
+      # Compute deep backscatter variable
+      # If NASC.20 is greater than cps.nasc (e.g., when backscatter near the surface was removed in nascR),
+      # cps.nasc.deep = cps.nasc, else the difference between NASC.20 and cps.nasc
+      mutate(cps.nasc.deep = case_when(
+        NASC.20 > cps.nasc ~ cps.nasc,
+        TRUE ~ cps.nasc - NASC.20)) %>% 
+      # Remove deep backscatter from cps.nasc for vessels defined in settings.
+      # Deep backscatter will be apportioned separately below and added back to cps.nasc
+      # prior to biomass estimation.
       mutate(cps.nasc = case_when(
-        cps.nasc >= NASC.20 & vessel.orig %in% deep.nasc.vessels ~ NASC.20,
+        cps.nasc.deep >= cps.nasc & vessel.orig %in% deep.nasc.vessels ~ cps.nasc.deep - cps.nasc,
         TRUE ~ cps.nasc))
     
-    # ggplot(nasc.nearshore, aes(cps.nasc2, NASC.30)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+    # ggplot(nasc.nearshore, aes(cps.nasc, NASC.20)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
     # ggplot(nasc.nearshore, aes(cps.nasc, cps.nasc.deep)) + geom_abline(slope = 1, intercept = 0) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
   }
   
@@ -1620,9 +1626,9 @@ for (i in unique(nearshore.spp$scientificName)) {
 #   facet_wrap(~scientificName) +
 #   theme_bw()
 
-# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + mapview(filter(transects.sf, Type == "Nearshore"))
+# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum") + mapview(filter(transects.sf, Type == "Nearshore"))
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
-# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
 
@@ -2061,12 +2067,6 @@ if (do.bootstrap) {
       # ggplot(nasc.temp, aes(long, lat, size = cps.nasc, colour = factor(stratum))) + geom_point() + coord_map()
       
       # Summarize nasc.temp to get strata to merge with pos.clusters below
-      # nasc.temp.summ <- nasc.temp %>% 
-      #   group_by(vessel.name, stratum) %>% 
-      #   summarise(n = n_distinct(cluster)) %>% 
-      #   ungroup()
-      
-      # The inclusion of cluster in group_by was incorrect
       nasc.temp.summ <- nasc.temp %>%
         group_by(vessel.name, stratum, cluster) %>%
         summarise(n = n_distinct(cluster)) %>%
@@ -2087,6 +2087,7 @@ if (do.bootstrap) {
         ungroup() %>% 
         replace(is.na(.), 0)
       
+      # Summarize positive clusters per species (add strata numbers)
       pos.cluster.spp <- pos.clusters.ns %>%
         filter(cluster %in% nasc.temp$cluster, scientificName == i) %>% 
         inner_join(select(nasc.temp.summ, -n)) %>% 
@@ -2516,7 +2517,7 @@ nasc.outlier.plot.ns <- ggplot(big.nasc.ns, aes(rank, cps.nasc, ids = label)) +
   scale_color_discrete("Vessel") +
   xlab("\nRank") + ylab(expression(italic(s)[A]/19)) +
   theme_bw() +
-  theme(legend.position      = c(0.95,0.95),
+  theme(legend.position.inside = c(0.95,0.95),
         legend.justification = c(1,1))
 
 if (save.figs) {
