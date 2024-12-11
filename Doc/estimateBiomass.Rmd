@@ -102,7 +102,7 @@ save.figs         <- T # Draw new figures and maps
 download.hab      <- F # Download habitat map
 process.scs       <- F # Process SCS data 
 
-do.bootstrap      <- T # Generate bootstrap estimates
+do.bootstrap      <- F # Generate bootstrap estimates
 
 ### Sometimes FALSE
 do.imap           <- T # Create interactive Leaflet map
@@ -141,7 +141,7 @@ Processing controls and survey-specific settings are configured here: `here("Doc
 
 ## Processing loop controls
 
-Options in this section of the settings file control the execution of the various code chunks. All chunks should usually be run (i.e., controls  <- `T`) the first time to copy all necessary data files, import data from databases, generate maps and figures, estimate abundance and biomass, etc. Subsequent processing may be sped-up by setting some controls to `F` if source data or analysis code has not changed.
+Options in this section of the settings file control the execution of the various code chunks. All chunks should usually %>% run (i.e., controls  <- `T`) the first time to copy all necessary data files, import data from databases, generate maps and figures, estimate abundance and biomass, etc. Subsequent processing may be sped-up by setting some controls to `F` if source data or analysis code has not changed.
 
 ### Survey-specific settings  
 
@@ -1869,7 +1869,7 @@ if (nrow(catch) > 0) {
   #          "JackMack"   = "Trachurus symmetricus",
   #          "RndHerring" = "Etrumeus acuminatus",
   #          "Other"      = "Other") 
-
+  
   # Summarise catch by cluster
   cluster.summ.wt <- haul.summ.wt %>% 
     select(-haul, -AllCPS, -sample.type) %>% 
@@ -3746,7 +3746,7 @@ if (save.figs) {
   } else {
     # Plot backscatter, CUFES, and acoustic proportion map
     nasc.prop.plot <- plot_grid(nasc.map.cps, acoustic.prop.cluster.final,
-                                          nrow = 1, labels = c("a)", "b)"))
+                                nrow = 1, labels = c("a)", "b)"))
     
     ggsave(nasc.prop.plot, 
            filename = here("Figs/fig_nasc_acoustic_proportion.png"),
@@ -7039,7 +7039,6 @@ if (do.bootstrap) {
   # Close the species counter
   close(pb1)
   
-  
   # Save bootstrap results
   save(bootstrap.estimates, abundance.estimates, survey.summary, 
        catch.summary, stratum.summary, bootstrap.comp,
@@ -7193,6 +7192,10 @@ be.stratum.all <- which(be$Stratum == "All")
 
 # Print bootstrap estimate table
 be %>% 
+  mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+  mutate(pe.range = cell_spec(
+    pe.range, knitr.format, color = "black",
+    background = ifelse(pe.range,"green","red"))) %>% 
   rename(Number               = Stratum,
          Transects            = nTransects,
          Clusters             = nClusters,
@@ -7201,7 +7204,8 @@ be %>%
          SD                   = biomass.sd,
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
-         "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+         "Upper CI$_{95\\%}$" = upper.ci.B,
+         "In range"           = pe.range) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
         align = c("l","c",rep("r",ncol(be) - 2)),
         digits = c(0),
@@ -7209,9 +7213,8 @@ be %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
-  # row_spec(be.stratum.all, bold = TRUE, color = "black", background = "#c1c2cc") %>% 
   collapse_rows(columns = c(1:2)) %>%
-  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
 ```
 
 Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.  
@@ -7219,6 +7222,10 @@ Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence inte
 ```{r biomass-bootstrap-estimates-totals-only}
 # Print bootstrap estimate table
 be %>% 
+  mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+  mutate(pe.range = cell_spec(
+    pe.range, knitr.format, color = "black",
+    background = ifelse(pe.range,"green","red"))) %>% 
   filter(Stratum == "All") %>% 
   rename(Number               = Stratum,
          Transects            = nTransects,
@@ -7228,7 +7235,8 @@ be %>%
          SD                   = biomass.sd,
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
-         "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+         "Upper CI$_{95\\%}$" = upper.ci.B,
+         "In range"           = pe.range) %>% 
   kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
         align = c("l","c",rep("r",ncol(be) - 2)),
         digits = c(0),
@@ -7237,7 +7245,7 @@ be %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = c(1)) %>%
-  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
 ``` 
 
 ```{r biomass-bootstrap-histograms-stratum}
@@ -7598,25 +7606,29 @@ be.stratum.all.nse <- which(be.nse$Stratum == "All")
 
 # Print bootstrap estimate table
 be.nse %>% 
+  mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+  mutate(pe.range = cell_spec(
+    pe.range, knitr.format, color = "black",
+    background = ifelse(pe.range,"green","red"))) %>% 
   rename(Number               = Stratum,
          Transects            = nTransects,
          Clusters             = nClusters,
          Individuals          = nIndiv,
-         "Point esimate"      = Biomass,
+         "Point estimate"     = Biomass,
          SD                   = biomass.sd,
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
-         "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+         "Upper CI$_{95\\%}$" = upper.ci.B,
+         "In range"           = pe.range) %>% 
   kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-        align = c("l","c",rep("r",ncol(be.nse) - 2)),
+        align = c("l","c",rep("r",ncol(be) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
-  # row_spec(be.stratum.all, bold = TRUE, color = "black", background = "#c1c2cc") %>% 
   collapse_rows(columns = c(1:2)) %>%
-  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
 ```
 
 Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence intervals, CV, and percent of total biomass; n = `r boot.num` bootstrap samples) for each CPS stock within the entire survey area (Stratum = "All"). Stratum distances are in nmi, and stratum areas are nmi^2^. A total of `r nrow(nasc)` acoustic intervals were included in this analysis.  
@@ -7624,6 +7636,10 @@ Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence inte
 ```{r biomass-bootstrap-estimates-totals-only-nse}
 # Print bootstrap estimate table
 be.nse %>% 
+  mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+  mutate(pe.range = cell_spec(
+    pe.range, knitr.format, color = "black",
+    background = ifelse(pe.range,"green","red"))) %>% 
   filter(Stratum == "All") %>% 
   rename(Number               = Stratum,
          Transects            = nTransects,
@@ -7633,16 +7649,29 @@ be.nse %>%
          SD                   = biomass.sd,
          CV                   = biomass.cv,
          "Lower CI$_{95\\%}$" = lower.ci.B,
-         "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-        align = c("l","c",rep("r",ncol(be.nse) - 2)),
+         "Upper CI$_{95\\%}$" = upper.ci.B,
+         "In range"           = pe.range) %>% 
+  kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
+        align = c("l","c",rep("r",ncol(be) - 2)),
         digits = c(0),
         format.args = list(big.mark = ",")) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = c(1)) %>%
-  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
+
+cluster.check %>% 
+  arrange(desc(cluster)) %>% 
+  mutate(duration = cell_spec(
+    duration, knitr.format, color = "black",
+    background = ifelse(duration <= 12,"white","orange"))) %>% 
+  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
+        align = c("c")) %>% 
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = FALSE) %>%
+  row_spec(0, align = c("c")) %>% 
+  scroll_box(height = "250px")
 ``` 
 
 (ref:biomass-bootstrap-histograms-stratum-nse) Distribution of biomass estimates (t; n = `r boot.num` bootstrap samples) by species and stratum (**Note: differences in x-axis limits**).
@@ -7856,6 +7885,10 @@ Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence inte
 if (exists("be.ns")) {
   # Print bootstrap estimate table
   be.ns %>% 
+    mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+    mutate(pe.range = cell_spec(
+      pe.range, knitr.format, color = "black",
+      background = ifelse(pe.range,"green","red"))) %>% 
     rename(Number               = Stratum,
            Transects            = nTransects,
            Clusters             = nClusters,
@@ -7864,7 +7897,8 @@ if (exists("be.ns")) {
            SD                   = biomass.sd,
            CV                   = biomass.cv,
            "Lower CI$_{95\\%}$" = lower.ci.B,
-           "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
+           "Upper CI$_{95\\%}$" = upper.ci.B,
+           "In range"           = pe.range) %>% 
     kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
           align = c("l","c",rep("r",ncol(be.ns) - 2)),
           digits = c(0),
@@ -7873,7 +7907,7 @@ if (exists("be.ns")) {
     column_spec(1, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = c(1:2)) %>%
-    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
 } else {
   print("No nearshore bootstrap estimates")
 }
@@ -7885,25 +7919,30 @@ Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence inte
 if (exists("be.ns")) {
   # Print bootstrap estimate table
   be.ns %>% 
-    filter(Stratum == "All") %>% 
-    rename(Number               = Stratum,
-           Transects            = nTransects,
-           Clusters             = nClusters,
-           Individuals          = nIndiv,
-           "Point estimate"     = Biomass,
-           SD                   = biomass.sd,
-           CV                   = biomass.cv,
-           "Lower CI$_{95\\%}$" = lower.ci.B,
-           "Upper CI$_{95\\%}$" = upper.ci.B) %>% 
-    kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
-          align = c("l","c",rep("r",ncol(be.ns) - 2)),
-          digits = c(0),
-          format.args = list(big.mark = ",")) %>%
-    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
-    column_spec(1, italic = TRUE) %>%
-    row_spec(0, align = c("c")) %>%
-    collapse_rows(columns = c(1)) %>%
-    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 5))
+  mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+  mutate(pe.range = cell_spec(
+    pe.range, knitr.format, color = "black",
+    background = ifelse(pe.range,"green","red"))) %>% 
+  filter(Stratum == "All") %>% 
+  rename(Number               = Stratum,
+         Transects            = nTransects,
+         Clusters             = nClusters,
+         Individuals          = nIndiv,
+         "Point estimate"     = Biomass,
+         SD                   = biomass.sd,
+         CV                   = biomass.cv,
+         "Lower CI$_{95\\%}$" = lower.ci.B,
+         "Upper CI$_{95\\%}$" = upper.ci.B,
+         "In range"           = pe.range) %>% 
+  kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
+        align = c("l","c",rep("r",ncol(be) - 2)),
+        digits = c(0),
+        format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
+  column_spec(1, italic = TRUE) %>%
+  row_spec(0, align = c("c")) %>%
+  collapse_rows(columns = c(1)) %>%
+  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
 } else {
   print("No nearshore bootstrap estimates present.")
 }
