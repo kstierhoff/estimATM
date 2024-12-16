@@ -334,7 +334,7 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM","LBC") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- c("LBC","LM") 
+nasc.vessels.nearshore <- c("LBC","LM") #,"LM"
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -446,7 +446,7 @@ seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
 use.seine.data  <- TRUE
 
 # Vessels for which to correct deep nasc that may be anchovy
-deep.nasc.vessels <- c("LBC","LM")
+# deep.nasc.vessels <- c("LBC","LM")
 
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
@@ -553,12 +553,10 @@ use.tx.number          <- c(RL  = TRUE,
                             SD  = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-# Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
-# but will ultimately be included in a joint analysis
 tx.rm                  <- list(RL  = NA,
                                SH  = NA,
                                LM  = NA,
-                               LBC = c(24,35,40),
+                               LBC = c(24,35,40), # Short transects off S. CA
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
@@ -673,7 +671,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 100 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
