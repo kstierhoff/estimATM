@@ -556,7 +556,7 @@ use.tx.number          <- c(RL  = TRUE,
 tx.rm                  <- list(RL  = NA,
                                SH  = NA,
                                LM  = NA,
-                               LBC = c(24,35,40), # Short transects off S. CA
+                               LBC = c("LBC 24", "LBC 40"), # Short transects off S. CA
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)

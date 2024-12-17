@@ -29,6 +29,11 @@ if (process.nearshore) {
                               nasc.summ.interval),
                 labels = FALSE, include.lowest = TRUE)) 
   
+  # # Summarize NASC by vessel and transect, to look for oddities
+  # nasc.nearshore %>% 
+  #   group_by(vessel.name, transect) %>% 
+  #   tally() %>% View()
+  
   # In 2022, LM sampled core transects between Cape Flattery and Bodega Bay spaced 20 nmi
   # Transect numbers correspond to the core transect names, and will not be unique with other
   # nearshore transects surveyed by LBC, so we must increment the transect numbers starting
@@ -235,7 +240,7 @@ if (process.nearshore) {
     # Keep nearshore acoustic intervals that intersect the nearshore mask
     nasc.nearshore <- filter(nasc.nearshore, id %in% nasc.nearshore.sf.sub$id)
     
-    # Convert nearshore backscatter to sf 
+    # Convert reduced nearshore backscatter to sf
     nasc.nearshore.sf <- nasc.nearshore %>% 
       st_as_sf(coords = c("long", "lat"), crs = crs.geog)
   }
@@ -321,7 +326,7 @@ if (process.nearshore) {
     bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance)) # %>%
     # bind_cols(select(nasc.match.ns, cluster.deep, cluster.distance.deep, haul.deep, haul.distance.deep)) 
   
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = TRUE) + coord_map()
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(stratum))) + geom_point(show.legend = FALSE) + coord_map()
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
@@ -358,7 +363,7 @@ nav.ns.sf <- st_as_sf(nasc.nearshore, coords = c("long","lat"), crs = crs.geog)
 
 nav.paths.ns.sf <- nav.ns.sf %>% 
   group_by(vessel.name, transect) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING") %>% 
   ungroup()
 
@@ -891,6 +896,7 @@ for (i in unique(tx.mid.ns$transect.name)) {
 # If nearshore transect spacing is manually defined
 if (!is.na("tx.spacing.ns")) {
   tx.nn.ns <- tx.nn.ns %>%
+    # Compute spacing using predefined values
     mutate(min.dist = case_when(
       vessel.name == "LM" ~ tx.spacing.ns["N"],
       vessel.name == "LBC" & transect <= tx.break.ns ~ tx.spacing.ns["S"],
@@ -914,7 +920,7 @@ if (!is.na("tx.spacing.ns")) {
 # Save nearest neighbor distance info
 save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
 
-# Summarise biomass density by transect and species
+# Add distance and spacing info to NASC density summary
 nasc.density.summ.ns <- nasc.density.summ.ns %>% 
   left_join(select(tx.nn.ns, vessel.name, transect.name, dist.cum, dist.bin)) %>% 
   arrange(scientificName, transect) 
@@ -978,6 +984,8 @@ for (v in unique(nasc.nearshore$vessel.name)) {
            wpt.num = as.numeric(str_replace(Waypoint, "N",""))) 
   
   # ggplot(region.wpts, aes(long, lat, colour = Region)) + geom_point() + coord_map()
+  # ggplot(region.wpts, aes(long, lat, label = transect.name, colour = Region)) + geom_text() + coord_map()
+  # region.wpts %>% group_by(Region) %>% summarise(min.tx = min(transect), max.tx = max(transect))
   
   # Get waypoint depth and add to region.wpts
   region.wpts$depth <- get.depth(noaa.bathy.ns, 
