@@ -683,7 +683,7 @@ estimate.regions   <- c("Core", "Nearshore")
 # Defines breaks between strata
 max.diff <- 3
 # Defines minimum number of transects in a stratum
-nTx.min <- 2
+nTx.min <- 3
 
 # Stratum pruning settings
 nIndiv.min    <- 1
