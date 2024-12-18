@@ -446,7 +446,7 @@ seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
 use.seine.data  <- TRUE
 
 # Vessels for which to correct deep nasc that may be anchovy
-# deep.nasc.vessels <- c("LBC","LM")
+deep.nasc.vessels <- c("LBC","LM")
 
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"

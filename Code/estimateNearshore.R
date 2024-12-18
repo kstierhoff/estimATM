@@ -93,29 +93,29 @@ if (process.nearshore) {
     }
   }
   
-  # # For vessels specified in deep.nasc.vessels,
-  # # replace cps.nasc with NASC.20, to examine the contribution of deep anchovy schools to the sardine estimates
-  # if (exists("deep.nasc.vessels")) {
-  #   nasc.nearshore <- nasc.nearshore %>%
-  #     # Retain original cps.nasc
-  #     # Create deep backscatter variable
-  #     mutate(cps.nasc.orig = cps.nasc) %>%
-  #     # Compute deep backscatter variable
-  #     # If NASC.20 is greater than cps.nasc (e.g., when backscatter near the surface was removed in nascR),
-  #     # cps.nasc.deep = cps.nasc, else the difference between NASC.20 and cps.nasc
-  #     mutate(cps.nasc.deep = case_when(
-  #       NASC.20 > cps.nasc ~ cps.nasc,
-  #       TRUE ~ cps.nasc - NASC.20)) %>% 
-  #     # Remove deep backscatter from cps.nasc for vessels defined in settings.
-  #     # Deep backscatter will be apportioned separately below and added back to cps.nasc
-  #     # prior to biomass estimation.
-  #     mutate(cps.nasc = case_when(
-  #       cps.nasc.deep >= cps.nasc & vessel.orig %in% deep.nasc.vessels ~ cps.nasc.deep - cps.nasc,
-  #       TRUE ~ cps.nasc))
-  #   
-  #   # ggplot(nasc.nearshore, aes(cps.nasc, NASC.20)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
-  #   # ggplot(nasc.nearshore, aes(cps.nasc, cps.nasc.deep)) + geom_abline(slope = 1, intercept = 0) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
-  # }
+  # For vessels specified in deep.nasc.vessels,
+  # replace cps.nasc with NASC.20, to examine the contribution of deep anchovy schools to the sardine estimates
+  if (exists("deep.nasc.vessels")) {
+    nasc.nearshore <- nasc.nearshore %>%
+      # Retain original cps.nasc
+      # Create deep backscatter variable
+      mutate(cps.nasc.orig = cps.nasc) %>%
+      # Compute deep backscatter variable
+      # If NASC.20 is greater than cps.nasc (e.g., when backscatter near the surface was removed in nascR),
+      # cps.nasc.deep = cps.nasc, else the difference between NASC.20 and cps.nasc
+      mutate(cps.nasc.deep = case_when(
+        NASC.20 > cps.nasc ~ cps.nasc,
+        TRUE ~ cps.nasc - NASC.20)) %>%
+      # Remove deep backscatter from cps.nasc for vessels defined in settings.
+      # Deep backscatter will be apportioned separately below and added back to cps.nasc
+      # prior to biomass estimation.
+      mutate(cps.nasc = case_when(
+        cps.nasc.deep >= cps.nasc & vessel.orig %in% deep.nasc.vessels ~ cps.nasc.deep - cps.nasc,
+        TRUE ~ cps.nasc))
+
+    # ggplot(nasc.nearshore, aes(cps.nasc, NASC.20)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+    # ggplot(nasc.nearshore, aes(cps.nasc, cps.nasc.deep)) + geom_abline(slope = 1, intercept = 0) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+  }
   
   # Process purse seine data
   if (process.seine) {
