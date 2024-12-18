@@ -334,7 +334,7 @@ lf.ncols <- 5
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
 nasc.vessels           <- c("RL","LM","LBC") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- c("LBC","LM") 
+nasc.vessels.nearshore <- c("LBC","LM") #,"LM"
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -371,8 +371,8 @@ sounder.type           <- c(RL  = "EK80",
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
-                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
   survey.dir           <- c(RL  = "C:/Users/Survey.RL/Desktop/2407RL_SWFSC",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
@@ -553,12 +553,10 @@ use.tx.number          <- c(RL  = TRUE,
                             SD  = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-# Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
-# but will ultimately be included in a joint analysis
 tx.rm                  <- list(RL  = NA,
                                SH  = NA,
                                LM  = NA,
-                               LBC = c(24,35,40),
+                               LBC = c("LBC 24", "LBC 40"), # Short transects off S. CA
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
@@ -577,9 +575,11 @@ limit.cluster.dist     <- c(OS  = FALSE,
 cluster.source <- c(OS = "cluster",
                     NS = "cluster")
 
-# Manually exclude hauls from the analysis
-# List hauls (e.g., c(1, 2...n)), else NA
-haul.rm <- NA
+# Manually exclude hauls or purse seine sets from the analysis
+# List trawl hauls (e.g., c(1, 2,...n)), else NA
+haul.rm     <- NA
+# List sets (e.g., c("LBC 2024-07-16 25",...n)), else NA
+key.set.rm  <- c("LBC 2024-07-16 25") # Set/landing 25/160 had no specimens due to a freezer failure
 
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
@@ -671,7 +671,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 10 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -683,7 +683,7 @@ estimate.regions   <- c("Core", "Nearshore")
 # Defines breaks between strata
 max.diff <- 3
 # Defines minimum number of transects in a stratum
-nTx.min <- 2
+nTx.min <- 3
 
 # Stratum pruning settings
 nIndiv.min    <- 1
@@ -884,14 +884,14 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL", "LBC") # ,"LBC","LM"
+cal.vessels        <- c("RL", "LBC", "LM") # ,"LBC","LM"
 cal.vessels.fm     <- c("RL") 
 # Named vector of EK80 CW-mode calibration directories
-cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
-                        LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
-                        LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS") 
+cal.dir            <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
+                        LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
+                        LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/RESULTS") 
 # Named vector of EK80 FM-mode calibration directories
-cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
+cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
 # Named vector of EK80 CW-mode calibration dates
 cal.datetime       <- c(RL  = "27 June", # Date/time of calibration
                         LBC = "16 May",
