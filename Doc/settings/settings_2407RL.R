@@ -371,8 +371,8 @@ sounder.type           <- c(RL  = "EK80",
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
-                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
   survey.dir           <- c(RL  = "C:/Users/Survey.RL/Desktop/2407RL_SWFSC",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
@@ -671,7 +671,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 100 # 1000 during final
+boot.num <- 1000 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
@@ -887,11 +887,11 @@ cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 cal.vessels        <- c("RL", "LBC", "LM") # ,"LBC","LM"
 cal.vessels.fm     <- c("RL") 
 # Named vector of EK80 CW-mode calibration directories
-cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
-                        LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
-                        LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/RESULTS") 
+cal.dir            <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
+                        LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
+                        LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/RESULTS") 
 # Named vector of EK80 FM-mode calibration directories
-cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
+cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
 # Named vector of EK80 CW-mode calibration dates
 cal.datetime       <- c(RL  = "27 June", # Date/time of calibration
                         LBC = "16 May",
