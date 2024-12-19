@@ -16,10 +16,10 @@ if (!require("pak")) install.packages("pak")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse, here, fs)
+
 # Install and load required packages from Github -------------------------------
+if (!require("atm")) pkg_install("SWFSC/atm")
 pacman::p_load_gh("kstierhoff/atm")
-# If pacman fails, use pak instead
-# pak::pkg_install("kstierhoff/atm")
 
 # Close any open graphics windows
 graphics.off()
