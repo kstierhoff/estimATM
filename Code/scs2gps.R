@@ -1,8 +1,17 @@
 # Create gps.csv file for Echoview processing from SCS data
 
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+if (!require("pak")) install.packages("pak")
+
 # Load libraries
 pacman::p_load(tidyverse, here, lubridate, fs)
-pacman::p_load_gh("kstierhoff/surveyR")
+
+# Install and load required packages from Github -------------------------------
+if (!require("atm")) pkg_install("SWFSC/atm")
+if (!require("surveyR")) pkg_install("SWFSC/surveyR")
+pacman::p_load_gh("SWFSC/atm")
+pacman::p_load_gh("SWFSC/surveyR")
 
 # Specify nav file source
 # nav.path <- "U:/SURVEYS/20220627_LASKER_SummerCPS/DATA/SCS/AST CONTINUOUS" # At sea
