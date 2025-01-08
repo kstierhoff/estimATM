@@ -1,0 +1,106 @@
+---
+title: "Quick plot of vessel GPX data"
+author: "Kevin L. Stierhoff"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load(tidyverse, sf, here, mapview, tmaptools)
+pacman::p_load_gh("kstierhoff/atm")
+
+# global knitr chunk options
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE, 
+  fig.align = "center", dev = "png", dev.args = list(type = "cairo"), dpi = 150
+)
+knitr::opts_chunk$set(cache = FALSE)
+```
+
+## Quick plot of vessel path
+
+```{r}
+# GPX file name
+gpx.file <- here::here("Data/Nav", "lm_tracks.gpx")
+waypoint.file <- here("Data/Nav", "waypoints_2407RL.csv")
+
+# Extract route
+vessel.route <- tmaptools::read_GPX(gpx.file)
+
+ctds <- tmaptools::read_GPX(here::here("Data/Nav", "lm_ctds.gpx"))$waypoints %>% 
+  atm::project_sf(crs = 4326) %>% 
+  select(lon = X, lat = Y, name, time) %>% 
+  arrange(time) %>% 
+  st_as_sf(coords = c("lon","lat"), crs = 4326)
+
+# Convert to points
+vessel.points <- vessel.route$track_points %>% 
+  atm::project_sf(crs = 4326) %>% 
+  select(lon = X, lat = Y, name, time) %>% 
+  arrange(time) %>% 
+  st_as_sf(coords = c("lon","lat"), crs = 4326) %>% 
+  mutate(date = date(time),
+         hour = hour(time),
+         minute = minute(time)) %>% 
+  # Downsample by minute
+  group_by(date, hour, minute) %>% 
+  slice(1)
+
+vessel.path <- vessel.points %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING")
+
+# Read transect waypoints
+wpts <- read_csv(waypoint.file)
+
+# Convert planned transects to sf; CRS = crs.geog
+wpts.sf <- wpts %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = 4326) %>% 
+  mutate(
+    label = paste("Transect", Transect),
+    popup = paste('<b>Transect:</b>', Transect, Type)
+  )
+
+transects.sf <- wpts.sf %>% 
+  group_by(Type, Transect, Region) %>% 
+  summarise(do_union = FALSE) %>% 
+  st_cast("LINESTRING") %>% 
+  ungroup() %>% 
+  mutate(
+    distance = round(as.numeric(st_length(.))/1852,1),
+    label    = paste("Transect", Transect),
+    popup    = paste('<b>Transect:</b>', Transect, Type, '<br/>',
+                     'Distance:', distance, 'nmi<br/>')
+  )
+
+if (file.exists(here("Data/Map/basemap.Rdata"))) {
+  load(file = here("Data/Map/basemap.Rdata"))
+  load(file = here("Output/basemap_bounds.Rdata"))
+
+  sets.proj <- project_df(sets, to = 3310) %>%
+    filter(vessel.name == "LM")
+
+  lm.map.2407RL <- base.map +
+    geom_sf(data = vessel.points, size = 0.1, colour = "blue") +
+    geom_sf(data = ctds, shape = 23, fill = "red") +
+    geom_point(data = sets.proj, aes(X, Y), shape = 21, fill = "white") +
+    # Format axes and titles
+    xlab("Longitude") + ylab("Latitude") +
+    coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
+             xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])),
+             ylim = unname(c(map.bounds["ymin"], map.bounds["ymax"]))) +
+    theme_bw()
+
+  # Save the base map
+  ggsave(lm.map.2407RL,
+         file = here("Figs/fig_Lisa_Marie_nav_2407RL.png"),
+         height = map.height, width = map.width)
+
+}
+
+# Plot map
+mapview(transects.sf, zcol = "Type") + mapview(vessel.points) 
+```
+

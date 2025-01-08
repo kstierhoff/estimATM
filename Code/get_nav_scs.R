@@ -2,7 +2,6 @@
 
 # # Load libraries
 # pacman::p_load(tidyverse, here, lubridate, fs)
-# pacman::p_load_gh("kstierhoff/surveyR")
 # 
 # # SCS data file info
 # scs.nav.path    <- "C:/SURVEY/2207RL/DATA/SCS" # Local

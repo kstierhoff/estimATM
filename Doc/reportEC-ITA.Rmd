@@ -12,17 +12,19 @@ output:
 ```{r setup, include=FALSE}
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
+if (!require("pak")) install.packages("pak")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,swfscMisc,lubridate,cowplot,here,marmap,fs,sf, odbc,
                mapview,mapdata,photobiology,ggmap,knitr,bookdown,tcltk,
-               rnaturalearth,ggspatial,kableExtra,geosphere,janitor)
+               rnaturalearth,ggspatial,kableExtra,geosphere,janitor,DT)
 
 # Install and load required packages from Github -------------------------------
-# surveyR
-pacman::p_load_gh("kstierhoff/surveyR")
-# atm==
-pacman::p_load_gh("kstierhoff/atm")
+if (!require("atm")) pkg_install("SWFSC/atm")
+if (!require("surveyR")) pkg_install("SWFSC/surveyR")
+pacman::p_load_gh("SWFSC/atm")
+pacman::p_load_gh("SWFSC/surveyR")
+
 # rnaturalearth data
 pacman::p_load_gh("ropenscilabs/rnaturalearthdata")
 pacman::p_load_gh("ropenscilabs/rnaturalearthhires")
@@ -40,7 +42,10 @@ if (doc.type == "latex") {
 
 # knitr options
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, error = FALSE, warning = FALSE,
-                      fig.align = "center")
+                      fig.align = "center", knitr.kable.NA = "-")
+
+# Specify default NA values in kable
+options(knitr.kable.NA = '') 
 
 # Create output directories
 dir_create(here(), c("Data", "Figs", "Output"))
@@ -62,13 +67,13 @@ source(here("Doc/settings", prj.settings))
 # Set processing controls -------------------------------------------------
 save.figs     <- T # Create new figures
 get.db        <- T # Download data from databases (fast; generally TRUE)
-get.nav       <- T # Download Lasker nav data from ERDDAP
+get.nav       <- F # Download Lasker nav data from ERDDAP
 nav.source    <- "ERDDAP" # Navigation data source: ERDDAP or SCS
 get.nav.sh    <- F # Download Shimada nav data from ERDDAP
 get.nav.sd    <- F # Download Saildrone nav data from ERDDAP
-get.nav.ns    <- F # Process data from nearshore vessels
+get.nav.ns    <- T # Process data from nearshore vessels
 get.bathy     <- T # Download ETOPO1 bathymetry data in the survey footprint
-extract.bathy <- T # Extract bathymetry for each nav point
+extract.bathy <- F # Extract bathymetry for each nav point
 resize.map    <- F # Resize map during survey; if T, uses anticipated bounds of survey area
 ```
 
@@ -143,8 +148,10 @@ if (get.nav.ns) {
     for (i in nav.vessels.ns) {
       if (dir_exists(file.path(here("Data/Backscatter", i)))) {
         # List all CSV files
-        nav.files <- dir_ls(file.path(here("Data/Backscatter", i)),
+        nav.files <- dir_ls(file.path(survey.dir[i], 
+                                      nasc.dir[i]), 
                             regexp = nasc.pattern.cps[i],
+                            recurse = nasc.recurse[i],
                             ignore.case = TRUE)
         
         # Remove existing nav.vessel.ns
@@ -352,7 +359,7 @@ nav.summ <- nav.depth %>%
   select(depth_bin:dist_km, dist_nmi, everything())
 
 # Write results to file
-write_csv(nav.summ, paste0(here("Output"), "/", survey.name, "_LineKilometers_", survey.vessel, ".csv"))
+write_csv(nav.summ, here("Output", paste0(survey.name, "_LineKilometers_", survey.vessel, ".csv")))
 ```
 
 ```{r summarize-results-ns}
@@ -444,7 +451,7 @@ if (exists("nav.ns")) {
     select(vessel.name, depth_bin:dist_km, dist_nmi, everything())
   
   # Write results to file
-  write_csv(nav.summ.ns, paste0(here("Output"), "/", survey.name, "_LineKilometers_Nearshore", ".csv")) 
+  write_csv(nav.summ.ns, here("Output", paste0(survey.name, "_LineKilometers_Nearshore", ".csv"))) 
 }
 ```
 
@@ -594,7 +601,9 @@ if (file.exists(here("Data/Backscatter/nasc_all.Rdata"))) {
   
   # Re-cut legs
   nasc <- nasc %>% 
-    mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE))
+    mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, labels = FALSE)) %>% 
+    mutate(transect = stringr::str_replace(string = .$transect, pattern = "-\\d{1}", replacement = ""),
+           transect.name = stringr::str_replace(string = .$transect.name, pattern = "-\\d{1}", replacement = ""))
   
   # Summarize transect distance by leg
   nasc.summ <- nasc %>% 
@@ -714,7 +723,7 @@ if (save.figs) {
   bathy.plot <- base.map + 
     geom_point(data = nav.depth, aes(X, Y, colour = depth_bin), size = 0.5) +
     scale_colour_manual(name = "Depth", values = c("#40C270","#1C1C8A")) +
-    theme(legend.position      = c(0,0),
+    theme(legend.position.inside = c(0,0),
           legend.justification = c(0,0),
           legend.background    = element_blank(),
           legend.key           = element_blank()) +
@@ -724,7 +733,7 @@ if (save.figs) {
   daynight.plot <- base.map + 
     geom_point(data = nav.depth, aes(X, Y, colour = day_night), size = 0.5) +
     scale_colour_manual(name = "Time of day", values = c("#F09F43","#211D1D")) +
-    theme(legend.position      = c(0,0),
+    theme(legend.position.inside = c(0,0),
           legend.justification = c(0,0),
           legend.background    = element_blank(),
           legend.key           = element_blank()) +
@@ -756,7 +765,7 @@ if (save.figs) {
     bathy.plot.ns <- base.map + 
       geom_point(data = nav.depth.ns, aes(X, Y, colour = depth_bin), size = 0.5) +
       scale_colour_manual(name = "Depth", values = c("#40C270","#1C1C8A")) +
-      theme(legend.position      = c(0,0),
+      theme(legend.position.inside = c(0,0),
             legend.justification = c(0,0),
             legend.background    = element_blank(),
             legend.key           = element_blank()) +
@@ -766,7 +775,7 @@ if (save.figs) {
     daynight.plot.ns <- base.map + 
       geom_point(data = nav.depth.ns, aes(X, Y, colour = day_night), size = 0.5) +
       scale_colour_manual(name = "Time of day", values = c("#F09F43","#211D1D")) +
-      theme(legend.position      = c(0,0),
+      theme(legend.position.inside = c(0,0),
             legend.justification = c(0,0),
             legend.background    = element_blank(),
             legend.key           = element_blank()) +
@@ -802,7 +811,7 @@ if (save.figs) {
     bathy.plot.sd <- base.map + 
       geom_point(data = nav.depth.sd, aes(X, Y, colour = depth_bin), size = 0.5) +
       scale_colour_manual(name = "Depth", values = c("#40C270","#1C1C8A")) +
-      theme(legend.position      = c(0,0),
+      theme(legend.position.inside = c(0,0),
             legend.justification = c(0,0),
             legend.background    = element_blank(),
             legend.key           = element_blank()) +
@@ -812,7 +821,7 @@ if (save.figs) {
     daynight.plot.sd <- base.map + 
       geom_point(data = nav.depth.sd, aes(X, Y, colour = day_night), size = 0.5) +
       scale_colour_manual(name = "Time of day", values = c("#F09F43","#211D1D")) +
-      theme(legend.position      = c(0,0),
+      theme(legend.position.inside = c(0,0),
             legend.justification = c(0,0),
             legend.background    = element_blank(),
             legend.key           = element_blank()) +
@@ -848,7 +857,7 @@ if (save.figs) {
     geom_point(data = filter(nav.depth, day_night == "Day"), 
                aes(X, Y, colour = depth_bin), size = 0.5) +
     scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
-    theme(legend.position      = c(0,0),
+    theme(legend.position.inside = c(0,0),
           legend.justification = c(0,0),
           legend.background    = element_blank(),
           legend.key           = element_blank()) +
@@ -873,7 +882,7 @@ if (exists("nav.depth.ns")) {
       geom_point(data = filter(nav.depth.ns, day_night == "Day"), 
                  aes(X, Y, colour = depth_bin), size = 0.5) +
       scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
-      theme(legend.position      = c(0,0),
+      theme(legend.position.inside = c(0,0),
             legend.justification = c(0,0),
             legend.background    = element_blank(),
             legend.key           = element_blank()) +
@@ -903,7 +912,7 @@ if (exists("nav.depth.sd")) {
       geom_point(data = filter(nav.depth.sd, day_night == "Day"), 
                  aes(X, Y, colour = depth_bin), size = 0.5) +
       scale_colour_manual(name = "Depth", values = c("#40C270", "#1C1C8A")) +
-      theme(legend.position      = c(0,0),
+      theme(legend.position.inside = c(0,0),
             legend.justification = c(0,0),
             legend.background    = element_blank(),
             legend.key           = element_blank()) +
@@ -1033,6 +1042,16 @@ haul <- haul.all %>%
   mutate(cluster = cumsum(c(0, diff(equilibriumTime)) > 12) + 1,
          sample.type = "Trawl") 
 
+# Filter catch data for current survey
+catch <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  left_join(select(haul, haul, equilibriumTime, startLatDecimal, startLongDecimal)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
+           netSampleType == 'codend') %>% 
+  inner_join(select(haul, haul, cluster)) %>% 
+  mutate(key = paste(haul, scientificName),
+         sample.type = "Trawl")
+
 # Find midpoint of each haul as the mean lat/lon
 haul.mid <- haul %>% 
   group_by(cluster, haul, sample.type) %>% 
@@ -1073,41 +1092,33 @@ cluster.mid.sf <- cluster.mid %>%
 ### GPS data for each haul 
 
 ```{r trawl-haul-stats}
-haul %>% 
-  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
-         stopLatDecimal, stopLongDecimal) %>%  
-  kable(format = knitr.format, booktabs = TRUE, escape = F,
-        align = c("c"), digits = c(4),
-        format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = F) %>% 
-  scroll_box(height = "500px") 
-
-
+# Output haul data to CSV
 haul %>% 
   select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
          stopLatDecimal, stopLongDecimal) %>% 
   write_csv(here("Output/haul_table_EC-ITA.csv"))
+
+haul %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         stopLatDecimal, stopLongDecimal) %>%  
+  datatable(rownames = FALSE) 
 ```
 
 ### Detailed catch and weight for each haul 
 
 ```{r trawl-catch-stats}
-# Filter catch data
-catch <- catch.all %>% 
-  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-  left_join(select(haul, haul, equilibriumTime, startLatDecimal, startLongDecimal)) %>% 
-  filter(cruise %in% cruise.name & ship %in% cruise.ship & 
-           netSampleType == 'codend') %>% 
-  inner_join(select(haul, haul, cluster)) %>% 
-  mutate(key = paste(haul, scientificName),
-         sample.type = "Trawl")
-
+# Output catch data to CSV
 catch %>% 
   select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
          scientificName, commonName, totalWeight, totalNum) %>% 
   arrange(haul, desc(totalWeight)) %>% 
   write_csv(here("Output/catch_table_EC-ITA.csv"))
+
+catch %>% 
+  select(haul, datetime = equilibriumTime, startLatDecimal, startLongDecimal,
+         scientificName, commonName, totalWeight, totalNum) %>% 
+  arrange(haul, desc(totalWeight)) %>%  
+  datatable(rownames = FALSE) 
 ```
 
 

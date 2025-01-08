@@ -1,3 +1,5 @@
+# load(here("Output/debug_nearshore.Rdata"))
+
 # Estimate nearshore biomass -----------------------------------------------
 # Remove any existing nearshore backscatter data from memory
 if (exists("nasc.nearshore")) rm(nasc.nearshore)
@@ -29,6 +31,11 @@ if (process.nearshore) {
                               nasc.summ.interval),
                 labels = FALSE, include.lowest = TRUE)) 
   
+  # # Summarize NASC by vessel and transect, to look for oddities
+  # nasc.nearshore %>%
+  #   group_by(vessel.name, transect) %>%
+  #   tally() %>% View()
+  
   # In 2022, LM sampled core transects between Cape Flattery and Bodega Bay spaced 20 nmi
   # Transect numbers correspond to the core transect names, and will not be unique with other
   # nearshore transects surveyed by LBC, so we must increment the transect numbers starting
@@ -36,7 +43,7 @@ if (process.nearshore) {
   if (survey.name == "2207RL") {
     # Max transect sampled by LBC along the mainland coast (not incl. islands)
     max.tx.lbc <- 227 
-
+    
     # Extract LBC nasc
     nasc.nearshore.lbc <- filter(nasc.nearshore, vessel.name == "LBC")
     # Extract LM nasc and renumber transects
@@ -86,22 +93,27 @@ if (process.nearshore) {
     }
   }
   
-  # For 2023, replace cps.nasc with NASC.30, to examine the contribution of deep anchovy schools to the sardine estimates
-  # Ideally, provide variable for nasc.depth.deep (e.g., NASC20), but hard-coded for 2307RL
-  if (survey.name %in% c("2307RL")) {
+  # For vessels specified in deep.nasc.vessels,
+  # replace cps.nasc with NASC.20, to examine the contribution of deep anchovy schools to the sardine estimates
+  if (exists("deep.nasc.vessels")) {
     nasc.nearshore <- nasc.nearshore %>%
       # Retain original cps.nasc
       # Create deep backscatter variable
       mutate(cps.nasc.orig = cps.nasc) %>%
-      # Create deep backscatter variable
-      mutate(cps.nasc.deep = cps.nasc - NASC.20) %>% 
-      # Remove deep backscatter from 
+      # Compute deep backscatter variable
+      # If NASC.20 is greater than cps.nasc (e.g., when backscatter near the surface was removed in nascR),
+      # cps.nasc.deep = cps.nasc, else the difference between NASC.20 and cps.nasc
+      mutate(cps.nasc.deep = case_when(
+        NASC.20 > cps.nasc ~ cps.nasc,
+        TRUE ~ cps.nasc - NASC.20)) %>%
+      # Remove deep backscatter from cps.nasc for vessels defined in settings.
+      # Deep backscatter will be apportioned separately below and added back to cps.nasc
+      # prior to biomass estimation.
       mutate(cps.nasc = case_when(
-        cps.nasc >= NASC.20 & vessel.orig == "LBC" ~ NASC.20,
-        TRUE ~ cps.nasc
-      ))
+        cps.nasc.deep >= cps.nasc & vessel.orig %in% deep.nasc.vessels ~ cps.nasc.deep - cps.nasc,
+        TRUE ~ cps.nasc))
 
-    # ggplot(nasc.nearshore, aes(cps.nasc2, NASC.30)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+    # ggplot(nasc.nearshore, aes(cps.nasc, NASC.20)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
     # ggplot(nasc.nearshore, aes(cps.nasc, cps.nasc.deep)) + geom_abline(slope = 1, intercept = 0) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
   }
   
@@ -138,33 +150,33 @@ if (process.nearshore) {
         bind_rows(lf.final.seine) %>% 
         filter(sample.type %in% catch.source.ns)
       
-      # Combine super.clusters and super.clusters.ns
-      super.clusters.ns <- bind_rows(super.clusters, super.clusters.ns) %>% 
-        filter(sample.type %in% catch.source.ns)
-      
+      # Combine super clusters from the core and nearshore regions
       super.hauls.ns    <- bind_rows(super.hauls, super.clusters.ns) %>% 
         filter(sample.type %in% catch.source.ns)
       
-      # Do deep data
-      clf.ns.deep <- clf %>%
-        bind_rows(clf.seine.deep) %>% 
+      super.clusters.ns <- bind_rows(super.clusters, super.clusters.ns) %>% 
         filter(sample.type %in% catch.source.ns)
       
-      hlf.ns.deep <- hlf %>% 
-        ungroup() %>% 
-        bind_rows(clf.seine.deep) %>% 
-        filter(sample.type %in% catch.source.ns)  
-      
-      lf.final.ns.deep <- lf.final %>% 
-        bind_rows(lf.final.seine.deep) %>% 
-        filter(sample.type %in% catch.source.ns)
-      
-      # Combine super.clusters and super.clusters.ns.deep
-      super.clusters.ns.deep <- bind_rows(super.clusters, super.clusters.ns.deep) %>% 
-        filter(sample.type %in% catch.source.ns)
-      
-      super.hauls.ns.deep    <- bind_rows(super.hauls, super.clusters.ns.deep) %>% 
-        filter(sample.type %in% catch.source.ns)
+      # # Do deep data
+      # clf.ns.deep <- clf %>%
+      #   bind_rows(clf.seine.deep) %>% 
+      #   filter(sample.type %in% catch.source.ns)
+      # 
+      # hlf.ns.deep <- hlf %>% 
+      #   ungroup() %>% 
+      #   bind_rows(clf.seine.deep) %>% 
+      #   filter(sample.type %in% catch.source.ns)  
+      # 
+      # lf.final.ns.deep <- lf.final %>% 
+      #   bind_rows(lf.final.seine.deep) %>% 
+      #   filter(sample.type %in% catch.source.ns)
+      # 
+      # # Combine super.clusters and super.clusters.ns.deep
+      # super.clusters.ns.deep <- bind_rows(super.clusters, super.clusters.ns.deep) %>% 
+      #   filter(sample.type %in% catch.source.ns)
+      # 
+      # super.hauls.ns.deep    <- bind_rows(super.hauls, super.clusters.ns.deep) %>% 
+      #   filter(sample.type %in% catch.source.ns)
       
       # ggplot() +
       #   geom_text(data = super.clusters.ns, aes(long, lat, label = cluster, colour = sample.type)) +
@@ -174,19 +186,19 @@ if (process.nearshore) {
       save(super.clusters.ns, super.hauls.ns,
            file = here("Output/super_clusters_hauls_ns.Rdata"))
       
-      save(super.clusters.ns.deep, super.hauls.ns.deep,
-           file = here("Output/super_clusters_hauls_ns_deep.Rdata"))
+      # save(super.clusters.ns.deep, super.hauls.ns.deep,
+      #      file = here("Output/super_clusters_hauls_ns_deep.Rdata"))
     }
   } else {
     load(here("Output/seine_summaries.Rdata"))
     load(here("Output/cluster_length_frequency_all_seine.Rdata"))
     load(here("Output/cluster_length_frequency_tables_seine.Rdata"))
     load(here("Output/super_clusters_hauls_ns.Rdata"))
-    
-    load(here("Output/seine_summaries_deep.Rdata"))
-    load(here("Output/cluster_length_frequency_all_seine_deep.Rdata"))
-    load(here("Output/cluster_length_frequency_tables_seine_deep.Rdata"))
-    load(here("Output/super_clusters_hauls_ns_deep.Rdata"))
+    # 
+    # load(here("Output/seine_summaries_deep.Rdata"))
+    # load(here("Output/cluster_length_frequency_all_seine_deep.Rdata"))
+    # load(here("Output/cluster_length_frequency_tables_seine_deep.Rdata"))
+    # load(here("Output/super_clusters_hauls_ns_deep.Rdata"))
   }
   
   # Convert nearshore backscatter to sf 
@@ -194,15 +206,17 @@ if (process.nearshore) {
     st_as_sf(coords = c("long", "lat"), crs = crs.geog)
   
   # During 2307RL, Lisa Marie extended transects and purse seine sampling well beyond
-  # the planned transects in the nearshore region. This section removes nearshore acoustic intervals 
+  # the planned transects in the nearshore region. This code section removes nearshore acoustic intervals 
   # that extend beyond the nearshore survey footprint for that survey only.
-  if (survey.name %in% c("2307RL")) {
+  if (survey.name %in% c("2307RL","2407RL")) {
     # Buffer mainland by 7 nmi, which seems to encompass the footprint of the
     # planned nearshore transects
-    na_buffer <- na_landmask %>% 
+    na_buffer_ns <- na_landmask %>% 
       st_transform(crs = crs.geog) %>% 
       st_union() %>% 
-      st_buffer(dist = 7/60) 
+      st_buffer(dist = 7/60) %>% 
+      # Remove overlap with core area transects along the mainland
+      st_difference(strata.super.polygons)
     
     # Buffer Channel Islands by 5 nmi, which should encompass the footprint of the
     # planned nearshore transects that are shorter than mainland transects
@@ -212,8 +226,8 @@ if (process.nearshore) {
       st_buffer(dist = 3/60)
     
     # Combine land masks
-    nearshore_mask <- st_union(na_buffer, ci_buffer)
-    
+    nearshore_mask <- st_union(na_buffer_ns, ci_buffer)
+
     # mapview(nearshore_mask) +
     #   mapview(nasc.nearshore.sf) +
     #   mapview(filter(transects.sf, Type == "Nearshore"), color = "red")
@@ -222,18 +236,22 @@ if (process.nearshore) {
     nasc.nearshore.sf.sub <- nasc.nearshore.sf %>% 
       st_intersection(nearshore_mask)
     
-    # mapview(nasc.nearshore.sf.sub) + mapview(nearshore_mask)
+    # 8
     
     # Keep nearshore acoustic intervals that intersect the nearshore mask
     nasc.nearshore <- filter(nasc.nearshore, id %in% nasc.nearshore.sf.sub$id)
+    
+    # Convert reduced nearshore backscatter to sf
+    nasc.nearshore.sf <- nasc.nearshore %>% 
+      st_as_sf(coords = c("long", "lat"), crs = crs.geog)
   }
   
   # Save after processing nearshore
   save(clf.ns, hlf.ns, super.clusters.ns, super.hauls.ns, lf.final.ns, set.pie, 
        file = here("Output/clf_nearshore.Rdata"))
   
-  save(clf.ns.deep, hlf.ns.deep, super.clusters.ns.deep, super.hauls.ns.deep, lf.final.ns.deep, set.pie.deep, 
-       file = here("Output/clf_nearshore_deep.Rdata"))
+  # save(clf.ns.deep, hlf.ns.deep, super.clusters.ns.deep, super.hauls.ns.deep, lf.final.ns.deep, set.pie.deep, 
+  #      file = here("Output/clf_nearshore_deep.Rdata"))
   
   # Assign backscatter to trawl clusters ------------------------------------
   saveRDS(nasc.nearshore, here("Output/nasc_match_ns.rds"))
@@ -249,22 +267,22 @@ if (process.nearshore) {
   haul.match.ns <- super.hauls.ns %>% 
     st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
     filter(sample.type %in% catch.source.ns)
-
-  cluster.match.ns.deep <- super.clusters.ns.deep %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    filter(sample.type %in% catch.source.ns)
   
-  haul.match.ns.deep <- super.hauls.ns.deep %>% 
-    st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-    filter(sample.type %in% catch.source.ns)
+  # cluster.match.ns.deep <- super.clusters.ns.deep %>% 
+  #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  #   filter(sample.type %in% catch.source.ns)
+  # 
+  # haul.match.ns.deep <- super.hauls.ns.deep %>% 
+  #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+  #   filter(sample.type %in% catch.source.ns)
   
   # Find nearest cluster ----------------------------
   # Returns a vector of nearest clusters
   nearest.cluster.ns <- st_nearest_feature(nasc.match.ns, cluster.match.ns)
   nearest.haul.ns <- st_nearest_feature(nasc.match.ns, haul.match.ns)
   
-  nearest.cluster.ns.deep <- st_nearest_feature(nasc.match.ns, cluster.match.ns.deep)
-  nearest.haul.ns.deep <- st_nearest_feature(nasc.match.ns, haul.match.ns.deep)
+  # nearest.cluster.ns.deep <- st_nearest_feature(nasc.match.ns, cluster.match.ns.deep)
+  # nearest.haul.ns.deep <- st_nearest_feature(nasc.match.ns, haul.match.ns.deep)
   
   # Expand clf to match nasc ------------------------
   cluster.ns.sp <- cluster.match.ns[nearest.cluster.ns, ] %>% 
@@ -275,13 +293,13 @@ if (process.nearshore) {
     select(geometry) %>% 
     as_Spatial()
   
-  cluster.ns.sp.deep <- cluster.match.ns.deep[nearest.cluster.ns.deep, ] %>% 
-    select(geometry) %>% 
-    as_Spatial()
-  
-  haul.ns.sp.deep <- haul.match.ns.deep[nearest.haul.ns.deep, ] %>% 
-    select(geometry) %>% 
-    as_Spatial()
+  # cluster.ns.sp.deep <- cluster.match.ns.deep[nearest.cluster.ns.deep, ] %>% 
+  #   select(geometry) %>% 
+  #   as_Spatial()
+  # 
+  # haul.ns.sp.deep <- haul.match.ns.deep[nearest.haul.ns.deep, ] %>% 
+  #   select(geometry) %>% 
+  #   as_Spatial()
   
   # Make nasc sp
   # Removing the other data (i.e., only retaining the geometry) decreases the size of nasc from 50 to 1 MB
@@ -295,21 +313,22 @@ if (process.nearshore) {
     mutate(cluster = cluster.match.ns$cluster[nearest.cluster.ns],
            cluster.distance = distGeo(nasc.ns.sp, cluster.ns.sp)*0.000539957,
            haul = haul.match.ns$haul[nearest.haul.ns],
-           haul.distance = distGeo(nasc.ns.sp, haul.ns.sp)*0.000539957) %>% 
-    mutate(cluster.deep = cluster.match.ns.deep$cluster[nearest.cluster.ns.deep],
-           cluster.distance.deep = distGeo(nasc.ns.sp, cluster.ns.sp.deep)*0.000539957,
-           haul.deep = haul.match.ns.deep$haul[nearest.haul.ns.deep],
-           haul.distance.deep = distGeo(nasc.ns.sp, haul.ns.sp.deep)*0.000539957)
+           haul.distance = distGeo(nasc.ns.sp, haul.ns.sp)*0.000539957) # %>% 
+    # mutate(cluster.deep = cluster.match.ns.deep$cluster[nearest.cluster.ns.deep],
+    #        cluster.distance.deep = distGeo(nasc.ns.sp, cluster.ns.sp.deep)*0.000539957,
+    #        haul.deep = haul.match.ns.deep$haul[nearest.haul.ns.deep],
+    #        haul.distance.deep = distGeo(nasc.ns.sp, haul.ns.sp.deep)*0.000539957)
   
   # Remove geometry
   nasc.match.ns <- st_set_geometry(nasc.match.ns, NULL) 
   
   # Add clusters and cluster distances to nasc
   nasc.nearshore <- nasc.nearshore %>% 
-    bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance,
-                                    cluster.deep, cluster.distance.deep, haul.deep, haul.distance.deep)) 
+    bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance)) # %>%
+    # bind_cols(select(nasc.match.ns, cluster.deep, cluster.distance.deep, haul.deep, haul.distance.deep)) 
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(stratum))) + geom_point(show.legend = FALSE) + coord_map()
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
   #   geom_point(show.legend = FALSE) +
@@ -325,8 +344,8 @@ if (process.nearshore) {
   load(here("Data/Backscatter/nasc_nearshore.Rdata"))
   load(here("Output/clf_nearshore.Rdata"))
   load(here("Output/seine_summaries.Rdata"))
-  load(here("Output/clf_nearshore_deep.Rdata"))
-  load(here("Output/seine_summaries_deep.Rdata"))
+  # load(here("Output/clf_nearshore_deep.Rdata"))
+  # load(here("Output/seine_summaries_deep.Rdata"))
 }
 
 # For 2307RL (and perhaps beyond), deep backscatter observed by nearshore vessels are probably
@@ -345,9 +364,11 @@ nav.ns.sf <- st_as_sf(nasc.nearshore, coords = c("long","lat"), crs = crs.geog)
 
 nav.paths.ns.sf <- nav.ns.sf %>% 
   group_by(vessel.name, transect) %>% 
-  summarise(do_union = F) %>% 
+  summarise(do_union = FALSE) %>% 
   st_cast("LINESTRING") %>% 
   ungroup()
+
+# mapview(nav.paths.ns.sf) + mapview(nearshore_mask)
 
 # Summarize nasc for plotting ---------------------------------------------
 nasc.plot.ns <- nasc.nearshore %>% 
@@ -387,17 +408,17 @@ nasc.super.hauls.ns <- nasc.nearshore %>%
   summarise() %>% 
   st_convex_hull()
 
-nasc.super.clusters.ns.deep <- nasc.nearshore %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(cluster.deep) %>% 
-  summarise() %>% 
-  st_convex_hull()
-
-nasc.super.hauls.ns.deep <- nasc.nearshore %>% 
-  st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-  group_by(haul.deep) %>% 
-  summarise() %>% 
-  st_convex_hull()
+# nasc.super.clusters.ns.deep <- nasc.nearshore %>% 
+#   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+#   group_by(cluster.deep) %>% 
+#   summarise() %>% 
+#   st_convex_hull()
+# 
+# nasc.super.hauls.ns.deep <- nasc.nearshore %>% 
+#   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+#   group_by(haul.deep) %>% 
+#   summarise() %>% 
+#   st_convex_hull()
 
 if (save.figs) {
   nasc.cluster.plot.ns <- base.map +
@@ -449,61 +470,61 @@ if (save.figs) {
          filename = here("Figs/fig_nasc_haul_map_ns.png"),
          width = map.width, height = map.height)
   
-  save(nasc.cluster.plot.ns, file = here("Output/nasc_cluster_plot_ns.Rdata"))
+  save(nasc.cluster.plot.ns, nasc.haul.plot.ns, file = here("Output/nasc_cluster_plot_ns.Rdata"))
 }
 
-if (save.figs) {
-  nasc.cluster.plot.ns.deep <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
-    # Plot convex hull around NASC clusters
-    geom_sf(data = nasc.super.clusters.ns.deep, colour = 'black', alpha = 0.5, show.legend = FALSE) +
-    scale_fill_discrete(name = "Cluster") +
-    scale_colour_manual(name = "Cluster", values = c("Trawl" = "blue", "Purse seine" = "red")) +
-    # Plot cluster midpoints
-    geom_shadowtext(data = filter(clf.ns.deep, CPS.num == 0), 
-                    aes(X, Y, label = cluster),
-                    colour = 'gray20', bg.colour = "white", size = 2) +
-    # Plot positive trawl cluster midpoints
-    geom_shadowtext(data = filter(clf.ns.deep, CPS.num > 0, cluster %in% nasc.nearshore$cluster.deep),
-                    aes(X, Y, label = cluster, colour = sample.type),
-                    size = 2, bg.colour = "white", fontface = "bold") +
-    # Plot panel label
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-  
-  nasc.haul.plot.ns.deep <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
-    # Plot convex hull around NASC clusters
-    geom_sf(data = nasc.super.hauls.ns.deep, colour = 'black', alpha = 0.5, show.legend = FALSE) +
-    scale_fill_discrete(name = "Haul") +
-    scale_colour_manual(name = "Haul", values = c("Trawl" = "blue", "Purse seine" = "red")) +
-    # Plot cluster midpoints
-    geom_shadowtext(data = filter(hlf.ns.deep, CPS.num == 0), 
-                    aes(X, Y, label = haul),
-                    colour = 'gray20', bg.colour = "white", size = 2) +
-    # Plot positive trawl cluster midpoints
-    geom_shadowtext(data = filter(hlf.ns.deep, CPS.num > 0, haul %in% nasc.nearshore$haul.deep),
-                    aes(X, Y, label = haul, colour = sample.type),
-                    size = 2, bg.colour = "white", fontface = "bold") +
-    # Plot panel label
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-  
-  # save trawl plot
-  ggsave(nasc.cluster.plot.ns.deep,
-         filename = here("Figs/fig_nasc_cluster_map_ns_deep.png"),
-         width = map.width, height = map.height)
-  
-  ggsave(nasc.haul.plot.ns.deep,
-         filename = here("Figs/fig_nasc_haul_map_ns_deep.png"),
-         width = map.width, height = map.height)
-  
-  save(nasc.cluster.plot.ns.deep, file = here("Output/nasc_cluster_plot_ns_deep.Rdata"))
-}
+# if (save.figs) {
+#   nasc.cluster.plot.ns.deep <- base.map +
+#     # Plot nasc data
+#     geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
+#     # Plot convex hull around NASC clusters
+#     geom_sf(data = nasc.super.clusters.ns.deep, colour = 'black', alpha = 0.5, show.legend = FALSE) +
+#     scale_fill_discrete(name = "Cluster") +
+#     scale_colour_manual(name = "Cluster", values = c("Trawl" = "blue", "Purse seine" = "red")) +
+#     # Plot cluster midpoints
+#     geom_shadowtext(data = filter(clf.ns.deep, CPS.num == 0), 
+#                     aes(X, Y, label = cluster),
+#                     colour = 'gray20', bg.colour = "white", size = 2) +
+#     # Plot positive trawl cluster midpoints
+#     geom_shadowtext(data = filter(clf.ns.deep, CPS.num > 0, cluster %in% nasc.nearshore$cluster.deep),
+#                     aes(X, Y, label = cluster, colour = sample.type),
+#                     size = 2, bg.colour = "white", fontface = "bold") +
+#     # Plot panel label
+#     coord_sf(crs = crs.proj, 
+#              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+#              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+#   
+#   nasc.haul.plot.ns.deep <- base.map +
+#     # Plot nasc data
+#     geom_point(data = nasc.nearshore, aes(X, Y), size = 0.5, show.legend = FALSE) +
+#     # Plot convex hull around NASC clusters
+#     geom_sf(data = nasc.super.hauls.ns.deep, colour = 'black', alpha = 0.5, show.legend = FALSE) +
+#     scale_fill_discrete(name = "Haul") +
+#     scale_colour_manual(name = "Haul", values = c("Trawl" = "blue", "Purse seine" = "red")) +
+#     # Plot cluster midpoints
+#     geom_shadowtext(data = filter(hlf.ns.deep, CPS.num == 0), 
+#                     aes(X, Y, label = haul),
+#                     colour = 'gray20', bg.colour = "white", size = 2) +
+#     # Plot positive trawl cluster midpoints
+#     geom_shadowtext(data = filter(hlf.ns.deep, CPS.num > 0, haul %in% nasc.nearshore$haul.deep),
+#                     aes(X, Y, label = haul, colour = sample.type),
+#                     size = 2, bg.colour = "white", fontface = "bold") +
+#     # Plot panel label
+#     coord_sf(crs = crs.proj, 
+#              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+#              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+#   
+#   # save trawl plot
+#   ggsave(nasc.cluster.plot.ns.deep,
+#          filename = here("Figs/fig_nasc_cluster_map_ns_deep.png"),
+#          width = map.width, height = map.height)
+#   
+#   ggsave(nasc.haul.plot.ns.deep,
+#          filename = here("Figs/fig_nasc_haul_map_ns_deep.png"),
+#          width = map.width, height = map.height)
+#   
+#   save(nasc.cluster.plot.ns.deep, file = here("Output/nasc_cluster_plot_ns_deep.Rdata"))
+# }
 
 # Map nearshore species proportions -------------------------------------------------------
 if (use.seine.data) {
@@ -513,13 +534,13 @@ if (use.seine.data) {
   haul.pie <- set.pie %>% 
     select(-cluster) %>% 
     bind_rows(haul.pie)
-
-  cluster.pie.deep <- bind_rows(cluster.pie, set.pie.deep)
   
-  haul.pie.deep <- set.pie.deep %>% 
-    select(-cluster) %>% 
-    bind_rows(haul.pie)
-  
+  # cluster.pie.deep <- bind_rows(cluster.pie, set.pie.deep)
+  # 
+  # haul.pie.deep <- set.pie.deep %>% 
+  #   select(-cluster) %>% 
+  #   bind_rows(haul.pie)
+  # 
   # ggplot() +
   #   geom_text(data = cluster.pie, aes(long, lat, label = cluster, colour = sample.type), show.legend = FALSE) +
   #   geom_text(data = set.pie, aes(long, lat, label = cluster, colour = sample.type), show.legend = FALSE) +
@@ -527,36 +548,36 @@ if (use.seine.data) {
 }
 
 # Select only clusters assigned to nasc intervals and included in catch.source.ns
-cluster.pie.ns <- cluster.pie %>% 
+cluster.pie.ns <- cluster.pie %>%
   filter(cluster %in% unique(nasc.nearshore$cluster),
-         sample.type %in% catch.source.ns) 
+         sample.type %in% catch.source.ns)
 
 cluster.pos.ns <- filter(cluster.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
 # Select only hauls assigned to nasc intervals and included in catch.source.ns
-haul.pie.ns <- haul.pie %>% 
+haul.pie.ns <- haul.pie %>%
   filter(haul %in% unique(nasc.nearshore$haul),
-         sample.type %in% catch.source.ns) 
+         sample.type %in% catch.source.ns)
 
 haul.pos.ns <- filter(haul.pie.ns, AllCPS > 0) %>% 
   arrange(desc(X))
 
-# Do deep data
-cluster.pie.ns.deep <- cluster.pie.deep %>% 
-  filter(cluster %in% unique(nasc.nearshore$cluster.deep),
-         sample.type %in% catch.source.ns) 
-
-cluster.pos.ns.deep <- filter(cluster.pie.ns.deep, AllCPS > 0) %>% 
-  arrange(desc(X))
-
-# Select only hauls assigned to nasc intervals and included in catch.source.ns
-haul.pie.ns.deep <- haul.pie.deep %>% 
-  filter(haul %in% unique(nasc.nearshore$haul.deep),
-         sample.type %in% catch.source.ns) 
-
-haul.pos.ns.deep <- filter(haul.pie.ns.deep, AllCPS > 0) %>% 
-  arrange(desc(X))
+# # Do deep data
+# cluster.pie.ns.deep <- cluster.pie.deep %>%
+#   filter(cluster %in% unique(nasc.nearshore$cluster.deep),
+#          sample.type %in% catch.source.ns)
+# 
+# cluster.pos.ns.deep <- filter(cluster.pie.ns.deep, AllCPS > 0) %>% 
+#   arrange(desc(X))
+# 
+# # Select only hauls assigned to nasc intervals and included in catch.source.ns
+# haul.pie.ns.deep <- haul.pie.deep %>%
+#   filter(haul %in% unique(nasc.nearshore$haul.deep),
+#          sample.type %in% catch.source.ns)
+# 
+# haul.pos.ns.deep <- filter(haul.pie.ns.deep, AllCPS > 0) %>% 
+#   arrange(desc(X))
 
 # Substitute very small value for species with zero catch, just for pie charts
 if (nrow(cluster.pos.ns) > 0) {
@@ -569,106 +590,47 @@ if (nrow(haul.pos.ns) > 0) {
     replace(. == 0, 0.0000001) 
 }
 
-if (nrow(cluster.pos.ns.deep) > 0) {
-  cluster.pos.ns.deep <- cluster.pos.ns.deep %>% 
-    replace(. == 0, 0.0000001) 
-}
-
-if (nrow(haul.pos.ns.deep) > 0) {
-  haul.pos.ns.deep <- haul.pos.ns.deep %>% 
-    replace(. == 0, 0.0000001) 
-}
+# if (nrow(cluster.pos.ns.deep) > 0) {
+#   cluster.pos.ns.deep <- cluster.pos.ns.deep %>% 
+#     replace(. == 0, 0.0000001) 
+# }
+# 
+# if (nrow(haul.pos.ns.deep) > 0) {
+#   haul.pos.ns.deep <- haul.pos.ns.deep %>% 
+#     replace(. == 0, 0.0000001) 
+# }
 
 # Filter for empty trawls
 cluster.zero.ns <- filter(cluster.pie.ns, AllCPS == 0)
 haul.zero.ns    <- filter(haul.pie.ns, AllCPS == 0)
 
-cluster.zero.ns.deep <- filter(cluster.pie.ns.deep, AllCPS == 0)
-haul.zero.ns.deep    <- filter(haul.pie.ns.deep, AllCPS == 0)
+# cluster.zero.ns.deep <- filter(cluster.pie.ns.deep, AllCPS == 0)
+# haul.zero.ns.deep    <- filter(haul.pie.ns.deep, AllCPS == 0)
 
 ## NOTE: These plots show proportion of catch by weight, NOT acoustic proportion
 ## The acoustic proportions get plotted below
 ## AFAIK, these figures are exploratory only, and do not appear in any reports
 ## KLS 2023-02-16
 if (save.figs) {
-  # Create trawl figure
-  # Use clustered trawl data (clf)
-  trawl.catch.plot.cluster.ns <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = cluster.pos.ns,
-                    aes(X, Y, group = cluster, r = pie.radius, colour = sample.type),
-                    cols = c("Anchovy","JackMack","Jacksmelt",
-                             "PacHerring","PacMack","Sardine"),
-                    alpha = 0.8) +
-    # Configure pie outline colors
-    scale_colour_manual(name = "Sample type", 
-                        labels = c("Purse seine", "Trawl"),
-                        values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
-                        guide = "none") +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty trawl locations
-    geom_point(data = cluster.zero.ns, aes(X, Y), 
-               size = 2, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    # ggtitle("CPS Species Proportions in Net Samples") +
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-  
-  # Use individual trawl haul data (hlf)
-  trawl.catch.plot.haul.ns <- base.map +
-    # Plot nasc data
-    geom_point(data = nasc.nearshore, aes(X, Y, group = transect),
-               size = 0.5, colour = "gray50", alpha = 0.5) +
-    # Plot trawl pies
-    geom_scatterpie(data = haul.pos.ns, 
-                    aes(X, Y, group = haul, r = pie.radius, colour = sample.type),
-                    cols = c("Anchovy","JackMack","Jacksmelt",
-                             "PacHerring","PacMack","Sardine"),
-                    alpha = 0.8) +
-    # Configure pie outline colors
-    scale_colour_manual(name = "Sample type", 
-                        labels = c("Purse seine", "Trawl"),
-                        values = c("Purse seine" = seine.color, "Trawl" = trawl.color),
-                        guide = "none") +
-    # Configure trawl scale
-    scale_fill_manual(name = 'Species',
-                      labels = c("Anchovy", "J. Mackerel", "Jacksmelt",
-                                 "P. herring", "P. mackerel", "Sardine"),
-                      values = c(anchovy.color, jack.mack.color, jacksmelt.color,
-                                 pac.herring.color, pac.mack.color, sardine.color)) +
-    # Plot empty trawl locations
-    geom_point(data = haul.zero.ns, aes(X, Y), 
-               size = 2, shape = 21, fill = 'black', colour = 'white') +
-    # Plot panel label
-    # ggtitle("CPS Species Proportions in Net Samples") +
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  # Create trawl haul and cluster proportion figures
+  source(here("Code/plot_haul_proportion_wt_nearshore.R"))
+  source(here("Code/plot_cluster_proportion_wt_nearshore.R"))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
-  nasc.trawl.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, trawl.catch.plot.cluster.ns,
+  nasc.seine.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
                                         nrow = 1, labels = c("a)", "b)"),
                                         align = "hv")
   
-  nasc.trawl.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, trawl.catch.plot.haul.ns,
+  nasc.seine.haul.wt.ns <- plot_grid(nasc.haul.plot.ns, set.pie.haul.wt,
                                      nrow = 1, labels = c("a)", "b)"),
                                      align = "hv")
   
-  ggsave(nasc.trawl.cluster.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_cluster_wt_ns.png"),
+  ggsave(nasc.seine.cluster.wt.ns,
+         filename = here("Figs/fig_nasc_seine_cluster_wt_ns.png"),
          width = map.width*2, height = map.height)
   
-  ggsave(nasc.trawl.haul.wt.ns,
-         filename = here("Figs/fig_nasc_trawl_haul_wt_ns.png"),
+  ggsave(nasc.seine.haul.wt.ns,
+         filename = here("Figs/fig_nasc_seine_haul_wt_ns.png"),
          width = map.width*2, height = map.height)
 }
 
@@ -680,19 +642,19 @@ if (cluster.source["NS"] == "cluster") {
   nasc.nearshore <- nasc.nearshore.tmp %>% 
     left_join(select(clf.ns, -lat, -long, -X, -Y, -haul), by = c("cluster" = "cluster"))
   
-  nasc.nearshore.deep <- nasc.nearshore.tmp %>% 
-    left_join(select(clf.ns.deep, -lat, -long, -X, -Y, -haul), by = c("cluster" = "cluster"))
-
+  # nasc.nearshore.deep <- nasc.nearshore.tmp %>% 
+  #   left_join(select(clf.ns.deep, -lat, -long, -X, -Y, -haul), by = c("cluster" = "cluster"))
+  
 } else {
   nasc.nearshore <- nasc.nearshore.tmp %>% 
     left_join(select(hlf.ns, -lat, -long, -X, -Y,-cluster), by = c("haul" = "haul"))
-
-  nasc.nearshore.deep <- nasc.nearshore.tmp %>% 
-    left_join(select(hlf.ns.deep, -lat, -long, -X, -Y,-cluster), by = c("haul" = "haul"))
+  
+  # nasc.nearshore.deep <- nasc.nearshore.tmp %>% 
+  #   left_join(select(hlf.ns.deep, -lat, -long, -X, -Y,-cluster), by = c("haul" = "haul"))
 }
 
 # Save results
-save(nasc.nearshore, nasc.nearshore.deep, file = here("Output/cps_nasc_prop_ns.Rdata"))
+save(nasc.nearshore, file = here("Output/cps_nasc_prop_ns.Rdata"))
 
 # Summarize transects -----------------------------------------------------
 # Summarize nasc data
@@ -723,11 +685,11 @@ if (limit.cluster.dist["NS"]) {
   nasc.nearshore$prop.mack[nasc.nearshore$cluster.distance > max.cluster.dist] <- 0
   nasc.nearshore$prop.her[nasc.nearshore$cluster.distance  > max.cluster.dist] <- 0  
   
-  nasc.nearshore.deep$prop.anch[nasc.nearshore.deep$cluster.distance.deep > max.cluster.dist] <- 0
-  nasc.nearshore.deep$prop.sar[nasc.nearshore.deep$cluster.distance.deep  > max.cluster.dist] <- 0
-  nasc.nearshore.deep$prop.jack[nasc.nearshore.deep$cluster.distance.deep > max.cluster.dist] <- 0
-  nasc.nearshore.deep$prop.mack[nasc.nearshore.deep$cluster.distance.deep > max.cluster.dist] <- 0
-  nasc.nearshore.deep$prop.her[nasc.nearshore.deep$cluster.distance.deep  > max.cluster.dist] <- 0  
+  # nasc.nearshore.deep$prop.anch[nasc.nearshore.deep$cluster.distance.deep > max.cluster.dist] <- 0
+  # nasc.nearshore.deep$prop.sar[nasc.nearshore.deep$cluster.distance.deep  > max.cluster.dist] <- 0
+  # nasc.nearshore.deep$prop.jack[nasc.nearshore.deep$cluster.distance.deep > max.cluster.dist] <- 0
+  # nasc.nearshore.deep$prop.mack[nasc.nearshore.deep$cluster.distance.deep > max.cluster.dist] <- 0
+  # nasc.nearshore.deep$prop.her[nasc.nearshore.deep$cluster.distance.deep  > max.cluster.dist] <- 0  
 }
 
 # Create data frame for plotting acoustic proportions by species
@@ -740,14 +702,14 @@ nasc.prop.all.ns <- nasc.nearshore %>%
          `Clupea pallasii`       = cps.nasc*prop.her,
          `Etrumeus acuminatus`   = cps.nasc*prop.rher) 
 
-# For intervals with deep backscatter
-nasc.prop.all.ns.deep <- nasc.nearshore.deep %>%
-  mutate(`Engraulis mordax`      = cps.nasc.deep*prop.anch,
-         `Sardinops sagax`       = cps.nasc.deep*prop.sar,
-         `Trachurus symmetricus` = cps.nasc.deep*prop.jack,
-         `Scomber japonicus`     = cps.nasc.deep*prop.mack,
-         `Clupea pallasii`       = cps.nasc.deep*prop.her,
-         `Etrumeus acuminatus`   = cps.nasc.deep*prop.rher) 
+# # For intervals with deep backscatter
+# nasc.prop.all.ns.deep <- nasc.nearshore.deep %>%
+#   mutate(`Engraulis mordax`      = cps.nasc.deep*prop.anch,
+#          `Sardinops sagax`       = cps.nasc.deep*prop.sar,
+#          `Trachurus symmetricus` = cps.nasc.deep*prop.jack,
+#          `Scomber japonicus`     = cps.nasc.deep*prop.mack,
+#          `Clupea pallasii`       = cps.nasc.deep*prop.her,
+#          `Etrumeus acuminatus`   = cps.nasc.deep*prop.rher) 
 
 # Prepare nasc.prop.all for facet plotting
 nasc.prop.spp.ns <- nasc.prop.all.ns %>% 
@@ -755,10 +717,10 @@ nasc.prop.spp.ns <- nasc.prop.all.ns %>%
          `Scomber japonicus`, `Clupea pallasii`, `Etrumeus acuminatus`) %>% 
   gather(scientificName, nasc, -X, -Y)
 
-nasc.prop.spp.ns.deep <- nasc.prop.all.ns.deep %>% 
-  select(X, Y, `Engraulis mordax`, `Sardinops sagax`, `Trachurus symmetricus`,
-         `Scomber japonicus`, `Clupea pallasii`, `Etrumeus acuminatus`) %>% 
-  gather(scientificName, nasc, -X, -Y)
+# nasc.prop.spp.ns.deep <- nasc.prop.all.ns.deep %>% 
+#   select(X, Y, `Engraulis mordax`, `Sardinops sagax`, `Trachurus symmetricus`,
+#          `Scomber japonicus`, `Clupea pallasii`, `Etrumeus acuminatus`) %>% 
+#   gather(scientificName, nasc, -X, -Y)
 
 if (save.figs) {
   # Create a base map with relative CPS backscatter
@@ -776,31 +738,31 @@ if (save.figs) {
     coord_sf(crs = crs.proj, 
              xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
              ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
-
-  map.prop.all.ns.deep <- base.map + 
-    # Plot backscatter for all CPS nasc
-    geom_point(data = nasc.prop.all.ns.deep, aes(X, Y, size = cps.nasc.deep), 
-               colour = "gray20") +
-    # Plot proportion of backscatter from each species present
-    geom_point(data = filter(nasc.prop.spp.ns.deep, nasc > 0),
-               aes(X, Y, size = nasc), colour = "red") +
-    # Facet by species
-    facet_wrap(~scientificName, nrow = 2) +
-    theme(strip.background.x = element_blank(),
-          strip.text.x       = element_text(face = "italic")) +
-    coord_sf(crs = crs.proj, 
-             xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
-             ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
+  
+  # map.prop.all.ns.deep <- base.map + 
+  #   # Plot backscatter for all CPS nasc
+  #   geom_point(data = nasc.prop.all.ns.deep, aes(X, Y, size = cps.nasc.deep), 
+  #              colour = "gray20") +
+  #   # Plot proportion of backscatter from each species present
+  #   geom_point(data = filter(nasc.prop.spp.ns.deep, nasc > 0),
+  #              aes(X, Y, size = nasc), colour = "red") +
+  #   # Facet by species
+  #   facet_wrap(~scientificName, nrow = 2) +
+  #   theme(strip.background.x = element_blank(),
+  #         strip.text.x       = element_text(face = "italic")) +
+  #   coord_sf(crs = crs.proj, 
+  #            xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
+  #            ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
   
   # Save map
   ggsave(here("Figs/fig_nasc_acoustic_proportions_ns.png"), map.prop.all.ns,
          width = map.width*3, height = map.height*2)
   
-  ggsave(here("Figs/fig_nasc_acoustic_proportions_ns_deep.png"), map.prop.all.ns.deep,
-         width = map.width*3, height = map.height*2)
+  # ggsave(here("Figs/fig_nasc_acoustic_proportions_ns_deep.png"), map.prop.all.ns.deep,
+  #        width = map.width*3, height = map.height*2)
   
   # Save plot objects
-  save(map.prop.all.ns, map.prop.all.ns.deep, file = here("Output/acoustic_proportion_maps_ns.Rdata"))
+  save(map.prop.all.ns, file = here("Output/acoustic_proportion_maps_ns.Rdata"))
   
 } else {
   # Load plot objects
@@ -818,24 +780,24 @@ nasc.nearshore <- nasc.nearshore %>%
     sar.dens  = cps.nasc*prop.sar  / (4*pi*sigmawg.sar)  / 1000,
     rher.dens = cps.nasc*prop.rher / (4*pi*sigmawg.rher) / 1000)
 
-# Deep density
-nasc.nearshore.deep <- nasc.nearshore.deep %>% 
-  mutate( 
-    anch.dens = cps.nasc.deep*prop.anch / (4*pi*sigmawg.anch) / 1000,
-    her.dens  = cps.nasc.deep*prop.her  / (4*pi*sigmawg.her)  / 1000,
-    jack.dens = cps.nasc.deep*prop.jack / (4*pi*sigmawg.jack) / 1000,
-    mack.dens = cps.nasc.deep*prop.mack / (4*pi*sigmawg.mack) / 1000,
-    sar.dens  = cps.nasc.deep*prop.sar  / (4*pi*sigmawg.sar)  / 1000,
-    rher.dens = cps.nasc.deep*prop.rher / (4*pi*sigmawg.rher) / 1000)
-
-# Add deep density to shallow density
-nasc.nearshore <- nasc.nearshore %>% 
-  mutate(anch.dens = anch.dens + nasc.nearshore.deep$anch.dens,
-         her.dens  = her.dens  + nasc.nearshore.deep$her.dens,
-         jack.dens = jack.dens + nasc.nearshore.deep$jack.dens,
-         mack.dens = mack.dens + nasc.nearshore.deep$mack.dens,
-         sar.dens  = sar.dens  + nasc.nearshore.deep$sar.dens,
-         rher.dens = rher.dens + nasc.nearshore.deep$rher.dens)
+# # Deep density
+# nasc.nearshore.deep <- nasc.nearshore.deep %>% 
+#   mutate( 
+#     anch.dens = cps.nasc.deep*prop.anch / (4*pi*sigmawg.anch) / 1000,
+#     her.dens  = cps.nasc.deep*prop.her  / (4*pi*sigmawg.her)  / 1000,
+#     jack.dens = cps.nasc.deep*prop.jack / (4*pi*sigmawg.jack) / 1000,
+#     mack.dens = cps.nasc.deep*prop.mack / (4*pi*sigmawg.mack) / 1000,
+#     sar.dens  = cps.nasc.deep*prop.sar  / (4*pi*sigmawg.sar)  / 1000,
+#     rher.dens = cps.nasc.deep*prop.rher / (4*pi*sigmawg.rher) / 1000)
+# 
+# # Add deep density to shallow density
+# nasc.nearshore <- nasc.nearshore %>% 
+#   mutate(anch.dens = anch.dens + nasc.nearshore.deep$anch.dens,
+#          her.dens  = her.dens  + nasc.nearshore.deep$her.dens,
+#          jack.dens = jack.dens + nasc.nearshore.deep$jack.dens,
+#          mack.dens = mack.dens + nasc.nearshore.deep$mack.dens,
+#          sar.dens  = sar.dens  + nasc.nearshore.deep$sar.dens,
+#          rher.dens = rher.dens + nasc.nearshore.deep$rher.dens)
 
 # Format for plotting
 nasc.density.ns <- nasc.nearshore %>%
@@ -906,6 +868,9 @@ tx.mid.ns <- nasc.nearshore %>%
     long = mean(long, na.rm = TRUE)) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog)
 
+# Remove nearest neighbor calculations if they exist
+if (exists("tx.nn.ns")) rm(tx.nn.ns)
+
 for (i in unique(tx.mid.ns$transect.name)) {
   # Get the mid lat/long for each transect
   tx.nn.i      <- filter(tx.mid.ns, transect.name == i) 
@@ -931,24 +896,34 @@ for (i in unique(tx.mid.ns$transect.name)) {
   }
 }
 
-# Bin transects by spacing
-tx.nn.ns <- tx.nn.ns %>% 
-  mutate(dist.bin = cut(tx.nn.ns$min.dist, tx.spacing.bins),
-         spacing  = tx.spacing.dist[as.numeric(dist.bin)],
-         dist.cum = cumsum(spacing)) %>% 
-  arrange(transect.name)
-
-if (!is.na(tx.spacing.ns)) {
-  tx.nn.ns <- tx.nn.ns %>% 
-    mutate(spacing = tx.spacing.ns,
-           dist.bin = cut(spacing, tx.spacing.bins),
+# If nearshore transect spacing is manually defined
+if (!is.na("tx.spacing.ns")) {
+  tx.nn.ns <- tx.nn.ns %>%
+    # Compute spacing using predefined values
+    mutate(min.dist = case_when(
+      vessel.name == "LM" ~ tx.spacing.ns["N"],
+      vessel.name == "LBC" & transect <= tx.break.ns ~ tx.spacing.ns["S"],
+      vessel.name == "LBC" & transect > tx.break.ns ~ tx.spacing.ns["CI"],
+      TRUE ~ NA)) %>% 
+    mutate(dist.bin = cut(min.dist, tx.spacing.bins),
+           spacing  = tx.spacing.dist[as.numeric(dist.bin)],
            dist.cum = cumsum(spacing))
+} else {
+  # Bin transects by spacing
+  tx.nn.ns <- tx.nn.ns %>% 
+    mutate(dist.bin = cut(min.dist, tx.spacing.bins),
+           spacing  = tx.spacing.dist[as.numeric(dist.bin)]) %>% 
+    mutate(spacing = case_when(
+      spacing > 6 ~ 5,
+      TRUE ~ spacing),
+      dist.cum = cumsum(spacing)) %>% 
+    arrange(transect)  
 }
 
 # Save nearest neighbor distance info
 save(tx.nn.ns, file = here("Output/transect_spacing_ns.Rdata"))
 
-# Summarise biomass density by transect and species
+# Add distance and spacing info to NASC density summary
 nasc.density.summ.ns <- nasc.density.summ.ns %>% 
   left_join(select(tx.nn.ns, vessel.name, transect.name, dist.cum, dist.bin)) %>% 
   arrange(scientificName, transect) 
@@ -986,31 +961,37 @@ if (get.bathy) {
   load(paste0(here("Data/GIS"), "/bathy_data_ns_", survey.name,".Rdata"))
 }
 
-# Remove nearshore strata, if exists
-if (exists("tx.ends.ns"))       rm(tx.ends.ns) # inshore- and offshore-most intervals
+# Remove nearshore strata, if exists ---------------------------
+# Inshore- and offshore-most acoustic intervals
+if (exists("tx.ends.ns"))       rm(tx.ends.ns)
 if (exists("strata.ns"))        rm(strata.ns) 
-if (exists("strata.points.ns")) rm(strata.points.ns) 
+if (exists("strata.points.ns")) rm(strata.points.ns)
+if (exists("nasc.region"))      rm(nasc.region)
 
 # Assign transects to region based on latitude
-# Because some duplicate transect numbers exist, can't do a straight join
+# Because in some years duplicate transect numbers exist, can't do a straight join
 for (v in unique(nasc.nearshore$vessel.name)) {
   # Get latitude range for backscatter data
   nasc.nearshore.summ <- nasc.nearshore %>% 
-    filter(vessel.name == v) %>% 
-    summarise(lat.min = min(lat) - 0.1,
-              lat.max = max(lat) + 0.1)
+    filter(vessel.name == v) #%>% 
+    # summarise(lat.min = min(lat) - 0.1,
+    #           lat.max = max(lat) + 0.1)
   
   # Extract only waypoints in the survey region
   region.wpts <- wpts %>% 
     filter(Type == "Nearshore") %>% 
-    group_by(Transect, Type, Region) %>% 
-    arrange(Type, Region, Transect) %>% 
-    filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max)) %>% 
+    # group_by(Transect, Type, Region) %>% 
+    # arrange(Type, Region, Transect) %>% 
+    # filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max)) %>% 
     # mutate(transect = sprintf("%03d", Transect)) %>% 
     mutate(transect = as.numeric(Transect),
-           transect.name = paste(v, sprintf("%03d", transect))) 
+           transect.name = paste(v, sprintf("%03d", transect)),
+           wpt.num = as.numeric(str_replace(Waypoint, "N",""))) %>% 
+    filter(transect %in% nasc.nearshore.summ$transect)
   
   # ggplot(region.wpts, aes(long, lat, colour = Region)) + geom_point() + coord_map()
+  # ggplot(region.wpts, aes(long, lat, label = transect.name, colour = Region)) + geom_text() + coord_map()
+  # region.wpts %>% group_by(Region) %>% summarise(min.tx = min(transect), max.tx = max(transect))
   
   # Get waypoint depth and add to region.wpts
   region.wpts$depth <- get.depth(noaa.bathy.ns, 
@@ -1018,9 +999,10 @@ for (v in unique(nasc.nearshore$vessel.name)) {
                                  region.wpts$lat, 
                                  locator = FALSE, distance = FALSE)$depth 
   
-  # Extract shallowest waypoint from each transect
+  # Extract shallowest (inshore-most) waypoint from each transect
   region.wpts.i <- region.wpts %>% 
-    slice(which.min(depth)) %>% 
+    group_by(transect) %>% 
+    slice(which.min(wpt.num)) %>% 
     ungroup()
   
   # Add region to nasc by vessel
@@ -1038,21 +1020,27 @@ for (v in unique(nasc.nearshore$vessel.name)) {
       # Get inshore nearshore waypoints
       tx.i.ns <- region.wpts %>%
         group_by(transect, transect.name) %>%
-        slice(which.min(abs(Depth))) %>% 
+        slice(which.min(wpt.num)) %>% 
+        # slice(which.min(abs(Depth))) %>% 
         mutate(grp = "original",
                loc = "inshore",
                key = paste(v, Region)) %>% 
         filter(key == k) %>%
+        # Arrange by transect
+        arrange(transect) %>% 
         ungroup() 
       
       # Get offshore nearshore waypoints
       tx.o.ns <- region.wpts %>%
         group_by(transect, transect.name) %>%
-        slice(which.max(abs(Depth))) %>% 
+        slice(which.max(wpt.num)) %>% 
+        # slice(which.max(abs(Depth))) %>%
         mutate(grp = "original",
                loc = "offshore",
                key = paste(v, Region)) %>% 
         filter(key == k) %>%
+        # Reverse order to correctly draw polygons later
+        arrange(desc(transect)) %>% 
         ungroup() 
       
       # ggplot() +
@@ -1299,32 +1287,41 @@ if (stratify.manually.ns) {
     mutate(stratum.orig = stratum)
   
 } else {
-  # Define strata automatically------------
+  # Define strata programmatically------------
+  # Remove existing strata
+  if (exists("strata.final.ns")) rm("strata.final.ns")
+  if (exists("strata.df")) rm("strata.df")
+  
   # Define strata boundaries and transects for each species
   for (i in unique(nasc.density.summ.ns$scientificName)) {
     for (j in unique(nasc.density.summ.ns$vessel.name)) {
       # Select positive transects and calculate differences between transect numbers
-      # diffs >= max.diff define stratum breaks
+      # diffs >= max.diff (usually 3 or more transects with zero biomass) define stratum breaks
       temp.spp <- nasc.density.summ.ns %>% 
         filter(scientificName == i, vessel.name == j, positive == TRUE) %>% 
         ungroup() %>% 
         mutate(diff = c(1, diff(transect)))
       
+      # Identify the first transect sampled by vessel j
+      min.tx.j <- min(nasc.density.summ.ns$transect[nasc.density.summ.ns$vessel.name == j])
+      
+      # Initiate a new data frame for strata info
       strata.df <- data.frame()
       
       if (nrow(temp.spp) > 0) {
-        # Find the start of each positive stratum
+        # Get stratum starts for each spp
         spp.starts <- temp.spp %>%
-          # mutate(diff = c(1, diff(transect))) %>%
-          filter(diff > max.diff)
+          # Get first positive transect
+          slice(1) %>%
+          # Get all other positive transects that start a new stratum
+          bind_rows(filter(temp.spp, diff > max.diff)) %>% 
+          # If the start of the first stratum equals the first transect sampled by vessel j, 
+          # survey.start is the first transect, else the first transect - 1 
+          mutate(transect = case_when(
+            transect == min.tx.j ~ min.tx.j,
+            TRUE ~ transect - 1))
         
         if (nrow(spp.starts) > 0) {
-          # If the start of the stratum == 1, stratum start is 1, else min transect number
-          survey.start <- ifelse(min(temp.spp$transect) == 1, 1, min(temp.spp$transect) - 1)
-          
-          # A vector of stratum starts
-          stratum.start <- c(survey.start, spp.starts$transect - 1)
-          
           # If the end of the stratum is the last transect in the survey,
           # select the last, else the last transect + 1
           survey.end <- ifelse(max(temp.spp$transect) == max(nasc.density.summ$transect),
@@ -1338,8 +1335,8 @@ if (stratify.manually.ns) {
           # Combine starts and ends in to a data frame for plotting and generating stratum vectors
           strata.spp <- data.frame(scientificName = i,
                                    vessel.name = j,
-                                   stratum = seq(1, length(stratum.start)),
-                                   start = stratum.start,
+                                   stratum = seq(1, nrow(spp.starts)),
+                                   start = spp.starts$transect,
                                    end = stratum.end) # %>% mutate(n.tx = end - start + 1)
           
           # Create stratum vectors
@@ -1364,9 +1361,10 @@ if (stratify.manually.ns) {
           # Summarize strata by key, remove strata with less than 3 transects,
           # and reassign stratum numbers
           strata.df.summ <- strata.df %>%
-            group_by(stratum.key) %>%
+            group_by(stratum, stratum.key) %>%
             summarise(n.tx = n()) %>%
             filter(n.tx >= nTx.min) %>%
+            ungroup() %>% 
             mutate(stratum = seq(1, n()))
           
           # Remove strata with less than minimum number of transects
@@ -1416,7 +1414,7 @@ if (stock.break.source == "primary") {
     mutate(lat.stock = lat)
 }
 
-# Summarise NASC to get species present
+# Summarise NASC to get species present during the survey
 nearshore.spp <- nasc.prop.spp.ns %>% 
   filter(nasc > 0) %>% 
   group_by(scientificName) %>% 
@@ -1427,8 +1425,8 @@ if (exists("strata.nearshore")) rm(strata.nearshore)
 if (exists("nasc.stock.ns"))    rm(nasc.stock.ns)
 
 for (i in unique(nearshore.spp$scientificName)) {
-  for (j in unique(strata.final.ns$vessel.name)) {
-    # Select each strata per species
+  for (j in unique(strata.final.ns$vessel.name[strata.final.ns$scientificName == i])) {
+    # Select each strata per species and vessel
     strata.sub <- filter(strata.final.ns, scientificName == i, vessel.name == j) %>% 
       select(transect.name, stratum) %>% 
       ungroup()
@@ -1437,17 +1435,18 @@ for (i in unique(nearshore.spp$scientificName)) {
     nasc.stock.temp <- strata.points.ns %>% 
       filter(vessel.name == j, loc == "inshore") %>%
       left_join(strata.sub) %>% 
+      filter(!is.na(stratum)) %>% 
       mutate(stock = case_when(
         i == "Engraulis mordax" & lat.stock >= stock.break.anch ~ "Northern",
         i == "Engraulis mordax" & lat.stock <  stock.break.anch ~ "Central",
         i == "Sardinops sagax"  & lat.stock >= stock.break.sar  ~ "Northern",
         i == "Sardinops sagax"  & lat.stock <  stock.break.sar  ~ "Southern",
-        i %in% c("Clupea pallasii","Scomber japonicus","Trachurus symmetricus") ~ "All"),
+        i %in% c("Clupea pallasii","Scomber japonicus",
+                 "Trachurus symmetricus","Etrumeus acuminatus") ~ "All"),
         scientificName = i) %>% 
-      filter(!is.na(stratum)) %>% 
       select(vessel.name, transect.name, stock, scientificName, stratum) %>%
       distinct() %>%
-      arrange(transect.name) %>% 
+      arrange(stratum, transect.name) %>% 
       ungroup()
     
     # Combine results
@@ -1464,12 +1463,12 @@ for (i in unique(nearshore.spp$scientificName)) {
         left_join(strata.sub) %>%
         left_join(select(nasc.stock.temp, transect.name, stock)) %>% 
         left_join(select(nasc.summ.region, transect.name, region)) %>% 
-        filter(vessel.name == j, stratum == k) %>%
+        filter(vessel.name == j, stratum == k) %>% 
         mutate(scientificName = i,
                region = case_when(
                  j %in% merge.regions ~ "All",
                  TRUE ~ region)) %>% 
-        ungroup()
+        ungroup() #%>% View()
       
       # Remove vessel name from nearshore region name
       poly.region <- str_replace(unique(primary.poly.temp$region), paste0(j, " "), "")
@@ -1492,27 +1491,41 @@ for (i in unique(nearshore.spp$scientificName)) {
         poly.region <- poly.region[grep(keep.region$Region, poly.region)]
       }
       
-      # ggplot(primary.poly.temp, aes(long, lat, group = region, colour = region)) + geom_polygon() + coord_map()
+      # ggplot(primary.poly.temp, aes(long, lat, group = region, colour = region)) + geom_polygon() + coord_map() + geom_text(aes(label = wpt.num))
+      
+      # If an island strata
       if (length(grep("Island", poly.region)) > 0) {
-        # if (str_detect(poly.region, "Island")) {
-        # If an Island strata
-        # Get latitude range for backscatter data
+        # Get backscatter data
         nasc.nearshore.summ <- nasc.nearshore %>% 
-          filter(vessel.name == j) %>% 
-          summarise(lat.min = min(lat) - 0.1,
-                    lat.max = max(lat) + 0.1)
+          filter(vessel.name == j)
         
         # Extract only waypoints in the survey region
         region.wpts <- wpts %>% 
           filter(Type == "Nearshore") %>% 
-          group_by(Transect, Type, Region) %>% 
-          arrange(Type, Region, Transect) %>% 
-          filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max),
-                 str_detect(Region, poly.region)) %>% 
+          # group_by(Transect, Type, Region) %>% 
+          # arrange(Type, Region, Transect) %>% 
           mutate(transect = as.numeric(Transect),
-                 transect.name = paste(j, sprintf("%03d", transect)),
+                 transect.name = paste(v, sprintf("%03d", transect)),
                  wpt.num = as.numeric(str_replace(Waypoint, "N",""))) %>% 
-          ungroup()
+          filter(transect %in% primary.poly.temp$transect)
+        
+        # # Get latitude range for backscatter data
+        # nasc.nearshore.summ <- nasc.nearshore %>% 
+        #   filter(vessel.name == j) %>% 
+        #   summarise(lat.min = min(lat) - 0.1,
+        #             lat.max = max(lat) + 0.1)
+        # 
+        # # Extract only waypoints in the survey region
+        # region.wpts <- wpts %>% 
+        #   filter(Type == "Nearshore") %>% 
+        #   group_by(Transect, Type, Region) %>% 
+        #   arrange(Type, Region, Transect) %>% 
+        #   filter(between(lat, nasc.nearshore.summ$lat.min, nasc.nearshore.summ$lat.max),
+        #          str_detect(Region, poly.region)) %>% 
+        #   mutate(transect = as.numeric(Transect),
+        #          transect.name = paste(j, sprintf("%03d", transect)),
+        #          wpt.num = as.numeric(str_replace(Waypoint, "N",""))) %>% 
+        #   ungroup()
         
         # Get waypoint depth and add to region.wpts
         region.wpts$depth <- get.depth(noaa.bathy.ns, 
@@ -1524,21 +1537,23 @@ for (i in unique(nearshore.spp$scientificName)) {
         tx.i.ns <- region.wpts %>%
           group_by(transect, transect.name) %>%
           # slice(which.min(absDepth)) %>% 
-          slice(which.min(abs(Depth))) %>%
+          slice(which.min(wpt.num)) %>%
           mutate(grp = "original",
                  loc = "inshore",
                  key = paste(j, Region)) %>% 
-          left_join(select(nasc.stock.temp, transect.name, stock)) %>% 
+          left_join(select(nasc.stock.temp, transect.name, stock)) %>%
+          arrange(transect) %>% 
           ungroup() 
         
         # Get offshore nearshore waypoints
         tx.o.ns <- region.wpts %>%
           group_by(transect, transect.name) %>%
           # slice(which.max(wpt.num)) %>% 
-          slice(which.max(abs(Depth))) %>%
+          slice(which.max(wpt.num)) %>%
           mutate(grp = "original",
                  loc = "offshore",
                  key = paste(j, Region)) %>% 
+          arrange(desc(transect)) %>% 
           # filter(key == k) %>%
           ungroup() 
         
@@ -1556,48 +1571,60 @@ for (i in unique(nearshore.spp$scientificName)) {
                  region = poly.region,
                  key = paste(transect.name, grp)) 
         
-        # Draw polygons around shallowest transect waypoint for island strata
-        primary.poly.i <- tx.i.ns %>% 
-          st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
-          summarise(do_union = F) %>% 
-          st_cast("LINESTRING") %>% 
-          st_cast("POLYGON") %>% 
-          ungroup()
+        # # Draw polygons around shallowest transect waypoint for island strata
+        # primary.poly.i <- tx.i.ns %>% 
+        #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+        #   summarise(do_union = F) %>% 
+        #   st_cast("LINESTRING") %>% 
+        #   st_cast("POLYGON") %>% 
+        #   ungroup()
+        # 
+        # # Draw polygons around deepest transect waypoint for island strata
+        # primary.poly.o <- tx.o.ns %>%
+        #   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+        #   summarise(do_union = F) %>% 
+        #   st_cast("LINESTRING") %>% 
+        #   st_cast("POLYGON") %>% 
+        #   ungroup()
+        # 
+        # # Combine polygons
+        # primary.poly.k <- primary.poly.o %>% 
+        #   st_difference(primary.poly.i) %>% 
+        #   st_make_valid() %>%
+        #   mutate(stratum = k,
+        #          stock = unique(primary.poly.temp$stock),
+        #          scientificName = i,
+        #          vessel.name = j,
+        #          area = as.numeric(st_area(.))) %>% 
+        #   ungroup() 
         
-        # Draw polygons around deepest transect waypoint for island strata
-        primary.poly.o <- tx.o.ns %>%
-          st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
+        # Create the final polygon
+        primary.poly.k <- strata.points.ns.k %>% 
+          st_as_sf(coords = c("long","lat"), crs = 4326) %>% 
           summarise(do_union = F) %>% 
-          st_cast("LINESTRING") %>% 
           st_cast("POLYGON") %>% 
-          ungroup()
-        
-        # Combine polygons
-        primary.poly.k <- primary.poly.o %>% 
-          st_difference(primary.poly.i) %>% 
-          st_make_valid() %>%
           mutate(stratum = k,
                  stock = unique(primary.poly.temp$stock),
-                 scientificName = i,
+                 scientificName = i, 
                  vessel.name = j,
                  area = as.numeric(st_area(.))) %>% 
-          ungroup() 
+          ungroup()
         
       } else {
         # If a mainland strata
-        # Select the southern-most inshore point for j-th stratum
+        # Select the southern-most inshore point for k-th stratum
         primary.poly.k.s <- primary.poly.temp %>%
           filter(loc == "inshore") %>% 
           # arrange(transect, order) %>%
           slice(which.min(lat))
         
-        # Select the northern-most inshore point for j-th stratum
+        # Select the northern-most inshore point for k-th stratum
         primary.poly.k.n <- primary.poly.temp %>%
           filter(loc == "inshore") %>% 
           # arrange(transect, order) %>%
           slice(which.max(lat))
         
-        # Select only the original inshore waypoints for j-th stratum
+        # Select only the original inshore waypoints for k-th stratum
         primary.poly.k.i <- primary.poly.temp %>% 
           filter(loc == "inshore", grp == "original") %>% 
           arrange(transect) %>%
@@ -1657,9 +1684,9 @@ for (i in unique(nearshore.spp$scientificName)) {
 #   facet_wrap(~scientificName) +
 #   theme_bw()
 
-# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + mapview(filter(transects.sf, Type == "Nearshore"))
+# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum") + mapview(filter(transects.sf, Type == "Nearshore"))
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
-# mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
 
@@ -1669,6 +1696,7 @@ save(strata.nearshore,
 
 if (exists("strata.nearshore.fac")) rm("strata.nearshore.fac")
 
+# Renumber duplicate strata numbers that occur when two vessels sample the same species/stock
 for (ii in unique(strata.nearshore$scientificName)) {
   strata.ns.fac.tmp <- strata.nearshore %>% 
     filter(scientificName == ii) %>% 
@@ -1707,8 +1735,7 @@ nasc.stock.ns <- nasc.stock.ns %>%
 #   facet_wrap(~scientificName) +
 #   theme_bw()
 
-# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + 
-#   mapview(filter(transects.sf, Type == "Nearshore"))
+# mapview(filter(strata.nearshore, scientificName == "Clupea pallasii"), zcol = "stratum") + mapview(filter(transects.sf, Type == "Nearshore"))
 # mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
 # mapview(filter(strata.nearshore, scientificName == "Scomber japonicus"), zcol = "stratum")
@@ -1731,8 +1758,8 @@ strata.summ.plot.ns <- strata.final.ns %>%
   summarise(
     start     = min(transect),
     end       = max(transect),
-    lat.start = min(lat),
-    lat.end   = max(lat),
+    lat.start = min(lat, na.rm = TRUE),
+    lat.end   = max(lat, na.rm = TRUE),
     nTx       = n()) %>% 
   arrange(scientificName, stratum)
 
@@ -1754,19 +1781,20 @@ if (length(island.polygons) > 0) {
 # Remove overlap with 5 m isobath and primary survey strata
 # and remove parts of stratum polygons that extend beyond the core area footprint
 
-# Extract polygons that intersect the nearshore_mask
+# Extract polygons that intersect the North American land mask (5m isobath)
 strata.nearshore <- strata.nearshore %>% 
   st_make_valid() %>% 
   st_difference(st_transform(na_landmask, crs = 4326))
 
 # Remove overlap with core area super polygons
 strata.nearshore <- strata.nearshore %>% 
-  st_difference(strata.super.polygons.ns)
+  st_difference(select(strata.super.polygons.ns, geometry))
 
 # mapview(strata.super.polygons.ns) + mapview(filter(strata.nearshore, scientificName == "Sardinops sagax"), zcol = "stratum")
 # mapview(strata.super.polygons.ns) + mapview(filter(strata.nearshore, scientificName == "Trachurus symmetricus"), zcol = "stratum")
+# mapview(strata.super.polygons.ns) + mapview(filter(strata.nearshore, scientificName == "Engraulis mordax"), zcol = "stratum")
 
-# Finalize strata creation
+# Finalize strata creation and recompute area
 strata.nearshore <- strata.nearshore %>%
   ungroup() %>% 
   mutate(area = st_area(.)) 
@@ -1783,7 +1811,7 @@ nasc.density.ns.sf <- nasc.density.ns %>%
                    '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>')
   )
 
-# ns.spp <- "Engraulis mordax"
+# ns.spp <- "Sardinops sagax"
 # mapview(filter(strata.nearshore, scientificName == ns.spp)) +
 # mapview(filter(strata.nearshore, scientificName == ns.spp), zcol = "stock") +
 # mapview(filter(nasc.density.ns.sf, scientificName == ns.spp), cex = "bin.level", zcol = "bin.level")
@@ -1879,6 +1907,7 @@ save(nasc.nearshore,
 
 # Save final nasc data frame used for point and bootstrap estimates
 save(nasc.nearshore, file = here("Output/nasc_nearshore_final.Rdata"))
+write_csv(nasc.nearshore, file = here("Output/nasc_nearshore_final.csv"))
 
 # Add stock and revised strata designations to strata.final.ns
 strata.final.ns <- strata.final.ns %>% 
@@ -1888,9 +1917,11 @@ strata.final.ns <- strata.final.ns %>%
   left_join(strata.nearshore.fac) %>% 
   rename(stratum = strata.fac)
 
+saveRDS(strata.final.ns, file = here("Output/strata_final_ns.rds"))
+
 # Remove point estimates, if they exist
 if(exists("point.estimates.ns")) rm(point.estimates.ns)
-if(exists("point.estimates.ns.deep")) rm(point.estimates.ns.deep)
+# if(exists("point.estimates.ns.deep")) rm(point.estimates.ns.deep)
 
 # Calculate point estimates for each species
 for (i in unique(strata.final.ns$scientificName)) {
@@ -1907,13 +1938,13 @@ for (i in unique(strata.final.ns$scientificName)) {
         left_join(strata.temp) %>% 
         filter(!is.na(stratum))
       
-      # Subset deep NASC
-      nasc.ns.temp.deep <- nasc.nearshore.deep %>%
-        select(-stratum) %>% 
-        left_join(strata.temp) %>% 
-        filter(!is.na(stratum)) %>% 
-        # Rename for compatibility with atm::estimate_point()
-        mutate(cps.nasc = cps.nasc.deep)
+      # # Subset deep NASC
+      # nasc.ns.temp.deep <- nasc.nearshore.deep %>%
+      #   select(-stratum) %>% 
+      #   left_join(strata.temp) %>% 
+      #   filter(!is.na(stratum)) %>% 
+      #   # Rename for compatibility with atm::estimate_point()
+      #   mutate(cps.nasc = cps.nasc.deep)
       
       # ggplot(nasc.ns.temp, aes(long, lat, size = cps.nasc, colour = factor(stratum))) + geom_point() + coord_map()
       
@@ -1947,36 +1978,36 @@ for (i in unique(strata.final.ns$scientificName)) {
         point.estimates.ns <- bind_rows(point.estimates.ns,
                                         data.frame(scientificName = i, vessel.name = j,
                                                    estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i)))
-        # Calculate deep point estimates
-        point.estimates.ns.deep <- bind_rows(point.estimates.ns.deep,
-                                        data.frame(scientificName = i, vessel.name = j,
-                                                   estimate_point(nasc.ns.temp.deep, stratum.info.nearshore, species = i)))
+        # # Calculate deep point estimates
+        # point.estimates.ns.deep <- bind_rows(point.estimates.ns.deep,
+        #                                      data.frame(scientificName = i, vessel.name = j,
+        #                                                 estimate_point(nasc.ns.temp.deep, stratum.info.nearshore, species = i)))
       } else {
         point.estimates.ns <- data.frame(scientificName = i, vessel.name = j,
                                          estimate_point(nasc.ns.temp, stratum.info.nearshore, species = i))
         
-        point.estimates.ns.deep <- data.frame(scientificName = i, vessel.name = j,
-                                         estimate_point(nasc.ns.temp.deep, stratum.info.nearshore, species = i))
+        # point.estimates.ns.deep <- data.frame(scientificName = i, vessel.name = j,
+        #                                       estimate_point(nasc.ns.temp.deep, stratum.info.nearshore, species = i))
       }
     }
   }
 }
 
 # Combine deep and shallow results
-point.estimates.ns <- point.estimates.ns %>% 
-  left_join(select(point.estimates.ns.deep, -area, biomass.deep = biomass.total)) %>% 
-  mutate(biomass.corr = biomass.total + biomass.deep) 
+# point.estimates.ns <- point.estimates.ns %>% 
+#   left_join(select(point.estimates.ns.deep, -area, biomass.deep = biomass.total)) %>% 
+#   mutate(biomass.corr = biomass.total + biomass.deep) 
 
 # Remove strata with zero biomass
 point.estimates.ns <- filter(point.estimates.ns, biomass.total != 0)
 
 # Add stock designations to point estimates
 point.estimates.ns <- point.estimates.ns %>% 
-  left_join(strata.summ.nearshore) %>% 
-  # Remove and rename temporary variables
-  select(-biomass.total, -biomass.deep) %>%
-  # New biomass.total based on the combination of the shallow and deep NASC
-  rename(biomass.total = biomass.corr)
+  left_join(strata.summ.nearshore) # %>% 
+  # # Remove and rename temporary variables
+  # select(-biomass.total, -biomass.deep) %>%
+  # # New biomass.total based on the combination of the shallow and deep NASC
+  # rename(biomass.total = biomass.corr)
 
 save(point.estimates.ns, 
      file = here("Output/biomass_point_estimates_ns.Rdata"))
@@ -2095,12 +2126,6 @@ if (do.bootstrap) {
       # ggplot(nasc.temp, aes(long, lat, size = cps.nasc, colour = factor(stratum))) + geom_point() + coord_map()
       
       # Summarize nasc.temp to get strata to merge with pos.clusters below
-      # nasc.temp.summ <- nasc.temp %>% 
-      #   group_by(vessel.name, stratum) %>% 
-      #   summarise(n = n_distinct(cluster)) %>% 
-      #   ungroup()
-      
-      # The inclusion of cluster in group_by was incorrect
       nasc.temp.summ <- nasc.temp %>%
         group_by(vessel.name, stratum, cluster) %>%
         summarise(n = n_distinct(cluster)) %>%
@@ -2121,6 +2146,8 @@ if (do.bootstrap) {
         ungroup() %>% 
         replace(is.na(.), 0)
       
+      # Summarize positive clusters per species (add strata numbers)
+      # Does multiple matches matter? I don't think so, as they get summarized in the next step
       pos.cluster.spp <- pos.clusters.ns %>%
         filter(cluster %in% nasc.temp$cluster, scientificName == i) %>% 
         inner_join(select(nasc.temp.summ, -n)) %>% 
@@ -2550,7 +2577,7 @@ nasc.outlier.plot.ns <- ggplot(big.nasc.ns, aes(rank, cps.nasc, ids = label)) +
   scale_color_discrete("Vessel") +
   xlab("\nRank") + ylab(expression(italic(s)[A]/19)) +
   theme_bw() +
-  theme(legend.position      = c(0.95,0.95),
+  theme(legend.position.inside = c(0.95,0.95),
         legend.justification = c(1,1))
 
 if (save.figs) {

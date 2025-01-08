@@ -3,14 +3,17 @@
 
 # Install and load pacman (library management package)
 if (!require("pacman")) install.packages("pacman")
+if (!require("pak")) install.packages("pak")
 
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,readr, lubridate, here, plotly, sf, mapview)
 
 # Install and load required packages from Github -------------------------------
-# surveyR
-pacman::p_load_gh("kstierhoff/surveyR")
-pacman::p_load_gh("kstierhoff/atm")
+if (!require("atm")) pkg_install("SWFSC/atm")
+if (!require("surveyR")) pkg_install("SWFSC/surveyR")
+pacman::p_load_gh("SWFSC/atm")
+pacman::p_load_gh("SWFSC/surveyR")
+
 
 # Get project settings----------------------------------------------------------
 # Get project name from directory

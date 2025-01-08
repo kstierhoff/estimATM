@@ -42,8 +42,10 @@ if (trawl.source == "Access") {
   haul.all <- haul.all %>% 
     arrange(haul) %>% 
     mutate(
+      netInWaterTime  = ymd_hms(netInWaterTime),
       equilibriumTime = ymd_hms(equilibriumTime),
-      haulBackTime    = ymd_hms(haulBackTime)) %>% 
+      haulBackTime    = ymd_hms(haulBackTime),
+      netOnDeckTime   = ymd_hms(netOnDeckTime)) %>% 
     mutate(deploymentTime = difftime(equilibriumTime, netInWaterTime, units = "mins"),
            recoveryTime   = difftime(netOnDeckTime, haulBackTime, units = "mins"),
            evolutionTime  = difftime(netOnDeckTime, netInWaterTime, units = "mins"))
@@ -77,6 +79,7 @@ haul.all <- haul.all %>%
 
 # Compute totalWeight and totalNum, which don't reliably exist in either database
 catch.all <- catch.all %>% 
+  replace_na(list(remainingSubSampleWtkg = 0)) %>% 
   mutate(
     totalWeight = subSampleWtkg + remainingSubSampleWtkg,
     totalNum    = (subSampleCount/subSampleWtkg)*totalWeight)

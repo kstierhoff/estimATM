@@ -514,12 +514,6 @@ cluster.source <- c(OS = "cluster",
 
 haul.rm <- c(104:109) # Off Oregon
 
-# Furthermore, hauls in Mexico were removed for this analysis, but may be 
-# included in a joint analysis later
-
-# haul.rm <- c(104:109, # Off Oregon
-#              110:127) # In Mexico
-
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 

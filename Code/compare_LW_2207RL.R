@@ -103,7 +103,7 @@ lengths.all <- lengths.all %>%
         convert_length("Trachurus symmetricus", .$forkLength_mm, "FL", "TL"),
       scientificName == "Etrumeus acuminatus" ~ 
         convert_length("Etrumeus acuminatus", .$forkLength_mm, "FL", "TL"),
-      scientificName == "Doryteuthis (Loligo) opalescens" ~  as.numeric(mantleLength_mm)),
+      scientificName == "Doryteuthis opalescens" ~  as.numeric(mantleLength_mm)),
     missing.length = case_when(is.na(totalLength_mm) ~ T, TRUE ~ FALSE)) %>% 
   # Compute differences from model predictions
   mutate(weightg.pred = estimate_weight(.$scientificName, .$totalLength_mm, season = season), 

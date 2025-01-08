@@ -11,6 +11,10 @@ if(exists("clf.os")) {
   clf.combo <- bind_rows(clf.combo, clf.os)
 }
 
+# Remove duplicated rows, like when haul or haul cluster data area used 
+# in the nearshore region
+clf.combo <- distinct(clf.combo)
+
 # Format positive clusters for plotting
 acoustic.prop.indiv.combo <- clf.combo %>%
   filter(!is.na(CPS.wg)) %>% 

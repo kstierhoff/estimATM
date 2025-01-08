@@ -1,0 +1,167 @@
+---
+output: 
+  bookdown::html_document2:
+    toc: no
+  bookdown::pdf_document2:
+    number_sections: no
+    toc: no
+    includes: 
+      in_header: yaml/header_final.tex
+  bookdown::word_document2:
+    reference_docx: template/report_template_DRAFT_Rmarkdown.docx
+csl: csl/ices-journal-of-marine-science.csl
+bibliography: bib/ast_bib.bib
+---
+
+```{r load-libraries,echo=F,error=F,message=F,warning=F}
+# Install and load pacman (library management package)
+if (!require("pacman")) install.packages("pacman")
+if (!require("pak")) install.packages("pak")
+
+# Install and load required packages from CRAN ---------------------------------
+pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate, knitr,here,
+               png,devtools,kableExtra,forcats,jpeg,bookdown,magick,
+               odbc,cowplot,mapview,fs,sf)
+
+# Install and load required packages from Github -------------------------------
+if (!require("atm")) pkg_install("SWFSC/atm")
+if (!require("surveyR")) pkg_install("SWFSC/surveyR")
+pacman::p_load_gh("SWFSC/atm")
+pacman::p_load_gh("SWFSC/surveyR")
+
+# determines method of table generation (whether kable or xtable) for best formatting
+doc.type <- knitr::opts_knit$get('rmarkdown.pandoc.to')
+if (is.null(doc.type)) {doc.type <- "html"}
+
+# global knitr chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      knitr.kable.NA = "-",
+                      fig.align = "center",
+                      dev = "png", dev.args = list(type = "cairo"))
+
+# Set options for NA values in knitr::kable
+options(knitr.kable.NA = '-')
+
+# determine global knitr table format
+if (doc.type == "latex") {
+  knitr.format <- "latex"
+} else {
+  knitr.format <- "html" 
+}
+
+# global pander options
+panderOptions('table.style','rmarkdown'); panderOptions('table.split.table', Inf); panderOptions('digits', 6);
+panderOptions('round', 6); panderOptions('keep.trailing.zeros', T); panderOptions('missing', "")
+```
+
+```{r project-info, include=FALSE}
+# Get project name from directory
+prj.name <- last(unlist(str_split(here(),"/")))
+
+# Get all settings files
+settings.files <- dir(here("Doc/settings"))
+
+# Source survey settings file
+prj.settings <- settings.files[str_detect(settings.files, paste0("settings_", prj.name, ".R"))]
+source(here("Doc/settings", prj.settings))
+```
+
+```{r user-controls}
+# Processing settings
+get.db     <- T
+get.nav    <- T
+do.spatial <- T
+nav.source <- "ERDDAP" # Navigation data source: ERDDAP or SCS
+save.figs  <- T
+resize.map <- F # Resize map during survey; if T, uses anticipated bounds of survey area
+
+# Sampling settings
+sampling.cufes <- F
+```
+
+```{r get-trawl-data}
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
+  
+} else {
+  # Load trawl data
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+  
+}
+```
+
+```{r format-trawl-data}
+# Source script to format data from trawl database
+source(here("Code/format_trawl_database.R"))
+```
+
+```{r process-trawl-data}
+# Filter haul data for current survey
+haul <- haul.all %>% 
+  select(cruise, ship, haul, collection, startLatDecimal, startLongDecimal, 
+         stopLatDecimal, stopLongDecimal, equilibriumTime, haulBackTime, 
+         trawlPerformance) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship) 
+
+# Filter and format catch data
+catch <- catch.all %>% 
+  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
+  filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
+  filter(!subSampleWtkg == 0) 
+
+# Summarize species catch by weight and number
+catch.summary <- catch %>% 
+  # Subset columns
+  select(haul, scientificName, commonName,
+         totalWeight, totalNum) %>% 
+  arrange(haul, desc(totalWeight)) %>% 
+  # Add position data
+  left_join(select(haul, haul, Latitude = startLatDecimal, 
+                   Longitude = startLongDecimal))
+
+# Rename columns
+names(catch.summary) <- c("Haul","Scientific Name","Common Name",
+                          "Total weight (kg)","Total number (n)",
+                          "Latitude","Longitude")
+
+# Write output files
+write_csv(haul, here("Output/haul_table_ONMS.csv"))
+write_csv(catch.summary, 
+          here("Output/catch_table_ONMS.csv"))
+```
+
+```{r load-spatial-data, include = FALSE}
+# Read EEZ shapefiles -----------------------------------------
+eez_usa <- st_read(here("Data/GIS/eez_us.shp")) %>% 
+  st_transform(crs.geog) %>% 
+  select(geometry)
+```
+
+\blandscape  
+
+# Trawl catch summary for the `r survey.name.long` (`r survey.name` )
+
+## NOAA Fisheries-Southwest Fisheries Science Center
+
+_**Last updated:**_ `r format(Sys.time(), "%F %T", tz = "America/Los_Angeles", usetz = TRUE)`
+
+Catch for all trawl samples are summarized in the table below. Species are listed descending by weight. For hauls with large catches (i.e., > 5 baskets), the total number was estimated from the total weight and the average weight of specimens in the subsample.
+
+```{r catch-table}
+# Convert to datatable to allow for sorting/filtering?
+kable(catch.summary, format = knitr.format, booktabs = TRUE, 
+      escape = FALSE, longtable = TRUE,
+      align           = c(rep("l", 3), rep("r", ncol(catch.summary) - 3)),
+      digits          = c(0,0,0,3,0,4,4),
+      format.args     = list(big.mark = ",")) %>% 
+  kable_styling(latex_options = c("repeat_header","HOLD_position",
+                                  "scale_down"),
+                position = "center",
+                font_size = 8) %>%
+  column_spec(2, italic = T) 
+```
+
+For questions about the contents of this report, please contact Kevin Stierhoff ([kevin.stierhoff@noaa.gov](mailto:kevin.stierhoff@noaa.gov)).
+
+\elandscape

@@ -1,19 +1,20 @@
 # Processing controls ----------------------------------------------------
 ## Settings in this section control various behaviors and tasks used in the main data processing scripts
 ### Biomass estimation
-process.seine     <- F # Process purse seine data, if present
-process.nearshore <- F # Process near backscatter data; typically TRUE
-estimate.ns       <- F # Estimate biomass in the nearshore strata; T if nearshore surveyed
+process.seine     <- T # Process purse seine data, if present
+process.nearshore <- T # Process near backscatter data; typically TRUE
+estimate.ns       <- T # Estimate biomass in the nearshore strata; T if nearshore surveyed
 process.offshore  <- F # Process offshore backscatter data
 estimate.os       <- F # Estimate biomass in the offshore strata; T if offshore surveyed
-combine.regions   <- F # Combine nearshore/offshore plots with those from the core region
+combine.regions   <- T # Combine nearshore/offshore plots with those from the core region
 
 # Survey planning ---------------------------------------------------------
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 10 # For Lasker 
 tx.spacing.sd   <- tx.spacing.fsv/2 # For Saildrone
-tx.spacing.ns   <- 7 # For nearshore sampling
+tx.spacing.ns   <- c("S" = 5, "N" = 7, "CI" = 2.5) # or NA
+tx.break.ns     <- 64 # Northernmost transect sampled by the southern F/V, 64 in 2024, near Carmel
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
 # Mainland buffer distance for FSV and Saildrone transects
@@ -97,8 +98,8 @@ survey.end             <- "30 September"    # Survey end date
 survey.year            <- "2024"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 85              # Days at sea allocated
-survey.landmark.n      <- "Cape Flattery, WA" # Landmark - N extent of survey
-survey.landmark.s      <- "San Diego, CA" # Landmark - S extent of survey
+survey.landmark.n      <- "Cape Scott, Vancouver Island, Canada" # Landmark - N extent of survey
+survey.landmark.s      <- "Punta Eugenia, Baja CA, Mexico" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
 survey.twilight.remove <- FALSE           # Remove twilight period (T/F)
@@ -112,7 +113,7 @@ leg.breaks <- as.numeric(lubridate::ymd(c("2024-06-26", "2024-07-22",
 
 # Define ERDDAP data variables for primary NOAA vessel
 erddap.url           <- "http://coastwatch.pfeg.noaa.gov/erddap/tabledap/fsuNoaaShip"
-erddap.vessel        <- "WTEGnrt"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
+erddap.vessel        <- "WTEG"    # Lasker == WTEG; Shimada == WTED; add "nrt" if during survey
 erddap.survey.start  <- "2024-06-24" # Start of survey for ERDDAP vessel data query
 erddap.survey.end    <- "2024-09-30" # End of survey for ERDDAP vessel data query
 erddap.vars          <- c("time,latitude,longitude,seaTemperature,platformSpeed,windDirection,windSpeed,flag")
@@ -300,7 +301,7 @@ pie.colors <- c("Engraulis mordax" = anchovy.color, "Trachurus symmetricus" = ja
 nasc.breaks        <- c(0, 1, 200, 500, 2000, 5000, 20000, 50000, 20000000)
 nasc.labels        <- c("0","1-200", "200-500", "500-2000", "2000-5000", 
                         "5000-20,000", "20,000-50,000", ">50,000")
-nasc.scale         <- 1.5#0.55 # Scale percentage (smaller for larger scale)
+nasc.scale         <- 0.75 # Scale percentage (smaller for larger scale, e.g., 0.5 v 0.75)
 nasc.sizes         <- c(0.1, 0.25, 2, 3, 4, 5, 6, 7)*nasc.scale
 nasc.colors        <- c("#000000", "#C2E6F2", "#1E90FF", "#FFFF00", "#FF8C00", 
                         "#FF0000", "#FFC0CB", "#FFFFFF")
@@ -331,9 +332,9 @@ lf.ncols <- 5
 # Data sources ------------------------------------------------------------
 # Backscatter data info
 # Survey vessels that collected acoustic data (a character vector of vessel abbreviations)
-nasc.vessels           <- c("RL") #c("RL","LBC","LM","SD") 
+nasc.vessels           <- c("RL","LM","LBC") #c("RL","LBC","LM","SD") 
 nasc.vessels.offshore  <- NA # c("SD")
-nasc.vessels.nearshore <- c("LBC","LM")
+nasc.vessels.nearshore <- c("LBC","LM") #,"LM"
 nasc.vessels.krill     <- c("RL")
 
 # Define columns to use for a fixed integration depth (if cps.nasc is not present)
@@ -369,9 +370,9 @@ sounder.type           <- c(RL  = "EK80",
 # Location of survey data on AST1, AST2, etc. (a vector of file paths)
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D","SWC-KSTIERH1-L")) {
-  survey.dir           <- c(RL  = "C:/SURVEY/2407RL",
-                            LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS")
+  survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS",
+                            LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS")
 } else if (Sys.info()['nodename'] %in% c("RL4433188-CHL1")) {
   survey.dir           <- c(RL  = "C:/Users/Survey.RL/Desktop/2407RL_SWFSC",
                             LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS",
@@ -444,9 +445,12 @@ seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
 # Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
 use.seine.data  <- TRUE
 
+# Vessels for which to correct deep nasc that may be anchovy
+deep.nasc.vessels <- c("LBC","LM")
+
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
-catch.source.ns <- c("Purse seine")
+catch.source.ns <- c("Purse seine", "Trawl")
 
 # Define path to seine data directories for each vessel
 seine.data.paths <- c("LBC"= file.path(survey.dir["LBC"], "DATA/SEINE/lbc_data_2407RL.xlsx"),
@@ -549,17 +553,15 @@ use.tx.number          <- c(RL  = TRUE,
                             SD  = TRUE)
 
 # Transects to manually exclude e.g., data.frame(vessel = "RL", transect = c("085","085-2"))
-# Transects 018-031 in 2107RL occurred in Mexico, and were removed from this analysis, but
-# but will ultimately be included in a joint analysis
 tx.rm                  <- list(RL  = NA,
                                SH  = NA,
                                LM  = NA,
-                               LBC = NA,
+                               LBC = c("LBC 24", "LBC 40"), # Short transects off S. CA
                                SD  = NA)
 
 # Minimum acoustic transect length (nmi)
-min.tx.length          <- c(RL  = 15,
-                            SH  = 15,
+min.tx.length          <- c(RL  = 12, # Transect 149 off VI was 12.7 nmi and had been excluded
+                            SH  = 12,
                             LM  = 1,
                             LBC = 1,
                             SD  = 1)
@@ -573,9 +575,11 @@ limit.cluster.dist     <- c(OS  = FALSE,
 cluster.source <- c(OS = "cluster",
                     NS = "cluster")
 
-# Manually exclude hauls from the analysis
-# List hauls (e.g., c(1, 2...n)), else NA
-haul.rm <- NA
+# Manually exclude hauls or purse seine sets from the analysis
+# List trawl hauls (e.g., c(1, 2,...n)), else NA
+haul.rm     <- NA
+# List sets (e.g., c("LBC 2024-07-16 25",...n)), else NA
+key.set.rm  <- c("LBC 2024-07-16 25") # Set/landing 25/160 had no specimens due to a freezer failure
 
 # Maximum distance to trawl clusters
 cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
@@ -584,8 +588,8 @@ cum.biomass.limit      <- 0.90 # Distance used to compute max.cluster.distance
 max.cluster.dist       <- 30
 
 # Define transect spacing bins and values (nmi) used to characterize transect spacing
-tx.spacing.bins <- c(0,  6, 15, 35, 70, 100)
-tx.spacing.dist <- c(5, 10, 20, 40, 80)
+tx.spacing.bins <- c(0, 3, 6, 8, 15, 35, 70, 100)
+tx.spacing.dist <- c(2.5, 5, 7, 10, 20, 40, 80)
 
 # SCS data
 scs.source             <- "ELG" # "CSV", "ELG", or "XLSX"
@@ -605,7 +609,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "Access"    # "SQL" or "Access"
+trawl.source           <- "SQL"    # "SQL" or "Access"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.db.access        <- "TrawlDataEntry2407RL.accdb"
 trawl.performance      <- c("Aborted") # Character vector; trawl performance to exclude
@@ -673,13 +677,13 @@ boot.num <- 1000 # 1000 during final
 do.lf    <- TRUE
 
 # Define regions to present in main Results
-estimate.regions   <- c("Core") 
+estimate.regions   <- c("Core", "Nearshore") 
 
 # Define rules for selecting and pruning sampling strata -----------------------
 # Defines breaks between strata
 max.diff <- 3
 # Defines minimum number of transects in a stratum
-nTx.min <- 2
+nTx.min <- 3
 
 # Stratum pruning settings
 nIndiv.min    <- 1
@@ -838,20 +842,22 @@ if ("SD" %in% nasc.vessels) {
 }
 
 # Stock boundaries --------------------------------------------------------
-stock.break.anch <- c("Cape Mendocino" = 40.80)  # Latitude of Cape Mendocino
-stock.break.sar  <- c("Bodega Bay" = 38.311) # Latitude of Bodega Bay, based on differences in length dist.
-# stock.break.sar  <- 34.3 # Latitude of ~Pt. Conception, base off 2023 habitat map
+stock.break.anch <- c("Cape Mendocino" = 40.80) # Latitude of Cape Mendocino
+stock.break.sar  <- c("Pt. Conception" = 34.7) # Latitude of Pt. Conception, based on habitat model
 
 # Transects used to define stock boundaries (primary or other)
 
-# Used in estimateOffshore, where stock break using offshore transect ends is ambiguous
+# Used in estimateOffshore and estimateNearshore, where stock break using offshore transect ends is ambiguous
 stock.break.source <- "primary" 
 
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2407RL_EK80"
-raw.size      <- 1  # file size in megabytes (GB)
-raw.log.range <-  350  # depth of ER60 logging (m)
+raw.size      <- 500  # file size in megabytes (MB)
+raw.log.range <- c(RL  = "500, 500, 500, 300, and 200",
+                   LBC = "500, 500, 500, and 300",
+                   LM  = "500, 500, 500, and 300")  # depth of ER60 logging (m)
+raw.log.range.night <- c(RL = "100")  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
@@ -878,36 +884,44 @@ cufes.threshold.anchovy <- 1   # egg density, eggs per minute
 cufes.threshold.sardine <- 0.3 # egg density, eggs per minute
 
 # # Calibration information ------------------------------------------------
-cal.vessels        <- c("RL", "LBC") # ,"LBC","LM"
+cal.vessels        <- c("RL", "LBC", "LM") # ,"LBC","LM"
 cal.vessels.fm     <- c("RL") 
-cal.dir            <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", # list of calibration directories
-                        LBC = "//swc-storage4-s/AST5/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
-                        LM  = "//swc-storage4-s/AST5/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS") 
-cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
+# Named vector of EK80 CW-mode calibration directories
+cal.dir            <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
+                        LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
+                        LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/RESULTS") 
+# Named vector of EK80 FM-mode calibration directories
+cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
+# Named vector of EK80 CW-mode calibration dates
 cal.datetime       <- c(RL  = "27 June", # Date/time of calibration
-                        LBC = NA_character_,
-                        LM  = NA_character_)    
+                        LBC = "16 May",
+                        LM  = "4 June")
+# Named vector of calibration dates, used to plot calibration time series
 cal.plot.date      <- c(RL  = "2024-07-02",
                         LBC = "2024-07-02",
-                        LM  = "2024-07-02") # Date of the calibration, used to plot cal time series
-cal.window         <- 400           # Number of days around calibration date to look for results
+                        LM  = "2024-07-02") 
+# Number of days around calibration date to look for results
+cal.window         <- 400 
+# Group and personnel conducting the calibrations
 cal.group          <- c(RL  = "SWFSC",
                         LBC = "SWFSC",
-                        LM  = "SWFSC")      # Group conducting the calibration
+                        LM  = "SWFSC")      
 cal.personnel      <- c(RL  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions",
                         LBC = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions",
-                        LM  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions")# Calibration participants
+                        LM  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions")
+# Calibration location name, lat/long
 cal.loc            <- c(RL  = "10th Avenue Marine Terminal, San Diego Bay",
                         LBC = "SWFSC Technology Development Tank",
-                        LM  = "Gig Harbor, WA") # Location name
-cal.lat.dd         <- c(RL  = 32.6956,
-                        LBC = 32.6956,
-                        LM  = 47.32212)    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
-cal.lon.dd         <- c(RL  = -117.15278,
-                        LBC = -117.15278,
-                        LM  = -122.57275)   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
+                        LM  = "Gray's Harbor, WA") 
+cal.lat.dd         <- c(RL  = 32.6936,
+                        LBC = 32.8701,
+                        LM  = 46.8885)    # Cal location latitude in decimal degrees (for mapping, e.g. with ggmap) 37.7865°N @ Pier 30-32
+cal.lon.dd         <- c(RL  = -117.1503,
+                        LBC = -117.2505,
+                        LM  = -124.1319)   # Cal location longitude in decimal degrees (for mapping, e.g. with ggmap) -122.3844°W @ Pier 30-32
 cal.lat            <- dd2decmin(cal.lat.dd)
 cal.lon            <- dd2decmin(cal.lon.dd)
+# Named vector of sphere type, name, and nominal depth below the transducer
 cal.sphere         <- c(RL  = "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)",
                         LBC = "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)",
                         LM  = "38.1-mm diameter sphere made from tungsten carbide (WC) with 6% cobalt binder material (WC38.1)") # Cal sphere info
@@ -916,21 +930,24 @@ cal.sphere.name    <- c(RL  = "_Lasker_ sphere #1",
                         LM  = "_Lasker_ sphere #1")
 cal.sphere.z       <- c(RL  = 6,
                         LBC = 6,
-                        LM  = 6) # Nominal depth of calibration sphere below the transducer
+                        LM  = 6) 
+# Info about impedance analyzer
 cal.imp.anal       <- c(RL  = "Agilent 4294A Precision Impedance Analyzer",
                         LBC = "Agilent 4294A Precision Impedance Analyzer",
-                        LM  = "Agilent 4294A Precision Impedance Analyzer") # Info about impedance analyzer
+                        LM  = "Agilent 4294A Precision Impedance Analyzer") 
 # Other notes about calibration
 cal.notes          <- c(RL  = "Lasker calibration sphere #1",
                         LBC = "Lasker calibration sphere #1",
                         LM  = "Lasker calibration sphere #1")
 
 # Physical conditions during calibration
-cal.temp           <-   20.16  # enter water temperature at sphere depth
-cal.sal            <-   34.11  # enter salinity at sphere depth
-cal.c              <- 1520.8   # enter sound speed (m/s)
-cal.min.z          <-    6     # enter minimum water depth below transducers
-cal.max.z          <-   10     # enter maximum water depth below transducers
+cal.temp           <-   c(RL = 20.16,
+                          LM = 12.3)  # enter water temperature at sphere depth
+cal.sal            <-   c(RL = 34.11,
+                          LM = 26.9)  # enter salinity at sphere depth
+cal.c              <- c(RL = 1520.8)   # enter sound speed (m/s)
+cal.min.z          <-    c(RL = 6)     # enter minimum water depth below transducers
+cal.max.z          <-   c(RL = 10)     # enter maximum water depth below transducers
 
 # Enter ambient noise estimates (dB re 1 W) for each vessel
 # Lowest to highest frequency
@@ -939,9 +956,9 @@ cal.noise <- list(RL  = NA,
                   LBC = NA)
 
 # RMS error values from Echoview processing
-cal.rms <- list(RL  = rep(0, 6),
+cal.rms <- list(RL  = c(0.1018, 0.1057, 0.1384, 0.1128, 0.1945, 0.4646),
                 LM  = rep(0, 4),
-                LBC = rep(0, 4))
+                LBC = c(0.0967, 0.0875, 0.1295, 0.2589))
 
 # Axis options for calibration plots
 cal.scales    <- "free"  # fixed or free
@@ -978,10 +995,10 @@ min.S <- 30
 max.S <- 35
 
 # Set limits for latitude and longitude ----------------------------------------
-min.lat  <-   31
+min.lat  <-   25
 max.lat  <-   52
 min.long <- -132
-max.long <- -117
+max.long <- -112
 
 # Files to manually exclude
 exclude.uctd <- c(NA)

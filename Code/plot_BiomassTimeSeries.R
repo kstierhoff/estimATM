@@ -21,14 +21,6 @@ if (get.db) {
   load(here("Output/biomass_database.Rdata"))
 }
 
-# Load 2021 data
-load("C:/KLS/CODE/Github/estimATM/2107RL/Output/biomass_timeseries_export.Rdata")
-be.db.export.2021 <- be.db.export
-
-# Load 2022 data
-load("C:/KLS/CODE/Github/estimATM/2207RL/Output/biomass_timeseries_export.Rdata")
-be.db.export.2022 <- be.db.export
-
 # Load present year estimates
 load(here("Output/biomass_timeseries_export.Rdata"))
 
@@ -36,8 +28,6 @@ load(here("Output/biomass_timeseries_export.Rdata"))
 # Combine with current survey results
 biomass.ts <- biomass.ts %>% 
   filter(!survey %in% unique(be.db.export$survey)) %>%
-  # bind_rows(filter(be.db.export.2021, region %in% estimate.regions)) %>% 
-  # bind_rows(filter(be.db.export.2022, region %in% estimate.regions)) %>% 
   bind_rows(filter(be.db.export, region %in% estimate.regions))
 
 # Summarise results across regions
@@ -173,24 +163,6 @@ biomass.ts.bar <- ggplot(biomass.ts,
   theme_bw() + 
   theme(axis.text.y = element_text(angle = 0),
         legend.text = element_text(face = "italic"))
-
-# # Create stacked bar plot
-# biomass.ts.bar <- ggplot(biomass.ts,
-#                          aes(x = date_start, y = biomass, fill = group)) +
-#   geom_bar(colour = "black", position = "stack", stat = "identity") +
-#   scale_fill_manual(name = 'Species (Stock)',
-#                     labels = c("Clupea pallasii", "Engraulis mordax (Central)", 
-#                                "Etrumeus acuminatus", "Sardinops sagax (Northern)", 
-#                                "Scomber japonicus", "Trachurus symmetricus"),
-#                     values = c(pac.herring.color, anchovy.color, 
-#                                rnd.herring.color, sardine.color, 
-#                                pac.mack.color, jack.mack.color)) +
-#   scale_x_datetime(name = "Year", date_breaks = "2 years", date_labels = "%Y") +
-#   scale_y_continuous(expression(Biomass~(italic(t))), labels = scales::comma) +
-#   ylab(expression(Biomass~(italic(t)))) +
-#   theme_bw() +
-#   theme(axis.text.y = element_text(angle = 0),
-#         legend.text = element_text(face = "italic"))
 
 # Save figure
 ggsave(biomass.ts.bar, 
