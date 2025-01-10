@@ -12,7 +12,7 @@ combine.regions   <- F # Combine nearshore/offshore plots with those from the co
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
 ### Transect spacing (nautical miles)
 tx.spacing.fsv  <- 15 # For Lasker 
-tx.spacing.sd   <- 10 # For Saildrone
+tx.spacing.sd   <- 15 # For Saildrone
 tx.spacing.ns   <- 5 # For nearshore sampling
 tx.spacing.os   <- 40 # Nearshore transect spacing, in nmi; set NA if calculating programatically
 
