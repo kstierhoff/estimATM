@@ -470,7 +470,8 @@ lengths.sub.lm <- set.lengths.comp %>%
   mutate(sample.type = "Purse seine")
 
 lengths.sub.all <- bind_rows(lengths.sub.rl, lengths.sub.lm) %>% 
-  filter(!is.na(scientificName))
+  filter(!is.na(scientificName)) %>% 
+  mutate(group = fct_rev(as.factor(sample.type)))
 
 # Plot length distributions for each species and vessel, on separate plots
 lengths.comp.grid <- ggplot(lengths.sub.all, aes(totalLength_mm)) + geom_histogram() + 
@@ -486,8 +487,8 @@ ggsave(lengths.comp.grid, filename = here("Figs/fig_trawl_seine_lengths_comp_gri
        height = 5, width = 10)
 
 # Plot length distributions for each species and vessel
-lengths.comp.combo <- ggplot(lengths.sub.all, aes(totalLength_mm, group = sample.type, fill = sample.type)) + 
-  geom_histogram(alpha = 0.5) + 
+lengths.comp.combo <- ggplot(lengths.sub.all, aes(totalLength_mm, group = group, fill = group)) + 
+  geom_histogram(position = "identity", alpha = 0.5) + 
   facet_wrap(~scientificName, nrow = 1) + theme_bw() +
   scale_fill_discrete(name = "Sample type") +
   labs(x = "\nTotal length (mm)",
