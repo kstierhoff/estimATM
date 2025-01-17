@@ -890,6 +890,13 @@ cal.vessels.fm     <- c("RL")
 cal.dir            <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-CW", 
                         LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/RESULTS",
                         LM  = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/RESULTS") 
+# Location of Lasker (or primary vessel) calibration single-target detections (for polar plots)
+single.targets.dir <- c(RL = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/EV_PROCESSING/CSV/singleTargets",
+                        LM = "//swc-storage4-s/AST4/SURVEYS/20240625_LISA-MARIE_SummerCPS/DATA/EK80/CALIBRATION/POST-SURVEY/EV/SingleTargets",
+                        LBC = "//swc-storage4-s/AST4/SURVEYS/20240625_CARNAGE_SummerCPS/DATA/EK80/CALIBRATION/EV/CSV")
+sphere.TS <- list(RL = list("18" = -42.41, "38" = -42.40, "70" = -41.64, "120" = -39.80, "200" = -38.82, "333" = -36.78),
+                  LM = list("38" = -42.36, "70" = -41.40, "120" = -39.72, "200" = -41.45),
+                  LBC = list("38" = -42.41, "70" = -41.62, "120" = -39.74, "200" = -38.84))
 # Named vector of EK80 FM-mode calibration directories
 cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
 # Named vector of EK80 CW-mode calibration dates
