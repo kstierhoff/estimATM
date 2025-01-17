@@ -231,9 +231,9 @@ for (i in cal.vessels) {
     
     # Define figure widths based on vessel so that plots are relatively square
     fig.width <- switch(i,
-                        "RL" = 10,
-                        "LM" = 11.5,
-                        "LBC" = 7,
+                        "RL"  = 10,
+                        "LM"  =  7,
+                        "LBC" =  7,
                         "SH"  = 10)
     
     # Save TS_c plot 
