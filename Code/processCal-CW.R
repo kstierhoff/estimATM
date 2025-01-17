@@ -6,13 +6,13 @@
 
 # Cycle through each vessel
 for (i in cal.vessels) {
+  
   # Get list of calibration files for that vessel
   cal.files <- sort(list.files(cal.dir[i], pattern = ".xml", 
                                full.names = TRUE))
   
   # Initialize data frames for storing results
   cal.res   <- data.frame()
-  cal.info  <- data.frame()
   cal.pings <- data.frame()
   
   # Cycle through each calibration file (frequency)
@@ -23,7 +23,6 @@ for (i in cal.vessels) {
     
     # Append to data frames
     cal.res <- bind_rows(cal.res,   cal$cal.res)
-    cal.info <- bind_rows(cal.info,  cal$cal.info)
     cal.pings <- bind_rows(cal.pings, cal$cal.pings)
   }
   
@@ -148,72 +147,57 @@ for (i in cal.vessels) {
   # If saving figures, then plot and save calibration polar plots
   if (save.figs) {
     
-    # Format ping data for plotting
-    cal.pings <- cal.pings %>% 
-      mutate(cal_date = date(date_time)) %>% 
-      filter(between(cal_date,
-                     ymd(cal.plot.date[i]) - days(cal.window),
-                     ymd(cal.plot.date[i]) + days(cal.window))) %>% 
-      arrange(txdr_freq, ping_num)
+    # Get list of single-target csv files
+    single.target.files <- sort(list.files(single.targets.dir[i], pattern = ".csv", 
+                                           full.names = TRUE))
+    
+    # Create data frame that will contain TS info for all frequencies
+    cal.pings <- data.frame()
+    
+    # Loop through and read each file
+    for (j in single.target.files) {
+      
+      # Parse out frequency from filename
+      freq <- as.numeric(gsub(".*?(\\d+)kHz.*", "\\1", basename(j)))
+      
+      # Read single-target CSV file
+      singleTargets <- read_csv(j) %>%                           # Read entire file
+        select(TS_comp, Angle_minor_axis, Angle_major_axis) %>%  # Retain only compensated TS and angles
+        mutate(txdr_freq = freq) %>%                             # Add frequency column, for parsing data later on
+        mutate(target_ts = sphere.TS[[i]][[as.character(freq)]])
+      
+      # Add to data frame
+      cal.pings <- bind_rows(cal.pings, singleTargets)
+    }
     
     # Set axis limits based on range of ping angles
-    cal.lim.tmp <- round(max(max(cal.pings$along), max(cal.pings$athw))) 
+    cal.lim.tmp <- round(max(max(cal.pings$Angle_minor_axis), max(cal.pings$Angle_major_axis))) 
     
+    # If range is odd, add 1 to make axis ticks look nice
     if (cal.lim.tmp %% 2) {
-      # If range is odd, add 1 to make axis ticks look nice
       cal.axis.lims <- c(-(cal.lim.tmp + 1), cal.lim.tmp + 1)
     } else {
       cal.axis.lims <- c(-cal.lim.tmp, cal.lim.tmp)
     }
     
-    # subset only outlier points
-    outliers <- filter(cal.pings, outlier == 1)
-    
-    cal.pings <- cal.pings %>% 
-      left_join(select(cal.res,txdr_freq,txdr_type,target_ts,
-                       txdr_gain,bm_txdr_gain,
-                       bm_alon_ba,bm_athw_ba,
-                       bm_alon_oa,bm_athw_oa)) %>% 
-      mutate(
-        txdr_type      = fct_reorder(txdr_type, txdr_freq),
-        TS_u_new       = TS_u + 2*(txdr_gain - bm_txdr_gain),
-        alpha          = along - bm_alon_oa,
-        beta           = athw - bm_athw_oa,
-        x              = (2*alpha) / bm_alon_ba,
-        y              = (2*beta) / bm_athw_ba,
-        B              = 6.0206*(x^2 + y^2 - 0.18*x^2*y^2),
-        TS_c_new       = TS_u_new + B,
-        relTS_c        = TS_c_new - target_ts,
+    # Add a column for the relative TS, along with a scaled version that is
+    # limited to -1 and 1 dB
+    cal.pings <- mutate(cal.pings, 
+        relTS_c        = TS_comp - target_ts,
         relTS_c_scaled = case_when(
           relTS_c >= 1 ~ 1,
           relTS_c <= -1 ~-1,
           between(relTS_c,-1,1) ~ relTS_c))
     
+    # If scales are fixed, then set fixed x- and y-axis limits using cal.axis.lims
     if (cal.scales == "fixed") {
-      # Plot beam-uncompensated target strength data #####
-      tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
-        geom_point(aes(colour = TS_u)) + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
-                   shape = "+", size = 1, alpha = 0.7) +
-        facet_wrap(~txdr_type, scales = cal.scales) +
-        scale_colour_viridis_c(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                               option = "magma") +
-        scale_x_continuous('\nAthwartship Beam Angle (deg)',limits = cal.axis.lims,
-                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-        scale_y_continuous('Alongship Beam Angle (deg)\n',limits = cal.axis.lims,
-                           breaks = seq(min(cal.axis.lims), max(cal.axis.lims), 2)) +
-        guides(size =  "none") + theme_bw() + 
-        theme(panel.spacing    = unit(1, "lines"),
-              strip.background = element_rect(fill = "white"),
-              strip.text.x     = element_text(face = "bold")) + 
-        coord_equal()
       
-      # Plot beam-compensated target strength data #####
-      tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+      # Plot relative beam-compensated target strength data #####
+      tsc.scatter <- ggplot(cal.pings, aes(Angle_major_axis, Angle_minor_axis)) +
         geom_point(aes(fill = relTS_c_scaled), shape = 21) + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
-                   shape = "+", size = 4) +
-        facet_wrap(~txdr_type, scales = cal.scales) + 
+        # geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
+        #            shape = "+", size = 4) +
+        facet_wrap(~txdr_freq, scales = cal.scales) + 
         scale_fill_distiller(name = expression(italic(TS)[rel]),
                              type = "div", palette = "RdBu", limits = c(-1,1)) +
         scale_x_continuous('\nAthwartship Beam Angle (deg)', limits = cal.axis.lims,
@@ -226,28 +210,15 @@ for (i in cal.vessels) {
               strip.text.x = element_text(face = "bold")) +
         coord_equal()
       
+    # Otherwise let the x- and y-axis limits be free and not limited to integer values
     } else {
-      # Plot beam-uncompensated target strength data #####
-      tsu.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
-        geom_point(aes(colour = TS_u)) + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along), 
-                   shape = "+", size = 1, alpha = 0.7) +
-        facet_wrap(~txdr_type, scales = cal.scales) +
-        scale_colour_viridis_c(name = expression(paste(italic(TS)[u]," (dB)",sep = "")),
-                               option = "magma") +
-        scale_x_continuous('\nAthwartship Beam Angle (deg)') +
-        scale_y_continuous('Alongship Beam Angle (deg)\n') +
-        guides(size =  "none") + theme_bw() + 
-        theme(panel.spacing    = unit(1, "lines"),
-              strip.background = element_rect(fill = "white"),
-              strip.text.x     = element_text(face = "bold")) 
       
-      # Plot beam-compensated target strength data #####
-      tsc.scatter <- ggplot(filter(cal.pings, outlier == 0), aes(athw, along)) +
+      # Plot relative beam-compensated target strength data #####
+      tsc.scatter <- ggplot(cal.pings, aes(Angle_major_axis, Angle_minor_axis)) +
         geom_point(aes(fill = relTS_c_scaled), shape = 21, colour = "gray70") + 
-        geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
-                   shape = "+", size = 4) +
-        facet_wrap(~txdr_type, scales = cal.scales) + 
+        # geom_point(data = filter(cal.pings, outlier == 1), aes(athw, along),
+        #            shape = "+", size = 4) +
+        facet_wrap(~txdr_freq, scales = cal.scales) + 
         scale_fill_distiller(name = expression(italic(TS)[rel]),
                              type = "div", palette = "RdBu", limits = c(-1,1)) +
         scale_x_continuous('\nAthwartship Beam Angle (deg)') +
@@ -255,7 +226,7 @@ for (i in cal.vessels) {
         theme_bw() + 
         theme(panel.spacing = unit(1, "lines"),
               strip.background = element_rect(fill = "white"),
-              strip.text.x = element_text(face = "bold")) 
+              strip.text.x = element_text(face = "bold"))
     }
     
     # Define figure widths based on vessel so that plots are relatively square
@@ -266,14 +237,10 @@ for (i in cal.vessels) {
                         "SH"  = 10)
     
     # Save TS_c plot 
-    ggsave(tsu.scatter, filename = here(paste0("Figs/fig_cal_TSu_scatter_", i, ".png")),  
-           width = fig.width, height = 6)
-    
-    # Save TS_c plot 
     ggsave(here(paste0("Figs/fig_cal_TSrel_scatter_", i, ".png")), tsc.scatter,
            width = fig.width, height = 6)
   }
 }
 
-# Save all FM calibration results to .Rdata
+# Save all calibration results to .Rdata
 save(list = ls(pattern = "all.output.*"), file = here("Output/cal_results_CW.Rdata"))
