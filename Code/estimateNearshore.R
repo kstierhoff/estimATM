@@ -2762,12 +2762,6 @@ if (save.figs) {
       # Filter positive clusters
       pos.cluster.txt <- filter(clf.ns, cluster %in% nasc.density.plot.ns$cluster) 
       
-      # pos.cluster.txt <- pos.clusters.ns %>% 
-      #   filter(scientificName == i, stock == j,
-      #          cluster %in% nasc.ns.clusters) %>% 
-      #   ungroup() %>% 
-      #   project_df(to = crs.proj)
-      
       # Select biomass density legend objects 
       dens.levels.all.ns <- sort(unique(nasc.density.plot.ns$bin.level))
       dens.labels.all.ns <- dens.labels[dens.levels.all.ns]
@@ -2779,8 +2773,6 @@ if (save.figs) {
         geom_sf(data = filter(strata.nearshore, scientificName == i, stock == j),
                 aes(colour = factor(stratum)), fill = NA, size = 1) +
         scale_colour_discrete('Stratum') + 
-        # Plot vessel track
-        # geom_sf(data = nav.paths.sf, colour = 'gray50', size = 0.25, alpha = 0.5) +
         # Plot zero nasc data
         geom_point(data = filter(nasc.nearshore, cps.nasc == 0), aes(X, Y),
                    colour = 'gray50', size = 0.15, alpha = 0.5) +
@@ -2792,14 +2784,17 @@ if (save.figs) {
                           values = dens.sizes.all.ns, labels = dens.labels.all.ns) +
         scale_fill_manual(name = bquote(atop(Biomass~density, ~'(t'~'nmi'^-2*')')),
                           values = dens.colors.all.ns, labels = dens.labels.all.ns) +
-        # Plot positive cluster midpoints
-        geom_shadowtext(data = pos.cluster.txt,
-                        aes(X, Y, label = cluster), 
-                        colour = "blue", bg.colour = "white", size = 2, fontface = "bold") +
         # Configure legend guides
         guides(colour = guide_legend(order = 1),
                fill   = guide_legend(order = 2), 
                size   = guide_legend(order = 2)) +
+        # Create new colour scale for nearshore cluster type
+        new_scale_colour() +
+        geom_shadowtext(data = pos.cluster.txt,
+                        aes(X, Y, label = cluster, colour = sample.type), 
+                        bg.colour = "white", size = 2, fontface = "bold",
+                        show.legend = FALSE) +
+        scale_colour_manual(values = c("Trawl" = "blue", "Purse seine" = "red")) +
         coord_sf(crs = crs.proj, 
                  xlim = c(map.bounds["xmin"], map.bounds["xmax"]), 
                  ylim = c(map.bounds["ymin"], map.bounds["ymax"]))
