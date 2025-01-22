@@ -964,7 +964,7 @@ cal.noise <- list(RL  = NA,
 
 # RMS error values from Echoview processing
 cal.rms <- list(RL  = c(0.1018, 0.1057, 0.1384, 0.1128, 0.1945, 0.4646),
-                LM  = rep(0, 4),
+                LM  = c(0.1380, 0.1359, 0.1667, 0.3739),
                 LBC = c(0.0967, 0.0875, 0.1295, 0.2589))
 
 # Axis options for calibration plots
