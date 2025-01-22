@@ -7925,30 +7925,30 @@ Estimates of biomass (metric tons (t); mean, lower and upper 95% confidence inte
 if (exists("be.ns")) {
   # Print bootstrap estimate table
   be.ns %>% 
-  mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
-  mutate(pe.range = cell_spec(
-    pe.range, knitr.format, color = "black",
-    background = ifelse(pe.range,"green","red"))) %>% 
-  filter(Stratum == "All") %>% 
-  rename(Number               = Stratum,
-         Transects            = nTransects,
-         Clusters             = nClusters,
-         Individuals          = nIndiv,
-         "Point estimate"     = Biomass,
-         SD                   = biomass.sd,
-         CV                   = biomass.cv,
-         "Lower CI$_{95\\%}$" = lower.ci.B,
-         "Upper CI$_{95\\%}$" = upper.ci.B,
-         "In range"           = pe.range) %>% 
-  kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
-        align = c("l","c",rep("r",ncol(be) - 2)),
-        digits = c(0),
-        format.args = list(big.mark = ",")) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
-  column_spec(1, italic = TRUE) %>%
-  row_spec(0, align = c("c")) %>%
-  collapse_rows(columns = c(1)) %>%
-  add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
+    mutate(pe.range = between(Biomass, lower.ci.B, upper.ci.B)) %>% 
+    mutate(pe.range = cell_spec(
+      pe.range, knitr.format, color = "black",
+      background = ifelse(pe.range,"green","red"))) %>% 
+    filter(Stratum == "All") %>% 
+    rename(Number               = Stratum,
+           Transects            = nTransects,
+           Clusters             = nClusters,
+           Individuals          = nIndiv,
+           "Point estimate"     = Biomass,
+           SD                   = biomass.sd,
+           CV                   = biomass.cv,
+           "Lower CI$_{95\\%}$" = lower.ci.B,
+           "Upper CI$_{95\\%}$" = upper.ci.B,
+           "In range"           = pe.range) %>% 
+    kable(format = knitr.format, booktabs = TRUE,escape = FALSE,
+          align = c("l","c",rep("r",ncol(be) - 2)),
+          digits = c(0),
+          format.args = list(big.mark = ",")) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"),full_width = FALSE) %>%
+    column_spec(1, italic = TRUE) %>%
+    row_spec(0, align = c("c")) %>%
+    collapse_rows(columns = c(1)) %>%
+    add_header_above(c(" " = 2, "Stratum" = 4, "Trawl" = 2, "Biomass" = 6))
 } else {
   print("No nearshore bootstrap estimates present.")
 }
@@ -9199,132 +9199,32 @@ if (save.figs) {
 }
 ```  
 
-```{r process-cal}
-if (exists("cal.res.all")) {
-  # Get results from current survey ---------------------------------------------
-  cal.res <- cal.res.all %>% 
-    mutate(cal_date = mdy(cal_date)) %>% 
-    filter(between(cal_date,
-                   ymd(cal.plot.date[survey.vessel.primary]) - days(cal.window),
-                   ymd(cal.plot.date[survey.vessel.primary]) + days(cal.window))) %>% 
-    arrange(txdr_freq)
-  
-  
-  # create data frame for calibration parameters
-  cal.params <- cal.res %>% 
-    select(txdr_freq,txdr_type,txdr_sn,gpt_power,gpt_pd,
-           txdr_gain,txdr_sa_corr,gpt_rcr_bw,gpt_si,
-           txdr_2way_ba,env_alpha,txdr_alon_ang_sens,
-           txdr_athw_ang_sens,txdr_alon_ba,txdr_athw_ba,
-           txdr_alon_oa,txdr_athw_oa,target_ts) 
-  
-  # add noise estimates
-  # if noise isn't measured, enter -999 in the User Inputs, else use noise estimates
-  if (is.na(cal.noise[survey.vessel.primary])) { 
-    cal.params$noise <- rep("N/A", nrow(cal.res))
-  }else{
-    cal.params$noise <- unlist(cal.noise[cal.vessels])
-  }
-  
-  # create data frame for beam model results
-  bm.res <- cal.res %>% 
-    select(txdr_freq,bm_txdr_gain,bm_sa_corr,dev_bm_rms,
-           bm_alon_ba,bm_athw_ba,bm_alon_oa,bm_athw_oa) 
-  
-  # create a data frame for echosounder settings
-  echo.settings <- cal.res %>% 
-    select(txdr_freq,gpt_pd,gpt_si,gpt_rcr_bw,gpt_power,txdr_z,env_alpha) 
-  
-  # create names for cal parameters and beam model results
-  names(cal.params) <- c("Frequency","Model","Serial Number","Transmit Power ($p_\\mathrm{et}$)",
-                         "Pulse Duration ($\\tau$)","On-axis Gain ($G_0$)",
-                         "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)",
-                         "Bandwidth ($W_\\mathrm{f}$)","Sample Interval",
-                         "Eq. Two-way Beam Angle ($\\mathrm{\\Psi}$)",
-                         "Absorption Coefficient ($\\alpha_\\mathrm{f}$)",
-                         "Angle Sensitivity Along. ($\\mathrm{\\Lambda}_{\\alpha}$)",
-                         "Angle Sensitivity Athw. ($\\mathrm{\\Lambda}_{\\beta}$)",
-                         "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                         "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                         "Angle Offset Along. ($\\alpha_{0}$)","Angle Offset Athw. ($\\beta_{0}$)",
-                         "Theoretical TS ($TS_\\mathrm{theory}$)",
-                         "Ambient Noise")
-  
-  names(bm.res) <- c("Frequency","On-axis Gain ($G_0$)",
-                     "$S_\\mathrm{a}$ Correction ($S_\\mathrm{a}\\mathrm{corr}$)","RMS",
-                     "3-dB Beamwidth Along. ($\\alpha_\\mathrm{-3dB}$)",
-                     "3-dB Beamwidth Athw. ($\\beta_\\mathrm{-3dB}$)",
-                     "Angle Offset Along. ($\\alpha_{0}$)",
-                     "Angle Offset Athw. ($\\beta_{0}$)")
-  
-  names(echo.settings) <- c("Frequency","Pulse Duration ($\\mu s$)","Sample Interval (m)",
-                            "Bandwidth (Hz)","Transmit Power (W)",
-                            "Transducer Depth (m)","Absorption Coefficient (dB km$\\^{-1}$)")
-  
-  # cast output by frequency and transducer model number
-  param.output <- cal.params %>% 
-    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
-    pivot_wider(names_from = Frequency, values_from = value)
-  
-  bm.output <- bm.res %>% 
-    pivot_longer(-Frequency, names_to = "variable", values_to = "value", values_transform = as.character) %>% 
-    pivot_wider(names_from = Frequency, values_from = value)
-  
-  # add a column with parameter units
-  param.units <- as.data.frame(c(" "," ","W","ms","dB re 1","dB re 1","Hz","m","dB re 1 sr","dB km$^{-1}$",
-                                 "Elec.$^\\circ$/Geom.$^\\circ$","Elec.$^\\circ$/Geom.$^\\circ$",
-                                 "deg","deg","deg","deg","dB re 1 m$^{2}$","dB re 1 W"))
-  
-  # add a column with beam model units
-  bm.units <- as.data.frame(c("dB re 1","dB re 1","dB","deg","deg","deg","deg"))
-  
-  # add label for first column
-  names(param.units) <- "Units"
-  names(bm.units)    <- "Units"
-  
-  # add units to output and arrange columns
-  param.output <- bind_cols(param.output, param.units) %>% 
-    select(variable, Units, everything()) %>% 
-    rename("Frequency ($f$, kHz)" = variable)
-  
-  bm.output <- bind_cols(bm.output, bm.units) %>% 
-    select(variable, Units, everything()) %>% 
-    rename("Frequency ($f$, kHz)" = variable)
-  
-  # combine results data frames
-  all.output <- rbind(param.output, bm.output) %>% 
-    rename(" " = "Frequency ($f$, kHz)")
-  
-  # save output to .Rdata and CSV
-  save(all.output,
-       file = here("Output/cal_output_table.Rdata"))
-  
-  write.csv(all.output,
-            file = here("Output/cal_output_table.csv"), 
-            quote = FALSE, row.names = FALSE)
-}
-```
-
 (ref:cal-results) Simrad EK80 wideband transceiver (WBT) information, pre-calibration settings (above horizontal line), and beam model results following calibration (below horizontal line). Prior to the survey, on-axis gain ($G_0$), beam angles and angle offsets, and $S_a$ Correction ($S_\mathrm{a}\mathrm{corr}$) values from calibration results were entered into the WBT-control software (Simrad EK80).
 
 ```{r cal-results, results='asis'}
-if (exists("all.output")) {
+if (exists(paste0("all.output.", survey.vessel.primary))) {
+  # Assign data frame using the name of the primary survey vessel
+  assign("cal.results", eval(parse(text = df.name)))
+  # Get number of columns for table formatting
+  cal.cols <- ncol(cal.results)
+  
   if (doc.type == "docx") {
-    # create kable object (for Word)
-    pander(all.output)
+    # Create kable object (for Word)
+    regulartable(cal.results)
   } else {
     # print LaTeX table for HTML or PDF
-    kable(all.output, format = knitr.format, align = c("l","l",rep("c",ncol(all.output) - 2)),
-          booktabs = T, escape = FALSE,
+    kable(cal.results, 
+          format = knitr.format, 
+          align = c("l","l",rep("c", cal.cols - 2)),
+          booktabs = TRUE, linesep = "", escape = FALSE,
           caption = '(ref:cal-results)') %>% 
-      kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>% 
-      row_spec(18, hline_after = T) %>% 
-      add_header_above(c(" " = 2, "Frequency (kHz)" = ncol(all.output) - 2))
-  }  
+      kable_styling(position = "center", latex_options = c("scale_down","hold_position")) %>%
+      add_header_above(c(" " = 2, "Frequency (kHz)" = cal.cols - 2)) %>% 
+      row_spec(7, hline_after = TRUE)}
 } else {
-  print("No calibration results to display.")
+  print("No calibration results to present.")
 }
-```  
+```    
 
 ```{r plot-cal-time-series}
 # Include calibration time series plot
