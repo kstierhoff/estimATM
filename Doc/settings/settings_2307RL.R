@@ -369,16 +369,16 @@ sounder.type           <- c(RL  = "EK80",
 # Root directory where survey data are stored; other paths relative to this
 if (Sys.info()['nodename'] %in% c("SWC-FRD-AST1-D")) {
   survey.dir           <- c(RL  = "C:/SURVEY/2307RL",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
-                            SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+                            LBC = "//swc-storage4-s/AST2/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST2/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST2/SURVEYS/20230703_SAILDRONE_SummerCPS",
+                            SH  = "//swc-storage4-s/AST2/SURVEYS/20231010_SHIMADA_SummerCPS")   
 } else {
   survey.dir           <- c(RL  = "//swc-storage4-s/AST5/SURVEYS/20230703_LASKER_SummerCPS",
-                            LBC = "//swc-storage4-s/AST4/SURVEYS/20230708_CARNAGE_SummerCPS",
-                            LM  = "//swc-storage4-s/AST4/SURVEYS/20230703_LISA-MARIE_SummerCPS",
-                            SD  = "//swc-storage4-s/AST4/SURVEYS/20230703_SAILDRONE_SummerCPS",
-                            SH  = "//swc-storage4-s/AST4/SURVEYS/20231010_SHIMADA_SummerCPS")   
+                            LBC = "//swc-storage4-s/AST2/SURVEYS/20230708_CARNAGE_SummerCPS",
+                            LM  = "//swc-storage4-s/AST2/SURVEYS/20230703_LISA-MARIE_SummerCPS",
+                            SD  = "//swc-storage4-s/AST2/SURVEYS/20230703_SAILDRONE_SummerCPS",
+                            SH  = "//swc-storage4-s/AST2/SURVEYS/20231010_SHIMADA_SummerCPS")   
 }
 
 # Backscatter data (within survey.dir, typically)
