@@ -93,8 +93,8 @@ survey.vessel.long     <- "Reuben Lasker" # Full vessel name: e.g., Bell M. Shim
 survey.vessel          <- "Lasker"        # Short vessel name; e.g., Shimada
 survey.vessel.primary  <- "RL"            # Primary vessel abbreviation 
 survey.name            <- "2407RL"        # SWFSC/AST survey name
-survey.start           <- "25 June"       # Survey start date
-survey.end             <- "30 September"    # Survey end date
+survey.start           <- "30 June"       # Survey start date (discounts 5d sea trials in 2407RL)
+survey.end             <- "30 September"  # Survey end date
 survey.year            <- "2024"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 85              # Days at sea allocated
