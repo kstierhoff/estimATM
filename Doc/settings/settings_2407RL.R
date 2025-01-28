@@ -98,7 +98,7 @@ survey.end             <- "30 September"  # Survey end date
 survey.year            <- "2024"          # Survey year, for report
 survey.season          <- "Summer"        # Survey season, for report
 survey.das             <- 85              # Days at sea allocated
-survey.landmark.n      <- "Cape Scott, Vancouver Island, Canada" # Landmark - N extent of survey
+survey.landmark.n      <- "Winter Harbour, Vancouver Island, Canada" # Landmark - N extent of survey
 survey.landmark.s      <- "Punta Eugenia, Baja CA, Mexico" # Landmark - S extent of survey
 survey.twilight        <- "none"          # Sunset type for computing day/night (none, nautical, civil, astronomical)
 survey.twilight.offset <- 30              # Twilight offset; minutes before sunrise/after sunset
@@ -635,7 +635,7 @@ uctd.dir               <- file.path(survey.dir[survey.vessel.primary],"DATA/UCTD
 uctd.type              <- "Valeport" # "Valeport" or "Oceansciences"
 uctd.hdr.pattern       <- ".*UCTD\\d{3}-\\d{1}.*.vp2"
 uctd.cast.pattern      <- ".*UCTD\\d{3}-\\d{1}.*.vp2"
-uctd.cast.depth        <- 350
+uctd.cast.depth        <- 300
 
 # TDR data
 tdr.dir.kite           <- here("Data/TDR/Kite")
@@ -853,7 +853,7 @@ stock.break.source <- "primary"
 # Data collection settings ------------------------------------------------
 # ER60 file info
 raw.prefix    <- "2407RL_EK80"
-raw.size      <- 500  # file size in megabytes (MB)
+raw.size      <- 2  # file size in gigabytes (GB)
 raw.log.range <- c(RL  = "500, 500, 500, 300, and 200",
                    LBC = "500, 500, 500, and 300",
                    LM  = "500, 500, 500, and 300")  # depth of ER60 logging (m)
@@ -861,8 +861,8 @@ raw.log.range.night <- c(RL = "100")  # depth of ER60 logging (m)
 
 # Echoview settings
 er60.version  <- "v2.4.3" # ER60 version
-ek80.version  <- "v21.15.1" # EK80 version
-ev.version    <- "v13.1" # Echoview version
+ek80.version  <- "v23.6.2" # EK80 version
+ev.version    <- "v14.0" # Echoview version
 int.start        <-    5  # Integration start line depth (m)
 int.stop         <-  350  # Integration start line depth (m)
 cps.depth        <-   70  # Integration depth for CPS (m)
@@ -900,7 +900,7 @@ sphere.TS <- list(RL = list("18" = -42.41, "38" = -42.40, "70" = -41.64, "120" =
 # Named vector of EK80 FM-mode calibration directories
 cal.dir.fm         <- c(RL  = "//swc-storage4-s/AST4/SURVEYS/20240625_LASKER_SummerCPS/DATA/EK80/CALIBRATION/RESULTS/Final-FM") 
 # Named vector of EK80 CW-mode calibration dates
-cal.datetime       <- c(RL  = "27 June", # Date/time of calibration
+cal.datetime       <- c(RL  = "20 June", # Date/time of calibration
                         LBC = "16 May",
                         LM  = "4 June")
 # Named vector of calibration dates, used to plot calibration time series
