@@ -913,9 +913,9 @@ cal.window         <- 400
 cal.group          <- c(RL  = "SWFSC",
                         LBC = "SWFSC",
                         LM  = "SWFSC")      
-cal.personnel      <- c(RL  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions",
-                        LBC = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions",
-                        LM  = "A. Beittel, D. Murfin, J. Renfree, and S. Sessions")
+cal.personnel      <- c(RL  = "A. Beittel^1^, D. Murfin^1^, J. Renfree^1^, and S. Sessions^1^",
+                        LBC = "J. Renfree^1^ and S. Sessions^1^",
+                        LM  = "D. Murfin^1^ and J. Renfree^1^")
 # Calibration location name, lat/long
 cal.loc            <- c(RL  = "10th Avenue Marine Terminal, San Diego Bay",
                         LBC = "SWFSC Technology Development Tank",
