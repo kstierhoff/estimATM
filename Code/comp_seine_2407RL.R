@@ -471,6 +471,7 @@ lengths.sub.lm <- set.lengths.comp %>%
 
 lengths.sub.all <- bind_rows(lengths.sub.rl, lengths.sub.lm) %>% 
   filter(!is.na(scientificName)) %>% 
+  filter(scientificName != "Engraulis mordax") %>%
   mutate(group = fct_rev(as.factor(sample.type)))
 
 # Plot length distributions for each species and vessel, on separate plots
@@ -489,7 +490,7 @@ ggsave(lengths.comp.grid, filename = here("Figs/fig_trawl_seine_lengths_comp_gri
 # Plot length distributions for each species and vessel
 lengths.comp.combo <- ggplot(lengths.sub.all, aes(totalLength_mm, group = group, fill = group)) + 
   geom_histogram(position = "identity", alpha = 0.5) + 
-  facet_wrap(~scientificName, nrow = 1) + theme_bw() +
+  facet_wrap(~scientificName, nrow = 1, scales = "free_x") + theme_bw() +
   scale_fill_discrete(name = "Sample type") +
   labs(x = "\nTotal length (mm)",
        y = "Counts") +
