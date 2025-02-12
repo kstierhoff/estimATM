@@ -346,38 +346,39 @@ if(nrow(route.ns) > 0) {
 }
 
 ## Saildrone
-route.sd <- route.sd %>%
-  left_join(daylength.df) %>% 
-  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
-  select(-group, -order) %>%
-  mutate(long = as.data.frame(st_coordinates(.))$X,
-         lat  = as.data.frame(st_coordinates(.))$Y,
-         distance_to_next = as.numeric(
-           na.omit(c(0, st_distance(geometry,
-                                    lead(geometry, 
-                                         default = NA),
-                                    by_element = TRUE))))/1852) %>% 
-  mutate(distance_to_next = c(distance_to_next[2:n()],0),
-         distance_cum = cumsum(distance_to_next),
-         time_to_next = distance_to_next / survey.speed / daylength,
-         time_cum     = cumsum(time_to_next) + transit.duration,
-         on_off       = 1,
-         leg          = cut(time_cum, leg.breaks.gpx, 
-                            labels = FALSE, include.lowest = TRUE)) %>%
-  st_set_geometry(NULL) %>% 
-  project_df(to = 3310) %>% 
-  mutate(
-    diff.wpt = c(diff(round(Waypoint)), 0),
-    speed = case_when(
-      diff.wpt == 0 ~ survey.speed,
-      TRUE ~ transit.speed),
-    mode         = case_when(
-      speed == survey.speed ~ "survey",
-      speed == transit.speed ~ "transit",
-      TRUE ~ "other")) %>% 
-  select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
-         distance_to_next, distance_cum, time_to_next, time_cum, leg, Region)
-
+if (nrow(route.sd) > 0) {
+  route.sd <- route.sd %>%
+    left_join(daylength.df) %>% 
+    st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog) %>% 
+    select(-group, -order) %>%
+    mutate(long = as.data.frame(st_coordinates(.))$X,
+           lat  = as.data.frame(st_coordinates(.))$Y,
+           distance_to_next = as.numeric(
+             na.omit(c(0, st_distance(geometry,
+                                      lead(geometry, 
+                                           default = NA),
+                                      by_element = TRUE))))/1852) %>% 
+    mutate(distance_to_next = c(distance_to_next[2:n()],0),
+           distance_cum = cumsum(distance_to_next),
+           time_to_next = distance_to_next / survey.speed / daylength,
+           time_cum     = cumsum(time_to_next) + transit.duration,
+           on_off       = 1,
+           leg          = cut(time_cum, leg.breaks.gpx, 
+                              labels = FALSE, include.lowest = TRUE)) %>%
+    st_set_geometry(NULL) %>% 
+    project_df(to = 3310) %>% 
+    mutate(
+      diff.wpt = c(diff(round(Waypoint)), 0),
+      speed = case_when(
+        diff.wpt == 0 ~ survey.speed,
+        TRUE ~ transit.speed),
+      mode         = case_when(
+        speed == survey.speed ~ "survey",
+        speed == transit.speed ~ "transit",
+        TRUE ~ "other")) %>% 
+    select(Transect, Waypoint, Type, daylength, long, lat, X, Y, on_off, speed, mode, 
+           distance_to_next, distance_cum, time_to_next, time_cum, leg, Region)  
+}
 # # Combine even and odd transects into one continuous route
 # route.fsv <- filter(transects.odd, Type %in% c("Adaptive","Compulsory")) %>% 
 #   bind_rows(filter(transects.even, Type %in% c("Adaptive","Compulsory"))) %>% 
