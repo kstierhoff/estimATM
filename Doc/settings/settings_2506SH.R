@@ -43,7 +43,7 @@ show.maps <- TRUE
 ## Used by processTransects.R -----------
 # GPX file location
 gpx.dir          <- here("Data/Nav")
-gpx.file         <- "IWCPS-planning.gpx" #"rosepoint_waypoints.gpx"
+gpx.file         <- "rosepoint_waypoints.gpx" #"IWCPS-planning.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9.5
