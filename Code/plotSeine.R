@@ -3,6 +3,21 @@
 #     - Basemap
 #     - Acoustic data
 
+# Summarize nasc for plotting ---------------------------------------------
+# ## Must be recomputed after correcting deep backscatter
+# nasc.plot.ns2 <- nasc.nearshore %>% 
+#   select(filename, vessel.name, transect, transect.name, int, lat, long, cps.nasc) %>% 
+#   group_by(filename, vessel.name, transect.name, transect, int) %>% 
+#   summarise(
+#     lat  = lat[1],
+#     long = long[1],
+#     NASC = mean(cps.nasc)) %>% 
+#   # Create bins for defining point size in NASC plots%>% 
+#   mutate(bin       = cut(NASC, nasc.breaks, include.lowest = TRUE),
+#          bin.level =  as.numeric(bin)) %>% 
+#   ungroup() %>% 
+#   project_df(to = crs.proj)
+
 # Define the latitude (y) and longitude (x) boundary extensions (in meters)
 xbuff <- c(300000, 100000)
 ybuff <- c(50000, 50000)

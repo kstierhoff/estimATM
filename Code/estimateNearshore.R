@@ -2075,8 +2075,7 @@ if (exists("abundance.estimates.ns")) rm(abundance.estimates.ns)
 if (exists("survey.summary.ns"))      rm(survey.summary.ns)
 if (exists("catch.summary.ns"))       rm(catch.summary.ns)
 if (exists("stratum.summary.ns"))     rm(stratum.summary.ns)
-
-## RESUME HERE
+if (exists("bootstrap.comp.ns"))     rm(bootstrap.comp.ns)
 
 # Bootstrap estimates -----------------------------------------------------
 # Generate multiple bootstrap biomass estimates
@@ -2236,6 +2235,24 @@ if (do.bootstrap) {
           abundance.estimates.ns <- abundance.temp
         }
         
+        # Calculate abundance and biomass all ways ----
+        boot.comp.temp.ns <- estimate_bootstrap(nasc.temp, cluster.final.ns, k, 
+                                             stratum.area = stratum.area, 
+                                             species = i, do.lf = do.lf, 
+                                             boot.number = 0)$data.frame
+        
+        # Extract abundance estimates
+        boot.comp.ns <- data.frame(Species = i, Stratum = k, 
+                                select(boot.comp.temp.ns, abundance, everything()))
+        
+        if (exists("bootstrap.comp.ns")) {
+          bootstrap.comp.ns <- bind_rows(bootstrap.comp.ns, boot.comp.ns) %>% 
+            arrange(Species, Stratum)  
+        } else {
+          bootstrap.comp.ns <- boot.comp.ns %>% 
+            arrange(Species, Stratum) 
+        }
+        
         # Update the progress bar
         pb.prog2 <- round(stratum.counter/n_distinct(nasc.temp$stratum)*100)
         info2 <- sprintf("%d%% done", pb.prog2)
@@ -2299,10 +2316,10 @@ if (do.bootstrap) {
   # 
   # Save bootstrap results
   save(bootstrap.estimates.ns, abundance.estimates.ns, survey.summary.ns, 
-       catch.summary.ns, stratum.summary.ns,
+       catch.summary.ns, stratum.summary.ns, bootstrap.comp.ns,
        file = (here("Output/biomass_bootstrap_est_ns.Rdata")))
   
-} else{
+} else {
   # Load saved bootstrap results
   load(here("Output/biomass_bootstrap_est_ns.Rdata"))
   
