@@ -9,7 +9,7 @@ if (seine.source == "SQL") {
   seine.con  <- DBI::dbConnect(odbc::odbc(), 
                           Driver = "SQL Server", 
                           Server = "161.55.235.187", 
-                          Database = "Trawl_Dev", 
+                          Database = "Trawl", 
                           Trusted_Connection = "True")
 } else if (seine.source == "Access") {
   # Copy trawl Access database
@@ -25,9 +25,9 @@ if (seine.source == "SQL") {
                           DBQ = file.path(here::here("Data/Trawl"), trawl.db.access))
 }
 # Import trawl database tables
-catch.all	     <- dplyr::tbl(seine.con,"Catch") %>% dplyr::collect()
-sets.all       <- dplyr::tbl(seine.con,"Haul") %>% dplyr::collect()
-lengths.all    <- dplyr::tbl(seine.con,"Specimen") %>% dplyr::collect()
+sets.all       <- dplyr::tbl(seine.con,"Nearshore_Set") %>% dplyr::collect()
+set.catch.all	     <- dplyr::tbl(seine.con,"Nearshore_Catch") %>% dplyr::collect()
+set.lengths.all    <- dplyr::tbl(seine.con,"Nearshore_Specimen") %>% dplyr::collect()
 if (DBI::dbExistsTable(seine.con, "LengthFrequency"))
   lengthFreq.all <- dplyr::tbl(seine.con,"LengthFrequency") %>% dplyr::collect()
 spp.codes      <- dplyr::tbl(seine.con,"SpeciesCodes") %>% dplyr::collect()
@@ -40,9 +40,9 @@ fs::dir_create(here("Data/Seine"))
 
 # Save imported database data to .Rdata file
 if (exists("lengthFreq.all")) {
-  save(catch.all, sets.all, lengths.all, spp.codes, lengthFreq.all, 
+  save(sets.all, set.catch.all, set.lengths.all, spp.codes, lengthFreq.all, 
        file = here::here("Data/Seine/seine_data_raw.Rdata"))
 } else {
-  save(catch.all, sets.all, lengths.all, spp.codes,  
+  save(sets.all, set.catch.all, set.lengths.all, spp.codes,
        file = here::here("Data/Seine/seine_data_raw.Rdata"))
 }
