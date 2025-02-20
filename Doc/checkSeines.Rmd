@@ -106,10 +106,10 @@ sets <- filter(sets.all, cruise %in% cruise.name) %>%
 ```{r process-catch-data, message=FALSE}
 # Filter catch data
 set.catch <- set.catch.all %>% 
-  left_join(select(sets.all, key, set_type)) %>% 
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
   filter(cruise %in% cruise.name & ship %in% seine.vessels & 
            scientificName %in% cps.spp) %>% 
+  left_join(select(sets.all, key, set_type)) %>% 
   mutate(key = paste(cruise, ship, date, set))
 
 if (nrow(set.catch) > 0) {
@@ -117,7 +117,7 @@ if (nrow(set.catch) > 0) {
   set.summ.wt <- set.catch %>% 
     select(set, ship, key, set_type, scientificName, totalWeight) %>% 
     pivot_wider(names_from = scientificName, values_from = totalWeight, values_fn = sum, values_fill = 0)
-   
+  
   # Add species with zero total weight
   if (!has_name(set.summ.wt, "Engraulis mordax"))      {set.summ.wt$`Engraulis mordax`      <- 0}
   if (!has_name(set.summ.wt, "Sardinops sagax"))       {set.summ.wt$`Sardinops sagax`       <- 0}
@@ -127,7 +127,7 @@ if (nrow(set.catch) > 0) {
   if (!has_name(set.summ.wt, "Atherinopsis californiensis")) {set.summ.wt$`Atherinopsis californiensis` <- 0}
   if (!has_name(set.summ.wt, "Etrumeus acuminatus"))   {set.summ.wt$`Etrumeus acuminatus` <- 0}
   if (!has_name(set.summ.wt, "Other"))                 {set.summ.wt$`Other` <- 0}
-
+  
   # Calculate total weight of all CPS species
   set.summ.wt <- set.summ.wt %>% 
     replace(is.na(.), 0) %>%
@@ -143,15 +143,15 @@ if (nrow(set.catch) > 0) {
 } else {
   # Summarize trawl catch by species
   set.summ.wt <- bind_cols(select(sets, set),
-                            data.frame(
-                              "Jacksmelt"  = rep(0, nrow(sets)),
-                              "PacHerring" = rep(0, nrow(sets)),
-                              "Anchovy"    = rep(0, nrow(sets)),
-                              "Sardine"    = rep(0, nrow(sets)),
-                              "PacMack"    = rep(0, nrow(sets)),
-                              "JackMack"   = rep(0, nrow(sets)),
-                              "RndHerring" = rep(0, nrow(sets)),
-                              "AllCPS"     = rep(0, nrow(sets)))) %>% 
+                           data.frame(
+                             "Jacksmelt"  = rep(0, nrow(sets)),
+                             "PacHerring" = rep(0, nrow(sets)),
+                             "Anchovy"    = rep(0, nrow(sets)),
+                             "Sardine"    = rep(0, nrow(sets)),
+                             "PacMack"    = rep(0, nrow(sets)),
+                             "JackMack"   = rep(0, nrow(sets)),
+                             "RndHerring" = rep(0, nrow(sets)),
+                             "AllCPS"     = rep(0, nrow(sets)))) %>% 
     right_join(select(sets, set, ship, key, set_type, datetime, long, lat)) %>% 
     replace(is.na(.), 0) %>%
     project_df(to = crs.proj) %>%
@@ -160,23 +160,24 @@ if (nrow(set.catch) > 0) {
 
 # Prepare catch data for plotting ----------------------------------------------
 # Select and rename trawl data for pie charts
-set.pie <- set.summ.wt %>% 
+set.catch.pie <- set.summ.wt %>% 
   select(ship, key, set_type, long, lat, any_of(names(pie.spp))) %>% 
   st_as_sf(coords = c("long","lat"), crs = crs.geog) %>% 
   project_sf(crs.proj) 
 
-# Convert haul data for plotting
-set.catch <- set.summ.wt %>% 
-  st_as_sf(coords = c("long", "lat"), crs = crs.geog) 
+# Convert set data for plotting
+set.catch.plot <- set.summ.wt %>%
+  st_as_sf(coords = c("long", "lat"), crs = crs.geog)
 ```
 
 ```{r summarise-sets}
 # Convert set catch to sf and create labels
-set.catch.sf <- set.catch %>%
+set.catch.sf <- set.catch.pie %>%
+  st_as_sf(coords = c("X","Y"), crs = crs.proj) %>%
   st_transform(crs = crs.geog) %>% 
   mutate(
-    label = paste("Key", key),
-    popup = paste('<b>Key:', key, '</b><br/>',
+    label = paste("Set key", key),
+    popup = paste('<b>Set key:', key, '</b><br/>',
                   'Anchovy:', Anchovy, 'kg<br/>',
                   'Sardine:', Sardine, 'kg<br/>',
                   'Jack mackerel:', JackMack, 'kg<br/>',
@@ -195,9 +196,7 @@ set.lengths.all <- set.lengths.all %>%
   # Add scientific and common names
   left_join(select(spp.codes, species, scientificName, commonName)) %>%
   # Filter for CPS species and market squid
-  filter(scientificName %in% c(cps.spp, 
-                               "Doryteuthis opalescens", 
-                               "Merluccius productus")) %>% 
+  filter(scientificName %in% c(cps.spp, "Merluccius productus")) %>% 
   # Select desired columns
   select(cruise, ship, date, set, species, individual_ID, 
          scientificName, commonName, specimenNumber, 
@@ -239,8 +238,7 @@ set.lengths.all <- set.lengths.all %>%
                         ", Flag: ", flaggedData)) %>%
   # Add season from haul
   left_join(select(sets.all, key, season)) %>%
-  filter(scientificName %in% c(cps.spp, "Doryteuthis opalescens", 
-                               "Merluccius productus"))
+  filter(scientificName %in% c(cps.spp, "Merluccius productus"))
 
 # Convert lengths to total length for TS estimates ---------------------------
 set.lengths.all  <- set.lengths.all %>%
@@ -314,13 +312,13 @@ set.lengths.all <- set.lengths.all %>%
 bad.lengths <-  set.lengths.all %>% 
   # Filter for cruise specific data
   filter(cruise %in% cruise.name & ship %in% seine.vessels & 
-           scientificName %in% c(cps.spp, "Doryteuthis opalescens")) %>% 
+           scientificName %in% c(cps.spp, "Merluccius productus")) %>% 
   filter(is.na(totalLength_mm), is.na(weightg))
 
 # Filter length data for current cruise and vessel
 set.lengths <- set.lengths.all %>% 
   filter(cruise %in% cruise.name & ship %in% seine.vessels & 
-           scientificName %in% c(cps.spp, "Doryteuthis opalescens", "Merluccius productus")) 
+           scientificName %in% c(cps.spp, "Merluccius productus")) 
 
 # Summarize Fulton's condition factor (K) for identifying outliers
 K.summ <- set.lengths %>%
@@ -354,7 +352,8 @@ saveRDS(set.lengths, file = here("Output/lw_data_checkSeines.rds"))
 ```
 
 # Overview
-This is a tool used to visualize and conduct QA/QC of trawl specimen data collected during Acoustic-Trawl (AT) surveys of coastal pelagic fish species (CPS) in the California Current Ecosystem. 
+
+This is a tool used to visualize and conduct QA/QC of purse-seine specimen data collected during Acoustic-Trawl (AT) surveys of coastal pelagic fish species (CPS) in the California Current Ecosystem. 
 
 The data below was collected during the **`r survey.name.long` (`r survey.name`)**. 
 
@@ -407,12 +406,12 @@ ggplot(filter(set.lengths, !is.na(leg)),
        aes(nativeLength_mm, group = factor(ship))) +
   geom_histogram(aes(fill = factor(ship)), position = "identity", alpha = 0.5) + 
   facet_wrap(~scientificName, scales = "free") +
-  scale_fill_viridis_d("Leg") +
+  scale_fill_viridis_d("Vessel") +
   xlab("Native length (mm)") + ylab("Frequency") +
   theme(strip.background.x = element_blank(),
         strip.text.x = element_text(face = "bold.italic"))
 
-ggsave(here("Figs/fig_length_frequency_leg_seine.png"),
+ggsave(here("Figs/fig_length_frequency_vessel_seine.png"),
        height = 7, width = 10)
 ```
 
@@ -425,7 +424,7 @@ View the distribution of Fulton's Condition Factor ($K = (w/TL^3)*100$) for each
 ```{r, fig.pos="hold"}
 # Plot lengths and bounds of outliers
 set.lengths %>% 
-  # filter(!scientificName == "Doryteuthis opalescens") %>% 
+  filter(!scientificName == "Doryteuthis opalescens") %>%
   ggplot(aes(K)) + geom_histogram() +
   geom_vline(data = K.summ, aes(xintercept =  K.lower), linetype = "dashed") +
   geom_vline(data = K.summ, aes(xintercept =  K.upper), linetype = "dashed") +
@@ -443,7 +442,6 @@ Only show "new" outliers -- i.e., those specimens identified as outliers based o
 
 ```{r outlier-table-new}
 # Select only outliers that have not yet been flagged
-# Select outliers
 set.lengths %>% 
   left_join(K.summ) %>% 
   filter(K <= K.lower | K >= K.upper) %>% 
@@ -461,7 +459,7 @@ set.lengths %>%
 All specimens identified as potential outliers that may or may not have been flagged and/or reviewed by trawl personnel (see the `flaggedData` column).  
 
 ```{r outlier-table-all}
-# Select outliers
+# Select all outliers
 set.lengths %>% 
   left_join(K.summ) %>% 
   filter(K <= K.lower | K >= K.upper) %>% 
@@ -511,8 +509,7 @@ set.lengths %>%
 Self explanatory; both length and weight measurements are missing, so K may not be calculated.
 
 ```{r missing-lengths-weights}
-# Select only outliers that have not yet been flagged
-# Select outliers
+# show missing lengths/weights
 bad.lengths %>% 
   select(ship, date, set, scientificName, specimenNumber, SL = standardLength_mm, 
          FL = forkLength_mm, TL = totalLength_mm, ML = mantleLength_mm, 
@@ -526,8 +523,7 @@ bad.lengths %>%
 Self explanatory; sex is not specified as either male, female, or unknown.
 
 ```{r missing-sex}
-# Select only outliers that have not yet been flagged
-# Select outliers
+# Select missing sexes
 set.lengths %>% 
   filter(sex == "missing") %>% 
   select(ship, date, set, scientificName, specimenNumber, SL = standardLength_mm, 
@@ -539,7 +535,7 @@ set.lengths %>%
 
 # Interactive plots
 
-The plots below provide information about trawl specimens (e.g., length, weight, haul, collection, and specimen number) when you hover over points with the mouse. You may zoom, pan, toggle spike-lines, etc using the menu above each graph (available when the mouse is in the plot area). **<span style="color:red">Red</span>** and **<span style="color:blue">blue</span>** points are specimens that had missing length and weight measurements, respectively. Points with **bold black** outlines have already been "flagged" in the database but may or may not have been corrected.  
+The plots below provide information about trawl specimens (e.g., length, weight, set, and specimen number) when you hover over points with the mouse. You may zoom, pan, toggle spike-lines, etc using the menu above each graph (available when the mouse is in the plot area). **<span style="color:red">Red</span>** and **<span style="color:blue">blue</span>** points are specimens that had missing length and weight measurements, respectively. Points with **bold black** outlines have already been "flagged" in the database but may or may not have been corrected.  
 
 The dashed lines represent the season-specific (in this case, `r survey.season`) relationship between length and weight as described in Palance et al. [-@Palance2019]. Missing length or weight entries are estimated using the same relationships.  
 
@@ -955,7 +951,8 @@ Total lengths (or mantle length, for Market Squid) vs. weight for all specimens,
 
 ```{r length-weight-leg}
 lw.df.sub <- lw.df %>% 
-  pivot_longer(totalLength_mm:standardLength_mm, names_to = "length_type", values_to = "length_mm")
+  pivot_longer(totalLength_mm:standardLength_mm, names_to = "length_type", values_to = "length_mm") %>% 
+  filter(scientificName %in% unique(set.lengths$scientificName))
 
 # Examine length differences by leg
 lw.plot.leg <- ggplot() +
@@ -1010,7 +1007,8 @@ lw.plot.final <- ggplot() +
              aes(totalLength_mm, weightg),
              shape = 21, fill = 'blue', size = 2.5) +
   # Plot seasonal length models for each species
-  geom_line(data = lw.df, aes(totalLength_mm, weightg), 
+  geom_line(data = filter(lw.df, scientificName %in% unique(set.lengths$scientificName)), 
+            aes(totalLength_mm, weightg), 
             alpha = 0.75, colour = "gray20", linetype = 'dashed') +
   # Facet by species
   facet_wrap(~scientificName, scales = "free") +
@@ -1027,249 +1025,29 @@ ggsave(lw.plot.final, filename = here("Figs/fig_LW_plots_final_seine.png"),
 include_graphics(here("Figs/fig_LW_plots_final_seine.png"))
 ```
 
-
-# RESUME HERE
-
 # Data checks
-## Hauls
-### Removed hauls  
-
-Hauls removed due to trawl performance issues (e.g., aborted, bad, poor, etc.).
-
-```{r bad-hauls}
-sets.bad %>% 
-  filter(cruise %in% cruise.name) %>%
-  mutate(trawlDate = date(equilibriumTime)) %>% 
-  select(haul, trawlDate, orderOcc, trawlPerformance) %>% 
-  datatable(rownames = FALSE)
-```
-
-### Hauls distances
-
-Trawl distances are examined to look for data entry errors. Trawls longer than 5 nmi are highlighted orange.
-
-```{r check-trawl-distance}
-haul.paths %>% 
-  st_set_geometry(NULL) %>% 
-  arrange(desc(haul)) %>% 
-  mutate(distance = cell_spec(
-    distance, knitr.format, color = "black",
-    background = ifelse(distance <= 5, "white", "orange"))) %>%
-  select(haul, distance) %>%
-  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-        align = c("c")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "250px")
-```
-
-### Hauls durations
-
-Trawl durations are examined to look for data entry errors. Trawls longer than 50 min are highlighted orange.
-
-```{r check-trawl-duration}
-haul %>%
-  arrange(desc(haul)) %>% 
-  mutate(duration = cell_spec(
-    duration, knitr.format, color = "black",
-    background = ifelse(duration >= 50, "orange", "white"))) %>%
-  select(haul, cluster, equilibriumTime, haulBackTime, duration) %>%
-  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-        align = c("c")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "250px")
-```
-
-\
-
-Trawl durations are examined to look at trends in deployment, recovery, and total evolution times. The top panel shows total evolution time (from netOnDeckTime - netInWaterTime; **<span style="color:green">green</span>**), while the bottom panel shows the deployment time (equilibriumTime - netInWaterTime, **<span style="color:blue">blue</span>**), fishing time (haulBackTime - equilbriumTime, **<span style="color:black">black</span>**), and recovery time (netOnDeckTime - haulBackTime, **<span style="color:red">red</span>**).
-
-```{r check-trawl-duration-all}
-# Plot trawl durations
-plot.evolution <- ggplot(data = haul) + 
-  geom_line(aes(haul, as.numeric(evolutionTime)), colour = "green") +
-  geom_point(aes(haul, as.numeric(evolutionTime)), shape = 21, fill = "white", colour = "green") +
-  labs(x = "\nHaul", y = "Duration (mins)", title = "Evolution Time") + 
-  scale_x_continuous(breaks = seq(0, 500, 5)) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
-
-
-plot.deployment <- ggplot(data = haul) +
-  geom_line(aes(haul, as.numeric(deploymentTime), color = "Deployment")) +
-  geom_point(aes(haul, as.numeric(deploymentTime)), 
-             shape = 21, fill = "white", colour = "blue") +
-  geom_line(aes(haul, as.numeric(recoveryTime), color = "Recovery")) +
-  geom_point(aes(haul, as.numeric(recoveryTime)), shape = 21, fill = "white", colour = "red") +
-  geom_line(aes(haul, as.numeric(duration), color = "Fishing")) +
-  geom_point(aes(haul, as.numeric(duration)), shape = 21, fill = "white", colour = "black") +
-  scale_color_manual(values = c("Deployment" = "blue", "Recovery" = "red", "Fishing" = "black")) +
-  scale_x_continuous(breaks = seq(0, 500, 5)) +
-  labs(x = "\nHaul", y = "Duration (mins)", title = "Deployment/Fishing/Recovery Time", color = NULL) +
-  theme(legend.position      = c(1,1),
-        legend.justification = c("right", "top"),
-        legend.margin        = margin(-3, 7, 2, 2),
-        legend.background    = element_rect(fill = "white", color = "black", size = 0.2),
-        legend.key           = element_rect(fill = "white", color = NA),
-        legend.text          = element_text(size = 6),
-        axis.text.x          = element_text(angle = 45, vjust = 0.5)) +
-  guides(color = guide_legend(nrow = 1))
-
-plot.duration.all <-  plot_grid(plot.evolution, plot.deployment, ncol = 1) 
-
-ggsave(plot.duration.all, filename = here("Figs/fig_trawl_evoution.png"))
-
-include_graphics(here("Figs/fig_trawl_evoution.png"))
-```
-
-### Haul paths
-
-```{r map-hauls,out.height="8in",out.width="100%"}
-# Provider tiles info: http://leaflet-extras.github.io/leaflet-providers/preview/index.html
-if (exists("nav.paths.sf")) {
-  i.map <- leaflet() %>% 
-    # Add provider tiles
-    addProviderTiles(providers$Esri.NatGeoWorldMap) %>%
-    # Add nav data
-    addPolylines(data = nav.paths.sf, color = "#000414", weight = 1, 
-                 label = ~leg, group = "Vessel Track") %>%
-    # Add trawl paths 
-    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
-                 popup = ~popup, label = ~label, 
-                 group = "Trawls") %>% 
-    # Add trawl catch
-    addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
-                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
-                     popup = ~popup, label = ~label,
-                     group =  "Trawls") %>% 
-    # Add scale bar
-    addScaleBar(position = "bottomright") %>%
-    # Add map coordinates
-    addMouseCoordinates() %>% 
-    # Add measurement tool
-    addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
-               primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
-               position = "topleft")
-  
-  # Add Shimada data
-  if (exists("nav.paths.sh.sf"))
-    i.map <- i.map %>% 
-      addPolylines(data = nav.paths.sh.sf, color = c("#000414"), weight = 1,
-                   label = ~paste("Leg", leg), group = "Vessel Track")
-  
-  # Display interactive map
-  i.map
-  
-} else {
-  leaflet() %>% 
-    # Add provider tiles
-    addProviderTiles(providers$Esri.OceanBasemap) %>%
-    # Add trawl paths 
-    addPolylines(data = haul.paths, color = c("#000000"), weight = 5, opacity = 0.8, 
-                 popup = ~popup, label = ~label, 
-                 group = "Trawls") %>% 
-    # Add trawl catch
-    addCircleMarkers(data = cluster.catch.sf, radius = 5, color = "#000000", stroke = TRUE, weight = 2,
-                     opacity = 0.8, fillOpacity = 1, fillColor =  "white",
-                     popup = ~popup, label = ~label,
-                     group =  "Trawls") %>% 
-    # Add map coordinates
-    addMouseCoordinates()
-}
-```
-
-### Haul clusters
-
-Trawl haul information is summarized by cluster. Those clusters where the difference in equilibrium time between the first and last haul in a cluster is $\geq$ 12 h are highlighted in yellow and should be examined in the Haul table of the Trawl database.  
-
-```{r check-trawl-clusters}
-# Summarize trawl clusters
-cluster.check <- haul %>% 
-  group_by(cluster) %>% 
-  summarise(
-    firstHaul      = min(haul),
-    lastHaul       = max(haul),
-    nHauls         = length(cluster),
-    firstHaulStart = min(equilibriumTime),
-    lastHaulEnd    = max(haulBackTime),
-    duration       = round(difftime(lastHaulEnd, 
-                                    firstHaulStart, 
-                                    units = 'hours'), 1)) %>% 
-  mutate(firstHaulStart = format(firstHaulStart,"%m/%d/%Y %H:%M"),
-         lastHaulEnd    = format(lastHaulEnd,"%m/%d/%Y %H:%M"))
-
-# Print cluster check table
-cluster.check %>% 
-  arrange(desc(cluster)) %>% 
-  mutate(duration = cell_spec(
-    duration, knitr.format, color = "black",
-    background = ifelse(duration <= 12,"white","orange"))) %>% 
-  kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-        align = c("c")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                full_width = FALSE) %>%
-  row_spec(0, align = c("c")) %>% 
-  scroll_box(height = "250px")
-```
-
 ## Catches
 ### Catch data - All
 
-In the catch table, `TotalWtKg` should equal the sum of `subSampleWtkg` and `remainingSubSampleWtkg`. Occasionally, when specimen errors are corrected, `TotalWtKg` does not get updated. Also, the `TotalNum` is estimated from product of the average weight of all specimens and the total weight (i.e., `(subSampleCount/subSampleWtkg)*TotalWtKg)`).  
-
-```{r catch-check}
-catch <- catch %>% 
-  left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-  filter(scientificName %in% cps.spp)
-
-# Merge catch table with weight summary and arrange by species and haul
-catch.comp <- catch %>% 
-  arrange(scientificName, haul) %>% 
-  # Calculate difference between trawl subsample weight and summed weight from individual specimens
-  mutate(calcWt    = subSampleWtkg + remainingSubSampleWtkg,
-         diffWt    = (subSampleWtkg + remainingSubSampleWtkg) - totalWeight,
-         diffCt    = ((subSampleCount/subSampleWtkg)*totalWeight) - totalNum)  %>%
-  mutate(diffCt = round(diffCt, 3)) %>% 
-  # Reorder columns
-  select(scientificName, haul, subSampleWtkg, remainingSubSampleWtkg, totalWeight, 
-         calcWt, diffWt, subSampleCount, totalNum, diffCt) %>% 
-  replace(is.na(.), -999) %>% 
-  mutate(
-    diffWt           = cell_spec(round(diffWt, digits = 4),
-                                 knitr.format, color = "black",
-                                 background = ifelse(diffWt == 0, "white", "orange")),
-    diffCt           = cell_spec(diffCt, knitr.format,color = "black",
-                                 background = ifelse(diffCt < 1, "white", "yellow"))) 
-
-catch.comp %>% 
-  kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-        digits = c(0,0,4,4,4,4,4,4,4,4),
-        format.args = list(big.mark = ",")) %>% 
-  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-  column_spec(1, italic = TRUE) %>%
-  # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-  # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
-  row_spec(0, align = c("c")) %>%
-  collapse_rows(columns = 1) %>% 
-  scroll_box(height = "250px")  
-```
 
 ### Catch errors
 
-This table includes only those hauls where `diffWt` are not equal to zero.
+This table includes only those sets where `totalNum` or `totalWeignt` are missing.
 
 ```{r catch-errors}
-catch.comp.errors <- catch.comp %>%
-  filter(diffWt > 0) 
+# Reduce catch data frame
+set.catch.comp <- set.catch %>% 
+  select(scientificName, ship, date, set, totalWeight, totalNum) 
+
+# Identify sets with missing catch comp data
+catch.comp.errors <- set.catch.comp %>%
+  filter(is.na(totalNum) | is.na(totalWeight)) 
 
 if (nrow(catch.comp.errors) > 0) {
   catch.comp.errors %>% 
     kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-          digits = c(0,0,4,4,4,4,4,4,4,4),
+          align = c("l","l",rep("r",ncol(catch.comp.errors) - 2)),
+          digits = c(0,0,0,0,4,4),
           format.args = list(big.mark = ",")) %>% 
     kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
@@ -1282,32 +1060,31 @@ if (nrow(catch.comp.errors) > 0) {
   print("Hooray, no (obvious) errors!")
 }
 ```
+
 ### Catch weight summary
 #### All catch
 
-Summary of catch weight by haul (kg), including CPS and all other species weighed. The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
+Summary of catch weight by set (kg), including CPS and all other species weighed.  
 
 ```{r plot-weight-summary-all}
 # Format data for plotting
-catch.bar <- catch.all %>% 
+set.catch.bar <- set.catch.all %>% 
   left_join(select(spp.codes, species, scientificName, commonName)) %>% 
-  filter(cruise %in% cruise.name & ship %in% cruise.ship & netSampleType == 'codend') %>% 
-  filter(!presenceOnly == "Y") %>%
-  left_join(select(haul, haul, cluster, datetime = equilibriumTime)) %>% 
-  mutate(key = paste(haul, scientificName),
-         totalWeight = subSampleWtkg + remainingSubSampleWtkg,
-         totalNum = (subSampleCount/subSampleWtkg)*totalWeight, 
-         group = case_when(
-           scientificName %in% c(cps.spp, "Merluccius productus") ~ scientificName,
-           TRUE ~ "Other")) %>% 
+  filter(cruise %in% cruise.name & ship %in% seine.vessels) %>% 
+  left_join(select(sets, ship, set, key, datetime)) %>% 
+  mutate(
+    label = paste(date, set, sep = "-"),
+    group = case_when(
+      scientificName %in% c(cps.spp, "Merluccius productus") ~ scientificName,
+      TRUE ~ "Other")) %>% 
   # Summarize non-CPS and hake weights
-  group_by(haul, group, datetime) %>% 
+  group_by(ship, key, label, group, datetime) %>% 
   summarise(totalWeight = sum(totalWeight, na.rm = TRUE),
             totalNum = sum(totalNum, na.rm = TRUE)) %>% 
   mutate(leg = cut(as.numeric(date(datetime)), leg.breaks, 
                    include.lowest = TRUE, labels = FALSE), 
          leg = paste("Leg", leg)) %>% 
-  arrange(haul, totalWeight)
+  arrange(datetime, totalWeight)
 
 # Species labels
 bar.labs <- c("Atherinopsis californiensis" = "Jacksmelt", "Clupea pallasii" = "P. herring",
@@ -1323,120 +1100,113 @@ bar.colors <- c("Atherinopsis californiensis" = jacksmelt.color, "Clupea pallasi
                 "Sardinops sagax" = sardine.color, "Scomber japonicus" = pac.mack.color, 
                 "Trachurus symmetricus" = jack.mack.color) 
 
-bar.spp <- sort(unique(catch.bar$group))
+bar.spp <- sort(unique(set.catch.bar$group))
 
 # Plot catch 
-catch.bar.plot.all <- ggplot(catch.bar, aes(haul, totalWeight, fill = group)) +
+catch.bar.plot.all <- ggplot(set.catch.bar, aes(label, totalWeight, fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
-  geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
-  facet_wrap(~leg, scales = "free", ncol = 1) +
+  # geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
+  facet_grid(leg~ship, scales = "free") +
+  # facet_wrap(~leg, scales = "free", ncol = 1) +
   scale_fill_manual(name = 'Species',
                     labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
                     values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
-  scale_x_continuous(breaks = seq(0, 500, 2)) +
-  theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold"),
-        axis.text.x        = element_text(angle = 45, size = 10, vjust = 0.5)) +
-  labs(x = "\nHaul number", y = "Total Weight (kg)")
+  # scale_x_continuous(breaks = seq(0, 500, 2)) +
+  theme(axis.text.x        = element_text(angle = 45, size = 6, vjust = 0.5)) +
+  labs(x = "\nSet", y = "Total Weight (kg)")
 
-ggsave(catch.bar.plot.all, file = here("Figs/fig_catch_weight_summ.png"),
-       width = 10, height = 6)
+ggsave(catch.bar.plot.all, file = here("Figs/fig_catch_weight_summ_seine.png"),
+       width = 10, height = 10)
 
 # Display plot
-include_graphics(here("Figs/fig_catch_weight_summ.png"))
+include_graphics(here("Figs/fig_catch_weight_summ_seine.png"))
 ```
 
 #### All catch (Log-transformed)
 
-Summary of log-transformed catch weight by haul (log(kg)), including CPS and all other species weighed. Catches are log-transformed so larger catches do not obscure smaller ones. The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
+Summary of log-transformed catch weight by set (log(kg)), including CPS and all other species weighed. Catches are log-transformed so larger catches do not obscure smaller ones. 
 
 ```{r plot-weight-summary-all-log}
 # Plot catch 
-catch.bar.plot.all.log <- ggplot(catch.bar, aes(haul, log(totalWeight + 1), fill = group)) +
+catch.bar.plot.all.log <- ggplot(set.catch.bar, aes(label, log(totalWeight + 1), fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
-  geom_hline(yintercept = log(150), linetype = "dashed", colour = "gray50") +
-  facet_wrap(~leg, scales = "free", ncol = 1) +
+  facet_grid(leg~ship, scales = "free") +
+  # facet_wrap(~leg, scales = "free", ncol = 1) +
   scale_fill_manual(name = 'Species',
                     labels = unname(bar.labs[names(bar.labs) %in% bar.spp]),
                     values = unname(bar.colors[names(bar.colors) %in% bar.spp])) +
-  scale_x_continuous(breaks = seq(0, 500, 2)) +
-  theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold"),
-        axis.text.x        = element_text(angle = 45, size = 10, vjust = 0.5)) +
-  labs(x = "\nHaul number", y = "log(Total  Weight) (kg)")
+  # scale_x_continuous(breaks = seq(0, 500, 2)) +
+  theme(axis.text.x        = element_text(angle = 45, size = 6, vjust = 0.5)) +
+  labs(x = "\nSet", y = "Total Weight (kg)")
 
-ggsave(catch.bar.plot.all.log, file = here("Figs/fig_catch_weight_summ_log.png"),
-       width = 10, height = 6)
+ggsave(catch.bar.plot.all.log, file = here("Figs/fig_catch_weight_summ_seine_log.png"),
+       width = 10, height = 10)
 
 # Display plot
-include_graphics(here("Figs/fig_catch_weight_summ_log.png"))
+include_graphics(here("Figs/fig_catch_weight_summ_seine_log.png"))
 ```
 
 #### CPS only
 
-Summary of catch weight (CPS only) by haul (kg). The horizontal dashed line indicates the approximate weight (~150 kg) of five (5) full fish baskets.  
+Summary of catch weight (CPS only) by set (kg).  
 
 ```{r plot-weight-summary-cps}
 # Format data for plotting
-catch.bar.cps <- catch.bar %>% 
+catch.bar.cps <- set.catch.bar %>% 
   filter(group %in% c(cps.spp, "Merluccius productus"))
 
 bar.spp.cps <- sort(unique(catch.bar.cps$group))
 
 # Plot catch 
-catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(haul, totalWeight, fill = group)) +
+catch.bar.plot.cps <- ggplot(catch.bar.cps, aes(label, totalWeight, fill = group)) +
   geom_bar(colour = "black", position = "stack", stat = "identity") + 
-  geom_hline(yintercept = 150, linetype = "dashed", colour = "gray50") +
-  facet_wrap(~leg, scales = "free", ncol = 1) +
-  facet_wrap(~leg, scales = "free", ncol = 1) +
+  facet_grid(leg~ship, scales = "free") +
   scale_fill_manual(name = 'Species',
                     labels = unname(bar.labs[names(bar.labs) %in% bar.spp.cps]),
                     values = unname(bar.colors[names(bar.colors) %in% bar.spp.cps])) +
-  scale_x_continuous(breaks = seq(0, 500, 2)) +
-  theme(strip.background.x = element_blank(),
-        strip.text.x       = element_text(face = "bold"),
-        axis.text.x        = element_text(angle = 45, size = 10, vjust = 0.5)) +
-  labs(x = "\nHaul number", y = "Total Weight (kg)")
+  theme(axis.text.x        = element_text(angle = 45, size = 6, vjust = 0.5)) +
+  labs(x = "\nSet", y = "Total Weight (kg)")
 
-ggsave(catch.bar.plot.cps, file = here("Figs/fig_catch_weight_summ_cps.png"),
+ggsave(catch.bar.plot.cps, file = here("Figs/fig_catch_weight_summ_seine_cps.png"),
        width = 10, height = 6)
 
 # Display plot
-include_graphics(here("Figs/fig_catch_weight_summ_cps.png"))
+include_graphics(here("Figs/fig_catch_weight_summ_seine_cps.png"))
 ```
 
 ## Specimens
 ### Specimen data - All
 
-The subsampled weight from the **Catch** table (`subSampleWtkg`) should equal the summed weight of subsampled individuals in the **Specimen** table (`totalWtSpecimens`; i.e., `diffWt` == 0), and the subsample count from the **Catch** table (`subSampleCount`) should equal the number of subsampled individuals in the **Specimen** table (`totalCtSpecimens`; i.e., `diffCt` == 0). Hauls with unequal values are in **bold**;  count differences are highlighted in yellow and weight differences are highlighted in orange. Hauls with missing specimen lengths our counts are highlighted in red. Hauls where binned lengths were present are highlighted in green.
+Sets with missing values (-999) are highlighted, as well as sets where the average specimen weight in the total catch is not within 25% of the average weight of the specimen weight in the subsample, which might indicate an error in the catch data entries. 
 
 ```{r specimen-check}
 # Summarize individual weights for comparison with total weight in the catch table
-summ.lengths <- lengths %>% 
-  group_by(scientificName, haul) %>% 
+summ.lengths <- set.lengths %>% 
+  group_by(scientificName, key) %>% 
   summarise(
     totalWtSpecimens = sum(weightg)/1000,
-    totalCtSpecimens = length(weightg),
-    binnedLengths    = sum(binned)) %>% 
-  mutate(key = paste(haul, scientificName)) 
+    totalCtSpecimens = length(weightg))  
 
 # Merge catch table with weight summary and arrange by species and haul
-specimen.comp <- left_join(select(catch, haul, scientificName, subSampleWtkg, subSampleCount),
-                           select(summ.lengths, haul, scientificName, totalWtSpecimens,
-                                  totalCtSpecimens, binnedLengths)) %>%
-  arrange(scientificName, haul) %>% 
+specimen.comp <- left_join(select(set.catch, key, scientificName, totalWeight, totalNum),
+                           select(summ.lengths, key, scientificName, totalWtSpecimens,
+                                  totalCtSpecimens)) %>%
+  arrange(scientificName, key) %>% 
   # Calculate difference between trawl subsample weight and summed weight from individual specimens
-  mutate(diffWt    = subSampleWtkg - totalWtSpecimens,
-         diffWtPct = abs(diffWt / subSampleWtkg * 100),
-         diffCt    = subSampleCount - totalCtSpecimens) %>%
+  mutate(diffWt    = abs(totalWeight - totalWtSpecimens),
+         diffCt    = abs(totalNum - totalCtSpecimens),
+         weightRatio = (totalWeight / totalNum) / (totalWtSpecimens / totalCtSpecimens)) %>%
   # Reorder columns
-  select(scientificName, haul, subSampleWtkg, totalWtSpecimens, diffWt, 
-         diffWtPct, subSampleCount, totalCtSpecimens, diffCt, binnedLengths) %>% 
+  select(scientificName, key, totalWeight, totalWtSpecimens, diffWt, 
+         weightRatio, totalNum, totalCtSpecimens, diffCt) %>% 
   replace(is.na(.), -999)
 
 # Display results
 specimen.comp %>% 
   mutate(
+    totalWeight      = cell_spec(round(totalWeight, digits = 4),
+                                 knitr.format, color = "black",
+                                 background = ifelse(totalWeight == -999, "red", "white")),
     totalWtSpecimens = cell_spec(round(totalWtSpecimens, digits = 4),
                                  knitr.format, color = "black",
                                  background = ifelse(is.na(totalWtSpecimens), "red", "white")),
@@ -1448,16 +1218,14 @@ specimen.comp %>%
                                  background = ifelse(diffWt == 0, "white", "orange")),
     diffCt           = cell_spec(diffCt, knitr.format,color = "black",
                                  background = ifelse(diffCt == 0, "white", "yellow")),
-    binnedLengths    = cell_spec(binnedLengths, knitr.format,color = "black",
-                                 background = ifelse(binnedLengths == 0, "white", "#FFC926"))) %>%
+    weightRatio      = cell_spec(round(weightRatio, 2), knitr.format,color = "black",
+                                 background = ifelse(between(weightRatio, 0.75, 1.25), "white", "cyan"))) %>%
   kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-        align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-        digits = c(0,0,3,3,4,0,0,0,0),
+        align = c("c","l",rep("r",ncol(specimen.comp) - 2)),
+        digits = c(0,0,3,3,4,2,0,0,0),
         format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
   column_spec(1, italic = TRUE) %>%
-  # row_spec(which(catch.comp$diffCt != 0), bold = TRUE) %>%
-  # row_spec(which(catch.comp$diffWt != 0), bold = TRUE) %>%
   row_spec(0, align = c("c")) %>%
   collapse_rows(columns = 1) %>% 
   scroll_box(height = "250px")
@@ -1465,12 +1233,13 @@ specimen.comp %>%
 
 ### Specimen errors
 
-This table includes only those hauls where `diffWt` and `diffCt` are not equal to zero.
+This table includes only those sets where errors are suspected.
 
 ```{r specimen-errors}
 # Filter hauls with diffCt or diffWt != zero
 specimen.comp.errors <- specimen.comp %>% 
-  filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) 
+  filter(!between(weightRatio, 0.75, 1.25) | totalWeight == -999 | 
+           totalNum == -999 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens))
 
 # Save output to CSV
 if (nrow(specimen.comp.errors) > 0) {
@@ -1479,8 +1248,12 @@ if (nrow(specimen.comp.errors) > 0) {
   
   # Display results
   specimen.comp %>% 
-    filter(diffCt != 0 | diffWt != 0 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
+    filter(!between(weightRatio, 0.75, 1.25) | totalWeight == -999 | 
+             totalNum == -999 | is.na(totalCtSpecimens) | is.na(totalWtSpecimens)) %>% 
     mutate(
+      totalWeight      = cell_spec(round(totalWeight, digits = 4),
+                                   knitr.format, color = "black",
+                                   background = ifelse(totalWeight == -999, "red", "white")),
       totalWtSpecimens = cell_spec(round(totalWtSpecimens, digits = 4),
                                    knitr.format, color = "black",
                                    background = ifelse(is.na(totalWtSpecimens), "red", "white")),
@@ -1490,261 +1263,24 @@ if (nrow(specimen.comp.errors) > 0) {
       diffWt           = cell_spec(round(diffWt, digits = 4),
                                    knitr.format, color = "black",
                                    background = ifelse(diffWt == 0, "white", "orange")),
-      diffCt           = cell_spec(diffCt, knitr.format, color = "black",
+      diffCt           = cell_spec(diffCt, knitr.format,color = "black",
                                    background = ifelse(diffCt == 0, "white", "yellow")),
-      binnedLengths    = cell_spec(binnedLengths, knitr.format, color = "black",
-                                   background = ifelse(binnedLengths == 0, "white", "green"))) %>% 
-    arrange(haul, scientificName) %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-          align = c("c","l",rep("r",ncol(catch.comp) - 2)),
-          digits = c(0,0,3,3,4,0,0,0,0),
+      weightRatio      = cell_spec(round(weightRatio, 2), knitr.format,color = "black",
+                                   background = ifelse(between(weightRatio, 0.75, 1.25), "white", "cyan"))) %>%
+    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
+          align = c("c","l",rep("r", ncol(specimen.comp) - 2)),
+          digits = c(0,0,3,3,4,2,0,0,0),
           format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
     column_spec(1, italic = TRUE) %>%
     row_spec(0, align = c("c")) %>%
     collapse_rows(columns = 1) %>% 
-    scroll_box(height = "250px") 
-  
+    scroll_box(height = "250px")
 } else {
   print("Hooray, no (obvious) errors!")
 }
 ```
 
-### Duplicated bar codes
-
-Display specimens with duplicated bar codes (i.e., `individual_ID`).
-
-```{r duplicated-bar-codes}
-# Find duplicated bar codes in specimen table
-# individual_ID is the bar code signature
-duplicate.ids <- lengths %>% 
-  filter(!is.na(individual_ID), duplicated(individual_ID) == TRUE) %>% 
-  pull(individual_ID)
-
-# Print duplicates table  
-if (length(duplicate.ids) > 0) {
-  lengths %>%
-    filter(individual_ID %in% duplicate.ids) %>% 
-    select(cruise:individual_ID, specimenNumber, scientificName, commonName) %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-    scroll_box(height = "250px")
-} else {
-  print("Hooray, no duplicated barcodes!")
-}
-```
-
-### Otolith samples
-
-Length distributions of all target CPS specimens (gray bars) vs. specimens from which otoliths were collected (colored bars). Ideally, the length distributions of specimens from which otoliths were collected reflect the length distribution of all specimens collected. The dashed line represents a general aim (n = 50) for the number of otoliths collected per length bin. Focus should be given to ensuring otoliths from the tail ends of the distribution are collected.
-
-```{r summarize-otolith-samples}
-# Plot lengths for specimens with collected otoliths
-# Filter for CPS species only
-otoliths <- lengths %>% 
-  filter(scientificName %in% cps.spp) 
-
-# Plot species with standard length measurements
-if (nrow(filter(otoliths, scientificName %in% c("Engraulis mordax","Sardinops sagax"))) > 0) {
-  otoliths.sl <- ggplot() + 
-    geom_histogram(data = filter(otoliths,
-                                 scientificName %in% c("Engraulis mordax","Sardinops sagax")),
-                   aes(standardLength_mm),
-                   colour = "black", fill = "gray50",
-                   binwidth = 10,  boundary = -5, closed = "left") +
-    geom_histogram(data = filter(otoliths, 
-                                 scientificName %in% c("Engraulis mordax","Sardinops sagax"),
-                                 !is.na(otolithNumber)),
-                   aes(standardLength_mm, fill = scientificName),
-                   colour = "black",
-                   binwidth = 10, boundary = -5, closed = "left",
-                   show.legend = FALSE) +
-    scale_x_continuous(breaks = seq(30, 350, 10),
-                       labels = seq(30, 350, 10)) +
-    geom_hline(yintercept = 50, linetype = "dashed") +
-    facet_wrap(~scientificName, scales = "free") + 
-    scale_fill_manual(values = c("Sardinops sagax" = sardine.color, 
-                                 "Engraulis mordax" = anchovy.color)) +
-    labs(x = "Standard length (mm)", y = "Count") +
-    theme(strip.background.x = element_blank(),
-          strip.text.x       = element_text(face = "bold.italic")) 
-  
-  # Save plot for species with SL measurements
-  ggsave(otoliths.sl,
-         filename = here("Figs/fig_otolith_sample_distribution-SL.png"), 
-         height=5, width=11)
-}
-
-
-# Plot species with fork length measurements
-if (nrow(filter(otoliths, scientificName %in% c("Scomber japonicus","Trachurus symmetricus"))) > 0) {
-  otoliths.fl <- ggplot() + 
-    geom_histogram(data = filter(otoliths,
-                                 scientificName %in% c("Scomber japonicus","Trachurus symmetricus")),
-                   aes(forkLength_mm),
-                   colour = "black", fill = "gray50",
-                   binwidth = 50,  boundary = -25, closed = "left") +
-    geom_histogram(data = filter(otoliths, 
-                                 scientificName %in% c("Scomber japonicus","Trachurus symmetricus"),
-                                 !is.na(otolithNumber)),
-                   aes(forkLength_mm, fill = scientificName),
-                   colour = "black",
-                   binwidth = 50, boundary = -25, closed = "left",
-                   show.legend = FALSE) +
-    scale_x_continuous(breaks = seq(50, 500, 50),
-                       labels = seq(50, 500, 50)) +
-    geom_hline(yintercept = 50, linetype = "dashed") +
-    facet_wrap(~scientificName, scales = "free") + 
-    scale_fill_manual(values = c("Scomber japonicus" = pac.mack.color, 
-                                 "Trachurus symmetricus" = jack.mack.color)) +
-    labs(x = "Fork length (mm)", y = "Count") +
-    theme(strip.background.x = element_blank(),
-          strip.text.x       = element_text(face = "bold.italic")) 
-  
-  # Save plot for species with SL measurements
-  ggsave(otoliths.fl,
-         filename = here("Figs/fig_otolith_sample_distribution-FL.png"), 
-         height=5, width=11)
-}
-```
-
-#### Standard Length ($L_s$) Specimens
-
-```{r otoliths-sl}
-if (file.exists(here("Figs/fig_otolith_sample_distribution-SL.png"))) {
-  # Print plot
-  include_graphics(here("Figs/fig_otolith_sample_distribution-SL.png"))  
-} else {
-  print("No speciments with standard length measurements")
-}
-```
-
-
-#### Fork Length ($L_f$) Specimens
-
-```{r otoliths-fl}
-if (file.exists(here("Figs/fig_otolith_sample_distribution-FL.png"))) {
-  # Print plot
-  include_graphics(here("Figs/fig_otolith_sample_distribution-FL.png"))  
-} else {
-  print("No speciments with fork length measurements")
-}
-```
-
-### DNA Samples
-#### Duplicated trays
-
-Identify duplicated DNA tray and vial combinations.  
-
-```{r find-duplicated-dna-trays}
-# Create key to detect and identify duplicated DNA trays
-duplicated.dna <- lengths %>%
-  # Create key to look for duplicates
-  mutate(key = paste(DNAtrayNumber, DNAvialNumber)) %>% 
-  # Remove rows with no DNA data
-  filter(!is.na(DNAtrayNumber)) %>% 
-  filter(duplicated(key)) %>% 
-  select(scientificName, DNAtrayNumber, DNAvialNumber)
-
-if (nrow(duplicated.dna) > 0) {
-  # Format and print table
-  duplicated.dna %>% 
-    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-          align = c("c","c","c")) %>% 
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
-    column_spec(1, italic = TRUE) %>% 
-    scroll_box(height = "200px")
-} else {
-  print("Hooray, no duplicated DNA trays!")
-}
-```
-
-#### Sample counts  
-
-Tally the total number of DNA samples collected for each of the target CPS species. **<span style="color:red">Red</span>** values indicate that the number of vials is not equal to the number of trays.  
-
-```{r summarize-dna-samples}
-# Summarize specimens from which DNA samples were collected, and compare DNAtrayNumber to DNAvialNumber
-# Tray summary
-dna.tray.summ <- lengths %>% 
-  filter(!is.na(DNAtrayNumber)) %>% 
-  group_by(scientificName) %>% 
-  summarise(nTrays = n())
-
-# Vial summary
-dna.vial.summ <- lengths %>% 
-  filter(!is.na(DNAvialNumber)) %>% 
-  group_by(scientificName) %>% 
-  summarise(nVials = n())
-
-# Combined summary
-dna.summ <- dna.tray.summ %>% 
-  left_join(select(dna.vial.summ, scientificName, nVials))
-
-if (nrow(dna.summ) > 0) {
-  # Format and print table
-  dna.summ %>% 
-    replace(is.na(.), 0) %>%
-    mutate(
-      nVials = cell_spec(round(nVials, digits = 4),
-                         knitr.format, color = "black",
-                         background = ifelse(!nVials == nTrays, "red", "white"))) %>%
-    kable(format = knitr.format, booktabs = TRUE, escape = FALSE,
-          align = c("c","c","c")) %>% 
-    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
-    column_spec(1, italic = TRUE)   
-} else {
-  print("Hooray, the number of DNA vials and trays is equal!")
-}
-```
-
-### Gonad samples
-#### Gonads saved
-
-This bar code type indicates that isGonadSaved should be "Y" so please confirm.
-
-```{r verify-gonad-samples-y}
-gonad.check <- lengths %>%
-  filter(startsWith(as.character(individual_ID), "0"),
-         isGonadSaved=="N")
-
-# Print problematic barcodes  
-if (nrow(gonad.check) > 0) {
-  gonad.check %>%
-    # filter(individual_ID %in% duplicate.ids) %>% 
-    select(haul, specimenNumber, individual_ID, scientificName, commonName) %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-    scroll_box(height = "250px")
-} else {
-  print("Hooray, no incorrect barcodes!")
-}
-```
-
-#### Gonads NOT saved
-
-This barcode type indicates that isGonadSaved should be "N" so please confirm.  
-
-```{r verify-gonad-samples-n}
-gonad.check2 <- lengths %>%
-  filter(startsWith(as.character(individual_ID), "A"),
-         isGonadSaved=="Y")
-
-# Print problematic barcodes  
-if (nrow(gonad.check2) > 0) {
-  gonad.check2 %>%
-    # filter(individual_ID %in% duplicate.ids) %>% 
-    select(individual_ID, specimenNumber, scientificName, commonName) %>% 
-    kable(format = knitr.format,booktabs = TRUE, escape = FALSE,
-          format.args = list(big.mark = ",")) %>% 
-    kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-    scroll_box(height = "250px")
-} else {
-  print("Hooray, no incorrect barcodes!")
-}
-```
 # Survey Area Maps
 ## Southern CA Bight
 
