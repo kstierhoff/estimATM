@@ -338,11 +338,18 @@ nasc.vessels.krill     <- c("RL")
 nasc.depth.cps   <- "NASC.250"
 nasc.depth.krill <- "NASC.350"
 
-# Purse seine data info
+# Purse seine data info -------------------------------------------------------
+# Use seine data to apportion nearshore backscatter
+# If seine catches were believed to be representative, TRUE
+# Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
+use.seine.data         <- FALSE
+seine.source    <- "SQL"
+seine.types     <- c("survey", "research", NA)
+
 # Survey vessels that collected purse seine data
 seine.vessels          <- c("LBC","LM")
-# Use seine data to apportion backscatter
-use.seine.data         <- FALSE
+seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
+                            "LM"  = "Lisa Marie")
 
 # Combine data from all vessels?
 # Should data from different vessels be combined, e.g., for Lasker and Saildrone
