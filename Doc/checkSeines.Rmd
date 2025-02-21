@@ -66,18 +66,22 @@ dir_create(here(c("Figs", "Output")))
 get.db     <- T # Extract data from trawl database (F for testing)
 get.nav    <- F # Download nearshore vessel nav data
 nav.source <- "GPX" # Navigation data source: CSV or GPX
+
+# Manually define cruise and ship?
+# cruise.name <- 201907
+# seine.vessels <- c("LBC","LM")
 ```
 
 ```{r get-nav, eval=FALSE}
-# Get nav data
-if (nav.source == "ERDDAP") {
-  # Source code to get nav data from ERDDAP
-  source(here("Code/get_nav_erddap.R"))
-} else if (nav.source == "SCS") {
-  # Source code to get nav data from SCS
-  # Not working with SCS post-2022 (new HTML-based SCS on FSVs); must update
-  source(here("Code/get_nav_scs.R"))
-}
+# # Get nav data
+# if (nav.source == "ERDDAP") {
+#   # Source code to get nav data from ERDDAP
+#   source(here("Code/get_nav_erddap.R"))
+# } else if (nav.source == "SCS") {
+#   # Source code to get nav data from SCS
+#   # Not working with SCS post-2022 (new HTML-based SCS on FSVs); must update
+#   source(here("Code/get_nav_scs.R"))
+# }
 ```
 
 ```{r collect-seine-data}
@@ -136,7 +140,7 @@ if (nrow(set.catch) > 0) {
     rename(any_of(pie.spp)) %>% 
     # Add lat/long and X/Y
     right_join(select(sets, set, ship, key, set_type, datetime, long, lat)) %>% 
-    replace(is.na(.), 0) %>%
+    # replace(is.na(.), 0) %>%
     project_df(to = crs.proj) %>%
     arrange(datetime) 
   
@@ -402,7 +406,7 @@ set.lengths %>%
 Length frequency by cruise leg. Length measurements are "native lengths", which are _SL_ for sardine and anchovies, and _FL_ for mackerels and herring.
 
 ```{r length-freq-leg}
-ggplot(filter(set.lengths, !is.na(leg)), 
+ggplot(filter(set.lengths), 
        aes(nativeLength_mm, group = factor(ship))) +
   geom_histogram(aes(fill = factor(ship)), position = "identity", alpha = 0.5) + 
   facet_wrap(~scientificName, scales = "free") +
@@ -1042,11 +1046,6 @@ if (exists("set.catch.sf")) {
                      opacity = 0.8, fillOpacity = 1, fillColor =  "white",
                      popup = ~popup, label = ~label,
                      group =  "Sets") %>% 
-    addCircleMarkers(data = filter(set.catch.sf, AllCPS == 0), 
-                     radius = 5, color = "#000000", stroke = TRUE, weight = 2,
-                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
-                     popup = ~popup, label = ~label,
-                     group =  "Sets") %>% 
     # Add scale bar
     addScaleBar(position = "bottomright") %>%
     # Add map coordinates
@@ -1055,6 +1054,14 @@ if (exists("set.catch.sf")) {
     addMeasure(primaryLengthUnit = "miles", secondaryLengthUnit = "km",
                primaryAreaUnit = "sqmiles", secondaryAreaUnit = "sqmeters",
                position = "topleft")
+  
+  if (nrow(filter(set.catch.sf, AllCPS == 0)) > 0)
+  i.map <- i.map %>% 
+          addCircleMarkers(data = filter(set.catch.sf, AllCPS == 0), 
+                     radius = 5, color = "#000000", stroke = TRUE, weight = 2,
+                     opacity = 0.8, fillOpacity = 1, fillColor =  "red",
+                     popup = ~popup, label = ~label,
+                     group =  "Sets")
   
   # Display interactive map
   i.map
