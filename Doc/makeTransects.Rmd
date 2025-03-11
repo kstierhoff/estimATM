@@ -314,6 +314,10 @@ Transects are then clipped using the 5-m and 1000-fm isobaths to create transect
 inshore.clip <- st_read(here("Data/GIS/bathy_20m_polygon.shp")) %>% 
   st_make_valid()
 
+# Import the 20m bathy polygon used to clip the transects on the eastern edge
+nearshore.clip <- st_read(here("Data/GIS/bathy_5m_polygon.shp")) %>% 
+  st_make_valid()
+
 # Read offshore clip polygon
 offshore.clip <- st_read(here("Data/GIS/waypoint_polygon.shp"))
 
@@ -395,7 +399,7 @@ if (exists("transects.final.ns")) rm(transects.final.ns)
 # Clip each set of FSV transects using the inshore and offshore polygons
 for (i in unique(transects.ns$loc)) {
   tx.temp <- ungroup(filter(transects.ns, loc == i)) %>% 
-    st_difference(inshore.clip) %>% 
+    st_difference(nearshore.clip) %>% 
     st_intersection(offshore.clip) %>% 
     st_intersection(states.buff.sd) %>% 
     select(loc, id)
@@ -675,9 +679,12 @@ leaflet() %>%
   addPolygons(data = wpt.polygon, color = "#000414", weight = 2, 
               fillColor = "transparent",
               label = ~htmlEscape("Offshore Mask"), group = "Offshore Mask") %>%
-  addPolygons(data = bathy_20m, color = "#000414", weight = 2, 
+  addPolygons(data = inshore.clip, color = "#000414", weight = 2, 
               fillColor = "transparent",
               label = ~htmlEscape("Inshore Mask"), group = "Inshore Mask") %>%
+  addPolygons(data = nearshore.clip, color = "#000414", weight = 2, 
+              fillColor = "transparent",
+              label = ~htmlEscape("Nearshore Mask"), group = "Nearshore Mask") %>%
   addPolygons(data = central.clip, color = "#000414", weight = 2, 
               fillColor = "transparent",
               label = ~htmlEscape("Central Mask"), group = "Central Mask") %>%
@@ -700,14 +707,13 @@ leaflet() %>%
                       "Planned Transects-Nearshore",
                       "Planned Transects-Saildrone",
                       "Bathymetry Contours", "UCTD Stations",
-                      "Inshore Mask", "Offshore Mask", 
+                      "Nearshore Mask", "Inshore Mask", "Offshore Mask", 
                       "Central Mask", "FSV Mask", "EEZs",
                       "Region Polygons"),
     options = layersControlOptions(collapsed = F)) %>% 
-  hideGroup(c("Inshore Mask", "Offshore Mask", "UCTD Stations",
+  hideGroup(c("Nearshore Mask","Inshore Mask", "Offshore Mask", "UCTD Stations",
               "Planned Transects-Saildrone", "EEZs",
-              "Central Mask", "FSV Mask", "Region Polygons",
-              "Planned Transects-Nearshore")) %>%  
+              "Central Mask", "FSV Mask", "Region Polygons")) %>%  
   fitBounds(min(bounds.long), min(bounds.lat),
             max(bounds.long), max(bounds.lat))
 ```
