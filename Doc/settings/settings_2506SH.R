@@ -33,8 +33,8 @@ rm.n.transects.sd  <- 69 # Number of transects to remove from the start (if near
 rm.i.transects     <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 renumber.transects <- TRUE # Renumber transects to start at zero if transect are removed
 
-# Locations to remove from planning (e.g., north, central, south, and mexico)
-rm.location <- c("Mexico") # c("mexico")
+# Locations to remove from planning (e.g., north, central, or south)
+rm.location <- NA # c("south")
 
 # Randomize
 do.random <- TRUE
