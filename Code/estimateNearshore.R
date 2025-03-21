@@ -113,7 +113,7 @@ if (process.nearshore) {
         cps.nasc.deep >= cps.nasc & vessel.orig %in% deep.nasc.vessels ~ cps.nasc.deep - cps.nasc,
         TRUE ~ cps.nasc))
 
-    # ggplot(nasc.nearshore, aes(cps.nasc, NASC.20)) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
+    # ggplot(nasc.nearshore, aes(cps.nasc, NASC.20)) + geom_point(aes(colour = vessel.orig)) + geom_abline(slope = 1, intercept = 0) + facet_wrap(~vessel.orig)
     # ggplot(nasc.nearshore, aes(cps.nasc, cps.nasc.deep)) + geom_abline(slope = 1, intercept = 0) + geom_point(aes(colour = vessel.orig)) + facet_wrap(~vessel.orig)
   }
   
