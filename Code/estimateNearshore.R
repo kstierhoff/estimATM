@@ -205,9 +205,11 @@ if (process.nearshore) {
   nasc.nearshore.sf <- nasc.nearshore %>% 
     st_as_sf(coords = c("long", "lat"), crs = crs.geog)
   
-  # During 2307RL, Lisa Marie extended transects and purse seine sampling well beyond
+  # In some years (e.g., 2307RL and 2407RL), Lisa Marie extended transects and purse seine sampling well beyond
   # the planned transects in the nearshore region. This code section removes nearshore acoustic intervals 
-  # that extend beyond the nearshore survey footprint for that survey only.
+  # that extend beyond the nearshore survey footprint for those surveys.
+  
+  # Consider adding a variable clip.nearshore.intervals to settings since this is buried in the code.
   if (survey.name %in% c("2307RL","2407RL")) {
     # Buffer mainland by 7 nmi, which seems to encompass the footprint of the
     # planned nearshore transects
@@ -325,15 +327,14 @@ if (process.nearshore) {
     bind_cols(select(nasc.match.ns, cluster, cluster.distance, haul, haul.distance))  %>%
     bind_cols(select(nasc.match.ns, cluster.deep, cluster.distance.deep, haul.deep, haul.distance.deep))
   
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point(show.legend = FALSE) + coord_map()
-  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(stratum))) + geom_point(show.legend = FALSE) + coord_map()
+  # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) + geom_point() + coord_map()
   
   # ggplot(nasc.nearshore, aes(long, lat, colour = factor(cluster))) +
   #   geom_point(show.legend = FALSE) +
   #   geom_text(data = super.clusters.ns, aes(long, lat, label = factor(cluster),
   #                                        colour = factor(cluster)), show.legend = FALSE) +
   #   coord_map()
-  
+
   # Save results of processing
   save(nasc.nearshore, file = here("Data/Backscatter/nasc_nearshore.Rdata"))
   
@@ -366,7 +367,7 @@ nav.paths.ns.sf <- nav.ns.sf %>%
   st_cast("LINESTRING") %>% 
   ungroup()
 
-# mapview(nav.paths.ns.sf) + mapview(nearshore_mask)
+# mapview(nearshore_mask) + mapview(nav.paths.ns.sf)
 
 # Summarize nasc for plotting ---------------------------------------------
 nasc.plot.ns <- nasc.nearshore %>% 
@@ -614,8 +615,8 @@ haul.zero.ns.deep    <- filter(haul.pie.ns.deep, AllCPS == 0)
 ## KLS 2023-02-16
 if (save.figs) {
   # Create trawl haul and cluster proportion figures
-  source(here("Code/plot_haul_proportion_wt_nearshore.R"))
   source(here("Code/plot_cluster_proportion_wt_nearshore.R"))
+  source(here("Code/plot_haul_proportion_wt_nearshore.R"))
   
   # Combine nasc.cluster.plot and trawl.proportion.plot for report
   nasc.seine.cluster.wt.ns <- plot_grid(nasc.cluster.plot.ns, set.pie.cluster.wt,
@@ -656,6 +657,7 @@ if (cluster.source["NS"] == "cluster") {
 
 # Save results
 save(nasc.nearshore, file = here("Output/cps_nasc_prop_ns.Rdata"))
+save(nasc.nearshore.deep, file = here("Output/cps_nasc_prop_ns_deep.Rdata"))
 
 # Summarize transects -----------------------------------------------------
 # Summarize nasc data
@@ -794,7 +796,7 @@ nasc.nearshore.deep <- nasc.nearshore.deep %>%
     rher.dens = cps.nasc.deep*prop.rher / (4*pi*sigmawg.rher) / 1000)
 
 # Add deep density to shallow density
-# This is where the magic happens
+# This is where the magic happens, I think.
 nasc.nearshore <- nasc.nearshore %>%
   mutate(anch.dens = anch.dens + nasc.nearshore.deep$anch.dens,
          her.dens  = her.dens  + nasc.nearshore.deep$her.dens,
@@ -1815,7 +1817,10 @@ nasc.density.ns.sf <- nasc.density.ns %>%
                    '<b>Density: </b>', signif(density, 2), ' t nmi<sup>-2</sup>'))
 
 # This is a good place to look at the effect of the deep backscatter correction for E. mordax in 2024
-# ns.spp <- "Engraulis mordax"
+# Looks like the biomass density was transferred from sardine to anchovy, but there was only one positive
+# transect near Monterey, so no strata was created.
+
+# ns.spp <- "Sardinops sagax"
 # mapview(filter(strata.nearshore, scientificName == ns.spp)) +
 # mapview(filter(strata.nearshore, scientificName == ns.spp), zcol = "stock") +
 # mapview(filter(nasc.density.ns.sf, scientificName == ns.spp), cex = "bin.level", zcol = "bin.level")
