@@ -93,19 +93,23 @@ if (process.nearshore) {
     }
   }
   
+  # Correct deep CPS backscatter -----------------------------------
+  # Compute deep CPS backscatter
+  nasc.nearshore <- nasc.nearshore %>%
+    # Compute deep backscatter variable
+    # If NASC.20 is greater than cps.nasc (e.g., when backscatter near the surface was removed in nascR),
+    # cps.nasc.deep = cps.nasc, else the difference between NASC.20 and cps.nasc
+    mutate(cps.nasc.deep = case_when(
+      NASC.20 > cps.nasc ~ cps.nasc,
+      TRUE ~ cps.nasc - NASC.20)) 
+  
   # For vessels specified in deep.nasc.vessels,
   # replace cps.nasc with NASC.20, to examine the contribution of deep anchovy schools to the sardine estimates
-  if (exists("deep.nasc.vessels")) {
+  if (rm.deep.nasc) {
     nasc.nearshore <- nasc.nearshore %>%
       # Retain original cps.nasc
       # Create deep backscatter variable
       mutate(cps.nasc.orig = cps.nasc) %>%
-      # Compute deep backscatter variable
-      # If NASC.20 is greater than cps.nasc (e.g., when backscatter near the surface was removed in nascR),
-      # cps.nasc.deep = cps.nasc, else the difference between NASC.20 and cps.nasc
-      mutate(cps.nasc.deep = case_when(
-        NASC.20 > cps.nasc ~ cps.nasc,
-        TRUE ~ cps.nasc - NASC.20)) %>%
       # Remove deep backscatter from cps.nasc for vessels defined in settings.
       # Deep backscatter will be apportioned separately below and added back to cps.nasc
       # prior to biomass estimation.
@@ -797,13 +801,15 @@ nasc.nearshore.deep <- nasc.nearshore.deep %>%
 
 # Add deep density to shallow density
 # This is where the magic happens, I think.
-nasc.nearshore <- nasc.nearshore %>%
-  mutate(anch.dens = anch.dens + nasc.nearshore.deep$anch.dens,
-         her.dens  = her.dens  + nasc.nearshore.deep$her.dens,
-         jack.dens = jack.dens + nasc.nearshore.deep$jack.dens,
-         mack.dens = mack.dens + nasc.nearshore.deep$mack.dens,
-         sar.dens  = sar.dens  + nasc.nearshore.deep$sar.dens,
-         rher.dens = rher.dens + nasc.nearshore.deep$rher.dens)
+if (adj.deep.nasc) {
+  nasc.nearshore <- nasc.nearshore %>%
+    mutate(anch.dens = anch.dens + nasc.nearshore.deep$anch.dens,
+           her.dens  = her.dens  + nasc.nearshore.deep$her.dens,
+           jack.dens = jack.dens + nasc.nearshore.deep$jack.dens,
+           mack.dens = mack.dens + nasc.nearshore.deep$mack.dens,
+           sar.dens  = sar.dens  + nasc.nearshore.deep$sar.dens,
+           rher.dens = rher.dens + nasc.nearshore.deep$rher.dens)  
+}
 
 # Format for plotting
 nasc.density.ns <- nasc.nearshore %>%

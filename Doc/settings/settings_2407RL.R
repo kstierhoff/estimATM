@@ -448,8 +448,13 @@ seine.vessels          <- c("LBC","LM")
 seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
                             "LM"  = "Lisa Marie")
 
-# Vessels for which to correct deep nasc that may be anchovy
-deep.nasc.vessels <- c("LBC","LM")
+# Deep backscatter correction
+# Correct deep backscatter?
+adj.deep.nasc <- TRUE
+# Remove deep backscatter, if a correction is not applied? Set to FALSE if adj.deep.nasc = TRUE
+rm.deep.nasc <- FALSE
+# Vessels for which to remove deep backscatter that may be anchovy
+deep.nasc.vessels <- c("LBC", "LM")
 
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
@@ -674,7 +679,7 @@ bootstrap.est.spp      <- c("Clupea pallasii","Engraulis mordax","Sardinops saga
                             "Scomber japonicus","Trachurus symmetricus")
 
 # Number of bootstrap samples
-boot.num <- 1000 # 1000 during final
+boot.num <- 100 # 1000 during final
 
 # Generate biomass length frequencies
 do.lf    <- TRUE
