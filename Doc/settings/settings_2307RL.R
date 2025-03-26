@@ -454,7 +454,7 @@ adj.deep.nasc <- TRUE
 # Remove deep backscatter, if a correction is not applied? Set to FALSE if adj.deep.nasc = TRUE
 rm.deep.nasc <- FALSE
 # Vessels for which to remove deep backscatter that may be anchovy
-deep.nasc.vessels <- c("LBC", "LM")
+deep.nasc.vessels <- c("LBC")
 
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
