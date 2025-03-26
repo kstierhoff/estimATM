@@ -433,15 +433,28 @@ nasc.recurse           <- c(RL  = FALSE,
 # Max NASC value for removing outliers
 nasc.max               <- NA
 
+
+# Purse seine data info -------------------------------------------------------
+# Use seine data to apportion nearshore backscatter
+# If seine catches were believed to be representative, TRUE
+# Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
+use.seine.data  <- TRUE
+seine.source    <- "SQL"
+seine.types     <- c("survey", "research", NA)
+
 # Purse seine data info
 # Survey vessels that collected purse seine data
 seine.vessels          <- c("LBC","LM")
 seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
                             "LM"  = "Lisa Marie")
-# Use seine data to apportion nearshore backscatter
-# If seine catches were believed to be representative, TRUE
-# Else, FALSE (e.g., if sets were non-random or otherwise believed to be biased)
-use.seine.data  <- TRUE
+
+# Deep backscatter correction
+# Correct deep backscatter?
+adj.deep.nasc <- TRUE
+# Remove deep backscatter, if a correction is not applied? Set to FALSE if adj.deep.nasc = TRUE
+rm.deep.nasc <- FALSE
+# Vessels for which to remove deep backscatter that may be anchovy
+deep.nasc.vessels <- c("LBC", "LM")
 
 # Which net data should be used to apportion nearshore backscatter?
 # "Trawl" and/or "Seine"
