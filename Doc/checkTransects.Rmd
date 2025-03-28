@@ -203,6 +203,10 @@ write_csv(select(ungroup(reg.90), Transect, lat, long),
           file = here("Output", paste0("region_lines_90.csv")),
           col_names = FALSE)
 
+ctds.sf <- ctds %>% 
+  as_tibble() %>% 
+  st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
+
 uctds.sf <- uctds %>% 
   as_tibble() %>% 
   st_as_sf(coords = c("Longitude","Latitude"), crs = crs.geog)
@@ -352,9 +356,9 @@ if (leaflet.checkTransects.simple) {
       overlayGroups = c("Canada MPAs","Mexico MPAs","U.S. MPAs","State MPAs", 
                         "State Waters", "Exclusive Economic Zones", 
                         "Bathymetry Contours", "Planned Transects", 
-                        "UCTD Stations"),
+                        "CTD Stations","UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
-    # hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
+    # hideGroup(c("CTD Stations","UCTD Stations", "State Waters", "MPAs")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2])
   
@@ -486,11 +490,22 @@ if (leaflet.checkTransects.simple) {
                         "Bathymetry Contours",
                         "Planned Transects (Compulsory)", "Planned Transects (Adaptive)",
                         "Planned Transects (Nearshore)", "Planned Transects (Offshore)",
-                        "Planned Transects (Transits)", "UCTD Stations"),
+                        "Planned Transects (Transits)", "CTD Stations","UCTD Stations"),
       options = layersControlOptions(collapsed = FALSE)) %>%  
-    # hideGroup(c("UCTD Stations", "State Waters", "MPAs")) %>% 
+    # hideGroup(c("CTD Stations","UCTD Stations", "State Waters", "MPAs")) %>% 
     fitBounds(imap.bounds$range.lon[1], imap.bounds$range.lat[1],
               imap.bounds$range.lon[2], imap.bounds$range.lat[2]) 
+}
+
+if (nrow(ctds.sf) > 0) {
+  i.map <- i.map %>% 
+    # Add CTD stations
+    addCircleMarkers(data = ctds.sf,
+                     radius = 3, color = "#000000", stroke = TRUE, weight = 2,
+                     fillOpacity = 1, fillColor =  "blue",
+                     label = ~htmlEscape(name),
+                     popup = ~name,
+                     group = "CTD Stations")   
 }
 
 if (nrow(uctds.sf) > 0) {
@@ -498,7 +513,7 @@ if (nrow(uctds.sf) > 0) {
     # Add UCTD stations
     addCircleMarkers(data = uctds.sf,
                      radius = 3, color = "#000000", stroke = TRUE, weight = 2,
-                     fillOpacity = 1, fillColor =  "white",
+                     fillOpacity = 1, fillColor =  "orange",
                      label = ~htmlEscape(name),
                      popup = ~name,
                      group = "UCTD Stations")   
@@ -521,7 +536,7 @@ i.map
 
 ## Static map  
 
-White points represent UCTD stations.
+Orange points represent UCTD stations.
 
 ```{r map-survey-plan-all}
 include_graphics(here("Figs/fig_survey_map.png"))
@@ -604,6 +619,23 @@ wpts %>%
     Lat = as.data.frame(st_coordinates(.))$Y) %>% 
   st_set_geometry(NULL) %>% 
   datatable(rownames = FALSE)
+```
+
+## CTD Stations
+
+```{r ctd-wpts-table}
+if (nrow(ctds) > 0) {
+  ctds %>% 
+    select(Station = station, Region, Depth) %>% 
+    arrange(Station) %>%
+    # mutate(
+    #   Long = as.data.frame(st_coordinates(.))$X,
+    #   Lat = as.data.frame(st_coordinates(.))$Y) %>% 
+    # st_set_geometry(NULL) %>% 
+    datatable(rownames = FALSE)  
+} else {
+  print("No CTD stations planned.")
+}
 ```
 
 ## UCTD Stations
@@ -794,7 +826,8 @@ survey.plan <- base.map +
                       values = wpt.colors) +
   scale_linetype_manual("Type", 
                         values = wpt.linetypes) +
-  geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "white") +
+  geom_sf(data = ctds.sf, shape = 21, size = 1, fill = "blue") +
+  geom_sf(data = uctds.sf, shape = 21, size = 1, fill = "orange") +
   geom_sf(data = pairovets.sf, aes(fill = type), shape = 21, size = 1) +
   coord_sf(crs = crs.proj, # CA Albers Equal Area Projection
            xlim = unname(c(map.bounds["xmin"], map.bounds["xmax"])), 
