@@ -362,10 +362,10 @@ pie.radius.ns  <- as.numeric(abs(map.bounds.ns$ymin - map.bounds.ns$ymax)*pie.sc
 # Calculate pie radius of each pie, based on All CPS landings
 if (scale.pies) {
   set.pie$r      <- pie.radius.ns*set.pie$bin
-  # set.pie.deep$r <- pie.radius.ns*set.pie.deep$bin
+  set.pie.deep$r <- pie.radius.ns*set.pie.deep$bin
 } else {
   set.pie$r      <- pie.radius.ns
-  # set.pie.deep$r <- pie.radius.ns
+  set.pie.deep$r <- pie.radius.ns
 }
 
 # Extract sets with positive CPS catch
@@ -425,7 +425,7 @@ lengths.seine.deep <- lengths.seine %>%
   filter(key.set %in% set.pos.deep$key.set)
 
 # Estimate TS
-ts.df.seine <- estimate_ts(lengths.seine$scientificName, lengths.seine$totalLength_mm)
+ts.df.seine      <- estimate_ts(lengths.seine$scientificName, lengths.seine$totalLength_mm)
 ts.df.seine.deep <- estimate_ts(lengths.seine.deep$scientificName, lengths.seine.deep$totalLength_mm)
 
 # Add TS estimates to lengths data frame
@@ -538,7 +538,7 @@ write.csv(seine.ts.deep, file = here("Output/seine_ts_EstimateCPS_deep.csv"),
           quote = F, row.names = F, na = "0")
 
 # Summarize target strength proportions by cluster and species
-ts.summ.seine <- select(l.summ.set, cluster, haul, scientificName,
+ts.summ.seine      <- select(l.summ.set, cluster, haul, scientificName,
                         meanwg, num, sigmawg, sigmaindiv)
 
 ts.summ.seine.deep <- select(l.summ.set.deep, cluster, haul, scientificName,
@@ -1061,7 +1061,7 @@ for (i in cps.spp) {
             file = paste0(here("Output/cluster_length_frequency_seine_deep_"), i, "_", survey.name, ".csv"))
 
   write_csv(hlf.final.ns,
-            file = paste0(here("Output/haul_length_frequency_seine__deep_"), i, "_", survey.name, ".csv"))
+            file = paste0(here("Output/haul_length_frequency_seine_deep_"), i, "_", survey.name, ".csv"))
   # Add species-specific results to list of results
   cluster.final.seine.deep[[i]] <- clf.final.ns
   haul.final.seine.deep[[i]] <- hlf.final.ns

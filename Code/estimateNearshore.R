@@ -108,11 +108,10 @@ if (process.nearshore) {
   if (rm.deep.nasc) {
     nasc.nearshore <- nasc.nearshore %>%
       # Retain original cps.nasc
-      # Create deep backscatter variable
       mutate(cps.nasc.orig = cps.nasc) %>%
-      # Remove deep backscatter from cps.nasc for vessels defined in settings.
-      # Deep backscatter will be apportioned separately below and added back to cps.nasc
-      # prior to biomass estimation.
+      # Remove deep backscatter from cps.nasc for deep.nasc.vessels defined in settings
+      # Deep backscatter will be apportioned separately below 30m and species-specific density will
+      # be added back prior to biomass estimation
       mutate(cps.nasc = case_when(
         cps.nasc.deep >= cps.nasc & vessel.orig %in% deep.nasc.vessels ~ cps.nasc.deep - cps.nasc,
         TRUE ~ cps.nasc))
@@ -256,6 +255,10 @@ if (process.nearshore) {
   
   save(clf.ns.deep, hlf.ns.deep, super.clusters.ns.deep, super.hauls.ns.deep, lf.final.ns.deep, set.pie.deep,
        file = here("Output/clf_nearshore_deep.Rdata"))
+  
+  # Write clf.ns and clf.ns.deep to CSV
+  write_csv(clf.ns, file = here("Output/clf_nearshore.csv"))
+  write_csv(clf.ns.deep, file = here("Output/clf_nearshore_deep.csv"))
   
   # Assign backscatter to trawl clusters ------------------------------------
   saveRDS(nasc.nearshore, here("Output/nasc_match_ns.rds"))
