@@ -450,9 +450,9 @@ seine.vessels.long     <- c("LBC" = "Long Beach Carnage",
 
 # Deep backscatter correction
 # Correct deep backscatter?
-adj.deep.nasc <- TRUE
+adj.deep.nasc <- FALSE
 # Remove deep backscatter, if a correction is not applied? Set to FALSE if adj.deep.nasc = TRUE
-rm.deep.nasc <- FALSE
+rm.deep.nasc <- TRUE
 # Vessels for which to remove deep backscatter that may be anchovy
 deep.nasc.vessels <- c("LBC", "LM")
 
