@@ -818,7 +818,7 @@ if (update.routes) {
   
   # Write CTD waypoints to CSV file
   ctd.sub <- updated.route %>%
-    filter(transect.name == i, Type == "CTD") %>%
+    filter(Type == "CTD") %>%
     select(id = name, Latitude, Longitude)
   
   if (nrow(ctd.sub) > 0) {
@@ -828,7 +828,7 @@ if (update.routes) {
   
   # Write UCTD waypoints to CSV file
   uctd.sub <- updated.route %>%
-    filter(transect.name == i, Type == "UCTD") %>%
+    filter(Type == "UCTD") %>%
     select(id = name, Latitude, Longitude)
   
   if (nrow(uctd.sub) > 0) {
