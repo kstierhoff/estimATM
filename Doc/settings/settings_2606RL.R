@@ -644,7 +644,7 @@ cufes.date.format      <- "mdy" # mdy (1907RL and later) or ymd (earlier surveys
 cufes.vessels          <- c("RL")
 
 # Trawl data
-trawl.source           <- "CLAMS-Postgres"  # "SQL" or "Access" or "CLAMS-Oracle" or "CLAMS-SQLite" or "CLAMS-Postgres"
+trawl.source           <- "SQL"  # "SQL" or "Access" or "CLAMS-Oracle" or "CLAMS-SQLite" or "CLAMS-Postgres"
 clams.db.settings      <- "CLAMS_db_info-2606RL.R"
 trawl.dsn              <- "TRAWL"  # DSN for Trawl database on SQL server
 trawl.db.name          <- "TrawlDataEntry2606RL.db"

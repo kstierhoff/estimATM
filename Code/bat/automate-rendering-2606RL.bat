@@ -2,7 +2,7 @@
 call "%~dp0sync-gcp-2606RL.bat"
 
 :: Define the location of the R and Quarto executables
-SET R_PATH="C:\Program Files\R\R-4.6.0\bin\x64\Rscript.exe" 
+SET R_PATH="C:\Program Files\R\R-4.6.1\bin\x64\Rscript.exe" 
 SET Q_PATH="C:\Program Files\RStudio\resources\app\bin\quarto\bin\quarto.exe"
 
 :: Define Rstudio Connect server
