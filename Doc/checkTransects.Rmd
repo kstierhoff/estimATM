@@ -131,7 +131,7 @@ if (create.stations) {
 # Read bathymetry shapefiles -----------------------------------------
 bathy <- st_read(here("Data/GIS/bathy_contours.shp"))
 bathy.ctd <- st_read(here("Data/GIS/bathy_us_wc_50m.shp")) %>% 
-    st_transform(crs.geog)
+  st_transform(crs.geog)
 
 # Read MPA shapefiles  -----------------------------------------
 # Canada
@@ -857,21 +857,13 @@ wpts %>%
 
 ```{r ctd-wpts-table}
 if (nrow(ctd) > 0) {
-  if (class(ctd) == "data.frame") {
-    ctd %>% 
-      select(Station = name, Region, Latitude, Longitude, Depth) %>% 
-      arrange(Station) %>%
-      datatable(rownames = FALSE)  
-  } else if (inherits(ctd.sf, "sf")) {
-    ctd %>% 
-      select(Station = name, Region, Depth) %>% 
-      arrange(Station) %>%
-      mutate(
-        Longitude = as.data.frame(st_coordinates(.))$X,
-        Latitude = as.data.frame(st_coordinates(.))$Y) %>%
-      st_set_geometry(NULL) %>%
-      datatable(rownames = FALSE)  
-  }
+  ctd %>%
+    select(Station = name, Region, Latitude, Longitude, Depth) %>%
+    mutate(Latitude = round(Latitude, 4),
+           Longitude = round(Longitude, 4)) %>%
+    arrange(Station) %>%
+    datatable(rownames = FALSE)
+  
 } else {
   print("No CTD stations planned.")
 }
@@ -881,21 +873,13 @@ if (nrow(ctd) > 0) {
 
 ```{r uctd-wpts-table}
 if (nrow(uctd) > 0) {
-  if (class(uctd) == "data.frame") {
-    uctd %>% 
-      select(Station = name, Region, Latitude, Longitude, Depth) %>% 
-      arrange(Station) %>%
-      datatable(rownames = FALSE)  
-  } else if (inherits(uctd.sf, "sf")) {
-    uctd %>% 
-      select(Station = name, Region, Depth) %>% 
-      arrange(Station) %>%
-      mutate(
-        Longitude = as.data.frame(st_coordinates(.))$X,
-        Latitude = as.data.frame(st_coordinates(.))$Y) %>%
-      st_set_geometry(NULL) %>%
-      datatable(rownames = FALSE)  
-  }
+  uctd %>% 
+    select(Station = name, Latitude, Longitude, Depth) %>%
+    mutate(Latitude = round(Latitude, 4),
+           Longitude = round(Longitude, 4)) %>%
+    arrange(Station) %>%
+    datatable(rownames = FALSE)
+  
 } else {
   print("No UCTD stations planned.")
 }
@@ -905,21 +889,13 @@ if (nrow(uctd) > 0) {
 
 ```{r eDNA-wpts-table}
 if (nrow(eDNA) > 0) {
-  if (class(eDNA) == "data.frame") {
-    eDNA %>% 
-      select(Station = name, Region, Latitude, Longitude, Depth) %>% 
-      arrange(Station) %>%
-      datatable(rownames = FALSE)  
-  } else if (inherits(eDNA, "sf")) {
-    eDNA %>% 
-      select(Station = name, Region, Depth) %>% 
-      arrange(Station) %>%
-      mutate(
-        Longitude = as.data.frame(st_coordinates(.))$X,
-        Latitude = as.data.frame(st_coordinates(.))$Y) %>%
-      st_set_geometry(NULL) %>%
-      datatable(rownames = FALSE)  
-  }
+  eDNA %>% 
+    select(Station = name, Latitude, Longitude, Depth) %>% 
+    mutate(Latitude = round(Latitude, 4),
+           Longitude = round(Longitude, 4)) %>%
+    arrange(Station) %>%
+    datatable(rownames = FALSE)
+  
 } else {
   print("No eDNA stations planned.")
 }
@@ -929,21 +905,13 @@ if (nrow(eDNA) > 0) {
 
 ```{r pairovet-wpts-table}
 if (nrow(pairovets) > 0) {
-  if (class(pairovets) == "data.frame") {
-    pairovets %>% 
-      select(Station = name, Region, Latitude, Longitude, Depth) %>% 
-      arrange(Station) %>%
-      datatable(rownames = FALSE)  
-  } else if (inherits(pairovets, "sf")) {
-    pairovets %>% 
-      select(Station = name, Region, Depth) %>% 
-      arrange(Station) %>%
-      mutate(
-        Longitude = as.data.frame(st_coordinates(.))$X,
-        Latitude = as.data.frame(st_coordinates(.))$Y) %>%
-      st_set_geometry(NULL) %>%
-      datatable(rownames = FALSE)  
-  }
+  pairovets %>% 
+    select(Station = name, Region, Latitude, Longitude, Depth) %>% 
+    mutate(Latitude = round(Latitude, 4),
+           Longitude = round(Longitude, 4)) %>%
+    arrange(Station) %>%
+    datatable(rownames = FALSE)  
+  
 } else {
   print("No Pairovet stations planned.")
 }
@@ -1168,15 +1136,15 @@ ggsave(here("Figs/fig_survey_plan_fsv.png"), survey.plan.fsv,
 
 # Make "fancy map" with bathymetry
 survey.plan.fancy <- basemap(limits = c(range(wpts$long), range(wpts$lat)), 
-        bathy.alpha = 1, bathy.style = "wceb", legends = FALSE,
-        expand.factor = 1.3, land.col = "gray") + 
+                             bathy.alpha = 1, bathy.style = "wceb", legends = FALSE,
+                             expand.factor = 1.3, land.col = "gray") + 
   geom_sf(data = states, fill = "gray") +
   geom_sf(data = bathy, colour = "gray50", alpha = 0.5, size = 0.25) +
   geom_sf(data = locations.sf, shape = 21, fill = "gray20", colour = "white") +
   geom_shadowtext(data  = locations, aes(long, lat, label = name),
-                                  colour = 'gray20', size = 2, fontface = 'bold',
-                                  hjust = 0, nudge_x = 0.2, nudge_y = 0.05, angle = 25,
-                                  bg.colour = "white") +
+                  colour = 'gray20', size = 2, fontface = 'bold',
+                  hjust = 0, nudge_x = 0.2, nudge_y = 0.05, angle = 25,
+                  bg.colour = "white") +
   geom_sf(data = filter(transects.sf, Type %in% c("Compulsory", "Adaptive")), 
           size = 0.5) +
   geom_shadowtext(data = filter(tx.labels, Type %in% c("Compulsory", "Adaptive")),

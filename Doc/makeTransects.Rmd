@@ -112,8 +112,8 @@ if (do.random) {
     group_by(loc) %>% 
     summarise(do_union = F) %>% 
     st_cast("LINESTRING") %>% 
-    st_transform(crs = 3310)
-  
+    st_transform(crs = 3310) 
+
   save(locations, random.segments, random.points, baselines,
        file = here("Data/Map/randomized_baseline_data.Rdata"))
 } else {
@@ -127,8 +127,20 @@ The start points of the transects that will be drawn perpendicular to the coast 
 
 ```{r segmentize-baselines,message=FALSE}
 # Create segments from baselines
-# dfMaxLength is 10 nautical miles (or 18520 m)
-segments <- st_segmentize(baselines, dfMaxLength = 1852 * tx.spacing.fsv)
+if ("segments" %in% ls()) rm("segments")
+
+# Segmentize allowing for different spacing in each loc
+for (i in baselines$loc) {
+  segments.tmp <- baselines %>% 
+    filter(loc == i) %>% 
+    st_segmentize(., dfMaxLength = 1852 * tx.spacing.fsv[i])
+  
+  if ("segments" %in% ls()) {
+    segments <- rbind(segments, segments.tmp)  
+  } else {
+    segments <- segments.tmp
+  }
+}
 
 # Extract points from segments and determine the offshore endpoints
 points <- st_cast(segments, "POINT") %>% 

@@ -12,7 +12,7 @@ combine.regions   <- F # Combine nearshore/offshore plots with those from the co
 ## This section controls and configures settings used by makeTransects and checkTransects for generating and checking survey transects
 ### Transect spacing (nautical miles)
 baseline.file   <- "baselines-iwcps.csv"
-tx.spacing.fsv  <- 5 # For Lasker 
+tx.spacing.fsv  <- c("central" = 15, "south" = 20) # For Lasker 
 tx.spacing.sd   <- 15 # For Saildrone
 tx.break.ns     <- 52 # Northernmost transect sampled by the southern F/V, 64 in 2024, near Carmel
 tx.spacing.ns   <- 7  # c("S" = 7, "N" = 7, "CI" = 2.5) # or NA
@@ -26,16 +26,16 @@ fsv.buffer <- 80 #limits offshore portion of lines (SCB)
 min.tx.length <- 0 # nmi
 
 # eDNA, CTD, and UCTD station preferences
-ctd.tx.range   <- seq(34, 201) # Range of transects to include CTD stations
+ctd.tx.range   <- seq(11, 70) # Range of transects to include CTD stations
 edna.spacing   <- 10 # Surface eDNA sample spacing (nmi)
-edna.tx.range  <- seq(1, 33) # Range of transects to include eDNA stations
+edna.tx.range  <- seq(1, 10) # Range of transects to include eDNA stations
 uctd.spacing   <- 15 # UCTD spacing (nmi)
 uctd.tx.range  <- seq(1, 100) # Range of transects to include eDNA stations
 
 ### Transect removal and renumbering
-rm.n.transects     <- 141 # Number of transects to remove from the start (if near Mexico); if none, use zero; 71@10 nmi spacing
-rm.n.transects.ns  <- 99 # Number of transects to remove from the start (if near Mexico); if none, use zero
-rm.n.transects.sd  <- 47 # Number of transects to remove from the start (if near Mexico); if none, use zero
+rm.n.transects     <- 0 # Number of transects to remove from the start (if near Mexico); if none, use zero; 71@10 nmi spacing
+rm.n.transects.ns  <- 0 # Number of transects to remove from the start (if near Mexico); if none, use zero
+rm.n.transects.sd  <- 0 # Number of transects to remove from the start (if near Mexico); if none, use zero
 rm.i.transects     <- NA # Remove specific transects from plan; else NA (for 2007RL: c(paste(90:117, "Nearshore")))
 # Renumber transects to start at zero if transect are removed
 renumber.transects <- c("Compulsory" = TRUE, 
@@ -45,14 +45,14 @@ renumber.transects <- c("Compulsory" = TRUE,
 rm.location <- c("bc") # c("south")
 
 # Randomize
-do.random <- TRUE
+do.random <- FALSE
 save.csv  <- TRUE
 show.maps <- TRUE
 
 ## Used by processTransects.R -----------
 ### GPX file location
 gpx.dir          <- here("Data/Nav")
-gpx.file         <- "2706RL-IWCPS-NW format.gpx" # "2606RL-hybrid-spacing.gpx" "2606RL-12.5-nmi-spacing.gpx"
+gpx.file         <- "2706RL-hybrid-20-15-spacing.gpx" # "2606RL-hybrid-spacing.gpx" "2606RL-12.5-nmi-spacing.gpx"
 
 # Define transit and survey speed (kn) for estimating progress
 survey.speed     <- 9 # FSV
@@ -66,23 +66,23 @@ transit.duration <- ceiling(transit.distance / transit.speed / 24)
 
 # Leg waste (d) due to transit, late departures, and early arrivals
 leg.waste <- c(1, 2, 2, 2, 2)
-wx.days   <- c(2, 2, 2, 2, 2)
+wx.days   <- c(1, 1, 1, 1, 1)
 
 # Time required for daytime trawling and CTD casts
-day.trawl.duration <- 0 # duration of daytime trawls (h)
-day.trawl.waste    <- c(0.5, 2.3, 2.3, 2.3, 2.3)*day.trawl.duration
-day.ctd.waste      <- c(0, 0, 0, 0, 0)
+day.trawl.duration <- 3 # duration of daytime trawls (h)
+day.trawl.waste    <- c(0, 2, 2, 2, 2)*day.trawl.duration
+day.ctd.waste      <- c(0, 2, 2, 2, 2)
 
 # Remove transects to adjust survey progress
 transects.rm <- NA # Numbered transects to remove
 
 # Compute leg durations and breaks ----------------------------------------
 # Define leg ends
-leg.ends <- c(ymd("2026-06-17"), ymd("2026-07-02"),
-              ymd("2026-07-06"), ymd("2026-07-21"),
-              ymd("2026-07-26"), ymd("2026-08-10"),
-              ymd("2026-08-14"), ymd("2026-08-29"),
-              ymd("2026-09-03"), ymd("2026-09-22"))
+leg.ends <- c(ymd("2027-06-09"), ymd("2027-06-23"),
+              ymd("2027-06-27"), ymd("2027-07-14"),
+              ymd("2027-07-18"), ymd("2027-08-05"),
+              ymd("2027-08-09"), ymd("2027-08-27"),
+              ymd("2027-08-31"), ymd("2027-09-18"))
 
 # Compute days per leg
 leg.days <- (leg.ends[seq(2, length(leg.ends), 2)] - leg.ends[seq(1,length(leg.ends) - 1, 2)]) + 1
@@ -103,8 +103,8 @@ region.vec <- c(0, 32.5353, 34.7, 41.99, 48.490, 55)
 ## Used by formatCoastalExplorerNotebook.R ------
 ### Coastal (.nob)X file location
 nob.dir          <- here("Data/Nav")
-nob.file         <- "2706RL-IWCPS-NW format.nob"
-nob.file.final   <- "2706RL-IWCPS-NW format_final.nob"
+nob.file         <- "2706RL-hybrid-20-15-spacing.nob"
+nob.file.final   <- "2706RL-hybrid-20-15-spacing_final.nob"
 
 ### Waypoint preferences
 rangeCircleRadius <- c(ctd = "1 NM", uctd = "1 NM", eDNA = "1 NM")
@@ -208,7 +208,7 @@ model.type    <- "glm"    # lm, nlm, or glm; for selecting growth model
 # Mapping preferences -----------------------------------------------------
 # Turn off S2 processing in sf
 sf::sf_use_s2(FALSE)
-mapviewOptions(basemaps = c("CartoDB.Positron","Esri.WorldImagery","Esri.OceanBasemap"))
+mapviewOptions(basemaps = c("Esri.OceanBasemap","Esri.WorldGrayCanvas","Esri.WorldImagery"))
 
 # Coordinate reference systems for geographic and projected data
 crs.geog <- 4326 # WGS84
