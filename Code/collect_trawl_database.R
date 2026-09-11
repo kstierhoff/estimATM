@@ -7,7 +7,7 @@
 if (trawl.source == "SQL") {
   # Configure ODBC connection to TRAWL database
   trawl.con <- DBI::dbConnect(odbc::odbc(),
-                              DRIVER="ODBC Driver 18 for SQL Server",
+                              DRIVER="SQL Server",
                               Encrypt = "Optional",
                               DATABASE="Trawl",
                               Trusted_Connection= "Yes",
