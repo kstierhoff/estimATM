@@ -44,7 +44,7 @@ if (!require("pak")) install.packages("pak")
 # Install and load required packages from CRAN ---------------------------------
 pacman::p_load(tidyverse,grid,gridExtra,pander,flextable,lubridate,knitr,here,
                png,devtools,forcats,jpeg,bookdown,magick,tmaptools,sf,
-               odbc,cowplot,mapview,fs,patchwork,gt)
+               DBI,odbc,cowplot,mapview,fs,patchwork,gt,tcltk)
 
 # Install and load required packages from Github -------------------------------
 if (!require("atm")) pak::pkg_install("SWFSC/atm")
@@ -102,6 +102,9 @@ source(here("Doc/settings", prj.settings))
 # Define figure directory for referencing estimATM figures
 fig.dir <-"G:/Shared drives/NMFS SWFSC FRD AST/Surveys/2026 Summer IWCPS (2606RL)/ANALYSIS/estimATM/2606RL/Figures"
 
+# copy.files        <- T # Copy data files to local directory 
+# process.csv       <- T # Process Echoview files
+# process.csv.all   <- F # Process all acoustic backscatter files (F = new files only)
 ```  
 
 \pagenumbering{gobble}
@@ -383,8 +386,6 @@ On _Lisa Marie_, CTD profiles were measured down to 110 m [**CHECK THIS**] using
 
 While underway, information about the position and direction (e.g., latitude, longitude, speed, course over ground, and heading), weather (air temperature, humidity, wind speed and direction, and barometric pressure), and sea-surface oceanography (e.g., temperature, salinity, and fluorescence) were measured continuously and logged using the ship's Scientific Computer System (SCS). The data from a subset of these sensors, logged with a standardized format at 1-min resolution, are typically made available on NOAA's ERDDAP data server^[`r paste0(erddap.url, erddap.vessel,".html")`].  
 
-[**RESUME HERE**]
-
 \newpage
 
 [**NEED TO FIGURE OUT WHERE TO PLACE THIS**]
@@ -402,87 +403,7 @@ if (file.exists(here("Images/img_sardine_habitat_composite_2506SH_newModel_AllVe
 
 \newpage
 
-[**RESUME HERE**]
-
-
-
-
-
-(ref:plot-thermocline-scb) Temperature versus depth for UCTD casts conducted in the SCB during summer 2023. The dashed horizontal line indicates the average estimated depth of the thermocline throughout the SCB.
-
-```{r plot-thermocline-scb,fig.cap='(ref:plot-thermocline-scb)',out.width='8in',fig.pos='H',eval=FALSE}
-# # Load UCTD data from the entire survey
-# load(file = here("Data/UCTD/uctd_data.Rdata"))
-#
-# # Subset casts S of Pt. Conception
-# uctd.hdr.scb <- filter(all.uctd.hdr, lat < 34.3)
-#
-# uctd.casts.scb <- all.uctd.casts %>%
-#   filter(cast %in% uctd.hdr.scb$cast)
-#
-# # Plot temperature v depth
-# uctd.T <- ggplot(data = uctd.casts.scb,
-#                  aes(T, Z, group = cast, colour = factor(cast))) +
-#   geom_path(alpha = 0.75) +
-#   geom_hline(yintercept = -30, linetype = "dashed") +
-#   xlab("\nTemperature (C)") + ylab("Depth (m)\n") +
-#   scale_x_continuous(limits = c(round(min(uctd.casts.scb$T),0) - 1,
-#                                 round(max(uctd.casts.scb$T),0) + 1),
-#                      breaks = seq(round(min(uctd.casts.scb$T),0) - 1,
-#                                   round(max(uctd.casts.scb$T), 0) + 1, 2),
-#                      expand = c(0,0)) +
-#   scale_y_continuous(limits = c(round(min(uctd.casts.scb$Z), digits = -1),0),
-#                      breaks = seq(round(min(uctd.casts.scb$Z), digits = -1), 0, 20),
-#                      expand = c(0,0)) +
-#   theme_bw() +
-#   theme(panel.grid.major = element_line(linewidth = 0.75),
-#         legend.position = "none",
-#         strip.background.x = element_blank(),
-#         strip.text.x = element_text(face = "bold"))
-#
-# # Save plot
-# ggsave(uctd.T, file = here("Figs/fig_uctd_T_v_Z_2307RL.png"))
-#
-# # Include plot
-# include_graphics(here("Figs/fig_uctd_T_v_Z_2307RL.png"))
-```
-
-### Biomass and sampling precision estimation {#methods-biomass-and-precision}
-
-For each stratum and subpopulation, the biomass ($\hat{B}$; kg) of each species was estimated by:
-
-\begin{equation}
-\hat{B} = A \times \hat{D}\text{, }
-(\#eq:biomass-mean)
-\end{equation}
-
-where $A$ is the stratum area (nmi^2^) and $\hat{D}$ is the estimated mean biomass density (kg nmi^-2^):
-
-\begin{equation}
-\hat{D} = \frac{\sum_{l=1}^{k}\overline{\rho}_{w,l} c_l}{\sum_{l=1}^{k}c_l}\text{, }
-(\#eq:biomass-mean-density)
-\end{equation}
-
-where $\overline{\rho}_{w,l}$ is the mean biomass density of the species on transect $l$, $c_l$ is the transect length, and $k$ is the total number of transects. The variance of $\hat{B}$ is a function of the variability of the transect-mean densities and associated lengths. Treating transects as replicate samples of the underlying population [@Simmonds1996], the variance was calculated using bootstrap resampling [@Efron1981] based on transects as sampling units. Provided that each stratum has independent and identically-distributed transect means (i.e., densities on nearby transects are not correlated, and they share the same statistical distribution), bootstrap or other random-sampling estimators provide asymptotically unbiased estimates of variance.
-
-The 95% confidence intervals (CI~95%~) for the mean biomass densities ($\hat{D}$) were estimated as the 0.025 and 0.975 percentiles of the distribution of `r prettyNum(boot.num, big.mark = ",")` bootstrap survey-mean biomass densities. Coefficient of variation (CV, %) values were obtained by dividing the bootstrapped standard error by the mean estimate [@Efron1981]. Total biomass in the survey area was estimated as the sum of the biomasses in each stratum, and the associated sampling variance was calculated as the sum of the variances across strata.
-
-### Abundance- and biomass-at-length estimation {#methods-abundance-at-length}
-
-The numerical densities by length class (**Section \@ref(methods-trawl-clustering)**) were averaged for each stratum in a similar way for that used for biomass (Equation \@ref(eq:biomass-mean-density)), and multiplied by the stratum area to obtain abundance per length class.
-
-### Percent biomass per cluster contribution {#methods-cluster-biomass-density}
-
-The percent contribution of each cluster to the estimated abundance in a stratum (**Appendix \@ref(appendix-cluster-length-percent)**) was calculated as:
-
-\begin{equation}
-\frac{\Sigma_{i = 1}^{l}\overline{\rho}_{ci}}{\Sigma_{c=1}^{C}\Sigma_{i=1}^{l}\overline{\rho}_{ci}}{\text{,}}
-(\#eq:pct-acoustic-biomass)
-\end{equation}
-
-where $\overline{\rho}_{ci}$ is the numerical density in interval $i$ represented by the nearest trawl cluster $c$.
-
-### Software and code
+## Software and code
 
 All analyses presented here were performed using R software [@Rcore2025], including functions contained in the {atm} package [@Stierhoff2026a]^[https://github.com/SWFSC/atm] and scripts contained in the _estimATM_ repository [@Stierhoff2026b]^[https://github.com/SWFSC/estimATM], both of which are available on GitHub.
 
@@ -492,8 +413,12 @@ All analyses presented here were performed using R software [@Rcore2025], includ
 
 ## Sampling effort and allocation {#results-sampling-effort}
 
-```{r summ-survey-distances}
+```{r get-survey-distances}
 # Summarise survey distance (nmi) by vessel
+
+# Read nasc.summ CSV file
+nasc.summ <- read.csv(here("Output/nasc_summ_tx.csv"))
+
 ## Core survey area
 dist.summ <- nasc.summ %>%
   mutate(vessel = case_when(
@@ -509,6 +434,8 @@ dist.summ <- nasc.summ %>%
             mean.tx.dist = distance/n.tx)
 
 ## Nearshore survey area
+nasc.summ.lbc.ns <- data.frame()
+nasc.summ.lm.ns <- data.frame()
 if (exists("nasc.summ.ns")) {
   dist.summ.ns <- nasc.summ.ns %>%
     mutate(vessel = case_when(
@@ -541,7 +468,8 @@ if (exists("nasc.summ.os")) {
 }
 ```
 
-```{r load-nearshore-nasc-summary}
+[**DELETE THIS IF NOT NEEDED**]
+```{r get-nearshore-nasc}
 if ("Nearshore" %in% estimate.regions) {
   load(here("Output/purse_seine_sets.Rdata"))
   load(here("Output/nasc_summ_tx_ns.Rdata"))
@@ -551,7 +479,13 @@ if ("Nearshore" %in% estimate.regions) {
 }
 ```
 
-```{r nav-summary}
+```{r get-nav-summary}
+# Get navigation summary for all of the sampling platforms
+
+get.nav <- TRUE
+source(here("Code/get_nav_erddap.R"))
+
+
 # Summarize Lasker days at sea
 if (file.exists(here("Data/Nav/nav_data_raw.rds"))) {
   nav.fsv <- readRDS(here("Data/Nav/nav_data_raw.rds"))
@@ -578,10 +512,37 @@ if (file.exists(here("Data/Nav/lbc_nav.gpx"))) {
   das.lbc <- n_distinct(date(nav.lbc$time))
 }
 ```
+[**NEED TO ADD CODE TO SUMMARIZE TRAWL CATCH**]
+```{r get-trawl-data}
 
-```{r summarise-seine-catch}
+get.db <- F
+
+# If getting data directly from the database
+if (get.db) {
+  # Source script to collect data from trawl database
+  source(here("Code/collect_trawl_database.R"))
+  
+# Otherwise, load data that has already been read and stored in an R file. This
+# is data that has not yet gone through format_trawl_database()
+} else {
+  # Load trawl data
+  load("G:/Shared drives/NMFS SWFSC FRD AST/Surveys/2026 Summer IWCPS (2606RL)/ANALYSIS/estimATM/2606RL/Output/haul_info.Rdata")
+  load(here("Data/Trawl/trawl_data_raw.Rdata"))
+}
+```
+
+
+```{r get-seine-data}
+
+# Load LBC .RData file into an isolated environment then convert to a vessel-specific list
+temp_env <- new.env()
+load("G:/Shared drives/NMFS SWFSC FRD AST/Surveys/2026 Summer IWCPS (2606LBC)/DATA/seine_data_raw.Rdata", envir = temp_env)
+seine.lbc <- as.list(temp_env)
+
+# Do the same when Lisa Marie data are available
+
+# Summarize Lisa Marie catch
 if (exists("set.lengths")) {
-  # Summarise Lisa Marie catch
   seine.summ.lm <- set.lengths %>%
     filter(vessel.name == "LM") %>%
     group_by(scientificName) %>%
@@ -590,7 +551,7 @@ if (exists("set.lengths")) {
       total.ct = n()
     )
 
-  # Summarise Long Beach Carnage catch
+  # Summarize Long Beach Carnage catch
   seine.summ.lbc <- set.lengths %>%
     filter(vessel.name == "LBC", landing != 160) %>%
     group_by(scientificName) %>%
@@ -608,11 +569,9 @@ if (exists("sets")) {
 }
 ```
 
-The core region of the `r tolower(survey.season)` `r survey.year` survey spanned the continental shelf from San Diego to Cape Flattery, between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`, and included most of the potential habitat for the northern subpopulation of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html]. In this region, _`r survey.vessel`_ sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi during `r das.fsv-5` DAS (**Fig. \@ref(fig:nasc-trawl)**). Catches from a total of `r nrow(haul)` nighttime surface trawls were combined into `r n_distinct(haul$cluster)` trawl clusters. In the core region, one to `r num2words(max(as.numeric(be$Stratum), na.rm = TRUE))` post-survey strata were defined by their transect spacing and the densities of biomass attributed to each species.
+The core region of the `r tolower(survey.season)` `r survey.year` survey spanned the continental shelf from San Diego to Cape Flattery, between `r format(ymd(erddap.survey.start),"%d %B")` and `r format(ymd(erddap.survey.end),"%d %B %Y")`, and included most of the potential habitat for the northern subpopulation of Pacific Sardine at the time of the survey^[https://coastwatch.pfeg.noaa.gov/erddap/griddap/sardine_habitat_modis.html] [**UPDATE URL**]. In this region, _`r survey.vessel`_ sampled `r nrow(nasc.summ)` east-west transects totaling `r prettyNum(sum(nasc.summ$distance), digits = 1, big.mark = ",")` nmi during `r das.fsv-5` DAS [**THIS SUBTRACTS 5. DETERMINE WHY**] (**Fig. \@ref(fig:nasc-trawl)**). Catches from a total of `r nrow(haul)` nighttime surface trawls were obtained.
 
-The nearshore region spanned an area from 5-m depth to approximately 5 nmi from the continental coast, or 2.5 nmi from the Santa Cruz and Santa Catalina Islands, between San Diego and Cape Flattery. _Long Beach Carnage_ surveyed from approximately San Diego to Half Moon Bay, CA and around the Santa Cruz and Santa Catalina Islands, with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r set.summ$n[set.summ$vessel.name == "LBC"]` purse-seine sets during `r das.lbc` DAS (**Fig. \@ref(fig:nasc-seine-lbc)**). _Lisa Marie_ surveyed from Half Moon Bay to Cape Flattery, WA with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r set.summ$n[set.summ$vessel.name == "LM"]` purse-seine sets during `r das.lm` DAS (**Fig. \@ref(fig:nasc-seine-lm)**). In the nearshore region, one to `r num2words(max(as.numeric(be.ns$Stratum),na.rm = TRUE))` post-survey strata were defined by their transect spacing and the densities of biomass attributed to each species.
-
-Biomasses and abundances were estimated for each species and subpopulation in both the core and nearshore survey regions. The total biomass for each subpopulation within the survey region was estimated as the sum of its biomasses in the core and nearshore regions.
+The nearshore region spanned an area from 5-m depth to approximately 5 nmi from the continental coast, or 2.5 nmi from the Santa Cruz and Santa Catalina Islands, between San Diego and Cape Flattery. _Long Beach Carnage_ surveyed from approximately San Diego to Half Moon Bay, CA [**UPDATE**] and around the Santa Cruz and Santa Catalina Islands, with `r nrow(nasc.summ.lbc.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lbc.ns$distance))` nmi and `r set.summ$n[set.summ$vessel.name == "LBC"]` purse-seine sets during `r das.lbc` DAS (**Fig. \@ref(fig:nasc-seine-lbc)**). _Lisa Marie_ surveyed from Half Moon Bay [**UPDATE**] to Cape Flattery, WA with `r nrow(nasc.summ.lm.ns)` east-west transects totaling `r sprintf("%.0f",sum(nasc.summ.lm.ns$distance))` nmi and `r set.summ$n[set.summ$vessel.name == "LM"]` purse-seine sets during `r das.lm` DAS (**Fig. \@ref(fig:nasc-seine-lm)**).
 
 ## Core area survey aboard _`r survey.vessel`_
 
@@ -620,92 +579,76 @@ Biomasses and abundances were estimated for each species and subpopulation in bo
 
 **Leg I**
 
-On 11 June, _`r survey.vessel`_ departed from 10th Avenue Terminal in San Diego, CA at ~2100 (all times UTC), then remained outside San Diego Bay to allow a RAPP Hydema technician to test and evaluate the trawl winch system as part of regular maintenance. At 1447 on 12 June, sampling was initiated on transect 002; at 1809 _`r survey.vessel`_ broke transect to transit back toward San Diego Bay where a small boat transfer was conducted to bring aboard a 2nd cook. Surface trawl sampling was then conducted that evening and acoustic sampling resumed on transect 002 at 1259 on 13 June. At 1259 on 17 June, _`r survey.vessel`_ anchored near Long Beach, CA to recalibrate the EK80 echosounders as requested by the NWFSC for hake analyses; at 1759, after an unsuccessful attempt, the anchor was retrieved and acoustic sampling resumed on transect 006. On 20 June, a bearing on the trawl gate broke during the first nighttime surface trawl, precluding further trawl operations. Acoustic sampling resumed as normal on the morning of 21 June while the ship’s crew investigated a repair; at 2300 that evening the trawl gate was fixed and trawling could commence. At 1749 on 24 June, in support of an unrelated SWFSC project, _`r survey.vessel`_ retrieved a bottom lander near Point Conception and deployed a new one before resuming acoustic sampling on transect 011. Acoustic sampling ceased after completion of transect 011 at 0409 on 25 June, followed by two nighttime surface trawls before beginning transit to San Francisco. On 25 June, _`r survey.vessel`_ arrived in San Francisco, CA at ~1700 to complete Leg I.
+On 18 June, following a one day delay due to needed repairs on Generator #2, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal in San Diego, CA at ~1700 (all times UTC). The first day of operations included a certification of the newly repaired bow thruster outside of San Diego Bay, after which the ABS inspectors were put ashore via small craft. For the remainder of 18 June, engineers from AML Oceanographic conducted testing and training of a newly installed Moving Vessel Profiler (MVP200). At 1230 on 19 June, the AML engineers disembarked via small craft outside Mission Bay. _`r survey.vessel`_ then transited to the first nearshore station, arriving at ~1500 to begin acoustic sampling along transect 001. Transect sampling then progressed northward throughout the Southern California Bight, utilizing regional sampling in order to ensure adequate trawl coverage in both the inshore and offshore regions. No surface trawls were conducted on the night of 30 June due to recent catches of marine mammals that approached the authorized take limit [**INCLUDE?**]. On 1 July, the final acoustic and eDNA sampling of Leg 1 was conducted, completing all sampling through transect 014 off Point Conception, CA. _`r survey.vessel`_ then transited to San Diego, arriving at 10th Avenue Marine Terminal at ~2100 on 2 July to complete Leg 1.
 
 **Leg II**
 
-On 2 July, following a three-day delay, _`r survey.vessel`_ departed from Pier 30/32 in San Francisco at ~0800 and transited south toward Pt. Conception. The delay, which was due to medical issues with the ship’s crew, resulted in a shortage of experienced deck crew, so the decision was made to limit trawl operations to 12 instead of 24 h. At ~1300 on 3 July, acoustic sampling was resumed along transect 011 near Lompoc, CA. In an effort to mitigate the lost days at sea, transect 016 was randomly selected to be skipped.  On 10 July, a member of the science party was put ashore in Monterey, CA after experiencing a medical emergency. Following a brief interruption of survey operations, and thanks to the prompt and strategic response by the ship’s personnel and medical officers, sampling resumed soon afterward. On 15 July, acoustic sampling ceased after the completion of transect 024 off San Francisco. On 15 July, after a night of surface trawling, _`r survey.vessel`_ arrived at Pier 30/32 in San Francisco at ~1500 to complete Leg II.
+On 6 July 1700 UTC, _`r survey.vessel`_ departed from 10th Avenue Marine Terminal to begin Leg 2. While transiting to Pt. Conception, a critical circuit breaker on the main electrical distribution bus failed but was repaired while underway. On 7 July, a bottom lander deployed near Pt. Conception during the 2025 IWCPS was successfully recovered, then a new one deployed. At 2200, acoustic sampling resumed along transect 015. Previous underway repairs to the electrical bus were not successful, requiring _`r survey.vessel`_ to call port in Port Hueneme, CA for further repairs. On 8 July at 1930, _`r survey.vessel`_ arrived at Naval Pier War 3 North, Port Hueneme. On 10 July at 1600, following successful repairs, _`r survey.vessel`_ departed Port Hueneme, then resumed acoustic sampling along transect 016 at 0215 on 11 July. On 19 July, acoustic sampling was completed along transects 038 and 037. From 0130 on 20 July until 0330 on 21 July, acoustic sampling was conducted along the remaining offshore portions of transects 036 to 032, sampling from north to south, before transiting to San Francisco Bay. On 21 July at 1645, _`r survey.vessel`_ arrived at Coast Guard Island in Alameda, CA to conclude Leg 2.
 
 **Leg III**
 
-On 19 July, _`r survey.vessel`_ departed from Pier 30/32 at ~1600 and resumed sampling along transect 025 just north of San Francisco Bay.  To regain additional time lost during Legs 1 and 2, transect 028 was randomly skipped. At ~0200 on 30 July, _`r survey.vessel`_ completed sampling transect 040 near Crescent City before transiting ~18 h to Newport for a medical emergency among the ship’s crew. At ~1800 on 31 July, the affected crew member was put ashore via small craft. Rather than transiting back to transect 041, or ending the leg early, the decision was made to conduct only CTD and eDNA sampling along transects 051, 053, and 055 just north of Newport, OR. On 2 August, _`r survey.vessel`_ arrived at MOC-P in Newport at ~1600 to complete Leg III.
+On 26 July, _`r survey.vessel`_ departed from Alameda at 1830 to begin Leg 3. On 27 July at 1300, acoustic sampling resumed on transect 039 near Pt. Arena. Acoustic and trawl operations proceeded smoothly for the majority of the survey leg. Inclement weather was encountered on 1 August, which limited nighttime trawling opportunities for two days. On 8 August, along transect 070, the winch control board in the MVP system failed but was repaired while underway using spares delivered with the system. At 0145 on 10 August, after acoustic sampling was completed on transects 072 and 073 off Tillamook, OR, the ship transited toward Newport, OR. On 10 August, _`r survey.vessel`_ arrived at MOC-P in Newport, OR at 1245 to end Leg 3. 
 
 **Leg IV**
 
-On 11 August, _`r survey.vessel`_ departed from Newport, OR at ~1500 and transited southward. On 12 August, _`r survey.vessel`_ resumed acoustic sampling at ~0715 along transect 041 near Brookings, OR. On 13 August the fog signal failed, and _`r survey.vessel`_ returned to Newport for repair, arriving at MOC-P at ~0700 on August 14. On 18 August at ~1630, _`r survey.vessel`_ departed from Newport, after repairing the fog signal and other personnel-related delays. On 19 August at ~0715, _`r survey.vessel`_ resumed acoustic sampling along transect 043 near Gold Beach, OR. On 21 August, acoustic sampling ceased after the completion of transect 048 off Reedsport, OR and _`r survey.vessel`_ transited to Newport, OR for a personnel exchange. On 22 August, after a failed personnel exchange attempt, _`r survey.vessel`_ departed Newport and resumed acoustic sampling along transect 048 near Reedsport on 22 August at ~1930. At ~2300, trawl sampling ceased on transect 048. On 23 August, _`r survey.vessel`_ arrived at MOC-P in Newport ~1430 to complete Leg IV.
-
-**Leg V**
-
-On 28 August, _`r survey.vessel`_ departed from MOC-P in Newport at 2302 and began the transit to Reedsport. On 29 August, _`r survey.vessel`_ resumed acoustic sampling along transect 049. Due to lost survey time during prior legs, acoustic sampling proceeded along odd-numbered transects for the remainder of the leg. On 30 August, the MFT used for surface trawling was damaged and replaced by a spare net on board. On 31 August, fishing was stopped after the second surface trawl due to a hydraulic leak in the crane, which was repaired while underway the following day and available to resume trawling. On 7 September, using time regained throughout Leg V, acoustic sampling was conducted along transect 066, which was planned to be skipped due to previously lost DAS. On 9 September, acoustic sampling ceased after the completion of transect 067 in the Strait of Juan de Fuca, after which _`r survey.vessel`_ transited to Elliott Bay near Seattle, WA to conduct a post-survey acoustic calibration. On 13 September, _`r survey.vessel`_ arrived at  MOC-P in Newport at ~1600 to complete Leg IV.
+On 23 August, after a 9-day delay to repair leaks in the main propulsion motor aft heat exchanger, _`r survey.vessel`_ departed from MOC-P in Newport at 1630 and began the transit to transect 074. To mitigate the loss of sea days, the remaining transects were reduced in length by approximately 35% and the spacing between transects was increased from 12.5 to 15 nmi. Acoustic and trawl sampling resumed on 24 August along transect 074 near Astoria, OR and continued without interruption for the remainder of Leg 4. On 24 August, the MVP failed to return to the surface and had to be manually brought back on deck. The MVP system was then secured and SWFSC's UCTD utilized for the rest of leg 4. On 27 August, acoustic and trawl sampling ceased after the completion of transect 084 off Cape Flattery, WA. On 29 August, _`r survey.vessel`_ arrived at MOC-P in Newport at ~2100 to complete Leg 4 and the CPS portion of the IWCPS survey.
 
 ## Nearshore survey aboard industry fishing vessels
 ### _Long Beach Carnage_
 
-On 16 June, _Long Beach Carnage_ was mobilized with EK80 echosounders at Point Loma Sportfishing in San Diego, CA. From 17 to 19 June, _Long Beach Carnage_ sampled nearshore transects 1 to 11, between San Diego and Newport Beach, before transiting offshore to sample transects 327 to 347 around Santa Catalina Island. From 20 to 26 June, _Long Beach Carnage_ sampled nearshore transects 12 to 25, between Newport Beach and Point Conception before transiting offshore to sample transects 284-303 around Santa Cruz Island. Finally, from 27 June to 2 July, Long Beach Carnage sampled nearshore transects 26 to 52, between Point Conception and Half Moon Bay, before completing nearshore sampling at 2000 on 2 July to conclude their portion of the nearshore survey.
+On 22 June, _Long Beach Carnage_ was mobilized with EK80 echosounders at Point Loma Sportfishing in San Diego, CA. From 23 to 25 June, _Long Beach Carnage_ sampled nearshore transects 1 to 11 between San Diego and Newport Beach. _Long Beach Carnage_ then transited offshore to sample transects 327 to 347 around Santa Catalina Island from 25 to 27 June. From 27 to 30 June, _Long Beach Carnage_ sampled nearshore transects 12 to 23, between Newport Beach and Santa Barbara before transiting offshore to sample transects 284-303 around Santa Cruz Island from 30 June to 2 July. Finally, from 2 to 5 July, _Long Beach Carnage_ sampled nearshore transects 24 to 36, between Santa Barbara and Cambria, before completing nearshore sampling at 1825 on 5 July to conclude their portion of the nearshore survey.
 
 ### _Lisa Marie_
 
+[**UPDATE AFTER RECEIVING LISA MARIE LOGBOOK**]
 From 22 July to 3 August, _Lisa Marie_ sampled nearshore transects 53 to 109, between Half Moon Bay and Coos Bay, where they called port to end the first half of their survey, reprovision the vessel, and exchange crew. On 13 August, _Lisa Marie_ resumed sampling nearshore sampling along transects 110 to 139 before calling port in Westport, WA on 24 August to refuel. On 25 August, _Lisa Marie_ resumed sampling transects 140 to 152, between Westport and Cape Flattery, before completing acoustic sampling and concluding the nearshore survey at 1600 on 28 August.
-
-## Acoustic backscatter {#results-backscatter-distribution}
-
-Acoustic backscatter ascribed to CPS was observed throughout the latitudinal range of the core survey area (**Fig. \@ref(fig:nasc-trawl)a**), but was greatest between Point Conception and Crescent City. Acoustic backscatter was present from the shore to the shelf break, but was generally greater closer to shore. Zero-biomass intervals were observed at the offshore end of each transect in the core region. Greater than `r cum.biomass.limit*100`% of the biomass for each species was apportioned using catch data from trawl clusters collected within ~20 nmi (**Fig. \@ref(fig:biomass-cluster-distance)**).
-
-Acoustic backscatter ascribed to CPS was also observed throughout the nearshore survey area, but was most prevalent along transects sampled by _Long Beach Carnage_ near Long Beach, Los Angeles, and between Point Conception and Santa Cruz (**Fig. \@ref(fig:nasc-seine-lbc)a**), and along transects sampled by _Lisa Marie_ between Half Moon Bay and Bodega Bay, and north of Cape Mendocino (**Fig. \@ref(fig:nasc-seine-lm)a**).
 
 ## Trawl catch {#results-trawl-catch}
 
-Trawl catches from _`r survey.vessel`_ were composed of mostly Northern Anchovy between San Diego and Bodega Bay, Jack Mackerel between Fort Bragg and Newport, and Pacific Herring between Newport and Cape Flattery (**Fig. \@ref(fig:nasc-trawl)b**). Some Pacific Sardine were present in trawl clusters near Fort Bragg, while Pacific Mackerel were scarce throughout the survey area. Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Anchovy'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'JackMack'),big.mark=",",digits=3)` kg of Jack Mackerel, `r prettyNum(sum(cluster.summ.wt$'PacHerring'),big.mark=",",digits=3)` kg of Pacific Herring,  `r prettyNum(sum(cluster.summ.wt$'PacMack'),big.mark=",",digits=3)` kg of Pacific Mackerel, and `r prettyNum(sum(cluster.summ.wt$'Sardine'),big.mark=",",digits=3)` kg of Pacific Sardine; **Appendix \@ref(appendix-trawl-sampling)**).
+Trawl catches from _`r survey.vessel`_ were composed of mostly Northern Anchovy between San Diego and Point Arena, CA; Jack Mackerel between Monterey and the US-Mexico border, and between Point Arena, CA and Cape Flattery, WA; and Pacific Herring between Coos Bay, OR and Cape Flattery, WA (**Fig. \@ref(fig:nasc-trawl)b**). Pacific Sardine and Pacific Mackerel were scarce throughout the survey area. Overall, the `r nrow(haul)` trawls captured a combined `r prettyNum(sum(cluster.summ.wt$AllCPS),big.mark=",",digits=3)` kg of CPS (`r prettyNum(sum(cluster.summ.wt$'Anchovy'),big.mark=",",digits=3)` kg of Northern Anchovy, `r prettyNum(sum(cluster.summ.wt$'JackMack'),big.mark=",",digits=3)` kg of Jack Mackerel, `r prettyNum(sum(cluster.summ.wt$'PacHerring'),big.mark=",",digits=3)` kg of Pacific Herring,  `r prettyNum(sum(cluster.summ.wt$'PacMack'),big.mark=",",digits=3)` kg of Pacific Mackerel, and `r prettyNum(sum(cluster.summ.wt$'Sardine'),big.mark=",",digits=3)` kg of Pacific Sardine; **Appendix \@ref(appendix-trawl-sampling)**).
 
 ## Purse-seine catch {#results-seine-catch}
 ### _Long Beach Carnage_
 
-Purse-seine catches from _Long Beach Carnage_ in the nearshore region were composed mostly of Pacific Sardine and Northern Anchovy collected along the mainland coast (**Fig. \@ref(fig:nasc-seine-lbc)b**). Relatively few Pacific Mackerel, and Jack Mackerel were present in purse-seine samples collected by _Long Beach Carnage_ (**Fig. \@ref(fig:nasc-seine-lbc)b**). Overall, dip-net samples from `r set.summ$n[set.summ$vessel.name == "LBC"]` seines totaled `r prettyNum(sum(seine.summ.lbc$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Scomber japonicus"],big.mark=",",digits=3)` kg of Pacific Mackerel, `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Engraulis mordax"],big.mark=",",digits=2)` kg of Northern Anchovy, and `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Trachurus symmetricus"],big.mark=",",digits=2)` kg of Jack Mackerel, **Appendix \@ref(appendix-seine-sampling-lbc)**).
+Purse-seine catches from _Long Beach Carnage_ in the nearshore region were composed mostly of Pacific Sardine and Northern Anchovy collected in the SCB, and Pacific Sardine and Jack Mackerel in Monterey Bay (**Fig. \@ref(fig:seine-lbc)b**). Relatively few Pacific Mackerel were present in purse-seine samples (**Fig. \@ref(fig:seine-lbc)b**). No purse seine samples were obtained between Santa Maria and Monterey Bay due primarily to the absence of CPS schools, but also due to schools consisting of Northern Anchovy that were too small for the seine net or inclement weather. Overall, dip-net samples from `r set.summ$n[set.summ$vessel.name == "LBC"]` seines totaled `r prettyNum(sum(seine.summ.lbc$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Scomber japonicus"],big.mark=",",digits=3)` kg of Pacific Mackerel, `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Engraulis mordax"],big.mark=",",digits=2)` kg of Northern Anchovy, and `r prettyNum(seine.summ.lbc$total.wt[seine.summ.lbc$scientificName == "Trachurus symmetricus"],big.mark=",",digits=2)` kg of Jack Mackerel, **Appendix \@ref(appendix-seine-sampling-lbc)**).
 
 ### _Lisa Marie_ {#results-seine-catch-lm}
 
-Purse-seine catches from _Lisa Marie_ in the nearshore were composed mostly of Pacific Herring, except Northern Anchovy collected between Half Moon Bay and Bodega Bay, several catches of Pacific Sardine between Pt. Arena and Eureka, CA, and a few catches of Jack Mackerel near Crescent City and north of Tillamook, OR (**Fig. \@ref(fig:nasc-seine-lm)b**). Purse-seine sampling between Cape Mendocino and Tillamook was sparse due to few CPS targets, the presence of marine mammals that did not permit the deployment of the purse-seine gear, or both. Many of the purse-seine sets north of Cape Mendocino contained no CPS (**Fig. \@ref(fig:nasc-seine-lm)b**). Overall, the dip-net samples from `r set.summ$n[set.summ$vessel.name == "LM"]` purse-seine sets totaled `r prettyNum(sum(seine.summ.lm$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Trachurus symmetricus"],big.mark=",",digits=3)` kg of Jack Mackerel, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Clupea pallasii"],big.mark=",",digits=3)` kg of Pacific Herring, and `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Engraulis mordax"],big.mark=",",digits=3)` kg of Northern Anchovy, **Appendix \@ref(appendix-seine-sampling-lm)**).
+[**NEED TO UPDATE AFTER GETTING LM CATCH DATA**]
+Purse-seine catches from _Lisa Marie_ in the nearshore were composed mostly of Pacific Herring, except Northern Anchovy collected between Half Moon Bay and Bodega Bay, several catches of Pacific Sardine between Pt. Arena and Eureka, CA, and a few catches of Jack Mackerel near Crescent City and north of Tillamook, OR (**Fig. \@ref(fig:seine-lm)b**). Purse-seine sampling between Cape Mendocino and Tillamook was sparse due to few CPS targets, the presence of marine mammals that did not permit the deployment of the purse-seine gear, or both. Many of the purse-seine sets north of Cape Mendocino contained no CPS (**Fig. \@ref(fig:seine-lm)b**). Overall, the dip-net samples from `r set.summ$n[set.summ$vessel.name == "LM"]` purse-seine sets totaled `r prettyNum(sum(seine.summ.lm$total.wt),big.mark=",",digits=3)` kg of CPS (`r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Trachurus symmetricus"],big.mark=",",digits=3)` kg of Jack Mackerel, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Sardinops sagax"],big.mark=",",digits=3)` kg of Pacific Sardine, `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Clupea pallasii"],big.mark=",",digits=3)` kg of Pacific Herring, and `r prettyNum(seine.summ.lm$total.wt[seine.summ.lm$scientificName == "Engraulis mordax"],big.mark=",",digits=3)` kg of Northern Anchovy, **Appendix \@ref(appendix-seine-sampling-lm)**).
 
 \newpage
 
-(ref:nasc-trawl) Spatial distributions sampled by _`r survey.vessel`_ of: a) 38-kHz vertically integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^;  averaged over 2000-m distance intervals) ascribed to CPS and b) proportion of acoustic backscatter from CPS in trawl clusters.
+(ref:FSV-trawl) Spatial distributions sampled by _`r survey.vessel`_ of proportion of CPS trawl catch, by weight, for each haul.
 
-```{r nasc-trawl, fig.cap='(ref:nasc-trawl)',out.width='100%',fig.pos='H'}
+```{r FSV-trawl, fig.cap='(ref:FSV-trawl)',out.width='100%',fig.pos='H'}
 # out.width='8.5in'
-include_graphics(here("Figs/fig_nasc_acoustic_proportion.png"))
-```
-
-\newpage
-\blandscape
-
-(ref:biomass-cluster-distance) Proportion (top) and cumulative proportion (bottom) of biomass of each CPS species versus distance to the nearest positive trawl cluster sampled by _`r survey.vessel`_. Dashed vertical lines (bottom) represent the cluster distance where cumulative biomass equals `r cum.biomass.limit*100`%. Note: these results are not separated by subpopulation.
-
-```{r biomass-cluster-distance,fig.cap='(ref:biomass-cluster-distance)',out.width='9in',fig.pos='H'}
-include_graphics(here("Figs/fig_cluster_distance_cumulative_biomass.png"))
+include_graphics(file.path(fig.dir, "fig_trawl_proportion_haul_wt.png"))
 ```
 
 \newpage
 
-(ref:nasc-seine-lbc) Nearshore transects sampled by _Long Beach Carnage_ overlaid with the distributions of: a) 38-kHz vertically integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals) ascribed to CPS; and b) the proportions of acoustic backscatter from CPS in each purse-seine catch. Black points indicate purse-seine sets with no CPS present. Species with low catch weights may not be visible at this scale.
+[**UPDATE WITH LBC-SPECIFIC FIGURE AFTER IT'S MADE**]
+(ref:seine-lbc) Nearshore transects sampled by _Long Beach Carnage_ overlaid with the proportions of CPS, by weight, in each purse-seine catch. Black points indicate purse-seine sets with no CPS present. Species with low catch weights may not be visible at this scale.
 
-```{r nasc-seine-lbc, fig.cap='(ref:nasc-seine-lbc)',out.width='100%',fig.pos='H'}
+```{r seine-lbc, fig.cap='(ref:seine-lbc)',out.width='100%',fig.pos='H'}
 # out.width='9in'
-if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LBC.png"))) {
-  include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LBC.png"))
+if (file.exists(file.path(fig.dir, "Figs/fig_seine_proportion_set_wt.png"))) {
+  include_graphics(file.path(fig.dir, "Figs/fig_seine_proportion_set_wt.png"))
 } else {
   print("No Long Beach Carnage purse-seine sampling figure present.")
 }
 ```
 
-\elandscape
 \newpage
 
-(ref:nasc-seine-lm) Nearshore survey transects sampled by _Lisa Marie_ overlaid with the distributions of: a) 38-kHz vertically integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals) ascribed to CPS; and b) the proportion of acoustic backscatter from CPS in each purse-seine catch. Black points indicate purse-seine sets with no CPS present. Species with low catch weights may not be visible at this scale.
+[**UPDATE WITH LM FIGURE AFTER CATCH DATA IS RECEIVED**]
+(ref:seine-lm) Nearshore transects sampled by _Lisa Marie_ overlaid with the proportions of CPS, by weight, in each purse-seine catch. Black points indicate purse-seine sets with no CPS present. Species with low catch weights may not be visible at this scale.
 
-```{r nasc-seine-lm, fig.cap='(ref:nasc-seine-lm)',out.width='100%', fig.pos='H', eval=TRUE}
+```{r seine-lm, fig.cap='(ref:seine-lm)',out.width='100%', fig.pos='H', eval=TRUE}
 # out.height='6.5in'
-if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LM.png"))) {
-  include_graphics(here("Figs/fig_nasc_seine_proportion_set_wt_LM.png"))
+if (file.exists(file.path(fig.dir, "Figs/fig_nasc_seine_proportion_set_wt_LM.png"))) {
+  include_graphics(file.path(fig.dir, "Figs/fig_nasc_seine_proportion_set_wt_LM.png"))
 } else {
   print("No Lisa Marie purse-seine sampling figure present.")
 }
@@ -713,1548 +656,14 @@ if (file.exists(here("Figs/fig_nasc_seine_proportion_set_wt_LM.png"))) {
 
 \newpage
 
-(ref:nasc-prop-ns) Spatial distributions of: a) 38-kHz vertically integrated backscattering coefficients ($s_A$, m^2^ nmi^-2^; averaged over 2000-m distance intervals) ascribed to CPS from nearshore sampling; and b) proportions of CPS backscatter in trawl clusters (`r trawl.color` outline) and purse-seine sets (`r seine.color` outline) used to estimate biomasses in the nearshore region.
+# Discussion {#discussion}  
 
-```{r nasc-prop-ns, fig.cap='(ref:nasc-prop-ns)',out.width='6.5in',fig.pos='H',eval=FALSE}
-if (file.exists(here("Figs/fig_nasc_acoustic_cluster_ns.png"))) {
-  include_graphics(here("Figs/fig_nasc_acoustic_cluster_ns.png"))
-} else {
-  print("No nearsure purse-seine/backscatter figure present.")
-}
-```
+[**UPDATE**]
+The principal objectives of the Summer 2026 Integrated West Coast Pelagics Survey were to survey the stocks of Pacific Sardine, Northern Anchovy, Pacific Mackerel, Jack Mackerel, Pacific Herring, and Round Herring. Despite the original survey plan being substantially modified due to OMAO staffing issues on _`r survey.vessel`_, the combined sampling from _`r survey.vessel`_, _Shimada_, _Lisa Marie_, _Long Beach Carnage_, and Saildrone USVs spanned the offshore and nearshore areas from San Diego, CA to Cape Flattery, WA. This was made possible by the resilience and adaptability of all personnel from the various sampling platforms, who repeatedly had to modify the timing of their surveys, along with the NOAA scientists and crew who remained prepared and flexible throughout the uncertain survey schedule.
 
-\newpage
+Due to the delays and cancellations on _Lasker_, no core-region trawl sampling was conducted between Cape Mendocino, CA and Reedsport, OR (**Fig. \@ref(fig:nasc-cufes-trawl)a**). Furthermore, sampling off Baja California, MX was only conducted by _Carranza_, and presented in a separate report by IMIPAS [@Vallarta2023]. Meanwhile, the nearshore sampling by _Lisa Marie_ and _Long Beach Carnage_ was comprehensive of the US west coast. The purse seine and acoustic sampling conducted by _Lisa Marie_ north of Cape Mendocino suggests that a small amount of CPS biomass resides in the unsampled core-region area between Cape Mendocino, CA and Reedsport, OR. 
 
-```{r biomass-table-all,results='asis'}
-# Format bootstrap estimate tables
-be.table <- be  %>%
-  rename(Name = Species,
-         Number           = Stratum,
-         Transects        = nTransects,
-         Clusters         = nClusters,
-         Individuals      = nIndiv,
-         "$\\hat{B}$"     = Biomass,
-         SD               = biomass.sd,
-         CV               = biomass.cv,
-         "CI$_{L,95\\%}$" = lower.ci.B,
-         "CI$_{U,95\\%}$" = upper.ci.B) %>%
-  select(-SD)
-
-if (exists("be.ns")) {
-  be.table.ns <- be.ns  %>%
-    rename(Name = Species,
-           Number           = Stratum,
-           Transects        = nTransects,
-           Clusters         = nClusters,
-           Individuals      = nIndiv,
-           "$\\hat{B}$"     = Biomass,
-           SD               = biomass.sd,
-           CV               = biomass.cv,
-           "CI$_{L,95\\%}$" = lower.ci.B,
-           "CI$_{U,95\\%}$" = upper.ci.B) %>%
-    select(-SD)
-}
-
-if (exists("be.nse")) {
-  be.table.nse <- be.nse  %>%
-    rename(Name = Species,
-           Number           = Stratum,
-           Transects        = nTransects,
-           Clusters         = nClusters,
-           Individuals      = nIndiv,
-           "$\\hat{B}$"     = Biomass,
-           SD               = biomass.sd,
-           CV               = biomass.cv,
-           "CI$_{L,95\\%}$" = lower.ci.B,
-           "CI$_{U,95\\%}$" = upper.ci.B) %>%
-    select(-SD)
-}
-
-if (exists("be.os")) {
-  be.table.os <- be.os  %>%
-    rename(Name = Species,
-           Number           = Stratum,
-           Transects        = nTransects,
-           Clusters         = nClusters,
-           Individuals      = nIndiv,
-           "$\\hat{B}$"     = Biomass,
-           SD               = biomass.sd,
-           CV               = biomass.cv,
-           "CI$_{L,95\\%}$" = lower.ci.B,
-           "CI$_{U,95\\%}$" = upper.ci.B) %>%
-    select(-SD)
-}
-
-# Format summary table
-be.table.summ <- be.all.summ %>%
-  rename(Name = Species,
-         # Number           = Stratum,
-         Transects        = nTransects,
-         Clusters         = nClusters,
-         Individuals      = nIndiv,
-         "$\\hat{B}$"     = Biomass,
-         SD               = biomass.sd,
-         CV               = biomass.cv,
-         "CI$_{L,95\\%}$" = lower.ci.B,
-         "CI$_{U,95\\%}$" = upper.ci.B) %>%
-  select(-SD)
-```
-
-## Biomass distribution and demographics {#results-biomass-distribution}
-
-The biomasses, distributions, and demographics for each species and subpopulation are for the survey area and period and therefore may not represent the entire population. All biomass estimates are in metric tons (t).
-
-### Northern Anchovy {#results-anchovy}
-#### Northern subpopulation {#results-anchovy-northern}
-\
-The total estimated biomass of the northern subpopulation of Northern Anchovy was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-n)**). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-n)**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Northern"]` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Northern"]` cm with modes at 4 and 15 cm (**Table \@ref(tab:l-freq-summ-anch-n)**, **Fig. \@ref(fig:l-disagg-anch-n)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-n)**), comprising `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"] / (be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Northern"] + be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Northern"]))*100,big.mark=",",digits=2)`% of the total biomass. Lengths in the nearshore region had two modes at 5 and 11 cm (**Table \@ref(tab:l-freq-summ-anch-n)**; **Fig. \@ref(fig:l-disagg-anch-n)**). In both the core and nearshore regions, the subpopulation was sparsely distributed between Cape Blanco and Cape Flattery (**Fig. \@ref(fig:biom-dens-anch-n)a, b**).
-
-(ref:biomass-anch-n) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for the northern subpopulation of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-anch-n}
-
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Engraulis mordax", Stock == "Northern") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Engraulis mordax", Stock == "Northern") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Engraulis mordax", Stock == "Northern") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Engraulis mordax", Stock == "Northern") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Engraulis mordax", Stock == "Northern") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Engraulis_mordax_Northern.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-anch-n)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-anch-n) Abundance estimates (total number of individuals) versus standard length ($L_S$, cm) for the northern subpopulation of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-anch-n}
-# Print table for anchovy
-if ("Engraulis mordax" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Engraulis mordax", Stock == "Northern") %>%
-    rename('$L_S$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center", part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-anch-n)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No anchovy present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-anch-n) Biomass densities (colored points) of the northern subpopulation of Northern Anchovy (_Engraulis mordax_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Northern Anchovy in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-anch-n,fig.cap='(ref:biom-dens-anch-n)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Northern.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-anch-n) Abundance estimates (n) versus standard length ($L_S$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for the northern subpopulation of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions.
-
-```{r l-disagg-anch-n,fig.cap='(ref:l-disagg-anch-n)',out.width='6.5in',fig.pos='H'}
-# out.height='7in'
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Northern.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-#### Central subpopulation {#results-anchovy-central}
-\
-The total estimated biomass of the central subpopulation of Northern Anchovy was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c)**). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=4)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c)**). The subpopulation was distributed throughout most of the survey area from San Diego to Fort Bragg, but was most abundant north of Pt. Conception (**Fig. \@ref(fig:biom-dens-anch-c)a**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Central"]` to `r length.summ$L.max[length.summ$scientificName == 'Engraulis mordax' & length.summ$stock == "Central"]` cm with a mode at 12 cm (**Table \@ref(tab:l-freq-summ-anch-c)**, **Fig. \@ref(fig:l-disagg-anch-c)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-anch-c)**), comprising `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"] / (be.all.ns$Biomass[be.all.ns$Species == 'Engraulis mordax' & be.all.ns$Stock == "Central"] + be.all$Biomass[be.all$Species == 'Engraulis mordax' & be.all$Stock == "Central"]))*100,big.mark=",",digits=2)`% of the total biomass. The biomass was sparsely distributed between San Diego and Bodega Bay, but was greatest between San Diego and Long Beach, and between Santa Cruz and San Francisco, CA (**Fig. \@ref(fig:biom-dens-anch-c)b**). The nearshore length distribution had a mode at 12 cm (**Table \@ref(tab:l-freq-summ-anch-c)**, **Fig. \@ref(fig:l-disagg-anch-c)**).
-
-(ref:biomass-anch-c) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for the central subpopulation of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-anch-c}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Engraulis mordax", Stock == "Central") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Engraulis mordax", Stock == "Central") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Engraulis mordax", Stock == "Central") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Engraulis mordax", Stock == "Central") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Engraulis mordax", Stock == "Central") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Engraulis_mordax_Central.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-anch-c)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-anch-c) Abundance estimates (total number of individuals) versus standard length ($L_S$, cm) for the central subpopulation of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-anch-c}
-# Print table for anchovy
-if ("Engraulis mordax" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Engraulis mordax", Stock == "Central") %>%
-    rename('$L_S$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center", part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-anch-c)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No anchovy present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-anch-c) Biomass densities (colored points) of central subpopulation of Northern Anchovy (_Engraulis mordax_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Northern Anchovy in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-anch-c,fig.cap='(ref:biom-dens-anch-c)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Engraulis mordax-Central.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Engraulis mordax-Central.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-anch-c) Abundance estimates (n) versus standard length ($L_S$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for the central subpopulation of Northern Anchovy (_Engraulis mordax_) in the core and nearshore survey regions.
-
-```{r l-disagg-anch-c,fig.cap='(ref:l-disagg-anch-c)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Engraulis mordax-Central.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Engraulis mordax-Central.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-\newpage
-
-### Pacific Sardine {#results-sardine}
-#### Northern subpopulation {#results-sardine-northern}
-\
-The total estimated biomass of the northern subpopulation of Pacific Sardine was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n)**). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n)**), and was observed between Pt. Conception and Newport (**Fig. \@ref(fig:biom-dens-sar-n)a**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Northern"]` to `r length.summ$L.max[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == 'Northern']` cm with a mode at 20 cm (**Table \@ref(tab:l-freq-summ-sar-n)**, **Fig. \@ref(fig:l-disagg-sar-n)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-n)**), comprising `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"] / (be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Northern"] + be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Northern"]))*100,big.mark=",",digits=3)`% of the total biomass. Biomass was distributed between Pt. Conception and Cape Mendocino, but was most abundant along the Big Sur Coast and between Fort Bragg and Cape Mendocino (**Fig. \@ref(fig:biom-dens-sar-n)b**). Lengths in the nearshore region had a mode at 18 cm  (**Table \@ref(tab:l-freq-summ-sar-n)**, **Fig. \@ref(fig:l-disagg-sar-n)**).
-
-(ref:biomass-sar-n) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for the northern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-sar-n}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Sardinops_sagax_Northern.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-sar-n)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-sar-n) Abundance estimates (total number of individuals) versus standard length ($L_S$, cm) for the northern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-sar-n}
-# Print table for sardine
-if ("Sardinops sagax" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Sardinops sagax", Stock == "Northern") %>%
-    rename('$L_S$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center",part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-sar-n)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No sardine present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-sar-n) Biomass densities (colored points) of the northern subpopulation of Pacific Sardine (_Sardinops sagax_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Pacific Sardine in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-sar-n,fig.cap='(ref:biom-dens-sar-n)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-sar-n) Abundance estimates (n) versus standard length ($L_S$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for the northern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions.
-
-```{r l-disagg-sar-n,fig.cap='(ref:l-disagg-sar-n)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Northern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-#### Southern subpopulation {#results-sardine-southern}
-\
-The total estimated biomass of the southern subpopulation of Pacific Sardine was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=4)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Sardinops sagax' & be.all.summ$Stock == "Southern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-s)**). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-s)**), and was distributed between San Diego and Long Beach (**Fig. \@ref(fig:biom-dens-sar-s)a**). $L_S$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == "Southern"]` to `r length.summ$L.max[length.summ$scientificName == 'Sardinops sagax' & length.summ$stock == 'Southern']` cm with a mode at 19 cm (**Table \@ref(tab:l-freq-summ-sar-s)**, **Fig. \@ref(fig:l-disagg-sar-s)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-sar-s)**), comprising `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"] / (be.all.ns$Biomass[be.all.ns$Species == 'Sardinops sagax' & be.all.ns$Stock == "Southern"] + be.all$Biomass[be.all$Species == 'Sardinops sagax' & be.all$Stock == "Southern"]))*100,big.mark=",",digits=2)`% of the total biomass. The nearshore biomass was distributed throughout the survey area, but was most abundant near San Diego, Long Beach, and Santa Barbara. Lengths in the nearshore region had a mode at 16 cm (**Table \@ref(tab:l-freq-summ-sar-s)**, **Fig. \@ref(fig:l-disagg-sar-s)**).
-
-(ref:biomass-sar-s) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for the southern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-sar-s}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Sardinops sagax", Stock == "Southern") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Sardinops sagax", Stock == "Southern") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Sardinops sagax", Stock == "Southern") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Sardinops sagax", Stock == "Southern") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Sardinops sagax", Stock == "Southern") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Sardinops_sagax_Southern.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-sar-s)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-sar-s) Abundance estimates (total number of individuals) versus standard length ($L_S$, cm) for the southern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-sar-s}
-# Print table for sardine
-if ("Sardinops sagax" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Sardinops sagax", Stock == "Southern") %>%
-    rename('$L_S$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center",part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-sar-s)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No sardine present.")
-}
-```
-\newpage
-
-(ref:biom-dens-sar-s) Biomass densities (colored points) of the southern subpopulation of Pacific Sardine (_Sardinops sagax_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Pacific Sardine in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-sar-s,fig.cap='(ref:biom-dens-sar-s)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Southern.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Sardinops sagax-Southern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Sardinops sagax-Southern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-sar-s) Abundance estimates (n) versus standard length ($L_S$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for the southern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions.
-
-```{r l-disagg-sar-s,fig.cap='(ref:l-disagg-sar-s)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Sardinops sagax-Southern.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Sardinops sagax-Southern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Sardinops sagax-Southern.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-\newpage
-
-#### All Pacific Sardines in U.S. waters {#results-all-sar}
-
-The estimated biomass of all Pacific Sardines in U.S. waters, including both the northern and southern subpopulations in the core and nearshore areas,  was `r prettyNum(be.sar.all.summ$Biomass[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=4)` t (CI~95%~ = `r prettyNum(be.sar.all.summ$lower.ci.B[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=3)` - `r prettyNum(be.sar.all.summ$upper.ci.B[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.sar.all.summ$biomass.cv[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=1)`%).
-
-<!-- Additional figures and tables for the distribution and abundances of all Pacific Sardine will be available prior to publication.   -->
-
-(ref:biomass-sar-all-us) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for the northern subpopulation of Pacific Sardine (_Sardinops sagax_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-sar-all-us,eval=FALSE}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Sardinops sagax", Stock == "Northern") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Sardinops_sagax_Northern.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-sar-all-us)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-### Pacific Mackerel {#results-mack}
-
-The total estimated biomass of Pacific Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-mack)**). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%) and was sparsely distributed between San Diego and Cape Flattery (**Fig. \@ref(fig:biom-dens-mack)a**). The distribution of $L_F$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Scomber japonicus']` to `r length.summ$L.max[length.summ$scientificName == 'Scomber japonicus']` cm with modes at 27 and 42 cm (**Table \@ref(tab:l-freq-summ-mack)**, **Fig. \@ref(fig:l-disagg-mack)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Scomber japonicus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-mack)**, **Fig. \@ref(fig:biom-dens-mack)b**), comprising `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Scomber japonicus'] + be.all$Biomass[be.all$Species == 'Scomber japonicus']))*100,big.mark=",",digits=3)`% of the total biomass, and was mostly present in along the mainland coast in the SCB and around Santa Cruz and Santa Catalina Islands. Lengths in the nearshore region had modes at 23, 27, and 41 cm.
-
-(ref:biomass-mack) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for Pacific Mackerel (_Scomber japonicus_) in nearshore survey region. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-mack}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Scomber japonicus") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Scomber japonicus") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Scomber japonicus") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Scomber japonicus") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Scomber japonicus") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Scomber_japonicus_all.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-mack)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-mack) Abundance estimates (total number of individuals) versus fork length ($L_F$, cm) for Pacific Mackerel (_Scomber japonicus_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-mack}
-# Print table for mackerel
-if ("Scomber japonicus" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Scomber japonicus") %>%
-    rename('$L_F$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center",part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-mack)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No mackerel present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-mack) Biomass densities (colored points) of Pacific Mackerel (_Scomber japonicus_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Pacific Mackerel in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-mack,fig.cap='(ref:biom-dens-mack)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Scomber japonicus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Scomber japonicus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-\newpage
-
-(ref:l-disagg-mack) Abundance estimates (n) versus fork length ($L_F$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for Pacific Mackerel (_Scomber japonicus_) in the core and nearshore survey regions.
-
-```{r l-disagg-mack,fig.cap='(ref:l-disagg-mack)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Scomber japonicus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Scomber japonicus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-\newpage
-
-### Jack Mackerel {#results-jack}
-
-The total estimated biomass of Jack Mackerel was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-jack)**). In the core region, the biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=4)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-jack)**), was distributed throughout the entire survey area, but was greatest north of Bodega Bay (**Fig. \@ref(fig:biom-dens-jack)a**). $L_F$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Trachurus symmetricus']` to `r length.summ$L.max[length.summ$scientificName == 'Trachurus symmetricus']` cm, with modes at 11, 25, and 41 cm. (**Table \@ref(tab:l-freq-summ-jack)**, **Fig. \@ref(fig:l-disagg-jack)**). In the nearshore region, the biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Trachurus symmetricus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-jack)**), comprising `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] + be.all$Biomass[be.all$Species == 'Trachurus symmetricus']))*100,big.mark=",",digits=2)`% of the total biomass. Biomass was present throughout the nearshore survey area, but was greatest between Cape Mendocino and Astoria (**Fig. \@ref(fig:biom-dens-jack)b**). Lengths in the nearshore region had modes at 14, 30, and 41 cm (**Table \@ref(tab:l-freq-summ-jack)**, **Fig. \@ref(fig:l-disagg-jack)**).
-
-(ref:biomass-jack) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-jack}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Trachurus symmetricus") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Trachurus symmetricus") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Trachurus symmetricus") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Trachurus symmetricus") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Trachurus symmetricus") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Trachurus_symmetricus_All.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-jack)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-jack) Abundance estimates (total number of individuals) versus fork length ($L_F$, cm) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-jack}
-# Print table for mackerel
-if ("Trachurus symmetricus" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Trachurus symmetricus") %>%
-    rename('$L_F$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center",part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-jack)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No Jack Mackerel present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-jack) Biomass densities (colored points) of Jack Mackerel (_Trachurus symmetricus_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Jack Mackerel in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-jack,fig.cap='(ref:biom-dens-jack)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Trachurus symmetricus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-
-  if (file.exists(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Trachurus symmetricus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-jack) Abundance estimates (n) versus fork length ($L_F$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for Jack Mackerel (_Trachurus symmetricus_) in the core and nearshore survey regions.
-
-```{r l-disagg-jack,fig.cap='(ref:l-disagg-jack)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Trachurus symmetricus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Trachurus symmetricus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-\newpage
-
-### Pacific Herring {#results-her}
-
-The total estimated biomass of Pacific Herring was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-her)**). In the core region, biomass was `r prettyNum(be.all$Biomass[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all$lower.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all$upper.ci.B[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all$biomass.cv[be.all$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-her)**), and was distributed from approximately Cape Mendocino to Cape Flattery (**Fig. \@ref(fig:biom-dens-her)a**). $L_F$ in the core region ranged from `r length.summ$L.min[length.summ$scientificName == 'Clupea pallasii']` to `r length.summ$L.max[length.summ$scientificName == 'Clupea pallasii']` cm, with a mode at 15 cm (**Table \@ref(tab:l-freq-summ-her)**, **Fig. \@ref(fig:l-disagg-her)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Clupea pallasii'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-her)**, **Fig. \@ref(fig:biom-dens-her)b**), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] / (be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] + be.all$Biomass[be.all$Species == 'Clupea pallasii']))*100,big.mark=",",digits=2)`% of the total biomass, was distributed from San Francisco to Cape Flattery (**Fig. \@ref(fig:l-disagg-her)**), but was most abundant north of Newport. Lengths in the nearshore region had modes at 9 and 13 cm (**Table \@ref(tab:l-freq-summ-her)**, **Fig. \@ref(fig:l-disagg-her)**).
-
-(ref:biomass-her) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for Pacific Herring (_Clupea pallasii_) in the core and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-her}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Clupea pallasii") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Clupea pallasii") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Clupea pallasii") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Clupea pallasii") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Clupea pallasii") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Clupea_pallasii_All.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-her)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-\newpage
-
-(ref:l-freq-summ-her) Abundance estimates (total number of individuals) versus fork length ($L_F$, cm) for Pacific Herring (_Clupea pallasii_) in the core and nearshore survey regions.
-
-```{r l-freq-summ-her}
-# Print table for P. herring
-if ("Clupea pallasii" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Clupea pallasii") %>%
-    rename('$L_F$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center",part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-her)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No Pacific Herring present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-her) Biomass densities (colored points) of Pacific Herring (_Clupea pallasii_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Pacific Herring in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-her,fig.cap='(ref:biom-dens-her)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Clupea pallasii-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Clupea pallasii-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-
-  if (file.exists(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Clupea pallasii-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-her) Abundance estimates (n) versus fork length ($L_F$, in cm, upper panels) and biomass (t) versus $L_S$ (lower panels) for Pacific Herring (_Clupea pallasii_) in the core and nearshore survey regions.
-
-```{r l-disagg-her,fig.cap='(ref:l-disagg-her)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Clupea pallasii-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Clupea pallasii-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Clupea pallasii-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-<!-- ### Round Herring {#results-rher} -->
-
-<!-- The total estimated biomass of Round Herring was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.summ$biomass.cv[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=1)`%, **Table \@ref(tab:biomass-rher)**), and was located in a small region of the SCB (**Fig. \@ref(fig:biom-dens-rher)a**). $L_F$ ranged from `r length.summ$L.min[length.summ$scientificName == 'Etrumeus acuminatus']` to `r length.summ$L.max[length.summ$scientificName == 'Etrumeus acuminatus']` cm with modes at 16, 23, and 26 cm (**Table \@ref(tab:l-freq-summ-rher)**, **Fig. \@ref(fig:l-disagg-rher)**). In the nearshore region, biomass was `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.ns$lower.ci.B[be.all.ns$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.ns$upper.ci.B[be.all.ns$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.all.ns$biomass.cv[be.all.ns$Species == 'Etrumeus acuminatus'],big.mark=",",digits=1)`%; **Table \@ref(tab:biomass-rher)**, **Fig. \@ref(fig:biom-dens-rher)b**), or `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Etrumeus acuminatus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Etrumeus acuminatus'] + be.all$Biomass[be.all$Species == 'Etrumeus acuminatus']))*100,big.mark=",",digits=2)`% of the total biomass. The biomass of Round Herring was negligible and based on one positive trawl cluster and one positive seine set, each with two individuals.     -->
-
-(ref:biomass-rher) Biomass estimates (metric tons, t) and their precisions (upper and lower 95% confidence intervals, CI~95%~; and coefficients of variation, CVs) for Round Herring (_Etrumeus acuminatus_) in the core  and nearshore survey regions. Stratum areas are nmi^2^ and distance covered by transects is in nmi.
-
-```{r biomass-rher, eval=FALSE}
-be.table.sub.all <- be.table.summ %>%
-  filter(Name == "Etrumeus acuminatus") %>%
-  mutate(Region = "All")
-
-be.table.sub <- be.table %>%
-  filter(Name == "Etrumeus acuminatus") %>%
-  mutate(Region = "Core")
-
-if (exists("be.table.ns")) {
-  be.table.sub.ns <- be.table.ns %>%
-    filter(Name == "Etrumeus acuminatus") %>%
-    mutate(Region = "Nearshore")
-
-  be.table.sub <- be.table %>%
-    filter(Name == "Etrumeus acuminatus") %>%
-    mutate(Region = "Core") %>%
-    bind_rows(be.table.sub.ns) %>%
-    bind_rows(be.table.sub.all) %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-} else {
-  be.table.sub <- be.table %>%
-    filter(Name == "Etrumeus acuminatus") %>%
-    mutate(Region = "Core") %>%
-    ungroup() %>%
-    select(Region, everything(), -Name, -Stock)
-}
-
-# Write results to CSV for stock assessors
-be.table.sub %>%
-  rename("point_estimate" = "$\\hat{B}$",
-         "ci_lower" = "CI$_{L,95\\%}$",
-         "ci_upper" =	"CI$_{U,95\\%}$") %>%
-  write_csv(file = here("Output/biomass_final_Etrumeus_acuminatus_All.csv"),
-            na = "")
-
-if (nrow(be.table.sub) != 0) {
-  if (doc.type == "docx") {
-    regulartable(be.table.sub) %>%
-      merge_v(j = c("Region")) %>%
-      add_header(Region  = "",
-                 # Stock    = "",
-                 Number   = "Stratum", Area = "Stratum", Transects = "Stratum", Distance = "Stratum",
-                 Clusters = "Trawl", Individuals = "Trawl",
-                 "$\\hat{B}$" = "Biomass", "CI$_{L,95\\%}$" = "Biomass", "CI$_{U,95\\%}$" = "Biomass",
-                 CV = "Biomass") %>%
-      merge_h(part = "header") %>%
-      align(align = "center",part = "header") %>%
-      autofit()
-  } else {
-    kable(be.table.sub, format = knitr.format, booktabs = FALSE, escape = FALSE,
-          align           = c(rep("l", 1), rep("r",ncol(be.table.sub) - 2)),
-          digits          = c(0),
-          format.args     = list(big.mark = ","),
-          caption = '(ref:biomass-rher)') %>%
-      kable_styling(latex_options = c("hold_position","scale_down"),
-                    position = "center",
-                    font_size = 8) %>%
-      row_spec(nrow(be.table.sub), bold = T) %>%
-      collapse_rows(columns = 1, valign = "top") %>%
-      add_header_above(c("Stratum" = 5, "Trawl" = 2, "Biomass" = 4))
-  }
-} else {
-  print("No results for this species/subpopulation.")
-}
-```
-
-\newpage
-
-(ref:l-freq-summ-rher) Abundance estimates (total number of individuals) versus fork length ($L_F$, cm) for Round Herring (_Etrumeus acuminatus_) in the core region. No Round Herring were caught in the nearshore region.
-
-```{r l-freq-summ-rher,eval=FALSE}
-# Print table for round herring
-if ("Etrumeus acuminatus" %in% unique(abund.summ.all$Species)) {
-  abund.summ.table <- abund.summ.all %>%
-    filter(Species == "Etrumeus acuminatus") %>%
-    rename('$L_F$' = SL) %>%
-    select(-Species, -Stock)
-
-  if (nrow(abund.summ.table) != 0) {
-    if (doc.type == "docx") {
-      regulartable(abund.summ.table) %>%
-        align(align = "center",part = "header") %>%
-        autofit()
-    } else {
-      kable(abund.summ.table, format = "latex", booktabs = FALSE,
-            escape = FALSE, longtable = TRUE,
-            digits = c(0),
-            format.args = list(big.mark = ","),
-            caption = '(ref:l-freq-summ-rher)') %>%
-        kable_styling(latex_options = c("repeat_header")) %>%
-        add_header_above(c(" " = 1, "Region" = ncol(abund.summ.table)-1)) %>%
-        row_spec(0, align = c("c"))
-    }
-  }
-} else {
-  print("No Round Herring present.")
-}
-```
-
-\newpage
-
-(ref:biom-dens-rher) Biomass densities (colored points) of Round Herring (_Etrumeus acuminatus_), per stratum, in the a) core and b) nearshore survey regions. Overlaid are the locations of trawl clusters (blue numbers) or purse-seine samples (red numbers) with at least one Round Herring in each stratum (colored polygons). Thick gray lines represent acoustic transects.
-
-```{r biom-dens-rher,eval=FALSE,fig.cap='(ref:biom-dens-rher)',out.width='6.5in',fig.pos='H'}
-# Include only for the core region; none collected in the nearshore region.
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_biomass_dens_combo_Etrumeus acuminatus-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_combo_Etrumeus acuminatus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-
-  if (file.exists(here("Figs/fig_biomass_dens_Etrumeus acuminatus-All.png"))) {
-    include_graphics(here("Figs/fig_biomass_dens_Etrumeus acuminatus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-(ref:l-disagg-rher) Estimated abundance (upper panel) and biomass (lower panel) versus fork length ($L_F$, cm) for Round Herring (_Etrumeus acuminatus_) in the core survey region. No Round Herring were caught in the nearshore region.
-
-```{r l-disagg-rher,eval=FALSE,fig.cap='(ref:l-disagg-rher)',out.width='6.5in',fig.pos='H'}
-if (combine.regions) {
-  if (file.exists(here("Figs/fig_L_disagg_combo_Etrumeus acuminatus-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_combo_Etrumeus acuminatus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-
-} else {
-  if (file.exists(here("Figs/fig_L_disagg_Etrumeus acuminatus-All.png"))) {
-    include_graphics(here("Figs/fig_L_disagg_Etrumeus acuminatus-All.png"))
-  } else {
-    print("No results for this species/subpopulation.")
-  }
-}
-```
-
-\newpage
-
-# Discussion {#discussion}
-
-The primary objective of the ATM surveys is to estimate the biomasses, distributions, and demographics of CPS within the survey area at the time of the survey. The 2025 IWCPS allocated `r survey.das` DAS for the survey aboard _`r survey.vessel`_. Due to inclement weather and personnel and mechanical issues with the ship and her crew, respectively, the ship was underway for only 69 DAS (or ~`r round((69/survey.das)*100)`%) and only 56 DAS (or ~`r round((56/survey.das)*100)`%) were available to conduct ATM sampling. The sampling of the nearshore region by F/Vs _Long Beach Carnage_ and _Lisa Marie_ was accomplished with minimal loss of survey days, all of which were testament to the planning, preparation, and skill of all parties involved. Coordination between the core and nearshore survey platforms had minimal spatial or temporal separation, except for when _`r survey.vessel`_ was not at sea for long and unanticipated periods of time.
-
-Despite the losses of DAS, the `r tolower(survey.season)` `r survey.year` survey area spanned the expected distribution of the northern subpopulation of Pacific Sardine and northern subpopulation of Northern Anchovy in U.S. waters, but also portions of the expected distribution of the southern subpopulation of Pacific Sardine, central subpopulation of Northern Anchovy, Pacific Mackerel, Jack Mackerel, and Pacific Herring. However, due to the loss of DAS, several acoustic transects were randomly dropped between Pt. Conception and Cape Mendocino, and every other transect was dropped between Brookings, OR and Cape Flattery, resulting in 30-nmi transect spacing and reduced trawl sampling effort for the latter, with an unknown effect on the precision of biomass estimates in those areas.
-
-## Biomass and abundance
-### Northern Anchovy {#discussion-anchovy-biomass}
-#### Northern subpopulation {#discussion-anchovy-biomass-northern}
-
-The estimated biomass of the northern subpopulation of Northern Anchovy in the survey region north of Astoria was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Northern"], big.mark=",", digits = 1)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Northern"],big.mark=",",digits=1)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Northern"],big.mark=",",digits=2)` t) in summer 2025. The northern subpopulation biomass has comprised a small fraction (`r round(min(biomass.pct.anch.n$biomass.pct),1)` to `r round(max(biomass.pct.anch.n$biomass.pct),1)`%) of the total CPS biomass in the CCE since at least 2015 [@Stierhoff2021a], and the 2025 point estimate is higher than the `r prettyNum(biomass.pct.anch.n$biomass[biomass.pct.anch.c$year == 2024],big.mark=",",digits=5)` t observed in summer 2024 [@Stierhoff2025].
-
-#### Central subpopulation {#discussion-anchovy-biomass-central}
-
-The estimated biomass of the central subpopulation of Northern Anchovy in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Central"],big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Engraulis mordax" & be.all.summ$Stock == "Central"],big.mark=",",digits=5)` t), making up `r round(be.all.summ$Biomass[be.all$Species == "Engraulis mordax" & be.all$Stock == "Central"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass in summer 2025, and has comprised a substantial portion of the CPS biomass in the CCE since approximately 2016. The biomass point estimate in 2025 increased `r prettyNum(((be.all.summ$Biomass[be.all.summ$Species == 'Engraulis mordax' & be.all.summ$Stock == "Central"]-biomass.pct.anch.c$biomass[biomass.pct.anch.c$year == 2024])/biomass.pct.anch.c$biomass[biomass.pct.anch.c$year == 2024])*100,big.mark=",",digits=2)`% from the `r prettyNum(biomass.pct.anch.c$biomass[biomass.pct.anch.c$year == 2024],big.mark=",",digits=5)` t estimated in summer 2024 [@Stierhoff2025]. This estimate excludes an unquantified but relatively small amount of biomass attributed to deep (i.e., $\ge$ 30 m) Northern Anchovy schools in the nearshore region. This is an ongoing area of research to investigate how to better incorporate this biomass in any future revisions.
-
-<!-- **The decrease in biomass in 2024 may also be due in part to the decreased northern extent of the distribution, which typically extends to Cape Mendocino but ended near San Francisco this year. We will continue exploring additional explanations for the apparent decline in biomass observed since 2022.**   -->
-
-<!-- Additional scrutiny of the 2023 survey data identified one acoustic transect near San Francisco with a significant CPS backscatter density that greatly increased both the point estimate and the confidence intervals (see **Fig. \@ref(fig:biomass-ts-combo)a**). For example, removing that transect reduced the 2023 biomass estimate by ~`r prettyNum((2700000-245000-945000)/2700000*100, digits = 2)`%, which would have resulted in a more gradual decrease in the biomass of the central subpopulation of Northern Anchovy over the past three survey years.  -->
-
-<!-- If this transect is removed, the biomass of the central subpopulation of Northern Anchovy in 2023 was approximately 945,000 t (700,000 t in core region and 245,000 t in nearshore region), which is comparable to the biomass estimated in 2024 but approximately 60% less than the biomass estimated in 2022.  -->
-
-<!-- **In summer 2024, the biomass of Northern Anchovy below the thermocline (>30 m depth) was `r prettyNum(241822-156926, big.mark=",", digits = 5)` t, which was `r round((241822-156926)/241822*100, 0)`% of the biomass in the nearshore region, and `r round((241822-156926)/be.all.summ$Biomass[be.all.summ$Species == "Engraulis mordax" & be.all$Stock == "Central"]*100, 1)`% of the biomass in the core and nearshore regions combined.**  -->
-
-### Pacific Sardine {#discussion-sardine}
-#### Northern subpopulation {#discussion-sardine-biomass-northern}
-
-The southern extent of northern subpopulation Pacific Sardine habitat was `r names(stock.break.sar)` based on the potential habitat model [@Zwolinski2024]. The northern extent based on the biological samples is southern Oregon. Unlike previous years, there was not a clear separation in the biomass density (**Fig. \@ref(fig:tx-biom-dens)**) or length composition around the habitat break (**Fig. \@ref(fig:tx-biom-dens)**) and visual differences in length compositions (**Fig. \@ref(fig:sardine-stock-allocation)**). The estimated biomass of `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all$Stock == "Northern"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"], big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Northern"], big.mark=",",digits=5)` t) in the survey region was a decrease from the `r prettyNum(biomass.pct.sar.n$biomass[biomass.pct.sar.n$year == 2024],big.mark=",", digits = 5)` t estimated in summer 2024 [@Stierhoff2025]. However, unlike in 2024 when 99.7% of the biomass was in the nearshore region, the 2025 biomass attributed to the northern subpopulation was greater in the core survey regions. Since 2014, the ATM biomass of the northern subpopulation of Pacific Sardine has remained less than the 150,000 t rebuilding target adopted by the Pacific Fishery Management Council in 2020^[https://www.pcouncil.org/documents/2020/08/g-1-attachment-1-pacific-sardine-rebuilding-plan-preliminary-environmental-analysis.pdf/] (**Figs. \@ref(fig:biomass-ts-combo)**). Japanese Sardine (_S. melanosticta_) have been present in the survey area since 2022 [@Longo2024; @Longo2025], but have not been separated out from Pacific Sardine biomass estimates. Since 2024, the length composition of the sardine complex in the NSP habitat has shown a decrease in the proportion of large sardine (200 mm and over) that were common in the Pacific Northwest (PNW) even after the closure of the fishery, but before the appearance of Japanese Sardine [see @Stierhoff2025, and references therein].
-
-#### Southern subpopulation {#discussion-sardine-biomass-southern}
-
-The estimated biomass of the southern subpopulation of Pacific Sardine was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",", digits = 5)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"], big.mark=",",digits=5)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"],big.mark=",",digits=5)` t), of which `r prettyNum(be.all.ns$Biomass[be.all.ns$Species == "Sardinops sagax" & be.all.ns$Stock == "Southern"], big.mark=",", digits = 5)` t (`r prettyNum(be.all.ns$Biomass[be.all.ns$Species == "Sardinops sagax" & be.all.ns$Stock == "Southern"]/be.all.summ$Biomass[be.all.summ$Species == "Sardinops sagax" & be.all.summ$Stock == "Southern"]*100, big.mark=",", digits = 1)`%) occurred in the nearshore region in the SCB. The southern subpopulation was first observed in U.S. waters by the SWFSC's ATM surveys in 2016 [`r prettyNum(biomass.pct.sar.s$biomass[biomass.pct.sar.s$year == 2016],big.mark=",", digits = 1)` t, @Stierhoff2021b]. Since then, the southern subpopulation biomass in U.S. waters has persisted. The biomass estimated in 2025 is within the range of biomasses from `r prettyNum(biomass.pct.sar.s$biomass[biomass.pct.sar.s$year == 2019],big.mark=",", digits = 3)` t estimated in summer 2019 [@Stierhoff2020b] to `r prettyNum(biomass.pct.sar.s$biomass[biomass.pct.sar.s$year == 2021],big.mark=",", digits = 3)` t in summer 2021 [@Stierhoff2023a]. In 2017, the summer survey did not extend into the SCB [@Zwolinski2019a], and no summer survey was conducted in 2020 due to the COVID-19 pandemic. Unlike prior years, no contemporaneous survey of CPS was conducted by Mexico off Baja CA in summer 2025.
-
-#### All Pacific Sardines in U.S. waters {#discussion-all-sar-subpopulations}
-
-The estimated biomass of all Pacific Sardines in U.S. waters (i.e., excluding any biomass observed in Mexico or Canada), derived by combining the northern and southern subpopulation estimates, was `r prettyNum(be.sar.all.summ$Biomass[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=4)` t (CI~95%~ = `r prettyNum(be.sar.all.summ$lower.ci.B[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=3)` - `r prettyNum(be.sar.all.summ$upper.ci.B[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=3)` t, CV = `r prettyNum(be.sar.all.summ$biomass.cv[be.sar.all.summ$Species == 'Sardinops sagax'],big.mark=",",digits=1)`%, **Fig. \@ref(fig:biomass-ts-sar-us)**). The biomass of the southern subpopulation was first estimated in the summer of 2016, prior to which all biomass was attributed to the northern subpopulation. The combined biomass peaked in summer 2022, and has remained lower since.
-
-(ref:biomass-ts-sar-us) Estimated biomasses ($t$) of the northern, southern, and combined subpopulations of Pacific Sardine (_Sardinops sagax_) in U.S. waters since 2008. Error bars are approximate 95% confidence intervals based on `r prettyNum(boot.num, big.mark = ",")` bootstrap estimates.
-
-```{r biomass-ts-sar-us,fig.cap='(ref:biomass-ts-sar-us)', out.width='6in',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_ts_line_all_US_sardine.png"))) {
-  include_graphics(here("Figs/fig_biomass_ts_line_all_US_sardine.png"))
-} else {
-  print("No time series combination bar chart available.")
-}
-```
-
-\newpage
-
-### Pacific Mackerel {#discussion-mack}
-
-In summer 2025, the estimated biomass of Pacific Mackerel in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Scomber japonicus'],big.mark=",",digits=3)` t), which is within the range of recent estimates (`r prettyNum(min(biomass.pct.mack$biomass[biomass.pct.mack$year %in% c(2016:2024)]),big.mark=",",digits=3)` - `r prettyNum(max(biomass.pct.mack$biomass[biomass.pct.mack$year %in% c(2016:2024)]),big.mark=",",digits=3)`) between 2016 and 2024, and comprised less than 1% of the total CPS biomass in the survey area.
-
-### Jack Mackerel {#discussion-jack}
-
-In summer 2025, the estimated biomass of Jack Mackerel in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Trachurus symmetricus'],big.mark=",",digits=3)` t), with `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] / (be.all.ns$Biomass[be.all.ns$Species == 'Trachurus symmetricus'] + be.all$Biomass[be.all$Species == 'Trachurus symmetricus']))*100,big.mark=",",digits=2)`% of the total biomass in the nearshore region. The 2025 estimate was an increase from the `r prettyNum(biomass.pct.jack$biomass[biomass.pct.jack$year == 2024],big.mark=",", digits = 5)` t estimated in summer 2024 [@Stierhoff2025], and comprised `r round(be.all.summ$Biomass[be.all$Species == "Trachurus symmetricus"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass in the survey area.
-
-<!-- a `r round((be.all.summ$Biomass[be.all.summ$Species == 'Trachurus symmetricus']-biomass.pct.jack$biomass[biomass.pct.jack$year == 2024])/biomass.pct.jack$biomass[biomass.pct.jack$year == 2024],1)*100`% -->
-
-### Pacific Herring {#discussion-herring}
-
-In summer 2025, the estimated biomass of Pacific Herring in the survey region was `r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Clupea pallasii'],big.mark=",",digits=3)` t), with `r prettyNum((be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] / (be.all.ns$Biomass[be.all.ns$Species == 'Clupea pallasii'] + be.all$Biomass[be.all$Species == 'Clupea pallasii']))*100,big.mark=",",digits=2)`% of the total biomass in the nearshore region. The 2025 estimate was an increase from the `r prettyNum(biomass.pct.her$biomass[biomass.pct.her$year == 2024],big.mark=",", digits = 5)` t estimated in summer 2024 [@Stierhoff2025], but similar to the estimate from 2023 (`r prettyNum(biomass.pct.her$biomass[biomass.pct.her$year == 2023],big.mark=",", digits = 5)` t), and comprised `r round(be.all.summ$Biomass[be.all$Species == "Clupea pallasii"]/sum(be.all.summ$Biomass)*100)`% of the total CPS biomass in the survey area.
-
-<!-- a `r (round(((be.all.summ$Biomass[be.all.summ$Species == 'Clupea pallasii']-biomass.pct.her$biomass[biomass.pct.her$year == 2024])/biomass.pct.her$biomass[biomass.pct.her$year == 2024])*100,0))`%  -->
-
-<!-- ### Round Herring {#discussion-rherring}  -->
-
-<!-- In summer 2025, the estimated biomass of Round Herring was negligible (`r prettyNum(be.all.summ$Biomass[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t (CI~95%~ = `r prettyNum(be.all.summ$lower.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` - `r prettyNum(be.all.summ$upper.ci.B[be.all.summ$Species == 'Etrumeus acuminatus'],big.mark=",",digits=3)` t), and based on one positive trawl cluster and one positive seine set, each with two individuals.   -->
-
-\newpage
-
-(ref:sardine-stock-allocation) Summary of lengths for Pacific Sardine sampled during the summer 2025 survey:  a) relative length distribution of individuals classified as northern (blue) and southern (red) subpopulations (NSP and SSP, respectively); b) individual length measurements (grey points) and mean lengths (blue and red points for NSP and SSP, respectively) for each trawl cluster versus latitude; and c) locations of trawls clusters with Pacific Sardine assigned to each subpopulation (blue and red points) based on the predicted potential habitat for the NSP [@Zwolinski2024] at the time the survey passed Pt. Conception (July 1, 2025).
-
-```{r sardine-stock-allocation,fig.cap='(ref:sardine-stock-allocation)',out.width='6in',fig.pos='H'}
-include_graphics(here("Images/img_sardine_stock_structure_lengths_summer2025.jpg"))
-```
-
-\newpage
-
-## Uncertainty in the nearshore estimates {#discussion-nearshore-biomass-uncertainty}
-
-<!-- https://docs.google.com/document/d/1YT27-F5GNMiY21Vwiwcf-SFj8ZPPhDuMWensDg17CYI/edit?tab=t.0#heading=h.662p1f86g02j -->
-
-Accurate assignment of acoustic echoes to species is necessary for unbiased estimates of CPS biomass using the ATM. Acousticians often classify echoes based on visual similarities to those of representative echoes ground-truthed by daytime trawling. This “expert-classification” method is adequate in areas of gradually varying species composition and when different species have distinctive acoustic features. However, in regions with high species diversity, such as the California Current Ecosystem, CPS that co-occur in the epipelagic habitat can be difficult to differentiate. Instead of performing _ad hoc_ classification of individual schools using the expert classification approach, SWFSC applies  a nearest neighbor allocation of species composition from a cluster of proximal nighttime trawls. This method takes advantage of the typical dispersal of CPS in the upper water column during the night, allowing for the determination of the regional species composition and their lengths. The nighttime species proportions, weighted by their mean acoustic backscattering cross-sections, are used to apportion the backscatter of acoustically-identified epipelagic fish schools observed during the day. While the latter allows for an objective, repeatable, user-independent procedure that puts the burden of classification in judiciously placed trawls, its application to the nearshore daytime acoustic-seine survey requires additional consideration.
-
-The use of nighttime trawl clusters for apportioning backscatter by species was devised under the working hypothesis that all CPS identified acoustically during the day migrate to and disperse in the upper mixed layer at night. Contrary to nighttime trawling, which targets randomly dispersed fishes, daytime purse-seining relies on the targeted sampling of individual schools, or portions of them. Therefore, each purse-seine sample is representative of a single school, whereas the nighttime trawl clusters can be composed of multiple schools. It then follows that daytime purse-seine sampling would require multiple sets randomly located along the transects to provide the same efficiency as a cluster of nighttime trawls. Purse-seining is further limited to capturing schools that are shallower than the depth of the net, which is approximately 27 m on _Long Beach Carnage_ and 40 m on _Lisa Marie_. Additionally, the success of the capture is greater when the schools are closer to the surface or when the bottom is shallow enough to prevent fish escaping by diving below the net. These constraints are evident in the nearshore sampling off California where most of the nearshore purse-seine sampling occurs within 1 nmi from the coast (**Fig. \@ref(fig:nearshore-sampling-bias-2025)**), despite the presence of CPS further offshore (**Fig. \@ref(fig:nasc-seine-lbc)a**).
-
-(ref:nearshore-sampling-bias-2025) The nearshore survey track executed by _Long Beach Carnage_ (continuous black line) and the location of purse-seine sets (white-filled circles). Of the 16 purse-seine sets performed in the mainland portion of this region, only one occurred in the offshore part of the transect, highlighting the preference for inshore sampling.
-
-```{r nearshore-sampling-bias-2025,fig.cap='(ref:nearshore-sampling-bias-2025)', out.width='4in',fig.pos='H'}
-if (file.exists(here("Images/img_nearshore_sampling_bias_2025.png"))) {
-  include_graphics(here("Images/img_nearshore_sampling_bias_2025.png"))
-} else {
-  print("No plot available.")
-}
-```
-
-During the day, Pacific Sardine and Northern Anchovy form well-defined epipelagic schools. From 2008-2013, when Pacific Sardine dominated the CPS community, the majority of echosounder-detected CPS schools occurred in the upper mixed layer. As the central subpopulation of Northern Anchovy rebounded and began to dominate the CPS community off California, their schools were observed over a wider range of depths and often closer to the bottom than Pacific Sardine. Based on our experience and conversations with the operators of the purse-seine vessels, Northern Anchovy schools are often more well-defined, denser, and deeper than those of Pacific Sardine, making them more likely to escape the purse-seine sets in clear, deep water. That understanding led us to adapt a nearest-neighbor approach for using catches from the nearest purse-seine or trawl to apportion nearshore backscatter from the upper mixed layer, which is approximately between the surface and 30 m depth. Below the thermocline, echoes from CPS schools are considered to be Northern Anchovy or Pacific Herring, depending on latitude.
-
-Unbiased classification of CPS in the epipelagic region still requires random or representative sampling of all schools observed along the transects. In the presence of a strong inshore-offshore gradient of the species distribution (**Fig. \@ref(fig:nearshore-sampling-bias-2025)**), the preferential sampling in the nearshore region (**Fig. \@ref(fig:nearshore-sampling-bias-2025)**) introduces an unquantified bias. Specifically, the preferential sampling of the Pacific Sardine-dominated region very close to the shore (i.e., less than 1 nmi in most cases; **Fig. \@ref(fig:nearshore-sampling-bias-2025)**), is unlikely to capture well the transition to areas inhabited by Northern Anchovy. Using our standard approach, dense, unsampled CPS schools observed up to 5 nmi from the coast of central California were classified as Pacific Sardine based on purse-seine sets conducted very close to shore (**Figs. \@ref(fig:nearshore-sampling-bias-2025)** and **\@ref(fig:species-proportion-inshore-offshore-2025)**). As a result, estimates of Pacific Sardine biomass would be positively biased by the inclusion of backscatter deeper and farther from shore that is more likely to be Northern Anchovy. In 2026, we plan to shift the timing of purse-seine sampling for the nearshore survey towards the evening, which is expected to allow for more representative biological sampling of CPS community.
-
-(ref:species-proportion-inshore-offshore-2025) Relative species composition (by weight) of Northern Anchovy (green), Pacific Sardine (red) and Jack Mackerel (blue) in purse-seine (black border) and trawl (white border) samples collected off the central coast of California. The region between 1 to 4 nmi from the coast (gray-shaded region) has the least amount of biological sampling.
-
-```{r species-proportion-inshore-offshore-2025,fig.cap='(ref:species-proportion-inshore-offshore-2025)', out.width='3in',fig.pos='H'}
-if (file.exists(here("Images/img_species_proportion_alongshore_2025.jpg"))) {
-  include_graphics(here("Images/img_species_proportion_alongshore_2025.jpg"))
-} else {
-  print("No time series plot available.")
-}
-```
-
-## Ecosystem dynamics: Forage fish community {#discussion-ecosystem-dynamics}
-
-The acoustic-trawl method (ATM) has been used to monitor the biomasses and distributions of pelagic and mid-water fish stocks worldwide [e.g., @Coetzee2008; @Karp1994; @Simmonds2009]. In 2006, the SWFSC's ATM survey in the CCE focused on Pacific Sardine [@Cutter2008], but evolved to assess the five most abundant CPS [@Zwolinski2014]: Pacific Sardine, Northern Anchovy, Jack Mackerel, Pacific Mackerel, and Pacific Herring. In the CCE, ATM surveys have been used to directly assess Pacific Hake [@JTC2014; @Edwards2018]; northern subpopulation of Pacific Sardine [@Hill2017; @Kuriyama2020; @Kuriyama2022b]; northern [@Mais1974; @Mais1977] and central subpopulations [@Kuriyama2022a] of Northern Anchovy; and Pacific Mackerel [@Crone2015; @Crone2019; @Kuriyama2023]. The proportions of these subpopulations that are in water too shallow to be sampled by NOAA ships are estimated using samples collected from fishing vessels. Also, concurrent satellite- and ship-based measures of their biotic and abiotic habitats are used to provide an ecosystem perspective.
-
-Collectively, these annual or bi-annual ATM surveys provide a unique insight into the dynamics of forage fishes in the CCE, including their distributions, abundances, interactions, and environments. For example, results from 2006 through 2013 indicate that Pacific Sardine dominated the CPS assemblage, but their biomass was declining [@Demer2012a; @Zwolinski2012a] and their seasonal migration was contracting [@Zwolinski2014]. Meanwhile, harvest rates for the declining subpopulation increased [@Demer2017], and the total forage-fish biomass decreased to less than 200,000 t in 2014 and 2015 (**Figs. \@ref(fig:biomass-ts-combo)a,b**). The U.S. fishery for Pacific Sardine was closed in 2015 [@NMFS2015], and there were reports of mass strandings, deaths, and reproductive failures in Brown Pelicans (_Pelecanus occidentalis_^[https://e360.yale.edu/features/brown_pelicans_a_test_case_for_the_endangered_species_act]), Common Murres (_Uria aalge_), Brandt’s Cormorants (_Phalacrocorax penicillatus_), and California sea lions (_Zalophus californianus_^[https://www.fisheries.noaa.gov/national/marine-life-distress/2013-2017-california-sea-lion-unusual-mortality-event-california]) [@McClatchie2016], all of which depend on forage species. NOAA deemed the northern subpopulation of Pacific Sardine overfished in 2019.
-
-The survey-estimated CPS biomasses since 2008 were dominated by northern subpopulation Pacific Sardine until 2013, Jack Mackerel in 2014 and 2015, and then central subpopulation of Northern Anchovy since 2015, when it was resurgent. The biomass of the central subpopulation of Northern Anchovy, which had been increasing rapidly since 2015 and grew to ~2.75 million metric tons by 2021 [@Stierhoff2023a], began decreasing after 2023 but still comprises the majority of CPS biomass in the CCE. Meanwhile, the northern and southern subpopulations of Pacific Sardine, delineated at Point Conception in 2025, were distributed approximately equally between the core and nearshore regions, with very little biomass north of Cape Mendocino. Comparatively, in 2023, the subpopulations of Pacific Sardine were delineated at Bodega Bay, with the northern subpopulation observed predominantly off Washington and central Oregon [@Stierhoff2024]. However, because the change in distribution largely follows the geographical change in potential habitat, there is no indication that the biomasses of the northern or southern subpopulations of Pacific Sardine have changed significantly since summer 2023. The southern subpopulation of Pacific Sardine has been present in U.S. waters since at least 2015, located mostly nearshore, south of Monterey Bay; the biomass of the northern subpopulation has been fluctuating below 100,000 t mostly off Oregon and Washington. Meanwhile, the biomass of Pacific Mackerel remained the lowest in the assemblage, and the biomass of Jack Mackerel trended up from 2017 through 2022. In 2023, the delayed and smaller survey in the northern area created uncertainty about the decrease in Jack Mackerel biomass (**Fig. \@ref(fig:biomass-ts-combo)**), perhaps corroborated by the 2024 biomass being between the 2021 and 2022 biomasses (**Fig. \@ref(fig:biomass-ts-combo)b**). In 2024, the biomass of Jack Mackerel was roughly equal to the biomass of the central subpopulation of Northern Anchovy, with each contributing to 41% and 45% of the total CPS biomass, respectively.
-
-<!-- The biomass of the central subpopulation of Northern Anchovy, which had been growing rapidly since 2015, still comprises the majority of CPS biomass in the CCE but remains below its peak estimated in 2023 [@Stierhoff2024]. Meanwhile, the northern and southern subpopulations of Pacific Sardine, delineated at Point Conception, were distributed approximately equally between the core and nearshore regions, with very little biomass north of Cape Mendocino. Comparatively, in 2023, the subpopulations of Pacific Sardine were delineated at Bodega Bay, with the northern subpopulation observed predominantly off Washington and central Oregon [@Stierhoff2024]. However, because the change in distribution largely follows the geographical change in potential habitat, there is no indication that the biomasses of the northern or southern subpopulations of Pacific Sardine have changed significantly since summer 2023. **[When ready, add a sentence about all P. sardine in U.S. waters]**   -->
-
-<!-- <!-- After re-examination of the 2023 survey data, a single acoustic transect near San Francisco was identified as having significant influence on both the biomass point estimate and confidence intervals. In any case, the biomass of the central subpopulation of Northern Anchovy appears to have declined recently.  --> -->
-
-<!-- The survey-estimated CPS biomasses since 2008 were dominated by northern subpopulation Pacific Sardine until 2013, Jack Mackerel in 2014 and 2015, and then central subpopulation of Northern Anchovy since 2015, when it was resurgent. The latter subpopulation grew to ~2.75 million metric tons by 2021 [@Stierhoff2023a], and hovered around ~2.5 million metric tons before decreasing after 2023. Meanwhile, the biomass of Pacific Mackerel remained the lowest in the assemblage, and the biomass of Jack Mackerel trended up from 2017 through 2022. In 2023, the delayed and smaller survey in the northern area created uncertainty about the decrease in Jack Mackerel biomass (**Fig. \@ref(fig:biomass-ts-combo)**), perhaps corroborated by the 2024 biomass being between the 2021 and 2022 biomasses (**Fig. \@ref(fig:biomass-ts-combo)b**). In 2024, the biomass of Jack Mackerel was roughly equal to the biomass of the central subpopulation of Northern Anchovy, with each contributing to 41% and 45% of the total CPS biomass, respectively. The biomasses of northern and southern subpopulations of Pacific Sardine are calculated separately based on oceanographic habitat [@Zwolinski2024]. The southern subpopulation of Pacific Sardine has been present in U.S. waters since at least 2015, located mostly nearshore, south of Monterey Bay; the biomass of the northern subpopulation has been fluctuating below 100,000 t mostly off Oregon and Washington.   -->
-
-(ref:species-proportion-time-series) Distributions of species proportions in _`r survey.vessel`_’s nighttime trawl catches, summer 2015 through 2022. In 2015, the integrated CPS-hake survey sample northward of Vancouver Island. In 2017, there was no sampling in the SCB. In 2020, there was no survey due to the COVID-19 pandemic. In 2021, through a collaboration with Mexico, the CPS survey extended farther south into Baja California. In 2022, there was no nighttime trawl sampling north of Cape Mendocino, California.
-
-```{r species-proportion-time-series,fig.cap='(ref:species-proportion-time-series)', out.width='9in',fig.pos='H',eval=FALSE}
-if (file.exists(here("Images/img_species_proportion_distributions_2015-2022.png"))) {
-  include_graphics(here("Images/img_species_proportion_distributions_2015-2022.png"))
-} else {
-  print("No time series plot available.")
-}
-```
-
-(ref:biomass-ts-line) Estimated biomasses ($t$) of the `r num2words(n_distinct(biomass.ts$group))` most abundant CPS populations or subpopulations of `r num2words(n_distinct(biomass.ts$species))` species in the CCE during summer since 2008. Surveys typically span the area between Cape Flattery and San Diego, but in some years also include Vancouver Island, Canada (2015-2019, 2024) and portions of Baja CA (2021-2022, 2024). Error bars are 95% confidence intervals.
-
-```{r biomass-ts-line,fig.cap='(ref:biomass-ts-line)', out.width='7in',fig.pos='H',eval=FALSE}
-if (file.exists(here("Figs/fig_biomass_ts_line.png"))) {
-  include_graphics(here("Figs/fig_biomass_ts_line.png"))
-} else {
-  print("No time series plot available.")
-}
-```
-
-(ref:biomass-ts-bar) Cumulative estimated biomass ($t$) of the `r num2words(n_distinct(biomass.ts$group))` most abundant CPS populations or subpopulations of `r num2words(n_distinct(biomass.ts$species))` species in the CCE during summer since 2008. Surveys typically span the area between Cape Flattery and San Diego, but in some years also include Vancouver Island, Canada (2015-2019, 2024) and portions of Baja CA (2021-2022, 2024).
-
-```{r biomass-ts-bar,fig.cap='(ref:biomass-ts-bar)', out.width='7in',fig.pos='H',eval=FALSE}
-if (file.exists(here("Figs/fig_biomass_ts_bar.png"))) {
-  include_graphics(here("Figs/fig_biomass_ts_bar.png"))
-} else {
-  print("No time series bar chart available.")
-}
-```
-
-(ref:biomass-ts-combo) a) Estimated and b) cumulative estimated biomasses ($t$) of the `r num2words(n_distinct(biomass.ts$group))` most abundant CPS populations or subpopulations of `r num2words(n_distinct(biomass.ts$species))` species in the CCE during summer since 2008. Error bars in panel a) are approximate 95% confidence intervals based on `r prettyNum(boot.num, big.mark = ",")` bootstrap estimates. Surveys typically span the area between Cape Flattery and San Diego, but in some years also include Vancouver Island, Canada (2015-2019, 2024) and portions of Baja CA (2021-2022, 2024).
-
-```{r biomass-ts-combo,fig.cap='(ref:biomass-ts-combo)', out.width='6.5in',fig.pos='H'}
-if (file.exists(here("Figs/fig_biomass_ts_combo.png"))) {
-  include_graphics(here("Figs/fig_biomass_ts_combo.png"))
-} else {
-  print("No time series combination bar chart available.")
-}
-```
-
-\newpage
+_Lisa Marie_ conducted purse seine sets during both day and night throughout the survey, allowing for comparisons of the species composition and size distributions between the two time periods (**Fig. \@ref(fig:day-vs-night-seine-comparison)**). Although _Lisa Marie_ also completed purse seine sets for comparative catch analyses with _Shimada_ trawls, they occurred approximately one month apart and may not provide reliable comparisons. Any such results from either analysis are not presented here.
 
 # Acknowledgements {-}
 
@@ -2272,10 +681,6 @@ The authors greatly appreciate that the ATM surveys require an enormous effort b
 
 # (APPENDIX) Appendix {-}
 # Appendices {-}
-
-<!-- # Separation of Pacific Sardine subpopulations {#appendix-sardine-subpopulations}   -->
-
-<!-- The literature of Pacific and other sardines often uses the terms subpopulation and stock interchangeably [e.g., @Ahlstrom1970; @Javor2011; @Smith1995; @Wolf2001]. In doing so, stocks or subpopulations implicitly refer to self-sustaining biological populations of randomly mating individuals, quasi-separated from other subpopulations and with a distinct population dynamic, in the sense of the subpopulation definition of Cadrin et al. [-@Cadrin2014]: "A single, mostly self-sustaining unit within a metapopulation" and Blackhart et al. [-@Blackhart2006]: "Subpopulations are defined as geographically or otherwise distinct groups in the population between which there is little exchange." While Marr [-@Marr1957] used the term subpopulation as a "fraction of a population that is itself genetically self-sustaining", genetic heterogeneity is no longer a requirement to distinguish subpopulations, nor is it a defining characteristic because the practical separation of subpopulations at ecological scales occurs at much shorter time scales than those required for genetic drift to be perceptible [@Waples1998]. As part of a metapopulation, subpopulations reside in different habitats or geographic regions [@Linner2022], have life cycles adapted to local hydrological conditions [@Begg1999], often demonstrate phenotypic heterogeneity [@Cadrin2010], but can overlap at times and mix sufficiently to negate genetic heterogeneity [@Begg1999; @McBride2014]. The purported separation between the NSP and SSP might not be permanent, but the proto-separation at ecological scales appears to be maintained by discontinuities in preferred habitat association [@Jacobson1995; @Felix-Uraga2004; @Baumgartner2005; @Zwolinski2024]. This explains the persistent and consistent phenotypical and life history traits reported for the Pacific Sardine in different environments [@Anon1952; @Felin1954; @Murphy1967]. Such differences can occur due to phenotypical plasticity under a common genotype [@Hedgecock1989; @McBride2014], but their persistence reflect the existence of quasi-separate groups at temporal scales compatible for fisheries management [@Cope2009; @Begg2016]. -->
 
 # Calibration plots {#appendix-calibration-plots}
 ## _`r survey.vessel`_ {#appendix-calibration-plots-sh}
@@ -2364,80 +769,6 @@ if (doc.type == "docx") {
 ```
 
 \newpage
-
-# Length distributions and percent biomass by cluster {#appendix-cluster-length-percent}
-## Northern Anchovy {#appendix-cluster-length-percent-anchovy}
-
-Standard length ($L_S$) relative frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
-
-(ref:rlf-anchovy) Standard length ($L_S$) frequency distributions of Northern Anchovy (_Engraulis mordax_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum.
-
-```{r rlf-anchovy,out.width='5.5in',fig.pos='H'}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Engraulis mordax.png"))
-```
-
-\newpage
-
-## Pacific Sardine {#appendix-cluster-length-percent-sardine}
-
-Standard length ($L_S$) relative frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum. The southern subpopulation was sampled in stratum 1 and the northern subpopulation was sampled in strata 2 through 6.
-
-(ref:rlf-sardine) Standard length ($L_S$) frequency distributions of Pacific Sardine (_Sardinops sagax_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum.
-
-```{r rlf-sardine,out.width='5.5in',fig.pos='H'}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Sardinops sagax.png"))
-```
-
-\newpage
-
-## Pacific Mackerel {#appendix-cluster-length-percent-mack}
-
-Fork length ($L_F$) relative frequency distributions of Pacific Mackerel (_Scomber japonicus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
-
-(ref:rlf-mack) Fork length ($L_F$) frequency distributions of Pacific Mackerel (_Scomber japonicus_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum.
-
-```{r rlf-mack,out.width='5.5in',fig.pos='H'}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Scomber japonicus.png"))
-```
-
-\newpage
-
-## Jack Mackerel {#appendix-cluster-length-percent-jack}
-
-Fork length ($L_F$) frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum.
-
-(ref:rlf-jack) Fork length ($L_F$) relative frequency distributions of Jack Mackerel (_Trachurus symmetricus_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
-
-```{r rlf-jack,out.width='5.5in',fig.pos='H'}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Trachurus symmetricus.png"))
-```
-
-\newpage
-
-## Pacific Herring {#appendix-cluster-length-percent-her}
-
-Fork length ($L_F$) frequency distributions of Pacific Herring (_Clupea pallasii_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum.
-
-(ref:rlf-her) Fork length ($L_F$) relative frequency distributions of Pacific Herring (_Clupea pallasii_) per nighttime trawl cluster, annotated with the number of individuals caught and their percentage contributions to the abundance in each stratum.
-
-```{r rlf-her,out.width='5.5in',fig.pos='H'}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Clupea pallasii.png"))
-```
-
-<!-- \newpage -->
-
-<!-- ## Round Herring {#appendix-cluster-length-percent-rher} -->
-
-<!-- Fork length ($L_F$) frequency distributions of Round Herring (_Etrumeus acuminatus_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum. -->
-
-(ref:rlf-rher) Fork length ($L_F$) frequency distributions of Round Herring (_Etrumeus acuminatus_) per nighttime trawl cluster, annotated with the number of individuals caught or estimated and their percentage contributions to the abundance in each stratum.
-
-```{r rlf-rher,out.width='5.5in',fig.pos='H',eval=FALSE}
-include_graphics(here("Figs/fig_cluster_relative_length_frequency_Etrumeus acuminatus.png"))
-```
-
-\newpage
-\blandscape
 
 # Trawl sample summary {#appendix-trawl-sampling}
 
@@ -2594,51 +925,3 @@ if (doc.type == "docx") {
 ```
 
 \elandscape
-\newpage
-
-# Scientific Personnel {#appendix-scientific-personnel}
-
-The collection and analysis of the survey data used to estimate the biomasses of CPS were conducted by members of 1-NOAA, 2- CU Boulder/CIRES, 3-UCSC/CIMEAS, 4-NOAA Teacher at Sea, 5-OAI, 6-volunteer, 7-T&T, 8-AIS, 9-WDFW, 10-CWPA, 11-PSFMC, and 12-Knauss Fellow. For each leg, ^\*^ denotes the Cruise Leader, and ^+^ the Acoustic and Trawl Leads from the SWFSC. The survey on _`r survey.vessel`_ was divided into five legs.
-
-<!-- **Members of the scientific party from the NWFSC are not listed here. [BUT SHOULD THEY BE?]**   -->
-
-<!-- https://docs.google.com/spreadsheets/d/1HXl-ghdcqVKPGXi9BCHrLA4kaUif0EOB/edit?gid=1997810242#gid=1997810242 -->
-
-**Principal Investigators:**
-
-J. Clemons^1^ and * K. Stierhoff^1^
-
-**Acoustic Data Collection and Processing:**
-
-* Leg I:   J. Clemons^1^, J. Pohl^1^, and J. Renfree^1\*+^
-* Leg II:  S. de Blois^1^, D. Murfin^1+^, and R. Thomas^1^
-* Leg III: J. Clemons^1^, E. Phillips^1^, and K. Stierhoff^1\*+^
-* Leg IV:  S. de Blois^1^, S. Sessions^1+^, and R. Thomas^1^
-* Leg V:   S. de Blois^1^, S. Mau^1+^, and J. Pohl^1^
-
-**Trawl Sampling:**
-
-* Leg I:    D. Bashford^2^, E. Capriles^2^, J. Cloninger^4^, S. de Blois^1^, K. James^1+^, M. Liotta^1^, B. Overcash^1^, Z. Skelton^5^, and A. Vitale^8^
-* Leg II:   S. Beyer^1^, L. Chang^4^, M. Liotta^1^, M. Shak^7^, Z. Skelton^5+^, P. Vavoulis^1^, A. Vitale^8^, and C. Wilson^1^
-* Leg III:  J. Crofts^1^, K. Davis^1^, A. Ostrowski^1^, B. Overcash^1^, M. Rivera^1^, Z. Skelton^5^,  B. Schwartzkopf^1+^, S. Van Hofwegen^11^, and A. Vitale^8^
-* Leg IV:   P. Bizzell^1^, B. Erisman^1^, J. Gonzalez^4^, P. Kuriyama^1^, M. Monneedy^12^, D. Lowry^1^, C. Sayre^1^, L. Vasquez del Mercado^1+^, and A. Vitale^8^
-* Leg V:    K. Alvstad^1^, J. Dunigan^11^, L. Kraatz^1^, T. Mitchell^1^, L. Ortiz^11^, B. Overcash^1+^, T. Rogers^1^, C. Russ^12^, and J. Stecher^6^
-
-**Purse-seine Sampling:**
-
-* _Lisa Marie_
-  + A. Cravens ^9^ and K. Hinton^9^
-
-* _Long Beach Carnage_
-  + J. van Noord^10^
-
-**Echosounder Calibrations:**
-
-* _Bell M. Shimada_
-  + `r cal.personnel["SH"]`
-* _Long Beach Carnage_
-  + `r cal.personnel["LBC"]`
-* _Lisa Marie_
-  + `r cal.personnel["LM"]`
-
-
